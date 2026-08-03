@@ -7,15 +7,15 @@
 | File:
 | ajax/update_cart.php
 |
-| Functions:
-| - Verify customer login
-| - Validate cart item
-| - Validate quantity
-| - Check current product stock
-| - Update cart quantity
-| - Recalculate subtotal
-| - Recalculate total
-| - Return JSON response
+| Handles:
+| - Customer authentication
+| - Cart item validation
+| - Quantity validation
+| - Stock validation
+| - Updating cart quantity
+| - Recalculating cart subtotal
+| - Recalculating cart total
+| - Returning JSON response
 |--------------------------------------------------------------------------
 */
 
@@ -30,14 +30,14 @@ if (session_status() === PHP_SESSION_NONE) {
 
 
 /* ==============================================================
-   JSON HEADER
+   JSON RESPONSE HEADER
 ============================================================== */
 
 header('Content-Type: application/json; charset=UTF-8');
 
 
 /* ==============================================================
-   JSON RESPONSE HELPER
+   JSON RESPONSE FUNCTION
 ============================================================== */
 
 function jsonResponse(
@@ -53,8 +53,7 @@ function jsonResponse(
                 'message' => $message
             ],
             $extra
-        ),
-        JSON_UNESCAPED_UNICODE
+        )
     );
 
     exit;
@@ -77,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 
 /* ==============================================================
-   CHECK LOGIN
+   CHECK CUSTOMER LOGIN
 ============================================================== */
 
 if (!isset($_SESSION['user_id'])) {
@@ -102,16 +101,17 @@ $userId = (int) $_SESSION['user_id'];
 
 
 /* ==============================================================
-   CHECK USER ROLE
+   CHECK ROLE
 ============================================================== */
 
 $userRole = $_SESSION['role'] ?? 'customer';
+
 
 if ($userRole !== 'customer') {
 
     jsonResponse(
         false,
-        'Only customers can update the cart.'
+        'Only customers can update their cart.'
     );
 }
 
@@ -147,6 +147,10 @@ $quantity = filter_input(
 );
 
 
+/* ==============================================================
+   VALIDATE QUANTITY
+============================================================== */
+
 if ($quantity === false || $quantity === null) {
 
     jsonResponse(
@@ -156,9 +160,8 @@ if ($quantity === false || $quantity === null) {
 }
 
 
-/* ==============================================================
-   QUANTITY VALIDATION
-============================================================== */
+$quantity = (int) $quantity;
+
 
 if ($quantity < 1) {
 
@@ -169,24 +172,28 @@ if ($quantity < 1) {
 }
 
 
+/* ==============================================================
+   MAXIMUM QUANTITY SAFETY
+============================================================== */
+
 if ($quantity > 9999) {
 
     jsonResponse(
         false,
-        'Quantity is too large.'
+        'Quantity is too high.'
     );
 }
 
 
 /* ==============================================================
-   DATABASE CONNECTION
+   DATABASE
 ============================================================== */
 
 require_once __DIR__ . '/../database/db.php';
 
 
 /* ==============================================================
-   CHECK MYSQL CONNECTION
+   CHECK DATABASE CONNECTION
 ============================================================== */
 
 if (!isset($conn) || !($conn instanceof mysqli)) {
@@ -211,24 +218,30 @@ mysqli_report(
 
 
 /* ==============================================================
-   GET CART ITEM + PRODUCT
+   FIND CART ITEM
 ============================================================== */
 
 try {
 
-    $query = "
+    $cartQuery = "
         SELECT
+
             c.cart_id,
+
             c.customer_id,
+
             c.product_id,
+
             c.quantity AS current_quantity,
 
             p.product_name,
+
             p.price,
+
             p.stock_quantity,
+
             p.status,
 
-            v.vendor_id,
             v.approval_status
 
         FROM cart c
@@ -240,32 +253,36 @@ try {
             ON p.vendor_id = v.vendor_id
 
         WHERE c.cart_id = ?
+
         AND c.customer_id = ?
 
         LIMIT 1
     ";
 
 
-    $stmt = $conn->prepare($query);
+    $cartStmt =
+        $conn->prepare(
+            $cartQuery
+        );
 
 
-    $stmt->bind_param(
+    $cartStmt->bind_param(
         'ii',
         $cartId,
         $userId
     );
 
 
-    $stmt->execute();
+    $cartStmt->execute();
 
 
-    $result =
-        $stmt->get_result();
+    $cartResult =
+        $cartStmt->get_result();
 
 
-    if ($result->num_rows === 0) {
+    if ($cartResult->num_rows === 0) {
 
-        $stmt->close();
+        $cartStmt->close();
 
         jsonResponse(
             false,
@@ -275,10 +292,10 @@ try {
 
 
     $cartItem =
-        $result->fetch_assoc();
+        $cartResult->fetch_assoc();
 
 
-    $stmt->close();
+    $cartStmt->close();
 
 
 } catch (Throwable $e) {
@@ -293,7 +310,7 @@ try {
 
     jsonResponse(
         false,
-        'Unable to retrieve cart item.'
+        'Unable to find cart item.'
     );
 }
 
@@ -306,7 +323,7 @@ if ($cartItem['status'] !== 'Available') {
 
     jsonResponse(
         false,
-        'This product is currently unavailable.'
+        'This product is no longer available.'
     );
 }
 
@@ -325,7 +342,7 @@ if ($cartItem['approval_status'] !== 'Approved') {
 
 
 /* ==============================================================
-   GET CURRENT STOCK
+   CHECK STOCK
 ============================================================== */
 
 $stockQuantity =
@@ -336,16 +353,13 @@ if ($stockQuantity <= 0) {
 
     jsonResponse(
         false,
-        'This product is currently out of stock.',
-        [
-            'stock' => 0
-        ]
+        'This product is currently out of stock.'
     );
 }
 
 
 /* ==============================================================
-   CHECK REQUESTED QUANTITY AGAINST STOCK
+   QUANTITY CANNOT EXCEED STOCK
 ============================================================== */
 
 if ($quantity > $stockQuantity) {
@@ -355,11 +369,16 @@ if ($quantity > $stockQuantity) {
         'Only ' .
         $stockQuantity .
         ' item(s) are available.',
+
         [
-            'stock' => $stockQuantity,
+            'stock' =>
+                $stockQuantity,
 
             'requested_quantity' =>
-                $quantity
+                $quantity,
+
+            'available_quantity' =>
+                $stockQuantity
         ]
     );
 }
@@ -378,7 +397,7 @@ $itemTotal =
 
 
 /* ==============================================================
-   UPDATE CART
+   UPDATE DATABASE
 ============================================================== */
 
 try {
@@ -392,8 +411,8 @@ try {
         SET quantity = ?
 
         WHERE cart_id = ?
+
         AND customer_id = ?
-        LIMIT 1
     ";
 
 
@@ -414,19 +433,39 @@ try {
     $updateStmt->execute();
 
 
+    if ($updateStmt->affected_rows < 0) {
+
+        $updateStmt->close();
+
+        throw new Exception(
+            'Unable to update cart item.'
+        );
+    }
+
+
     $updateStmt->close();
 
 
     /* ==========================================================
-       GET UPDATED CART ITEMS
+       GET CART SUBTOTAL
     ========================================================== */
 
-    $cartQuery = "
+    $subtotalQuery = "
         SELECT
-            c.cart_id,
-            c.product_id,
-            c.quantity,
-            p.price
+
+            COALESCE(
+                SUM(
+                    c.quantity * p.price
+                ),
+                0
+            ) AS subtotal,
+
+            COALESCE(
+                SUM(c.quantity),
+                0
+            ) AS cart_count,
+
+            COUNT(c.cart_id) AS item_count
 
         FROM cart c
 
@@ -437,90 +476,68 @@ try {
     ";
 
 
-    $cartStmt =
+    $subtotalStmt =
         $conn->prepare(
-            $cartQuery
+            $subtotalQuery
         );
 
 
-    $cartStmt->bind_param(
+    $subtotalStmt->bind_param(
         'i',
         $userId
     );
 
 
-    $cartStmt->execute();
+    $subtotalStmt->execute();
 
 
-    $cartResult =
-        $cartStmt->get_result();
+    $subtotalResult =
+        $subtotalStmt->get_result();
 
 
-    $subtotal = 0;
-
-    $cartCount = 0;
-
-    $itemCount = 0;
+    $summary =
+        $subtotalResult->fetch_assoc();
 
 
-    while (
-        $row =
-        $cartResult->fetch_assoc()
-    ) {
-
-        $rowQuantity =
-            (int) $row['quantity'];
-
-
-        $rowPrice =
-            (float) $row['price'];
-
-
-        $subtotal +=
-            $rowQuantity * $rowPrice;
-
-
-        $cartCount +=
-            $rowQuantity;
-
-
-        $itemCount++;
-
-    }
-
-
-    $cartStmt->close();
+    $subtotalStmt->close();
 
 
     /* ==========================================================
-       SHIPPING
+       VALUES
     ========================================================== */
+
+    $subtotal =
+        (float) (
+            $summary['subtotal'] ?? 0
+        );
+
+
+    $cartCount =
+        (int) (
+            $summary['cart_count'] ?? 0
+        );
+
+
+    $itemCount =
+        (int) (
+            $summary['item_count'] ?? 0
+        );
+
 
     /*
     |--------------------------------------------------------------------------
-    | IMPORTANT
+    | HOCHIPOHUB DELIVERY
     |--------------------------------------------------------------------------
-    | Shipping calculation is kept simple here.
-    |
-    | Actual delivery calculation can later be handled inside
-    | checkout.php according to:
-    |
-    | - Pickup
-    | - Postage
-    | - Vendor
-    | - Address
-    |--------------------------------------------------------------------------
+    | Current cart page uses subtotal first.
+    | Final delivery charge can later be calculated
+    | separately during checkout.
     */
 
-    $shipping = 0.00;
+    $deliveryFee = 0.00;
 
-
-    /* ==========================================================
-       GRAND TOTAL
-    ========================================================== */
 
     $total =
-        $subtotal + $shipping;
+        $subtotal + $deliveryFee;
 
 
     /* ==========================================================
@@ -539,7 +556,7 @@ try {
     } catch (Throwable $rollbackError) {
 
         error_log(
-            'HOCHIPOHUB update_cart rollback error: ' .
+            'HOCHIPOHUB rollback error: ' .
             $rollbackError->getMessage()
         );
     }
@@ -566,7 +583,9 @@ try {
 
 jsonResponse(
     true,
+
     'Cart updated successfully.',
+
     [
 
         'cart_id' =>
@@ -580,6 +599,12 @@ jsonResponse(
 
         'quantity' =>
             $quantity,
+
+        'previous_quantity' =>
+            (int) $cartItem['current_quantity'],
+
+        'stock' =>
+            $stockQuantity,
 
         'unit_price' =>
             $unitPrice,
@@ -596,9 +621,9 @@ jsonResponse(
                 2
             ),
 
-        'shipping' =>
+        'delivery_fee' =>
             round(
-                $shipping,
+                $deliveryFee,
                 2
             ),
 
@@ -612,9 +637,7 @@ jsonResponse(
             $cartCount,
 
         'item_count' =>
-            $itemCount,
+            $itemCount
 
-        'stock' =>
-            $stockQuantity
     ]
 );
