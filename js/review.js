@@ -1,1316 +1,409 @@
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB - REVIEW.JS
+| HOCHIPOHUB - REVIEW JS
 |--------------------------------------------------------------------------
 | Handles:
-| - Star rating selection
-| - Review form validation
+| - Star rating
+| - Review form
 | - Character counter
 | - Review image preview
+| - Review validation
 | - AJAX review submission
-| - Review UI updates
-| - Review sorting
 |--------------------------------------------------------------------------
 */
 
-"use strict";
-
 document.addEventListener("DOMContentLoaded", function () {
 
-    /* ==========================================================
-       ELEMENTS
-    ========================================================== */
-
-    const reviewForm = document.querySelector("#reviewForm");
-
-    const ratingInput = document.querySelector("#rating");
-    const ratingButtons = document.querySelectorAll(
-        ".review-rating-input button, .rating-star"
-    );
-
-    const reviewTextarea = document.querySelector(
-        "#review, #reviewText, .review-textarea"
-    );
-
-    const characterCounter = document.querySelector(
-        "#reviewCharacterCount, .review-character-count"
-    );
-
-    const imageInput = document.querySelector(
-        "#reviewImage, #review_image"
-    );
-
-    const imagePreview = document.querySelector(
-        "#reviewImagePreview, .review-image-preview"
-    );
-
-    const reviewSubmitButton = reviewForm
-        ? reviewForm.querySelector(
-            "button[type='submit'], .review-submit-btn"
-        )
-        : null;
-
-    const reviewList = document.querySelector(
-        ".review-list, #reviewList"
-    );
-
-    const reviewSort = document.querySelector(
-        "#reviewSort, .review-sort"
-    );
-
-
-    /* ==========================================================
-       CONFIGURATION
-    ========================================================== */
-
-    const MAX_REVIEW_LENGTH = 1000;
-
-    let selectedRating = 0;
-
-
-    /* ==========================================================
-       HELPER - GET PRODUCT ID
-    ========================================================== */
-
-    function getProductId() {
-
-        const productInput = document.querySelector(
-            "#product_id"
-        );
-
-        if (productInput && productInput.value) {
-            return productInput.value;
-        }
-
-        const productElement = document.querySelector(
-            "[data-product-id]"
-        );
-
-        if (
-            productElement &&
-            productElement.dataset.productId
-        ) {
-            return productElement.dataset.productId;
-        }
-
-        const urlParams = new URLSearchParams(
-            window.location.search
-        );
-
-        return urlParams.get("product_id") ||
-               urlParams.get("id") ||
-               "";
-    }
-
-
-    /* ==========================================================
+    /* ==============================================================
        STAR RATING
-    ========================================================== */
+    ============================================================== */
 
-    function updateStars(rating) {
+    const ratingContainer = document.querySelector(".review-rating-input");
 
-        ratingButtons.forEach(function (button) {
+    if (ratingContainer) {
 
-            const buttonRating = parseInt(
-                button.dataset.rating ||
-                button.dataset.value ||
-                button.getAttribute("data-star") ||
-                "0",
-                10
-            );
+        const ratingButtons = ratingContainer.querySelectorAll("button");
+        const ratingInput = document.querySelector("#rating");
 
-            if (buttonRating <= rating) {
+        ratingButtons.forEach((button, index) => {
 
-                button.classList.add("active");
+            button.addEventListener("click", function () {
 
-                button.setAttribute(
-                    "aria-pressed",
-                    "true"
-                );
+                const rating = index + 1;
 
-            } else {
-
-                button.classList.remove("active");
-
-                button.setAttribute(
-                    "aria-pressed",
-                    "false"
-                );
-
-            }
-
-        });
-    }
-
-
-    function setRating(rating) {
-
-        rating = parseInt(rating, 10);
-
-        if (
-            Number.isNaN(rating) ||
-            rating < 1 ||
-            rating > 5
-        ) {
-            return;
-        }
-
-        selectedRating = rating;
-
-        if (ratingInput) {
-            ratingInput.value = rating;
-        }
-
-        updateStars(rating);
-
-        const ratingLabel = document.querySelector(
-            "#ratingLabel, .rating-label"
-        );
-
-        if (ratingLabel) {
-
-            const labels = {
-                1: "Poor",
-                2: "Fair",
-                3: "Good",
-                4: "Very Good",
-                5: "Excellent"
-            };
-
-            ratingLabel.textContent =
-                labels[rating] || "";
-        }
-    }
-
-
-    ratingButtons.forEach(function (button) {
-
-        button.addEventListener("click", function (event) {
-
-            event.preventDefault();
-
-            const rating = parseInt(
-                button.dataset.rating ||
-                button.dataset.value ||
-                button.getAttribute("data-star") ||
-                "0",
-                10
-            );
-
-            setRating(rating);
-
-        });
-
-
-        /* ------------------------------------------------------
-           Keyboard Accessibility
-        ------------------------------------------------------ */
-
-        button.addEventListener(
-            "keydown",
-            function (event) {
-
-                if (
-                    event.key === "Enter" ||
-                    event.key === " "
-                ) {
-
-                    event.preventDefault();
-
-                    button.click();
+                if (ratingInput) {
+                    ratingInput.value = rating;
                 }
-            }
-        );
 
-    });
+                ratingButtons.forEach((btn, btnIndex) => {
 
-
-    /* ==========================================================
-       INITIAL RATING
-    ========================================================== */
-
-    if (ratingInput && ratingInput.value) {
-
-        const initialRating = parseInt(
-            ratingInput.value,
-            10
-        );
-
-        if (
-            initialRating >= 1 &&
-            initialRating <= 5
-        ) {
-            setRating(initialRating);
-        }
-    }
-
-
-    /* ==========================================================
-       TEXTAREA CHARACTER COUNTER
-    ========================================================== */
-
-    function updateCharacterCounter() {
-
-        if (!reviewTextarea) {
-            return;
-        }
-
-        const currentLength =
-            reviewTextarea.value.length;
-
-        if (characterCounter) {
-
-            characterCounter.textContent =
-                `${currentLength}/${MAX_REVIEW_LENGTH}`;
-
-            if (
-                currentLength >=
-                MAX_REVIEW_LENGTH * 0.9
-            ) {
-
-                characterCounter.classList.add(
-                    "near-limit"
-                );
-
-            } else {
-
-                characterCounter.classList.remove(
-                    "near-limit"
-                );
-            }
-
-            if (
-                currentLength >=
-                MAX_REVIEW_LENGTH
-            ) {
-
-                characterCounter.classList.add(
-                    "limit-reached"
-                );
-
-            } else {
-
-                characterCounter.classList.remove(
-                    "limit-reached"
-                );
-            }
-        }
-
-    }
-
-
-    if (reviewTextarea) {
-
-        reviewTextarea.setAttribute(
-            "maxlength",
-            MAX_REVIEW_LENGTH
-        );
-
-        reviewTextarea.addEventListener(
-            "input",
-            updateCharacterCounter
-        );
-
-        updateCharacterCounter();
-    }
-
-
-    /* ==========================================================
-       IMAGE PREVIEW
-    ========================================================== */
-
-    if (imageInput) {
-
-        imageInput.addEventListener(
-            "change",
-            function () {
-
-                const file =
-                    imageInput.files &&
-                    imageInput.files[0];
-
-                if (!file) {
-
-                    if (imagePreview) {
-
-                        imagePreview.innerHTML = "";
-
-                        imagePreview.classList.remove(
-                            "active"
-                        );
+                    if (btnIndex < rating) {
+                        btn.classList.add("active");
+                        btn.setAttribute("aria-pressed", "true");
+                    } else {
+                        btn.classList.remove("active");
+                        btn.setAttribute("aria-pressed", "false");
                     }
 
-                    return;
-                }
+                });
+
+            });
+
+            button.addEventListener("mouseenter", function () {
+
+                const rating = index + 1;
+
+                ratingButtons.forEach((btn, btnIndex) => {
+
+                    if (btnIndex < rating) {
+                        btn.classList.add("hover");
+                    } else {
+                        btn.classList.remove("hover");
+                    }
+
+                });
+
+            });
+
+        });
 
 
-                /* ------------------------------------------------
-                   Validate image type
-                ------------------------------------------------ */
+        ratingContainer.addEventListener("mouseleave", function () {
 
-                if (!file.type.startsWith("image/")) {
+            ratingButtons.forEach(button => {
+                button.classList.remove("hover");
+            });
 
-                    showMessage(
-                        "Please select a valid image file.",
-                        "error"
+        });
+
+    }
+
+
+    /* ==============================================================
+       REVIEW TEXT COUNTER
+    ============================================================== */
+
+    const reviewTextarea = document.querySelector(".review-textarea");
+    const reviewCounter = document.querySelector(".review-character-count");
+
+    if (reviewTextarea && reviewCounter) {
+
+        const maxLength = reviewTextarea.getAttribute("maxlength") || 1000;
+
+        function updateCounter() {
+
+            const currentLength = reviewTextarea.value.length;
+
+            reviewCounter.textContent =
+                `${currentLength}/${maxLength}`;
+
+        }
+
+        reviewTextarea.addEventListener("input", updateCounter);
+
+        updateCounter();
+
+    }
+
+
+    /* ==============================================================
+       REVIEW IMAGE PREVIEW
+    ============================================================== */
+
+    const reviewImageInput = document.querySelector("#review-image");
+    const reviewImagePreview = document.querySelector(".review-image-preview");
+
+    if (reviewImageInput && reviewImagePreview) {
+
+        reviewImageInput.addEventListener("change", function () {
+
+            const file = this.files[0];
+
+            if (!file) {
+                reviewImagePreview.innerHTML = "";
+                return;
+            }
+
+            if (!file.type.startsWith("image/")) {
+
+                showReviewMessage(
+                    "Please select a valid image.",
+                    "error"
+                );
+
+                this.value = "";
+                return;
+            }
+
+            const maxSize = 5 * 1024 * 1024;
+
+            if (file.size > maxSize) {
+
+                showReviewMessage(
+                    "Image size must be less than 5MB.",
+                    "error"
+                );
+
+                this.value = "";
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = function (event) {
+
+                reviewImagePreview.innerHTML = `
+                    <div class="review-preview-wrapper">
+                        <img 
+                            src="${event.target.result}"
+                            alt="Review image preview"
+                            class="review-preview-image"
+                        >
+
+                        <button 
+                            type="button"
+                            class="remove-review-image"
+                            aria-label="Remove image"
+                        >
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                `;
+
+                const removeButton =
+                    reviewImagePreview.querySelector(
+                        ".remove-review-image"
                     );
 
-                    imageInput.value = "";
-
-                    return;
-                }
-
-
-                /* ------------------------------------------------
-                   Validate image size
-                ------------------------------------------------ */
-
-                const MAX_IMAGE_SIZE =
-                    5 * 1024 * 1024;
-
-                if (file.size > MAX_IMAGE_SIZE) {
-
-                    showMessage(
-                        "Image size must be 5MB or less.",
-                        "error"
-                    );
-
-                    imageInput.value = "";
-
-                    return;
-                }
-
-
-                if (!imagePreview) {
-                    return;
-                }
-
-
-                const reader =
-                    new FileReader();
-
-
-                reader.onload = function (event) {
-
-                    imagePreview.innerHTML = "";
-
-                    const wrapper =
-                        document.createElement("div");
-
-                    wrapper.className =
-                        "review-preview-wrapper";
-
-
-                    const image =
-                        document.createElement("img");
-
-                    image.src =
-                        event.target.result;
-
-                    image.alt =
-                        "Review image preview";
-
-                    image.className =
-                        "review-preview-image";
-
-
-                    const removeButton =
-                        document.createElement("button");
-
-                    removeButton.type =
-                        "button";
-
-                    removeButton.className =
-                        "review-preview-remove";
-
-                    removeButton.innerHTML =
-                        '<i class="fa-solid fa-xmark"></i> Remove';
-
+                if (removeButton) {
 
                     removeButton.addEventListener(
                         "click",
                         function () {
 
-                            imageInput.value = "";
+                            reviewImageInput.value = "";
 
-                            imagePreview.innerHTML = "";
+                            reviewImagePreview.innerHTML = "";
 
-                            imagePreview.classList.remove(
-                                "active"
-                            );
                         }
                     );
 
+                }
 
-                    wrapper.appendChild(image);
+            };
 
-                    wrapper.appendChild(
-                        removeButton
-                    );
+            reader.readAsDataURL(file);
 
-                    imagePreview.appendChild(
-                        wrapper
-                    );
+        });
 
-                    imagePreview.classList.add(
-                        "active"
-                    );
-
-                };
-
-
-                reader.readAsDataURL(file);
-
-            }
-        );
     }
 
 
-    /* ==========================================================
-       FORM VALIDATION
-    ========================================================== */
+    /* ==============================================================
+       REVIEW FORM
+    ============================================================== */
 
-    function validateReviewForm() {
+    const reviewForm = document.querySelector("#review-form");
 
-        clearFormErrors();
+    if (reviewForm) {
 
+        reviewForm.addEventListener("submit", async function (event) {
 
-        /* ------------------------------------------------------
-           Check rating
-        ------------------------------------------------------ */
+            event.preventDefault();
 
-        if (
-            !selectedRating &&
-            ratingInput &&
-            ratingInput.value
-        ) {
+            const ratingInput =
+                reviewForm.querySelector("#rating");
 
-            selectedRating =
-                parseInt(
-                    ratingInput.value,
-                    10
-                );
-        }
-
-
-        if (
-            !selectedRating ||
-            selectedRating < 1 ||
-            selectedRating > 5
-        ) {
-
-            showFieldError(
-                ".review-rating-input",
-                "Please select a rating."
-            );
-
-            return false;
-        }
-
-
-        /* ------------------------------------------------------
-           Check review text
-        ------------------------------------------------------ */
-
-        if (reviewTextarea) {
-
-            const review =
-                reviewTextarea.value.trim();
-
-            if (!review) {
-
-                showFieldError(
-                    reviewTextarea,
-                    "Please write a review."
+            const reviewInput =
+                reviewForm.querySelector(
+                    ".review-textarea"
                 );
 
-                reviewTextarea.focus();
+            if (!ratingInput || Number(ratingInput.value) < 1) {
 
-                return false;
+                showReviewMessage(
+                    "Please select a rating first.",
+                    "error"
+                );
+
+                return;
             }
-
-
-            if (review.length < 5) {
-
-                showFieldError(
-                    reviewTextarea,
-                    "Review must contain at least 5 characters."
-                );
-
-                reviewTextarea.focus();
-
-                return false;
-            }
-
 
             if (
-                review.length >
-                MAX_REVIEW_LENGTH
+                reviewInput &&
+                reviewInput.value.trim().length < 5
             ) {
 
-                showFieldError(
-                    reviewTextarea,
-                    `Review cannot exceed ${MAX_REVIEW_LENGTH} characters.`
+                showReviewMessage(
+                    "Your review must contain at least 5 characters.",
+                    "error"
                 );
 
-                reviewTextarea.focus();
+                reviewInput.focus();
 
-                return false;
+                return;
             }
-        }
 
-
-        return true;
-    }
-
-
-    /* ==========================================================
-       FORM ERROR
-    ========================================================== */
-
-    function showFieldError(
-        element,
-        message
-    ) {
-
-        let target = element;
-
-        if (typeof element === "string") {
-
-            target =
-                document.querySelector(element);
-        }
-
-
-        if (!target) {
-            return;
-        }
-
-
-        target.classList.add(
-            "review-field-error"
-        );
-
-
-        let errorElement =
-            target.parentElement
-                ? target.parentElement.querySelector(
-                    ".review-error-message"
-                )
-                : null;
-
-
-        if (!errorElement) {
-
-            errorElement =
-                document.createElement("small");
-
-            errorElement.className =
-                "review-error-message";
-
-            target.parentElement.appendChild(
-                errorElement
-            );
-        }
-
-
-        errorElement.textContent =
-            message;
-    }
-
-
-    function clearFormErrors() {
-
-        document
-            .querySelectorAll(
-                ".review-field-error"
-            )
-            .forEach(function (element) {
-
-                element.classList.remove(
-                    "review-field-error"
+            const submitButton =
+                reviewForm.querySelector(
+                    '[type="submit"]'
                 );
 
-            });
+            const originalText =
+                submitButton
+                    ? submitButton.innerHTML
+                    : "";
 
+            if (submitButton) {
 
-        document
-            .querySelectorAll(
-                ".review-error-message"
-            )
-            .forEach(function (element) {
+                submitButton.disabled = true;
 
-                element.remove();
+                submitButton.innerHTML = `
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    Submitting...
+                `;
 
-            });
+            }
+
+            try {
+
+                const formData =
+                    new FormData(reviewForm);
+
+                const response =
+                    await fetch(
+                        "review.php",
+                        {
+                            method: "POST",
+                            body: formData,
+                            headers: {
+                                "X-Requested-With":
+                                    "XMLHttpRequest"
+                            }
+                        }
+                    );
+
+                const result =
+                    await response.json();
+
+                if (result.success) {
+
+                    showReviewMessage(
+                        result.message ||
+                        "Review submitted successfully.",
+                        "success"
+                    );
+
+                    reviewForm.reset();
+
+                    if (ratingInput) {
+                        ratingInput.value = "";
+                    }
+
+                    if (ratingContainer) {
+
+                        ratingContainer
+                            .querySelectorAll("button")
+                            .forEach(button => {
+                                button.classList.remove("active");
+                            });
+
+                    }
+
+                    if (reviewImagePreview) {
+                        reviewImagePreview.innerHTML = "";
+                    }
+
+                } else {
+
+                    showReviewMessage(
+                        result.message ||
+                        "Unable to submit review.",
+                        "error"
+                    );
+
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "Review submission error:",
+                    error
+                );
+
+                showReviewMessage(
+                    "Something went wrong. Please try again.",
+                    "error"
+                );
+
+            } finally {
+
+                if (submitButton) {
+
+                    submitButton.disabled = false;
+
+                    submitButton.innerHTML =
+                        originalText;
+
+                }
+
+            }
+
+        });
+
     }
 
 
-    /* ==========================================================
-       MESSAGE SYSTEM
-    ========================================================== */
+    /* ==============================================================
+       REVIEW MESSAGE
+    ============================================================== */
 
-    function showMessage(
-        message,
-        type = "info"
-    ) {
+    function showReviewMessage(message, type) {
 
-        let container =
+        let messageBox =
             document.querySelector(
-                "#reviewMessage"
+                ".review-form-message"
             );
 
+        if (!messageBox) {
 
-        if (!container) {
-
-            container =
+            messageBox =
                 document.createElement("div");
 
-            container.id =
-                "reviewMessage";
-
-            container.className =
-                "review-message";
+            messageBox.className =
+                "review-form-message";
 
             if (reviewForm) {
-
-                reviewForm.parentNode.insertBefore(
-                    container,
-                    reviewForm
-                );
-
-            } else {
-
-                document.body.prepend(
-                    container
-                );
+                reviewForm.prepend(messageBox);
             }
+
         }
 
+        messageBox.className =
+            `review-form-message ${type}`;
 
-        container.className =
-            `review-message ${type}`;
+        messageBox.innerHTML = `
+            <i class="fa-solid ${
+                type === "success"
+                    ? "fa-circle-check"
+                    : "fa-circle-exclamation"
+            }"></i>
 
-        container.textContent =
-            message;
+            <span>${message}</span>
+        `;
 
-
-        container.scrollIntoView({
+        messageBox.scrollIntoView({
             behavior: "smooth",
             block: "nearest"
         });
 
+        setTimeout(() => {
 
-        setTimeout(function () {
-
-            if (container) {
-
-                container.classList.add(
-                    "fade-out"
-                );
-
-            }
+            messageBox.classList.add("fade-out");
 
         }, 4500);
 
     }
 
-
-    /* ==========================================================
-       SET BUTTON LOADING
-    ========================================================== */
-
-    function setButtonLoading(
-        loading
-    ) {
-
-        if (!reviewSubmitButton) {
-            return;
-        }
-
-
-        if (loading) {
-
-            reviewSubmitButton.dataset.originalText =
-                reviewSubmitButton.innerHTML;
-
-            reviewSubmitButton.disabled =
-                true;
-
-            reviewSubmitButton.innerHTML =
-                '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
-
-        } else {
-
-            reviewSubmitButton.disabled =
-                false;
-
-            if (
-                reviewSubmitButton.dataset.originalText
-            ) {
-
-                reviewSubmitButton.innerHTML =
-                    reviewSubmitButton.dataset.originalText;
-            }
-        }
-    }
-
-
-    /* ==========================================================
-       AJAX SUBMIT REVIEW
-    ========================================================== */
-
-    async function submitReview() {
-
-        const productId =
-            getProductId();
-
-
-        if (!productId) {
-
-            showMessage(
-                "Product information is missing.",
-                "error"
-            );
-
-            return;
-        }
-
-
-        const formData =
-            new FormData(reviewForm);
-
-
-        formData.set(
-            "product_id",
-            productId
-        );
-
-        formData.set(
-            "rating",
-            selectedRating
-        );
-
-
-        /*
-        ----------------------------------------------------------
-        AJAX endpoint
-        ----------------------------------------------------------
-        review.php should process POST requests.
-        ----------------------------------------------------------
-        */
-
-        try {
-
-            setButtonLoading(true);
-
-
-            const response =
-                await fetch(
-                    "review.php",
-                    {
-                        method: "POST",
-                        body: formData,
-                        headers: {
-                            "X-Requested-With":
-                                "XMLHttpRequest"
-                        }
-                    }
-                );
-
-
-            if (!response.ok) {
-
-                throw new Error(
-                    `HTTP ${response.status}`
-                );
-            }
-
-
-            const contentType =
-                response.headers.get(
-                    "content-type"
-                ) || "";
-
-
-            let result;
-
-
-            if (
-                contentType.includes(
-                    "application/json"
-                )
-            ) {
-
-                result =
-                    await response.json();
-
-            } else {
-
-                /*
-                --------------------------------------------------
-                If review.php returns normal HTML,
-                reload page after submission.
-                --------------------------------------------------
-                */
-
-                showMessage(
-                    "Your review has been submitted.",
-                    "success"
-                );
-
-                setTimeout(function () {
-
-                    window.location.reload();
-
-                }, 1000);
-
-                return;
-            }
-
-
-            if (result.success) {
-
-                showMessage(
-                    result.message ||
-                    "Your review has been submitted successfully.",
-                    "success"
-                );
-
-
-                reviewForm.reset();
-
-                selectedRating = 0;
-
-                if (ratingInput) {
-                    ratingInput.value = "";
-                }
-
-                updateStars(0);
-
-                updateCharacterCounter();
-
-
-                if (imagePreview) {
-
-                    imagePreview.innerHTML = "";
-
-                    imagePreview.classList.remove(
-                        "active"
-                    );
-                }
-
-
-                if (result.review) {
-
-                    addReviewToList(
-                        result.review
-                    );
-                }
-
-
-            } else {
-
-                showMessage(
-                    result.message ||
-                    "Unable to submit your review.",
-                    "error"
-                );
-            }
-
-
-        } catch (error) {
-
-            console.error(
-                "Review submission error:",
-                error
-            );
-
-
-            showMessage(
-                "Something went wrong while submitting your review.",
-                "error"
-            );
-
-        } finally {
-
-            setButtonLoading(false);
-
-        }
-    }
-
-
-    /* ==========================================================
-       REVIEW FORM SUBMIT
-    ========================================================== */
-
-    if (reviewForm) {
-
-        reviewForm.addEventListener(
-            "submit",
-            function (event) {
-
-                event.preventDefault();
-
-
-                if (
-                    !validateReviewForm()
-                ) {
-                    return;
-                }
-
-
-                submitReview();
-
-            }
-        );
-    }
-
-
-    /* ==========================================================
-       ADD REVIEW TO LIST
-    ========================================================== */
-
-    function addReviewToList(
-        review
-    ) {
-
-        if (!reviewList) {
-            return;
-        }
-
-
-        const item =
-            document.createElement("article");
-
-        item.className =
-            "review-item new-review";
-
-
-        const avatar =
-            document.createElement("div");
-
-        avatar.className =
-            "review-avatar";
-
-
-        if (review.profile_image) {
-
-            const img =
-                document.createElement("img");
-
-            img.src =
-                review.profile_image;
-
-            img.alt =
-                review.name ||
-                "Customer";
-
-            avatar.appendChild(img);
-
-        } else {
-
-            avatar.textContent =
-                getInitials(
-                    review.name ||
-                    "Customer"
-                );
-        }
-
-
-        const content =
-            document.createElement("div");
-
-        content.className =
-            "review-content";
-
-
-        const header =
-            document.createElement("div");
-
-        header.className =
-            "review-content-header";
-
-
-        const username =
-            document.createElement("span");
-
-        username.className =
-            "review-user-name";
-
-        username.textContent =
-            review.name ||
-            "Customer";
-
-
-        const date =
-            document.createElement("span");
-
-        date.className =
-            "review-date";
-
-        date.textContent =
-            review.date ||
-            "Just now";
-
-
-        header.appendChild(username);
-
-        header.appendChild(date);
-
-
-        const stars =
-            document.createElement("div");
-
-        stars.className =
-            "product-stars";
-
-
-        const rating =
-            parseInt(
-                review.rating || 0,
-                10
-            );
-
-
-        for (
-            let i = 1;
-            i <= 5;
-            i++
-        ) {
-
-            const star =
-                document.createElement("i");
-
-            star.className =
-                i <= rating
-                    ? "fa-solid fa-star"
-                    : "fa-regular fa-star";
-
-            stars.appendChild(star);
-        }
-
-
-        const text =
-            document.createElement("p");
-
-        text.className =
-            "review-text";
-
-        text.textContent =
-            review.review ||
-            "";
-
-
-        content.appendChild(header);
-
-        content.appendChild(stars);
-
-        content.appendChild(text);
-
-
-        item.appendChild(avatar);
-
-        item.appendChild(content);
-
-
-        reviewList.prepend(item);
-
-    }
-
-
-    /* ==========================================================
-       GET INITIALS
-    ========================================================== */
-
-    function getInitials(
-        name
-    ) {
-
-        if (!name) {
-            return "?";
-        }
-
-
-        const parts =
-            name
-                .trim()
-                .split(/\s+/)
-                .filter(Boolean);
-
-
-        if (parts.length === 1) {
-
-            return parts[0]
-                .substring(0, 2)
-                .toUpperCase();
-        }
-
-
-        return (
-            parts[0][0] +
-            parts[parts.length - 1][0]
-        ).toUpperCase();
-    }
-
-
-    /* ==========================================================
-       REVIEW SORTING
-    ========================================================== */
-
-    if (reviewSort) {
-
-        reviewSort.addEventListener(
-            "change",
-            function () {
-
-                const value =
-                    reviewSort.value;
-
-
-                if (!reviewList) {
-                    return;
-                }
-
-
-                const reviews =
-                    Array.from(
-                        reviewList.querySelectorAll(
-                            ".review-item"
-                        )
-                    );
-
-
-                if (reviews.length < 2) {
-                    return;
-                }
-
-
-                if (value === "newest") {
-
-                    reviews.reverse();
-
-                }
-
-
-                if (value === "oldest") {
-
-                    reviews.reverse();
-
-                }
-
-
-                if (value === "highest") {
-
-                    reviews.sort(
-                        function (a, b) {
-
-                            return (
-                                getReviewRating(b) -
-                                getReviewRating(a)
-                            );
-
-                        }
-                    );
-
-                }
-
-
-                if (value === "lowest") {
-
-                    reviews.sort(
-                        function (a, b) {
-
-                            return (
-                                getReviewRating(a) -
-                                getReviewRating(b)
-                            );
-
-                        }
-                    );
-
-                }
-
-
-                reviews.forEach(
-                    function (review) {
-
-                        reviewList.appendChild(
-                            review
-                        );
-
-                    }
-                );
-
-            }
-        );
-    }
-
-
-    function getReviewRating(
-        reviewElement
-    ) {
-
-        const stars =
-            reviewElement.querySelectorAll(
-                ".product-stars .fa-star"
-            );
-
-
-        return stars.length;
-    }
-
-
-    /* ==========================================================
-       REMOVE ERROR WHEN USER STARTS TYPING
-    ========================================================== */
-
-    if (reviewTextarea) {
-
-        reviewTextarea.addEventListener(
-            "input",
-            function () {
-
-                reviewTextarea.classList.remove(
-                    "review-field-error"
-                );
-
-                const error =
-                    reviewTextarea.parentElement
-                        ? reviewTextarea.parentElement
-                            .querySelector(
-                                ".review-error-message"
-                            )
-                        : null;
-
-                if (error) {
-                    error.remove();
-                }
-
-            }
-        );
-    }
-
-
-    /* ==========================================================
-       PUBLIC REVIEW FUNCTIONS
-    ========================================================== */
-
-    window.HochipoReview = {
-
-        setRating: setRating,
-
-        validate:
-            validateReviewForm,
-
-        getRating:
-            function () {
-                return selectedRating;
-            },
-
-        getProductId:
-            getProductId
-
-    };
 
 });
