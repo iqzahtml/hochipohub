@@ -3,36 +3,80 @@
 require_once "../config/db.php";
 
 
+header("Content-Type: application/json");
+
+
+
+if(!isset($_POST['product_id'])){
+
+
+echo json_encode([
+
+"status"=>"error",
+
+"message"=>"Product ID required"
+
+]);
+
+
+exit();
+
+
+}
+
+
+
 $product_id=$_POST['product_id'];
 
 
 
 $stmt=$conn->prepare("
 
+
 SELECT
 
-reviews.*,
 
-users.name
+reviews.review_id,
+
+reviews.rating,
+
+reviews.review,
+
+reviews.image,
+
+reviews.review_date,
+
+
+users.name,
+
+
+users.profile_image
+
 
 
 FROM reviews
 
 
+
 JOIN users
 
-ON reviews.customer_id=users.user_id
+
+ON reviews.customer_id = users.user_id
 
 
-WHERE product_id=?
+
+WHERE reviews.product_id=?
 
 AND reviews.status='Visible'
 
 
-ORDER BY review_id DESC
+
+ORDER BY reviews.review_date DESC
+
 
 
 ");
+
 
 
 $stmt->bind_param(
@@ -53,43 +97,32 @@ $result=$stmt->get_result();
 
 
 
+$reviews=[];
+
+
+
 while($row=$result->fetch_assoc()){
 
 
-?>
+
+$reviews[]=$row;
 
 
-<div class="review-box">
-
-
-<h4>
-
-<?= htmlspecialchars($row['name']); ?>
-
-</h4>
-
-
-<p>
-
-Rating:
-<?= $row['rating']; ?>/5
-
-</p>
-
-
-<p>
-
-<?= htmlspecialchars($row['review']); ?>
-
-</p>
-
-
-</div>
-
-
-
-<?php
 
 }
+
+
+
+echo json_encode([
+
+
+"status"=>"success",
+
+
+"data"=>$reviews
+
+
+
+]);
 
 ?>
