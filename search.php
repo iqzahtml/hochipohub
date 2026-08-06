@@ -1,6 +1,6 @@
 <?php
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 
@@ -82,7 +82,7 @@ Search
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/product.css">
+<link rel="stylesheet" href="css/product.css">
 
 
 </head>
@@ -117,7 +117,7 @@ Search Result:
 <div class="product-card">
 
 
-<img src="../assets/uploads/products/<?= $row['image']; ?>">
+<img src="uploads/products/<?= $row['image']; ?>">
 
 
 
