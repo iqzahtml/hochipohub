@@ -107,7 +107,7 @@ exit("Product not found");
 
 
 
-<?php include "../includes/navbar.php"; ?>
+<?php include "includes/navbar.php"; ?>
 
 
 
