@@ -19,7 +19,7 @@ Contact
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="css/style.css">
 
 
 </head>
@@ -29,7 +29,7 @@ Contact
 <body>
 
 
-<?php include "../includes/navbar.php"; ?>
+<?php include "includes/navbar.php"; ?>
 
 
 
