@@ -2,12 +2,12 @@
 
 session_start();
 
-require_once "config/db.php";
+require_once "../config/db.php";
 
 
 if(!isset($_SESSION['user_id'])){
 
-header("Location: login.php");
+header("Location: ../auth/login.php");
 
 exit();
 
@@ -15,25 +15,53 @@ exit();
 
 
 
-$user=$_SESSION['user_id'];
+$user_id=$_SESSION['user_id'];
 
 
 
-$result=$conn->query("
+$orders=$conn->prepare("
 
 
-SELECT *
+SELECT
+
+
+orders.*
+
+
 
 FROM orders
 
-WHERE customer_id='$user'
 
 
-ORDER BY order_date DESC
+WHERE customer_id=?
+
+
+
+ORDER BY order_id DESC
 
 
 
 ");
+
+
+
+$orders->bind_param(
+
+"i",
+
+$user_id
+
+);
+
+
+
+$orders->execute();
+
+
+
+$result=$orders->get_result();
+
+
 
 ?>
 
@@ -45,70 +73,33 @@ ORDER BY order_date DESC
 
 <head>
 
-<title>My Orders</title>
+<title>
+My Orders
+</title>
 
 
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/style.css">
 
 
 </head>
+
 
 
 <body>
 
 
 
-<?php include "includes/navbar.php"; ?>
+<?php include "../includes/navbar.php"; ?>
 
 
 
-<section class="container">
+<div class="order-container">
+
 
 
 <h1>
-
 My Orders
-
 </h1>
-
-
-
-
-<div class="admin-panel">
-
-
-<table class="admin-table">
-
-
-<tr>
-
-
-<th>
-Order ID
-</th>
-
-
-<th>
-Date
-</th>
-
-
-<th>
-Total
-</th>
-
-
-<th>
-Status
-</th>
-
-
-<th>
-Action
-</th>
-
-
-</tr>
 
 
 
@@ -116,63 +107,57 @@ Action
 <?php while($row=$result->fetch_assoc()){ ?>
 
 
-<tr>
 
-
-<td>
-
-#<?php echo $row['order_id']; ?>
-
-</td>
+<div class="order-card">
 
 
 
-<td>
+<h3>
 
-<?php echo $row['order_date']; ?>
+Order #<?= $row['order_id']; ?>
 
-</td>
-
-
-
-<td>
-
-RM <?php echo number_format($row['total_amount'],2); ?>
-
-</td>
+</h3>
 
 
 
-<td>
+<p>
 
-<?php echo $row['order_status']; ?>
+Date:
 
-</td>
+<?= $row['order_date']; ?>
+
+</p>
 
 
 
 
-<td>
+<p>
+
+Total:
+
+RM <?= number_format($row['total_amount'],2); ?>
+
+</p>
 
 
-<a href="order_details.php?id=<?php echo $row['order_id']; ?>">
 
-View
+<p>
+
+Status:
+
+<?= $row['order_status']; ?>
+
+</p>
+
+
+
+<a href="order_details.php?id=<?= $row['order_id']; ?>">
+
+
+View Details
+
 
 </a>
-
-
-</td>
-
-
-
-</tr>
-
-
-<?php } ?>
-
-
-</table>
 
 
 
@@ -180,13 +165,15 @@ View
 
 
 
-</section>
+<?php } ?>
 
 
 
-<?php include "includes/footer.php"; ?>
+</div>
+
 
 
 </body>
+
 
 </html>
