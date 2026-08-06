@@ -1,6 +1,6 @@
 <?php
 
-require_once "config/db.php";
+require_once "../config/db.php";
 
 
 
@@ -12,7 +12,12 @@ SELECT
 
 products.*,
 
-vendors.business_name
+
+vendors.business_name,
+
+
+categories.category_name
+
 
 
 FROM products
@@ -25,7 +30,17 @@ ON products.vendor_id=vendors.vendor_id
 
 
 
-ORDER BY product_id DESC
+JOIN categories
+
+ON products.category_id=categories.category_id
+
+
+
+WHERE products.status='Available'
+
+
+
+ORDER BY products.product_id DESC
 
 
 
@@ -43,62 +58,49 @@ ORDER BY product_id DESC
 
 <head>
 
-
 <title>
-
 Catalog
-
 </title>
 
 
-
-<link rel="stylesheet" href="assets/css/product.css">
+<link rel="stylesheet" href="../assets/css/product.css">
 
 
 </head>
-
 
 
 <body>
 
 
 
-<?php include "includes/navbar.php"; ?>
-
-
-
-<section class="product-page">
-
-
-<div class="product-container">
+<?php include "../includes/navbar.php"; ?>
 
 
 
 <h1>
-
 Product Catalog
-
 </h1>
+
 
 
 
 <div class="product-grid">
 
 
-
 <?php while($row=$products->fetch_assoc()){ ?>
+
 
 
 <div class="product-card">
 
 
-<img src="assets/uploads/products/<?php echo $row['image']; ?>">
+<img src="../assets/uploads/products/<?= $row['image']; ?>">
 
 
 
 <h3>
 
-<?php echo $row['product_name']; ?>
+<?= htmlspecialchars($row['product_name']); ?>
 
 </h3>
 
@@ -106,26 +108,26 @@ Product Catalog
 
 <p>
 
-<?php echo $row['business_name']; ?>
+<?= htmlspecialchars($row['business_name']); ?>
 
 </p>
 
 
 
-<strong>
 
-RM <?php echo number_format($row['price'],2); ?>
+<p>
 
-</strong>
+RM <?= number_format($row['price'],2); ?>
+
+</p>
 
 
 
-<a href="product_details.php?id=<?php echo $row['product_id']; ?>">
+<a href="product_details.php?id=<?= $row['product_id']; ?>">
 
 View Product
 
 </a>
-
 
 
 </div>
@@ -135,23 +137,11 @@ View Product
 <?php } ?>
 
 
-
 </div>
 
 
-
-</div>
-
-
-</section>
-
-
-
-
-<?php include "includes/footer.php"; ?>
 
 
 </body>
-
 
 </html>
