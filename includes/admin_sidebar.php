@@ -1,46 +1,13 @@
-<?php
+<div class="sidebar">
 
-if(!isset($_SESSION['user_id'])){
-
-    header("Location: ../login.php");
-    exit();
-
-}
-
-
-if($_SESSION['role'] !== "admin"){
-
-    exit("Access Denied");
-
-}
-
-?>
-
-
-<aside class="dashboard-sidebar admin-sidebar">
-
-
-<div class="sidebar-header">
 
 <h2>
 Admin Panel
 </h2>
 
-<p>
-HochipoHub
-</p>
-
-</div>
-
-
-
-
-<nav class="sidebar-menu">
 
 
 <a href="../admin/dashboard.php">
-
-<i class="fa-solid fa-chart-line"></i>
 
 Dashboard
 
@@ -48,10 +15,7 @@ Dashboard
 
 
 
-
 <a href="../admin/users.php">
-
-<i class="fa-solid fa-users"></i>
 
 Users
 
@@ -59,11 +23,7 @@ Users
 
 
 
-
-
 <a href="../admin/vendors.php">
-
-<i class="fa-solid fa-store"></i>
 
 Vendors
 
@@ -71,11 +31,7 @@ Vendors
 
 
 
-
-
 <a href="../admin/products.php">
-
-<i class="fa-solid fa-box"></i>
 
 Products
 
@@ -83,11 +39,7 @@ Products
 
 
 
-
-
 <a href="../admin/orders.php">
-
-<i class="fa-solid fa-cart-shopping"></i>
 
 Orders
 
@@ -95,35 +47,15 @@ Orders
 
 
 
-
-
-<a href="../admin/inventory.php">
-
-<i class="fa-solid fa-warehouse"></i>
-
-Inventory
-
-</a>
-
-
-
-
-
 <a href="../admin/payment.php">
 
-<i class="fa-solid fa-credit-card"></i>
-
-Payment
+Payments
 
 </a>
-
-
 
 
 
 <a href="../admin/commission.php">
-
-<i class="fa-solid fa-money-bill"></i>
 
 Commission
 
@@ -131,11 +63,7 @@ Commission
 
 
 
-
-
 <a href="../admin/reviews.php">
-
-<i class="fa-solid fa-star"></i>
 
 Reviews
 
@@ -143,11 +71,7 @@ Reviews
 
 
 
-
-
 <a href="../admin/settings.php">
-
-<i class="fa-solid fa-gear"></i>
 
 Settings
 
@@ -155,23 +79,12 @@ Settings
 
 
 
-
-
-<a href="../auth/logout.php"
-class="logout-link">
-
-
-<i class="fa-solid fa-right-from-bracket"></i>
+<a href="../auth/logout.php">
 
 Logout
-
 
 </a>
 
 
 
-
-</nav>
-
-
-</aside>
+</div>
