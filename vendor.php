@@ -1,43 +1,41 @@
 <?php
 
-session_start();
-
-require_once "database/db.php";
+require_once "../database/db.php";
 
 
-if(!isset($_GET['id'])){
-
-    header("Location: index.php");
-    exit();
-
-}
+$vendors=$conn->query("
 
 
-$vendor_id=$_GET['id'];
+SELECT
 
 
+vendors.*,
 
-$vendor=$conn->query("
 
-SELECT *
+users.name,
+
+
+users.email
+
+
 
 FROM vendors
 
-WHERE vendor_id='$vendor_id'
-
-")->fetch_assoc();
 
 
-
-$products=$conn->query("
-
-
-SELECT *
-
-FROM products
+JOIN users
 
 
-WHERE vendor_id='$vendor_id'
+ON vendors.user_id=users.user_id
+
+
+
+WHERE vendors.approval_status='Approved'
+
+
+
+ORDER BY vendors.vendor_id DESC
+
 
 
 ");
@@ -47,7 +45,6 @@ WHERE vendor_id='$vendor_id'
 ?>
 
 
-
 <!DOCTYPE html>
 
 <html>
@@ -55,20 +52,12 @@ WHERE vendor_id='$vendor_id'
 
 <head>
 
-
 <title>
-
-<?php echo $vendor['business_name']; ?>
-
+Vendors
 </title>
 
 
-
-<link rel="stylesheet" href="assets/css/style.css">
-
-<link rel="stylesheet" href="assets/css/vendor.css">
-
-<link rel="stylesheet" href="assets/css/product.css">
+<link rel="stylesheet" href="../assets/css/vendor.css">
 
 
 </head>
@@ -78,121 +67,80 @@ WHERE vendor_id='$vendor_id'
 <body>
 
 
-<?php include "includes/navbar.php"; ?>
 
+<?php include "../includes/navbar.php"; ?>
 
-
-<section class="vendor-page">
-
-
-<div class="vendor-container">
-
-
-
-<div class="vendor-header">
-
-
-
-<div class="vendor-logo">
-
-
-<img src="assets/uploads/vendors/<?php echo $vendor['logo']; ?>">
-
-
-</div>
-
-
-
-
-<div>
 
 
 <h1>
-
-<?php echo $vendor['business_name']; ?>
-
+Local Vendors
 </h1>
 
 
-<p>
 
-<?php echo $vendor['description']; ?>
-
-</p>
+<div class="vendor-grid">
 
 
-</div>
+<?php while($row=$vendors->fetch_assoc()){ ?>
 
 
 
-</div>
+<div class="vendor-card">
 
 
 
+<?php if($row['business_logo']){ ?>
+
+
+<img src="../assets/uploads/vendors/<?= $row['business_logo']; ?>">
+
+
+<?php } ?>
 
 
 
 <h2>
 
-Products
+<?= htmlspecialchars($row['business_name']); ?>
 
 </h2>
 
 
 
 
-
-<div class="product-grid">
-
-
-
-<?php while($row=$products->fetch_assoc()){ ?>
-
-
-
-<div class="product-card">
-
-
-
-<div class="product-card-image">
-
-
-<img src="assets/uploads/products/<?php echo $row['image']; ?>">
-
-
-</div>
-
-
-
-<div class="product-card-content">
-
-
-<h3 class="product-card-title">
-
-<?php echo $row['product_name']; ?>
-
-</h3>
-
-
-
-
 <p>
 
-RM <?php echo number_format($row['price'],2); ?>
+Owner:
+
+<?= htmlspecialchars($row['name']); ?>
 
 </p>
 
 
 
-<a href="product_details.php?id=<?php echo $row['product_id']; ?>">
+<p>
 
-View Product
+Category:
+
+<?= htmlspecialchars($row['category']); ?>
+
+</p>
+
+
+
+<p>
+
+<?= htmlspecialchars($row['business_description']); ?>
+
+</p>
+
+
+
+<a href="catalog.php?vendor=<?= $row['vendor_id']; ?>">
+
+View Products
 
 </a>
-
-
-
-</div>
 
 
 
@@ -208,18 +156,7 @@ View Product
 
 
 
-
-</div>
-
-
-</section>
-
-
-
-
-<?php include "includes/footer.php"; ?>
-
-
 </body>
+
 
 </html>
