@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 if(!isset($_SESSION['user_id'])){
@@ -194,7 +194,7 @@ Payment
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/checkout.css">
+<link rel="stylesheet" href="css/checkout.css">
 
 
 </head>
