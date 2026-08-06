@@ -1,5 +1,135 @@
 <?php
 
+require_once dirname(__DIR__) . '/database/db.php';
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Redirect
+|--------------------------------------------------------------------------
+*/
+
+function redirect($url){
+
+    header(
+        "Location: ".$url
+    );
+
+    exit();
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Flash Message
+|--------------------------------------------------------------------------
+*/
+
+function setFlashMessage($type,$message){
+
+    $_SESSION['flash']=[
+
+        'type'=>$type,
+
+        'message'=>$message
+
+    ];
+
+}
+
+
+
+function getFlashMessage(){
+
+    if(isset($_SESSION['flash'])){
+
+        $msg=$_SESSION['flash'];
+
+        unset($_SESSION['flash']);
+
+        return $msg;
+
+    }
+
+
+    return null;
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Cart Count
+|--------------------------------------------------------------------------
+*/
+
+function getCartCount($user_id){
+
+    global $conn;
+
+
+    $sql="
+    SELECT SUM(quantity) AS total
+
+    FROM cart
+
+    WHERE customer_id='$user_id'
+    ";
+
+
+    $result=$conn->query($sql);
+
+
+    $row=$result->fetch_assoc();
+
+
+    return $row['total'] ?? 0;
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Wishlist Count
+|--------------------------------------------------------------------------
+*/
+
+function getWishlistCount($user_id){
+
+    global $conn;
+
+
+    $sql="
+    SELECT COUNT(*) AS total
+
+    FROM wishlist
+
+    WHERE user_id='$user_id'
+    ";
+
+
+    $result=$conn->query($sql);
+
+
+    $row=$result->fetch_assoc();
+
+
+    return $row['total'] ?? 0;
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Sanitize
+|--------------------------------------------------------------------------
+*/
 
 function clean($data){
 
@@ -10,88 +140,6 @@ function clean($data){
     );
 
 }
-
-
-
-
-function redirect($page){
-
-    header("Location: ".$page);
-
-    exit();
-
-}
-
-
-
-
-function uploadImage($file,$folder){
-
-
-
-    if($file['error'] != 0){
-
-        return null;
-
-    }
-
-
-
-    $ext=strtolower(
-        pathinfo(
-            $file['name'],
-            PATHINFO_EXTENSION
-        )
-    );
-
-
-
-    $allowed=[
-        "jpg",
-        "jpeg",
-        "png",
-        "webp"
-    ];
-
-
-
-    if(!in_array($ext,$allowed)){
-
-        return null;
-
-    }
-
-
-
-
-    $name=time()."_".$file['name'];
-
-
-
-    move_uploaded_file(
-
-        $file['tmp_name'],
-
-        "../assets/uploads/".$folder."/".$name
-
-    );
-
-
-
-    return $name;
-
-
-}
-
-
-
-
-function formatPrice($price){
-
-    return "RM ".number_format($price,2);
-
-}
-
 
 
 ?>
