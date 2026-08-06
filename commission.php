@@ -2,100 +2,72 @@
 
 session_start();
 
-require_once "database/db.php";
-
+require_once "../database/db.php";
 
 
 if(!isset($_SESSION['user_id'])){
 
-header("Location: login.php");
-
 exit();
 
 }
 
 
 
-$user=$_SESSION['user_id'];
+$user_id=$_SESSION['user_id'];
 
 
 
-$vendor=$conn->query("
-
-
-SELECT *
-
-FROM vendors
-
-
-WHERE user_id='$user'
-
-
-")->fetch_assoc();
-
-
-
-if(!$vendor){
-
-echo "Vendor only";
-
-exit();
-
-}
-
-
-
-$vendor_id=$vendor['vendor_id'];
-
-
-
-
-$result=$conn->query("
+$stmt=$conn->prepare("
 
 
 SELECT
 
 
-SUM(order_details.subtotal) AS sales
+commission.*,
+
+
+vendors.business_name
 
 
 
-FROM order_details
+FROM commission
 
 
 
-JOIN products
-
-ON order_details.product_id=products.product_id
+JOIN vendors
 
 
-
-JOIN orders
-
-ON order_details.order_id=orders.order_id
+ON commission.vendor_id=vendors.vendor_id
 
 
 
-WHERE products.vendor_id='$vendor_id'
+WHERE vendors.user_id=?
+
+
+
+ORDER BY commission_id DESC
+
 
 
 ");
 
 
 
-$data=$result->fetch_assoc();
+$stmt->bind_param(
+
+"i",
+
+$user_id
+
+);
 
 
 
-$sales=$data['sales'] ?? 0;
+$stmt->execute();
 
 
 
-$commission=$sales*0.05;
-
-
-
-$income=$sales-$commission;
+$result=$stmt->get_result();
 
 
 
@@ -110,114 +82,102 @@ $income=$sales-$commission;
 
 <head>
 
-
 <title>
-
 Commission
-
 </title>
-
-
-
-<link rel="stylesheet" href="assets/css/style.css">
 
 
 </head>
 
 
-
 <body>
-
-
-<?php include "includes/navbar.php"; ?>
-
-
-
-<section class="container">
 
 
 
 <h1>
-
-Vendor Commission
-
+Commission History
 </h1>
 
 
 
 
-<div class="dashboard-card">
+<table border="1">
 
 
-<h3>
+<tr>
 
-Total Sales
+<th>
+Order
+</th>
 
-</h3>
+<th>
+Rate
+</th>
 
+<th>
+Amount
+</th>
 
-<p>
+<th>
+Status
+</th>
 
-RM <?php echo number_format($sales,2); ?>
-
-</p>
-
-
-</div>
-
-
-
-
-<div class="dashboard-card">
-
-
-<h3>
-
-Platform Commission (5%)
-
-</h3>
-
-
-<p>
-
-RM <?php echo number_format($commission,2); ?>
-
-</p>
-
-
-</div>
+</tr>
 
 
 
 
-<div class="dashboard-card">
+<?php while($row=$result->fetch_assoc()){ ?>
 
 
-<h3>
-
-Your Earnings
-
-</h3>
+<tr>
 
 
-<p>
+<td>
 
-RM <?php echo number_format($income,2); ?>
+#<?= $row['order_id']; ?>
 
-</p>
-
-
-</div>
+</td>
 
 
 
-</section>
+<td>
+
+<?= $row['commission_rate']; ?>%
+
+</td>
 
 
 
-<?php include "includes/footer.php"; ?>
+<td>
+
+RM <?= number_format($row['commission_amount'],2); ?>
+
+</td>
+
+
+
+<td>
+
+<?= $row['status']; ?>
+
+</td>
+
+
+
+</tr>
+
+
+
+<?php } ?>
+
+
+
+</table>
+
 
 
 </body>
+
 
 </html>
