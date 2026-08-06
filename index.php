@@ -1,18 +1,26 @@
 <?php
 
-require_once "config/db.php";
+session_start();
+
+require_once "../config/db.php";
 
 
 
-$latest=$conn->query("
+/*
+|--------------------------------------------------------------------------
+| Featured Products
+|--------------------------------------------------------------------------
+*/
 
+$products=$conn->query("
 
 SELECT
 
-
 products.*,
 
-vendors.business_name
+vendors.business_name,
+
+categories.category_name
 
 
 FROM products
@@ -20,12 +28,18 @@ FROM products
 
 JOIN vendors
 
-ON products.vendor_id=vendors.vendor_id
+ON products.vendor_id = vendors.vendor_id
 
 
+JOIN categories
 
-ORDER BY product_id DESC
+ON products.category_id = categories.category_id
 
+
+WHERE products.status='Available'
+
+
+ORDER BY products.created_at DESC
 
 
 LIMIT 8
@@ -35,16 +49,27 @@ LIMIT 8
 
 
 
+/*
+|--------------------------------------------------------------------------
+| Categories
+|--------------------------------------------------------------------------
+*/
+
 
 $categories=$conn->query("
 
 
 SELECT *
 
+
 FROM categories
 
 
+ORDER BY category_name ASC
+
+
 LIMIT 6
+
 
 
 ");
@@ -54,6 +79,7 @@ LIMIT 6
 ?>
 
 
+
 <!DOCTYPE html>
 
 <html>
@@ -61,66 +87,44 @@ LIMIT 6
 
 <head>
 
-
 <title>
-
-HochipoHub Marketplace
-
+HochipoHub
 </title>
 
 
-
-<link rel="stylesheet" href="assets/css/style.css">
-
-<link rel="stylesheet" href="assets/css/product.css">
+<link rel="stylesheet" href="../assets/css/style.css">
 
 
 </head>
 
 
+
 <body>
 
 
-<?php include "includes/navbar.php"; ?>
+<?php include "../includes/navbar.php"; ?>
 
 
 
-
-
-<section class="hero-section">
-
-
-<div class="hero-content">
+<section class="hero">
 
 
 <h1>
-
 Discover Local Products
-
-with HochipoHub
-
 </h1>
 
 
-
 <p>
-
-Support local vendors and shop everything in one place.
-
+Support local vendors with HochipoHub
 </p>
-
 
 
 
 <a href="catalog.php">
 
-Start Shopping
+Shop Now
 
 </a>
-
-
-
-</div>
 
 
 </section>
@@ -128,35 +132,31 @@ Start Shopping
 
 
 
-
-<section class="container">
-
+<section class="categories">
 
 
 <h2>
-
 Categories
-
 </h2>
-
 
 
 
 <div class="category-grid">
 
 
-
 <?php while($cat=$categories->fetch_assoc()){ ?>
 
 
+<a href="category.php?id=<?= $cat['category_id']; ?>">
 
-<a href="category.php?id=<?php echo $cat['category_id']; ?>"
-class="category-card">
+
+
+<img src="../assets/uploads/categories/<?= $cat['category_image']; ?>">
 
 
 <h3>
 
-<?php echo $cat['category_name']; ?>
+<?= htmlspecialchars($cat['category_name']); ?>
 
 </h3>
 
@@ -172,21 +172,16 @@ class="category-card">
 </div>
 
 
-
 </section>
 
 
 
 
-
-<section class="container">
-
+<section class="products">
 
 
 <h2>
-
 Latest Products
-
 </h2>
 
 
@@ -195,19 +190,20 @@ Latest Products
 
 
 
-<?php while($row=$latest->fetch_assoc()){ ?>
+<?php while($row=$products->fetch_assoc()){ ?>
+
 
 
 <div class="product-card">
 
 
-<img src="assets/uploads/products/<?php echo $row['image']; ?>">
+<img src="../assets/uploads/products/<?= $row['image']; ?>">
 
 
 
 <h3>
 
-<?php echo $row['product_name']; ?>
+<?= htmlspecialchars($row['product_name']); ?>
 
 </h3>
 
@@ -215,17 +211,19 @@ Latest Products
 
 <p>
 
-RM <?php echo number_format($row['price'],2); ?>
+RM <?= number_format($row['price'],2); ?>
 
 </p>
 
 
 
-<a href="product_details.php?id=<?php echo $row['product_id']; ?>">
+
+<a href="product_details.php?id=<?= $row['product_id']; ?>">
 
 View
 
 </a>
+
 
 
 </div>
@@ -239,15 +237,14 @@ View
 </div>
 
 
-
 </section>
 
 
 
-
-<?php include "includes/footer.php"; ?>
+<?php include "../includes/footer.php"; ?>
 
 
 </body>
+
 
 </html>
