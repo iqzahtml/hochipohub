@@ -5,84 +5,100 @@ session_start();
 require_once "../config/db.php";
 
 
-if(!isset($_SESSION['user_id'])){
+if(!isset($_SESSION['user_id']) || $_SESSION['role']!="admin"){
 
-    header("Location: ../login.php");
+    header("Location: ../auth/login.php");
     exit();
 
 }
 
 
-$user_id=$_SESSION['user_id'];
-
-
+/*
+|--------------------------------------------------------------------------
+| TOTAL USERS
+|--------------------------------------------------------------------------
+*/
 
 $user=$conn->query("
 
-SELECT *
-
-FROM users
-
-WHERE user_id='$user_id'
-
-")->fetch_assoc();
-
-
-
-if($user['role']!="admin"){
-
-    echo "Access denied";
-    exit();
-
-}
-
-
-
-
-$totalUsers=$conn->query("
-
 SELECT COUNT(*) AS total
 
 FROM users
 
-")->fetch_assoc()['total'];
+");
+
+
+$total_users=$user->fetch_assoc()['total'];
 
 
 
-
-$totalProducts=$conn->query("
-
-SELECT COUNT(*) AS total
-
-FROM products
-
-")->fetch_assoc()['total'];
+/*
+|--------------------------------------------------------------------------
+| TOTAL VENDORS
+|--------------------------------------------------------------------------
+*/
 
 
-
-
-$totalOrders=$conn->query("
-
-SELECT COUNT(*) AS total
-
-FROM orders
-
-")->fetch_assoc()['total'];
-
-
-
-
-$totalVendors=$conn->query("
+$vendor=$conn->query("
 
 SELECT COUNT(*) AS total
 
 FROM vendors
 
-")->fetch_assoc()['total'];
+WHERE approval_status='Approved'
+
+");
+
+
+$total_vendors=$vendor->fetch_assoc()['total'];
+
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL PRODUCTS
+|--------------------------------------------------------------------------
+*/
+
+
+$product=$conn->query("
+
+SELECT COUNT(*) AS total
+
+FROM products
+
+");
+
+
+$total_products=$product->fetch_assoc()['total'];
+
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL SALES
+|--------------------------------------------------------------------------
+*/
+
+
+$sales=$conn->query("
+
+SELECT SUM(total_amount) AS total
+
+FROM orders
+
+WHERE order_status='Completed'
+
+");
+
+
+
+$total_sales=$sales->fetch_assoc()['total'] ?? 0;
 
 
 
 ?>
+
 
 <!DOCTYPE html>
 
@@ -90,10 +106,10 @@ FROM vendors
 
 <head>
 
-<title>Admin Dashboard</title>
+<title>
+Admin Dashboard
+</title>
 
-
-<link rel="stylesheet" href="../assets/css/style.css">
 
 <link rel="stylesheet" href="../assets/css/admin.css">
 
@@ -107,11 +123,13 @@ FROM vendors
 <?php include "../includes/navbar.php"; ?>
 
 
+<div class="admin-layout">
 
-<section class="dashboard-page">
+
+<?php include "../includes/admin_sidebar.php"; ?>
 
 
-<div class="dashboard-container">
+<main class="admin-content">
 
 
 <h1>
@@ -120,7 +138,7 @@ Admin Dashboard
 
 
 
-<div class="dashboard-grid">
+<div class="dashboard-cards">
 
 
 
@@ -130,59 +148,13 @@ Admin Dashboard
 Users
 </h3>
 
+
 <p>
-<?php echo $totalUsers; ?>
+<?= $total_users ?>
 </p>
 
 
-<a href="users.php">
-Manage Users
-</a>
-
 </div>
-
-
-
-
-
-<div class="dashboard-card">
-
-<h3>
-Products
-</h3>
-
-<p>
-<?php echo $totalProducts; ?>
-</p>
-
-
-<a href="products.php">
-Manage Products
-</a>
-
-</div>
-
-
-
-
-
-<div class="dashboard-card">
-
-<h3>
-Orders
-</h3>
-
-<p>
-<?php echo $totalOrders; ?>
-</p>
-
-
-<a href="orders.php">
-View Orders
-</a>
-
-</div>
-
 
 
 
@@ -193,14 +165,45 @@ View Orders
 Vendors
 </h3>
 
+
 <p>
-<?php echo $totalVendors; ?>
+<?= $total_vendors ?>
 </p>
 
 
-<a href="vendors.php">
-Manage Vendors
-</a>
+</div>
+
+
+
+
+<div class="dashboard-card">
+
+<h3>
+Products
+</h3>
+
+
+<p>
+<?= $total_products ?>
+</p>
+
+
+</div>
+
+
+
+
+<div class="dashboard-card">
+
+<h3>
+Sales
+</h3>
+
+
+<p>
+RM <?= number_format($total_sales,2); ?>
+</p>
+
 
 </div>
 
@@ -210,13 +213,11 @@ Manage Vendors
 
 
 
+</main>
+
+
 </div>
 
-</section>
-
-
-
-<?php include "../includes/footer.php"; ?>
 
 
 </body>
