@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 
@@ -65,7 +65,7 @@ $_SESSION['role']=$user['role'];
 if($user['role']=="admin"){
 
 
-header("Location: ../admin/dashboard.php");
+header("Location: admin/dashboard.php");
 
 
 }
@@ -73,7 +73,7 @@ header("Location: ../admin/dashboard.php");
 elseif($user['role']=="vendor"){
 
 
-header("Location: ../seller/dashboard.php");
+header("Location: seller/dashboard.php");
 
 
 }
@@ -81,7 +81,7 @@ header("Location: ../seller/dashboard.php");
 else{
 
 
-header("Location: ../dashboard.php");
+header("Location: dashboard.php");
 
 
 }
@@ -103,7 +103,7 @@ exit();
 $_SESSION['error']="Invalid email or password";
 
 
-header("Location: ../login.php");
+header("Location: login.php");
 
 
 exit();
