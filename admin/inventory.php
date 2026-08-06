@@ -1,14 +1,14 @@
 <?php
 
+
 session_start();
+
 
 require_once "../config/db.php";
 
 
 
-if(!isset($_SESSION['user_id'])){
-
-header("Location: ../login.php");
+if($_SESSION['role']!="admin"){
 
 exit();
 
@@ -16,29 +16,35 @@ exit();
 
 
 
-$products=$conn->query("
+$inventory=$conn->query("
 
 
 SELECT
 
 
-product_id,
-
-product_name,
-
-inventory.quantity
+inventory.*,
 
 
-
-FROM products
+products.product_name
 
 
 
-ORDER BY inventory.quantity ASC
+FROM inventory
+
+
+
+JOIN products
+
+ON inventory.product_id = products.product_id
+
+
+
+ORDER BY inventory_id DESC
 
 
 
 ");
+
 
 
 ?>
@@ -57,18 +63,10 @@ Inventory
 
 <link rel="stylesheet" href="../assets/css/admin.css">
 
-
 </head>
 
 
 <body>
-
-
-<?php include "../includes/navbar.php"; ?>
-
-
-
-<div class="dashboard-container">
 
 
 <h1>
@@ -77,42 +75,35 @@ Inventory Management
 
 
 
-<table class="admin-table">
+<table border="1">
 
 
 <tr>
-
-<th>
-Product ID
-</th>
 
 <th>
 Product
 </th>
 
-<th>
-Stock
-</th>
 
 <th>
-Status
+Quantity
 </th>
+
+
+<th>
+Updated
+</th>
+
 
 </tr>
 
 
 
-<?php while($row=$products->fetch_assoc()){ ?>
+
+<?php while($row=$inventory->fetch_assoc()){ ?>
 
 
 <tr>
-
-
-<td>
-
-<?= $row['product_id']; ?>
-
-</td>
 
 
 <td>
@@ -122,52 +113,30 @@ Status
 </td>
 
 
-
 <td>
 
-<?= $row['stock']; ?>
+<?= $row['quantity']; ?>
 
 </td>
 
 
-
 <td>
 
-
-<?php
-
-if($row['stock'] <= 5){
-
-echo "<span class='stock-low'>Low Stock</span>";
-
-}
-
-else{
-
-echo "<span class='stock-ok'>Available</span>";
-
-}
-
-
-?>
-
+<?= $row['last_updated']; ?>
 
 </td>
+
 
 
 </tr>
 
 
+
 <?php } ?>
 
 
+
 </table>
-
-
-</div>
-
-
-<?php include "../includes/footer.php"; ?>
 
 
 </body>
