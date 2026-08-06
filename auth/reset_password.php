@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 
@@ -68,7 +68,7 @@ unset($_SESSION['reset_email']);
 $_SESSION['success']="Password changed";
 
 
-header("Location: ../login.php");
+header("Location: login.php");
 
 
 exit();
