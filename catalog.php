@@ -2,22 +2,21 @@
 
 require_once "config/db.php";
 
-session_start();
 
 
+$products=$conn->query("
 
-$query="
 
 SELECT
 
+
 products.*,
 
-vendors.business_name,
-
-categories.category_name
+vendors.business_name
 
 
 FROM products
+
 
 
 JOIN vendors
@@ -25,21 +24,13 @@ JOIN vendors
 ON products.vendor_id=vendors.vendor_id
 
 
-JOIN categories
 
-ON products.category_id=categories.category_id
-
-
-WHERE products.status='Available'
+ORDER BY product_id DESC
 
 
-ORDER BY products.created_at DESC
 
+");
 
-";
-
-
-$result=$conn->query($query);
 
 
 ?>
@@ -49,9 +40,16 @@ $result=$conn->query($query);
 
 <html>
 
+
 <head>
 
-<title>Catalog | HochipoHub</title>
+
+<title>
+
+Catalog
+
+</title>
+
 
 
 <link rel="stylesheet" href="assets/css/product.css">
@@ -60,10 +58,13 @@ $result=$conn->query($query);
 </head>
 
 
+
 <body>
 
 
+
 <?php include "includes/navbar.php"; ?>
+
 
 
 <section class="product-page">
@@ -73,38 +74,11 @@ $result=$conn->query($query);
 
 
 
-<div class="product-page-header">
-
-
-<div>
-
-
-<span class="product-page-eyebrow">
-
-CATALOG
-
-</span>
-
-
 <h1>
 
-All Products
+Product Catalog
 
 </h1>
-
-
-<p>
-
-Discover products from different vendors.
-
-</p>
-
-
-</div>
-
-
-</div>
-
 
 
 
@@ -112,60 +86,33 @@ Discover products from different vendors.
 
 
 
-<?php while($row=$result->fetch_assoc()){ ?>
+<?php while($row=$products->fetch_assoc()){ ?>
 
 
 <div class="product-card">
 
 
-<div class="product-card-image">
-
-
 <img src="assets/uploads/products/<?php echo $row['image']; ?>">
 
 
-</div>
 
-
-
-<div class="product-card-content">
-
-
-<span class="product-card-category">
-
-<?php echo $row['category_name']; ?>
-
-</span>
-
-
-
-<h3 class="product-card-title">
-
-<a href="product_details.php?id=<?php echo $row['product_id']; ?>">
+<h3>
 
 <?php echo $row['product_name']; ?>
-
-</a>
 
 </h3>
 
 
 
-<div class="product-card-vendor">
-
-<i class="fa-solid fa-store"></i>
+<p>
 
 <?php echo $row['business_name']; ?>
 
-</div>
+</p>
 
 
 
-
-<div class="product-card-footer">
-
-
-<strong class="product-price-current">
+<strong>
 
 RM <?php echo number_format($row['price'],2); ?>
 
@@ -173,24 +120,16 @@ RM <?php echo number_format($row['price'],2); ?>
 
 
 
-<a class="add-cart-btn"
-href="product_details.php?id=<?php echo $row['product_id']; ?>">
+<a href="product_details.php?id=<?php echo $row['product_id']; ?>">
 
-
-<i class="fa-solid fa-cart-shopping"></i>
-
+View Product
 
 </a>
 
 
-</div>
-
-
 
 </div>
 
-
-</div>
 
 
 <?php } ?>
@@ -208,9 +147,11 @@ href="product_details.php?id=<?php echo $row['product_id']; ?>">
 
 
 
+
 <?php include "includes/footer.php"; ?>
 
 
 </body>
+
 
 </html>
