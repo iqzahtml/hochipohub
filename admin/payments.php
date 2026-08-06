@@ -1,14 +1,13 @@
 <?php
 
+
 session_start();
+
 
 require_once "../config/db.php";
 
 
-
-if(!isset($_SESSION['user_id'])){
-
-header("Location: ../login.php");
+if(!isset($_SESSION['user_id']) || $_SESSION['role']!="admin"){
 
 exit();
 
@@ -24,6 +23,10 @@ SELECT
 
 payments.*,
 
+
+orders.customer_id,
+
+
 users.name
 
 
@@ -32,9 +35,15 @@ FROM payments
 
 
 
+JOIN orders
+
+ON payments.order_id = orders.order_id
+
+
+
 JOIN users
 
-ON payments.user_id = users.user_id
+ON orders.customer_id = users.user_id
 
 
 
@@ -53,6 +62,7 @@ ORDER BY payment_id DESC
 
 <html>
 
+
 <head>
 
 <title>
@@ -60,32 +70,22 @@ Payment Management
 </title>
 
 
-<link rel="stylesheet"
-
-href="../assets/css/admin.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
 
 
 </head>
 
 
-
 <body>
 
 
-<?php include "../includes/navbar.php"; ?>
-
-
-
-<div class="dashboard-container">
-
-
 <h1>
-Payment Management
+Payments
 </h1>
 
 
 
-<table class="admin-table">
+<table border="1">
 
 
 <tr>
@@ -95,15 +95,19 @@ Payment ID
 </th>
 
 <th>
+Order
+</th>
+
+<th>
 Customer
 </th>
 
 <th>
-Amount
+Method
 </th>
 
 <th>
-Method
+Amount
 </th>
 
 <th>
@@ -130,7 +134,7 @@ Status
 
 <td>
 
-<?= $row['name']; ?>
+#<?= $row['order_id']; ?>
 
 </td>
 
@@ -138,7 +142,7 @@ Status
 
 <td>
 
-RM <?= $row['amount']; ?>
+<?= htmlspecialchars($row['name']); ?>
 
 </td>
 
@@ -154,28 +158,33 @@ RM <?= $row['amount']; ?>
 
 <td>
 
-<?= $row['status']; ?>
+RM <?= number_format($row['amount'],2); ?>
 
 </td>
+
+
+
+<td>
+
+<?= $row['payment_status']; ?>
+
+</td>
+
 
 
 </tr>
 
 
+
 <?php } ?>
+
 
 
 </table>
 
 
 
-</div>
-
-
-
-<?php include "../includes/footer.php"; ?>
-
-
 </body>
+
 
 </html>
