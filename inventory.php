@@ -2,95 +2,72 @@
 
 session_start();
 
-require_once "database/db.php";
-
+require_once "../inventory/db.php";
 
 
 if(!isset($_SESSION['user_id'])){
 
-header("Location: login.php");
-
 exit();
 
 }
 
 
-
-$user=$_SESSION['user_id'];
-
-
-
-$vendor=$conn->query("
-
-SELECT *
-
-FROM vendors
-
-WHERE user_id='$user'
-
-
-")->fetch_assoc();
+$user_id=$_SESSION['user_id'];
 
 
 
-if(!$vendor){
-
-echo "Vendor account required";
-
-exit();
-
-}
+$stmt=$conn->prepare("
 
 
-
-$vendor_id=$vendor['vendor_id'];
-
+SELECT
 
 
+inventory.*,
 
 
-if(isset($_POST['update'])){
+products.product_name
 
 
-$product=$_POST['product_id'];
-
-$stock=$_POST['stock'];
+FROM inventory
 
 
 
-$conn->query("
+JOIN products
 
 
-UPDATE products SET
+ON inventory.product_id=products.product_id
 
 
-stock='$stock'
+
+JOIN vendors
 
 
-WHERE product_id='$product'
+ON products.vendor_id=vendors.vendor_id
+
+
+
+WHERE vendors.user_id=?
+
 
 
 ");
 
 
-}
+$stmt->bind_param(
+
+"i",
+
+$user_id
+
+);
 
 
 
+$stmt->execute();
 
 
-$products=$conn->query("
 
-
-SELECT *
-
-FROM products
-
-
-WHERE vendor_id='$vendor_id'
-
-
-");
+$result=$stmt->get_result();
 
 
 
@@ -105,133 +82,68 @@ WHERE vendor_id='$vendor_id'
 
 <head>
 
-
 <title>
-
 Inventory
-
 </title>
-
-
-
-<link rel="stylesheet" href="assets/css/style.css">
-
-<link rel="stylesheet" href="assets/css/admin.css">
 
 
 </head>
 
 
-
 <body>
-
-
-<?php include "includes/navbar.php"; ?>
-
-
-
-<section class="dashboard-page">
-
-
-<div class="dashboard-container">
 
 
 
 <h1>
-
-Inventory Management
-
+Inventory
 </h1>
 
 
 
-
-
-<table class="admin-table">
+<table border="1">
 
 
 <tr>
-
 
 <th>
 Product
 </th>
 
-
 <th>
-Stock
+Quantity
 </th>
 
-
 <th>
-Action
+Updated
 </th>
-
 
 </tr>
 
 
 
-
-<?php while($row=$products->fetch_assoc()){ ?>
+<?php while($row=$result->fetch_assoc()){ ?>
 
 
 <tr>
 
 
-
 <td>
 
-<?php echo $row['product_name']; ?>
+<?= htmlspecialchars($row['product_name']); ?>
 
 </td>
 
 
-
-
 <td>
 
-
-<form method="POST">
-
-
-<input
-
-type="number"
-
-name="stock"
-
-value="<?php echo $row['stock']; ?>">
-
-
-
-<input
-
-type="hidden"
-
-name="product_id"
-
-value="<?php echo $row['product_id']; ?>">
-
-
+<?= $row['quantity']; ?>
 
 </td>
 
 
-
-
 <td>
 
-
-<button name="update">
-
-Update
-
-</button>
-
-
-</form>
-
+<?= $row['last_updated']; ?>
 
 </td>
 
@@ -249,16 +161,7 @@ Update
 
 
 
-</div>
-
-
-</section>
-
-
-
-<?php include "includes/footer.php"; ?>
-
-
 </body>
+
 
 </html>
