@@ -4,14 +4,14 @@
 session_start();
 
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 
 if(!isset($_SESSION['user_id'])){
 
 
-header("Location: ../auth/login.php");
+header("Location: auth/login.php");
 
 
 exit();
@@ -104,7 +104,7 @@ My Products
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/vendor.css">
+<link rel="stylesheet" href="css/vendor.css">
 
 
 </head>
