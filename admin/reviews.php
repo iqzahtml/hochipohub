@@ -1,48 +1,18 @@
 <?php
 
+
 session_start();
+
 
 require_once "../config/db.php";
 
 
-if(!isset($_SESSION['user_id'])){
 
-header("Location: ../login.php");
+if(!isset($_SESSION['user_id']) || $_SESSION['role']!="admin"){
 
 exit();
 
 }
-
-
-
-
-if(isset($_GET['delete'])){
-
-
-$id=$_GET['delete'];
-
-
-
-$conn->query("
-
-
-DELETE FROM reviews
-
-WHERE review_id='$id'
-
-
-");
-
-
-
-header("Location: reviews.php");
-
-exit();
-
-
-}
-
-
 
 
 
@@ -54,7 +24,9 @@ SELECT
 
 reviews.*,
 
+
 users.name,
+
 
 products.product_name
 
@@ -66,13 +38,13 @@ FROM reviews
 
 JOIN users
 
-ON reviews.user_id=users.user_id
+ON reviews.customer_id = users.user_id
 
 
 
 JOIN products
 
-ON reviews.product_id=products.product_id
+ON reviews.product_id = products.product_id
 
 
 
@@ -95,13 +67,11 @@ ORDER BY review_id DESC
 <head>
 
 <title>
-Reviews
+Review Management
 </title>
 
 
-<link rel="stylesheet"
-
-href="../assets/css/admin.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
 
 
 </head>
@@ -111,47 +81,35 @@ href="../assets/css/admin.css">
 
 
 
-<?php include "../includes/navbar.php"; ?>
-
-
-
-<div class="dashboard-container">
-
-
 <h1>
-Reviews Management
+Reviews
 </h1>
 
 
 
-<table class="admin-table">
+<table border="1">
 
 
 <tr>
 
+<th>
+Customer
+</th>
 
 <th>
 Product
 </th>
 
-
-<th>
-User
-</th>
-
-
 <th>
 Rating
 </th>
 
-
 <th>
-Comment
+Review
 </th>
 
-
 <th>
-Action
+Status
 </th>
 
 
@@ -168,16 +126,18 @@ Action
 
 <td>
 
-<?= $row['product_name']; ?>
+<?= htmlspecialchars($row['name']); ?>
 
 </td>
+
 
 
 <td>
 
-<?= $row['name']; ?>
+<?= htmlspecialchars($row['product_name']); ?>
 
 </td>
+
 
 
 <td>
@@ -187,29 +147,24 @@ Action
 </td>
 
 
+
 <td>
 
-<?= $row['comment']; ?>
+<?= htmlspecialchars($row['review']); ?>
 
 </td>
 
 
+
 <td>
 
-
-<a href="?delete=<?= $row['review_id']; ?>"
-
-onclick="return confirm('Delete review?')">
-
-Delete
-
-</a>
-
+<?= $row['status']; ?>
 
 </td>
 
 
 </tr>
+
 
 
 <?php } ?>
@@ -219,13 +174,7 @@ Delete
 
 
 
-</div>
-
-
-
-<?php include "../includes/footer.php"; ?>
-
-
 </body>
+
 
 </html>
