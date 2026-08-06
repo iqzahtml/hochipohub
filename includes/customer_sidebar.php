@@ -7,7 +7,7 @@ Customer Menu
 
 
 
-<a href="../hochipohub/dashboard.php">
+<a href="hochipohub/dashboard.php">
 
 Dashboard
 
@@ -15,7 +15,7 @@ Dashboard
 
 
 
-<a href="../hochipohub/profile.php">
+<a href="hochipohub/profile.php">
 
 Profile
 
@@ -23,7 +23,7 @@ Profile
 
 
 
-<a href="../hochipohub/cart.php">
+<a href="hochipohub/cart.php">
 
 My Cart
 
@@ -31,7 +31,7 @@ My Cart
 
 
 
-<a href="../hochipohub/wishlist.php">
+<a href="hochipohub/wishlist.php">
 
 Wishlist
 
@@ -39,7 +39,7 @@ Wishlist
 
 
 
-<a href="../hochipohub/order.php">
+<a href="hochipohub/order.php">
 
 Orders
 
@@ -47,7 +47,7 @@ Orders
 
 
 
-<a href="../auth/logout.php">
+<a href="auth/logout.php">
 
 Logout
 
