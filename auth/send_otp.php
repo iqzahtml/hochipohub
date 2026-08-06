@@ -2,9 +2,9 @@
 
 session_start();
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
-require_once "../mail/send_mail.php";
+require_once "mail/send_mail.php";
 
 
 
@@ -276,7 +276,7 @@ if($mailSent){
 
 
 
-    header("Location: ../verify_otp.php");
+    header("Location: verify_otp.php");
 
 
     exit();
