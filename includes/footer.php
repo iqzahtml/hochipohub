@@ -657,7 +657,7 @@ if (function_exists('isLoggedIn')) {
         <?php
 
         $loginModalPath =
-            DIR . '/login_modal.php';
+            __DIR__ . '/login_modal.php';
 
         if (
             file_exists($loginModalPath)
@@ -677,7 +677,7 @@ if (function_exists('isLoggedIn')) {
         <?php
 
         $registerModalPath =
-            DIR . '/register_modal.php';
+            __DIR__. '/register_modal.php';
 
         if (
             file_exists($registerModalPath)
