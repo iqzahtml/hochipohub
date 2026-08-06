@@ -151,7 +151,7 @@ Categories
 
 
 
-<img src="assets/uploads/categories/<?= $cat['category_image']; ?>">
+<img src="uploads/categories/<?= $cat['category_image']; ?>">
 
 
 <h3>
@@ -197,7 +197,7 @@ Latest Products
 <div class="product-card">
 
 
-<img src="assets/uploads/products/<?= $row['image']; ?>">
+<img src="uploads/products/<?= $row['image']; ?>">
 
 
 
