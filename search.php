@@ -1,9 +1,14 @@
 <?php
 
-require_once "config/db.php";
+require_once "../config/db.php";
 
 
-$key=$_GET['q'] ?? '';
+
+$keyword=$_GET['q'] ?? '';
+
+
+
+$search="%".$keyword."%";
 
 
 
@@ -15,32 +20,41 @@ SELECT
 
 products.*,
 
+
 vendors.business_name
+
 
 
 FROM products
 
 
+
 JOIN vendors
+
 
 ON products.vendor_id=vendors.vendor_id
 
 
 
-WHERE product_name LIKE ?
+WHERE products.product_name LIKE ?
+
+
+AND products.status='Available'
+
+
+ORDER BY product_id DESC
 
 
 
 ");
 
 
-
-$value="%".$key."%";
-
-
 $stmt->bind_param(
+
 "s",
-$value
+
+$search
+
 );
 
 
@@ -63,17 +77,12 @@ $result=$stmt->get_result();
 
 <head>
 
-
 <title>
-
-Search Result
-
+Search
 </title>
 
 
-<link rel="stylesheet" href="assets/css/style.css">
-
-<link rel="stylesheet" href="assets/css/product.css">
+<link rel="stylesheet" href="../assets/css/product.css">
 
 
 </head>
@@ -83,26 +92,22 @@ Search Result
 <body>
 
 
-<?php include "includes/navbar.php"; ?>
 
+<?php include "../includes/navbar.php"; ?>
 
-
-<section class="product-page">
-
-
-<div class="product-container">
 
 
 <h1>
 
-Search : <?php echo $key; ?>
+Search Result:
+<?= htmlspecialchars($keyword); ?>
 
 </h1>
 
 
 
-<div class="product-grid">
 
+<div class="product-grid">
 
 
 <?php while($row=$result->fetch_assoc()){ ?>
@@ -112,26 +117,27 @@ Search : <?php echo $key; ?>
 <div class="product-card">
 
 
-<img src="assets/uploads/products/<?php echo $row['image']; ?>">
+<img src="../assets/uploads/products/<?= $row['image']; ?>">
 
 
 
 <h3>
 
-<?php echo $row['product_name']; ?>
+<?= htmlspecialchars($row['product_name']); ?>
 
 </h3>
 
 
+
 <p>
 
-RM <?php echo $row['price']; ?>
+RM <?= number_format($row['price'],2); ?>
 
 </p>
 
 
 
-<a href="product_details.php?id=<?php echo $row['product_id']; ?>">
+<a href="product_details.php?id=<?= $row['product_id']; ?>">
 
 View
 
@@ -150,16 +156,8 @@ View
 </div>
 
 
-</div>
-
-
-</section>
-
-
-
-<?php include "includes/footer.php"; ?>
-
 
 </body>
+
 
 </html>
