@@ -1,13 +1,14 @@
 <?php
 
+
 session_start();
+
 
 require_once "../config/db.php";
 
 
-if(!isset($_SESSION['user_id'])){
 
-header("Location: ../login.php");
+if($_SESSION['role']!="admin"){
 
 exit();
 
@@ -19,10 +20,27 @@ exit();
 $vendors=$conn->query("
 
 
-SELECT *
+SELECT
+
+
+vendors.*,
+
+
+users.name,
+
+
+users.email
+
 
 
 FROM vendors
+
+
+
+JOIN users
+
+ON vendors.user_id = users.user_id
+
 
 
 ORDER BY vendor_id DESC
@@ -30,76 +48,6 @@ ORDER BY vendor_id DESC
 
 
 ");
-
-
-
-
-
-if(isset($_GET['approve'])){
-
-
-$id=$_GET['approve'];
-
-
-
-$conn->query("
-
-
-UPDATE vendors
-
-
-SET status='approved'
-
-
-WHERE vendor_id='$id'
-
-
-");
-
-
-
-header("Location: vendors.php");
-
-
-exit();
-
-
-}
-
-
-
-
-
-if(isset($_GET['reject'])){
-
-
-$id=$_GET['reject'];
-
-
-
-$conn->query("
-
-
-UPDATE vendors
-
-
-SET status='rejected'
-
-
-WHERE vendor_id='$id'
-
-
-");
-
-
-
-header("Location: vendors.php");
-
-
-exit();
-
-
-}
 
 
 
@@ -113,132 +61,89 @@ exit();
 
 <head>
 
-
 <title>
 Vendor Management
 </title>
 
-
-<link rel="stylesheet"
-
-href="../assets/css/admin.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
 
 
 </head>
+
 
 
 <body>
 
 
 
-<?php include "../includes/navbar.php"; ?>
-
-
-
-<div class="dashboard-container">
-
-
 <h1>
-
-Vendor Management
-
+Vendors
 </h1>
 
 
 
 
-<table class="admin-table">
+<table border="1">
 
 
 <tr>
 
+<th>
+Business
+</th>
 
-<th>ID</th>
+<th>
+Owner
+</th>
 
-<th>Business Name</th>
+<th>
+Email
+</th>
 
-<th>Email</th>
-
-<th>Status</th>
-
-<th>Action</th>
-
+<th>
+Status
+</th>
 
 </tr>
-
 
 
 
 <?php while($row=$vendors->fetch_assoc()){ ?>
 
 
-
 <tr>
 
 
 <td>
 
-<?php echo $row['vendor_id']; ?>
+<?= $row['business_name']; ?>
 
 </td>
 
 
-
 <td>
 
-<?php echo $row['business_name']; ?>
+<?= $row['name']; ?>
 
 </td>
 
 
-
-
 <td>
 
-<?php echo $row['email']; ?>
+<?= $row['email']; ?>
 
 </td>
 
 
-
-
 <td>
 
-<?php echo $row['status']; ?>
-
-</td>
-
-
-
-
-<td>
-
-
-
-<a href="?approve=<?php echo $row['vendor_id']; ?>">
-
-Approve
-
-</a>
-
-
-
-|
-
-<a href="?reject=<?php echo $row['vendor_id']; ?>">
-
-Reject
-
-</a>
-
-
+<?= $row['approval_status']; ?>
 
 </td>
 
 
 
 </tr>
-
 
 
 
@@ -250,13 +155,7 @@ Reject
 
 
 
-</div>
-
-
-
-<?php include "../includes/footer.php"; ?>
-
-
 </body>
+
 
 </html>
