@@ -21,7 +21,7 @@ function requireLogin(){
 
     if(!isLogin()){
 
-        header("Location: ../auth/login.php");
+        header("Location: auth/login.php");
 
         exit();
 
@@ -47,7 +47,7 @@ function requireRole($role){
     if(!isset($_SESSION['role']) || $_SESSION['role'] != $role){
 
 
-        header("Location: ../hochipohub/index.php");
+        header("Location: hochipohub/index.php");
 
         exit();
 
