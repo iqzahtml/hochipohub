@@ -7,7 +7,7 @@ Admin Panel
 
 
 
-<a href="../admin/dashboard.php">
+<a href="admin/dashboard.php">
 
 Dashboard
 
@@ -15,7 +15,7 @@ Dashboard
 
 
 
-<a href="../admin/users.php">
+<a href="admin/users.php">
 
 Users
 
@@ -23,7 +23,7 @@ Users
 
 
 
-<a href="../admin/vendors.php">
+<a href="admin/vendors.php">
 
 Vendors
 
@@ -31,7 +31,7 @@ Vendors
 
 
 
-<a href="../admin/products.php">
+<a href="admin/products.php">
 
 Products
 
@@ -39,7 +39,7 @@ Products
 
 
 
-<a href="../admin/orders.php">
+<a href="admin/orders.php">
 
 Orders
 
@@ -47,7 +47,7 @@ Orders
 
 
 
-<a href="../admin/payment.php">
+<a href="admin/payment.php">
 
 Payments
 
@@ -55,7 +55,7 @@ Payments
 
 
 
-<a href="../admin/commission.php">
+<a href="admin/commission.php">
 
 Commission
 
@@ -63,7 +63,7 @@ Commission
 
 
 
-<a href="../admin/reviews.php">
+<a href="admin/reviews.php">
 
 Reviews
 
@@ -71,7 +71,7 @@ Reviews
 
 
 
-<a href="../admin/settings.php">
+<a href="admin/settings.php">
 
 Settings
 
@@ -79,7 +79,7 @@ Settings
 
 
 
-<a href="../auth/logout.php">
+<a href="auth/logout.php">
 
 Logout
 
