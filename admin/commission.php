@@ -1,24 +1,20 @@
 <?php
 
+
 session_start();
+
 
 require_once "../config/db.php";
 
 
-if(!isset($_SESSION['user_id'])){
 
-    header("Location: ../login.php");
-    exit();
+if(!isset($_SESSION['user_id']) || $_SESSION['role']!="admin"){
+
+exit();
 
 }
 
 
-
-/*
-|--------------------------------------------------------------------------
-| GET COMMISSION DATA
-|--------------------------------------------------------------------------
-*/
 
 
 $commission=$conn->query("
@@ -27,15 +23,11 @@ $commission=$conn->query("
 SELECT
 
 
-orders.order_id,
 
-users.name,
+commission.*,
 
-orders.total_amount,
 
-commission.amount,
-
-commission.status
+vendors.business_name
 
 
 
@@ -43,19 +35,13 @@ FROM commission
 
 
 
-JOIN orders
+JOIN vendors
 
-ON commission.order_id = orders.order_id
-
-
-
-JOIN users
-
-ON orders.user_id = users.user_id
+ON commission.vendor_id = vendors.vendor_id
 
 
 
-ORDER BY commission.commission_id DESC
+ORDER BY commission_id DESC
 
 
 
@@ -65,15 +51,21 @@ ORDER BY commission.commission_id DESC
 
 ?>
 
+
 <!DOCTYPE html>
 
 <html>
 
+
 <head>
 
-<title>Commission Management</title>
+<title>
+Commission
+</title>
+
 
 <link rel="stylesheet" href="../assets/css/admin.css">
+
 
 </head>
 
@@ -81,37 +73,33 @@ ORDER BY commission.commission_id DESC
 <body>
 
 
-<?php include "../includes/navbar.php"; ?>
-
-
-<div class="dashboard-container">
-
 
 <h1>
-Commission Management
+Vendor Commission
 </h1>
 
 
 
-<table class="admin-table">
+
+<table border="1">
 
 
 <tr>
 
 <th>
-Order ID
+Vendor
 </th>
 
 <th>
-Customer
+Order
 </th>
 
 <th>
-Order Amount
+Rate
 </th>
 
 <th>
-Commission
+Amount
 </th>
 
 <th>
@@ -131,30 +119,34 @@ Status
 
 <td>
 
-<?= $row['order_id']; ?>
+<?= htmlspecialchars($row['business_name']); ?>
 
 </td>
+
 
 
 <td>
 
-<?= $row['name']; ?>
+#<?= $row['order_id']; ?>
 
 </td>
+
 
 
 <td>
 
-RM <?= $row['total_amount']; ?>
+<?= $row['commission_rate']; ?>%
 
 </td>
+
 
 
 <td>
 
-RM <?= $row['amount']; ?>
+RM <?= number_format($row['commission_amount'],2); ?>
 
 </td>
+
 
 
 <td>
@@ -164,21 +156,20 @@ RM <?= $row['amount']; ?>
 </td>
 
 
+
 </tr>
+
 
 
 <?php } ?>
 
 
+
 </table>
 
 
-</div>
-
-
-<?php include "../includes/footer.php"; ?>
-
 
 </body>
+
 
 </html>
