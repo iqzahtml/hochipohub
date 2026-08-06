@@ -1,62 +1,7 @@
 <?php
 
-require_once "database/db.php";
 
-
-
-if(isset($_POST['send'])){
-
-
-$name=$_POST['name'];
-
-$email=$_POST['email'];
-
-$message=$_POST['message'];
-
-
-
-$stmt=$conn->prepare("
-
-
-INSERT INTO contact_messages
-
-(
-name,
-email,
-message
-)
-
-
-VALUES(?,?,?)
-
-
-");
-
-
-
-$stmt->bind_param(
-
-"sss",
-
-$name,
-
-$email,
-
-$message
-
-);
-
-
-
-$stmt->execute();
-
-
-
-$success="Message sent successfully";
-
-
-}
-
+session_start();
 
 
 ?>
@@ -69,76 +14,54 @@ $success="Message sent successfully";
 
 <head>
 
-
 <title>
-
-Contact Us
-
+Contact
 </title>
 
 
-
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/style.css">
 
 
 </head>
 
 
+
 <body>
 
 
-
-<?php include "includes/navbar.php"; ?>
-
+<?php include "../includes/navbar.php"; ?>
 
 
-<section class="container">
+
+<div class="contact-box">
 
 
 <h1>
-
 Contact HochipoHub
-
 </h1>
 
 
 
-<?php
-
-if(isset($success)){
-
-echo "<p>$success</p>";
-
-}
-
-?>
+<p>
+Need help? Contact our support team.
+</p>
 
 
 
-
-<form method="POST"
-class="admin-form">
+<form method="POST">
 
 
 
-<input
+<input type="text"
 
-type="text"
-
-name="name"
-
-placeholder="Your Name"
+placeholder="Name"
 
 required>
 
 
 
 
-<input
-
-type="email"
-
-name="email"
+<input type="email"
 
 placeholder="Email"
 
@@ -147,19 +70,12 @@ required>
 
 
 
-
-<textarea
-
-name="message"
-
-placeholder="Message"
-
-required></textarea>
+<textarea placeholder="Message"></textarea>
 
 
 
 
-<button name="send">
+<button>
 
 Send Message
 
@@ -171,14 +87,11 @@ Send Message
 
 
 
-</section>
+</div>
 
-
-
-
-<?php include "includes/footer.php"; ?>
 
 
 </body>
+
 
 </html>
