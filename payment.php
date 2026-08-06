@@ -7,7 +7,7 @@ require_once "database/db.php";
 
 if(!isset($_SESSION['user_id'])){
 
-    header("Location: ../auth/login.php");
+    header("Location: auth/login.php");
     exit();
 
 }
@@ -204,7 +204,7 @@ Payment
 <body>
 
 
-<?php include "../includes/navbar.php"; ?>
+<?php include "includes/navbar.php"; ?>
 
 
 
