@@ -1,6 +1,6 @@
 <?php
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 $vendors=$conn->query("
@@ -57,7 +57,7 @@ Vendors
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/vendor.css">
+<link rel="stylesheet" href="css/vendor.css">
 
 
 </head>
@@ -92,7 +92,7 @@ Local Vendors
 <?php if($row['business_logo']){ ?>
 
 
-<img src="../assets/uploads/vendors/<?= $row['business_logo']; ?>">
+<img src="uploads/vendors/<?= $row['business_logo']; ?>">
 
 
 <?php } ?>
