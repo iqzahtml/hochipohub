@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "config/db.php";
+require_once "database/db.php";
 
 
 if(!isset($_GET['id'])){
