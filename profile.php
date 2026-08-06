@@ -2,19 +2,20 @@
 
 session_start();
 
-require_once "database/db.php";
+require_once "../database/db.php";
 
 
 if(!isset($_SESSION['user_id'])){
 
-header("Location: login.php");
+header("Location: ../auth/login.php");
 
 exit();
 
 }
 
 
-$id=$_SESSION['user_id'];
+
+$user_id=$_SESSION['user_id'];
 
 
 
@@ -23,29 +24,51 @@ if(isset($_POST['update'])){
 
 $name=$_POST['name'];
 
-$email=$_POST['email'];
-
 $phone=$_POST['phone'];
 
 
 
-$conn->query("
+$stmt=$conn->prepare("
 
 
-UPDATE users SET
+UPDATE users
 
 
-name='$name',
-
-email='$email',
-
-phone='$phone'
+SET
 
 
-WHERE user_id='$id'
+name=?,
+
+
+phone=?
+
+
+WHERE user_id=?
+
 
 
 ");
+
+
+$stmt->bind_param(
+
+"ssi",
+
+$name,
+
+$phone,
+
+$user_id
+
+);
+
+
+
+$stmt->execute();
+
+
+
+$message="Profile updated";
 
 
 
@@ -58,9 +81,12 @@ $user=$conn->query("
 
 SELECT *
 
+
 FROM users
 
-WHERE user_id='$id'
+
+WHERE user_id=$user_id
+
 
 
 ")->fetch_assoc();
@@ -77,75 +103,89 @@ WHERE user_id='$id'
 
 <head>
 
-
 <title>
-
 Profile
-
 </title>
 
 
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/style.css">
 
 
 </head>
+
 
 
 <body>
 
 
 
-<?php include "includes/navbar.php"; ?>
+<?php include "../includes/navbar.php"; ?>
 
-
-
-<section class="container">
 
 
 <h1>
-
 My Profile
-
 </h1>
 
 
 
-<form method="POST"
-class="admin-form">
+
+<?php if(isset($message)){ ?>
+
+<p>
+
+<?= $message; ?>
+
+</p>
+
+<?php } ?>
 
 
 
-<input
+<form method="POST">
 
-type="text"
+
+
+<label>
+Name
+</label>
+
+
+<input type="text"
 
 name="name"
 
-value="<?php echo $user['name']; ?>">
+value="<?= htmlspecialchars($user['name']); ?>">
 
 
 
 
 
-<input
-
-type="email"
-
-name="email"
-
-value="<?php echo $user['email']; ?>">
+<label>
+Email
+</label>
 
 
+<input type="email"
+
+value="<?= htmlspecialchars($user['email']); ?>"
+
+readonly>
 
 
 
-<input
 
-type="text"
+
+<label>
+Phone
+</label>
+
+
+<input type="text"
 
 name="phone"
 
-value="<?php echo $user['phone']; ?>">
+value="<?= htmlspecialchars($user['phone']); ?>">
 
 
 
@@ -153,7 +193,7 @@ value="<?php echo $user['phone']; ?>">
 
 <button name="update">
 
-Save Profile
+Update
 
 </button>
 
@@ -163,14 +203,7 @@ Save Profile
 
 
 
-</section>
-
-
-
-
-<?php include "includes/footer.php"; ?>
-
-
 </body>
+
 
 </html>
