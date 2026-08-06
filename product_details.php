@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 $product_id=$_GET['id'];
@@ -96,7 +96,7 @@ exit("Product not found");
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/product.css">
+<link rel="stylesheet" href="css/product.css">
 
 
 </head>
@@ -115,7 +115,7 @@ exit("Product not found");
 
 
 
-<img src="../assets/uploads/products/<?= $product['image']; ?>">
+<img src="uploads/products/<?= $product['image']; ?>">
 
 
 
@@ -241,7 +241,7 @@ Reviews
 
 
 
-<script src="../assets/js/script.js"></script>
+<script src="js/script.js"></script>
 
 
 </body>
