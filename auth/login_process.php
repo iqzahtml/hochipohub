@@ -73,7 +73,7 @@ header("Location: ../admin/dashboard.php");
 elseif($user['role']=="vendor"){
 
 
-header("Location: ../vendor/dashboard.php");
+header("Location: ../seller/dashboard.php");
 
 
 }
