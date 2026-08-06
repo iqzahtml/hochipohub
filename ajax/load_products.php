@@ -1,6 +1,6 @@
 <?php
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 header("Content-Type: text/html");
