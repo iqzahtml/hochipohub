@@ -34,7 +34,7 @@ define(
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'hochipohub');
 define('DB_USER', 'root');
-define('DB_PASS', 'root');
+define('DB_PASS', '');
 
 
 /*
@@ -45,22 +45,22 @@ define('DB_PASS', 'root');
 
 define(
     'PRODUCT_UPLOAD_PATH',
-    DIR . '/uploads/products/'
+   __DIR__. '/uploads/products/'
 );
 
 define(
     'VENDOR_UPLOAD_PATH',
-    DIR . '/uploads/vendors/'
+    __DIR__ . '/uploads/vendors/'
 );
 
 define(
     'REVIEW_UPLOAD_PATH',
-    DIR . '/uploads/reviews/'
+    __DIR__. '/uploads/reviews/'
 );
 
 define(
     'PROFILE_UPLOAD_PATH',
-    DIR . '/uploads/profiles/'
+    __DIR__. '/uploads/profiles/'
 );
 
 
