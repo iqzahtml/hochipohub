@@ -26,7 +26,7 @@ product_id,
 
 product_name,
 
-stock
+inventory.quantity
 
 
 
@@ -34,7 +34,7 @@ FROM products
 
 
 
-ORDER BY stock ASC
+ORDER BY inventory.quantity ASC
 
 
 
