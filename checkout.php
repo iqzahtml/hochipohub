@@ -2,80 +2,58 @@
 
 session_start();
 
-require_once "config/db.php";
+
+require_once "../config/db.php";
+
 
 
 if(!isset($_SESSION['user_id'])){
 
-    header("Location: login.php");
-    exit();
+
+header("Location: ../auth/login.php");
+
+
+exit();
+
 
 }
+
 
 
 $user_id=$_SESSION['user_id'];
 
 
 
-/*
-|--------------------------------------------------------------------------
-| GET CUSTOMER INFO
-|--------------------------------------------------------------------------
-*/
-
-$user_query=$conn->prepare("
-
-SELECT *
-
-FROM users
-
-WHERE user_id=?
-
-");
-
-
-$user_query->bind_param(
-    "i",
-    $user_id
-);
-
-
-$user_query->execute();
-
-
-$user=$user_query->get_result()->fetch_assoc();
-
-
 
 
 /*
 |--------------------------------------------------------------------------
-| GET CART ITEMS
+| GET CUSTOMER CART
 |--------------------------------------------------------------------------
 */
 
 
-$query="
+$cart=$conn->prepare("
 
 
 SELECT
 
 
-cart.cart_id,
+cart.product_id,
+
 
 cart.quantity,
 
 
-products.product_id,
-
-products.product_name,
 
 products.price,
 
-products.image,
+products.vendor_id,
 
 
-vendors.business_name
+
+products.product_name
+
 
 
 FROM cart
@@ -84,13 +62,8 @@ FROM cart
 
 JOIN products
 
-ON cart.product_id=products.product_id
 
-
-
-JOIN vendors
-
-ON products.vendor_id=vendors.vendor_id
+ON cart.product_id = products.product_id
 
 
 
@@ -98,59 +71,513 @@ WHERE cart.customer_id=?
 
 
 
-";
+");
 
 
+$cart->bind_param(
 
-$stmt=$conn->prepare($query);
+"i",
 
+$user_id
 
-$stmt->bind_param(
-    "i",
-    $user_id
 );
 
 
-$stmt->execute();
+
+$cart->execute();
 
 
-$cart=$stmt->get_result();
+
+$items=$cart->get_result();
+
+
+
+
+if($items->num_rows==0){
+
+
+header("Location: cart.php");
+
+
+exit();
+
+
+}
+
+
+
+
+
+
+
+if(isset($_POST['checkout'])){
+
+
+
+$delivery=$_POST['delivery_method'];
+
+$address=$_POST['delivery_address'];
+
+
 
 
 
 $total=0;
+
+$cart_data=[];
+
+
+
+
+
+while($item=$items->fetch_assoc()){
+
+
+
+$subtotal=$item['price']*$item['quantity'];
+
+
+
+$total += $subtotal;
+
+
+
+$cart_data[]=$item;
+
+
+
+}
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| CREATE MAIN ORDER
+|--------------------------------------------------------------------------
+*/
+
+
+$order=$conn->prepare("
+
+
+INSERT INTO orders
+
+
+(
+
+customer_id,
+
+total_amount,
+
+delivery_method,
+
+delivery_address,
+
+order_status
+
+)
+
+
+
+VALUES
+
+(?,?,?,?, 'Pending')
+
+
+
+");
+
+
+
+$order->bind_param(
+
+"idss",
+
+$user_id,
+
+$total,
+
+$delivery,
+
+$address
+
+);
+
+
+
+$order->execute();
+
+
+
+$order_id=$conn->insert_id;
+
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| INSERT ORDER DETAILS
+|--------------------------------------------------------------------------
+*/
+
+
+foreach($cart_data as $item){
+
+
+
+$subtotal=$item['price']*$item['quantity'];
+
+
+
+
+$detail=$conn->prepare("
+
+
+INSERT INTO order_details
+
+
+(
+
+order_id,
+
+product_id,
+
+quantity,
+
+unit_price,
+
+subtotal
+
+)
+
+
+
+VALUES
+
+(?,?,?,?,?)
+
+
+
+");
+
+
+
+$detail->bind_param(
+
+"iiidd",
+
+$order_id,
+
+$item['product_id'],
+
+$item['quantity'],
+
+$item['price'],
+
+$subtotal
+
+);
+
+
+
+$detail->execute();
+
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| CREATE VENDOR ORDER
+|--------------------------------------------------------------------------
+*/
+
+
+$vendor=$item['vendor_id'];
+
+
+
+
+$check_vendor=$conn->prepare("
+
+
+SELECT vendor_order_id
+
+FROM vendor_orders
+
+WHERE order_id=?
+
+AND vendor_id=?
+
+
+
+");
+
+
+
+$check_vendor->bind_param(
+
+"ii",
+
+$order_id,
+
+$vendor
+
+);
+
+
+
+$check_vendor->execute();
+
+
+
+$result=$check_vendor->get_result();
+
+
+
+
+
+if($result->num_rows==0){
+
+
+
+$vendor_order=$conn->prepare("
+
+
+INSERT INTO vendor_orders
+
+
+(
+
+order_id,
+
+vendor_id,
+
+subtotal,
+
+vendor_status
+
+
+)
+
+
+
+VALUES
+
+(?,?,?, 'Pending')
+
+
+
+");
+
+
+
+$vendor_order->bind_param(
+
+"iid",
+
+$order_id,
+
+$vendor,
+
+$subtotal
+
+);
+
+
+
+$vendor_order->execute();
+
+
+
+}
+
+else{
+
+
+
+$update_vendor=$conn->prepare("
+
+
+UPDATE vendor_orders
+
+
+SET subtotal=subtotal+?
+
+
+
+WHERE order_id=?
+
+AND vendor_id=?
+
+
+
+");
+
+
+
+$update_vendor->bind_param(
+
+"dii",
+
+$subtotal,
+
+$order_id,
+
+$vendor
+
+);
+
+
+
+$update_vendor->execute();
+
+
+
+}
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE STOCK
+|--------------------------------------------------------------------------
+*/
+
+
+$stock=$conn->prepare("
+
+
+UPDATE products
+
+
+SET stock_quantity = stock_quantity - ?
+
+
+WHERE product_id=?
+
+
+
+");
+
+
+$stock->bind_param(
+
+"ii",
+
+$item['quantity'],
+
+$item['product_id']
+
+);
+
+
+
+$stock->execute();
+
+
+
+}
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| CLEAR CART
+|--------------------------------------------------------------------------
+*/
+
+
+$clear=$conn->prepare("
+
+
+DELETE FROM cart
+
+
+WHERE customer_id=?
+
+
+
+");
+
+
+
+$clear->bind_param(
+
+"i",
+
+$user_id
+
+);
+
+
+
+$clear->execute();
+
+
+
+
+
+header("Location: payment.php?order_id=".$order_id);
+
+
+exit();
+
+
+
+}
+
+
+
+
+/*
+RELOAD CART FOR DISPLAY
+
+*/
+
+$cart->execute();
+
+$items=$cart->get_result();
 
 
 
 ?>
 
 
+
 <!DOCTYPE html>
 
 <html>
 
+
 <head>
 
-<title>Checkout | HochipoHub</title>
+<title>
+Checkout
+</title>
 
 
-<link rel="stylesheet" href="assets/css/style.css">
-
-<link rel="stylesheet" href="assets/css/checkout.css">
+<link rel="stylesheet" href="../assets/css/checkout.css">
 
 
 </head>
 
 
-
 <body>
 
 
-<?php include "includes/navbar.php"; ?>
 
+<?php include "../includes/navbar.php"; ?>
 
-
-<section class="checkout-page">
 
 
 <div class="checkout-container">
@@ -158,140 +585,36 @@ $total=0;
 
 
 <h1>
-
 Checkout
-
 </h1>
 
 
 
 
-<form action="payment.php"
-method="POST">
+<form method="POST">
 
-
-
-
-
-<div class="checkout-layout">
-
-
-
-
-
-<div class="checkout-form">
-
-
-
-<h2>
-
-Delivery Information
-
-</h2>
-
-
-
-
-<div class="checkout-input">
 
 
 <label>
-
-Name
-
-</label>
-
-
-<input
-
-type="text"
-
-name="name"
-
-value="<?php echo $user['name']; ?>"
-
-required>
-
-
-</div>
-
-
-
-
-
-<div class="checkout-input">
-
-
-<label>
-
-Phone
-
-</label>
-
-
-<input
-
-type="text"
-
-name="phone"
-
-value="<?php echo $user['phone']; ?>"
-
-required>
-
-
-</div>
-
-
-
-
-
-<div class="checkout-input">
-
-
-<label>
-
-Address
-
-</label>
-
-
-<textarea
-
-name="address"
-
-required></textarea>
-
-
-</div>
-
-
-
-
-
-
-
-<h2>
 
 Delivery Method
 
-</h2>
+</label>
 
 
-<select name="delivery_method"
-required>
-
-
-<option value="Postage">
-
-Postage
-
-</option>
+<select name="delivery_method">
 
 
 <option value="Pickup">
 
 Pickup
+
+</option>
+
+
+<option value="Postage">
+
+Postage
 
 </option>
 
@@ -302,137 +625,24 @@ Pickup
 
 
 
+<label>
 
-</div>
+Delivery Address
 
+</label>
 
 
 
+<textarea name="delivery_address"></textarea>
 
 
 
 
+<button name="checkout">
 
-<div class="checkout-summary">
-
-
-
-<h2>
-
-Order Summary
-
-</h2>
-
-
-
-
-<?php while($item=$cart->fetch_assoc()){
-
-
-
-$item_total=$item['price']*$item['quantity'];
-
-$total += $item_total;
-
-
-?>
-
-
-
-<div class="checkout-item">
-
-
-<div>
-
-
-<h4>
-
-<?php echo $item['product_name']; ?>
-
-</h4>
-
-
-<p>
-
-<?php echo $item['business_name']; ?>
-
-</p>
-
-
-</div>
-
-
-
-<span>
-
-RM <?php echo number_format($item_total,2); ?>
-
-</span>
-
-
-
-</div>
-
-
-
-<?php } ?>
-
-
-
-
-
-<hr>
-
-
-
-
-<div class="checkout-total">
-
-
-<strong>
-
-Total
-
-</strong>
-
-
-
-<strong>
-
-RM <?php echo number_format($total,2); ?>
-
-</strong>
-
-
-
-</div>
-
-
-
-<input type="hidden"
-name="total"
-value="<?php echo $total; ?>">
-
-
-
-
-
-<button class="checkout-btn">
-
-Continue Payment
+Place Order
 
 </button>
-
-
-
-
-</div>
-
-
-
-
-
-</div>
 
 
 
@@ -443,15 +653,8 @@ Continue Payment
 </div>
 
 
-</section>
-
-
-
-
-
-<?php include "includes/footer.php"; ?>
-
 
 </body>
+
 
 </html>
