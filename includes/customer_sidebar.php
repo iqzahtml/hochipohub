@@ -1,52 +1,13 @@
-<?php
-
-if(!isset($_SESSION['user_id'])){
-
-header("Location: ../login.php");
-
-exit();
-
-}
-
-
-
-?>
-
-
-<aside class="dashboard-sidebar customer-sidebar">
-
-
-
-<div class="sidebar-header">
+<div class="sidebar">
 
 
 <h2>
-
-Customer
-
+Customer Menu
 </h2>
 
 
-<p>
 
-HochipoHub
-
-</p>
-
-
-</div>
-
-
-
-
-
-<nav class="sidebar-menu">
-
-
-
-<a href="../dashboard.php">
-
-<i class="fa-solid fa-house"></i>
+<a href="../hochipohub/dashboard.php">
 
 Dashboard
 
@@ -54,59 +15,7 @@ Dashboard
 
 
 
-
-
-<a href="../product.php">
-
-<i class="fa-solid fa-store"></i>
-
-Shop
-
-</a>
-
-
-
-
-
-<a href="../wishlist.php">
-
-<i class="fa-solid fa-heart"></i>
-
-Wishlist
-
-</a>
-
-
-
-
-
-<a href="../cart.php">
-
-<i class="fa-solid fa-cart-shopping"></i>
-
-Cart
-
-</a>
-
-
-
-
-
-<a href="../order.php">
-
-<i class="fa-solid fa-box"></i>
-
-My Orders
-
-</a>
-
-
-
-
-
-<a href="../profile.php">
-
-<i class="fa-solid fa-user"></i>
+<a href="../hochipohub/profile.php">
 
 Profile
 
@@ -114,48 +23,36 @@ Profile
 
 
 
+<a href="../hochipohub/cart.php">
 
-
-<a href="../review.php">
-
-<i class="fa-solid fa-star"></i>
-
-Reviews
+My Cart
 
 </a>
 
 
 
+<a href="../hochipohub/wishlist.php">
 
-
-<a href="../contact.php">
-
-<i class="fa-solid fa-message"></i>
-
-Contact
+Wishlist
 
 </a>
 
 
 
+<a href="../hochipohub/order.php">
+
+Orders
+
+</a>
 
 
-<a href="../auth/logout.php"
 
-class="logout-link">
-
-
-<i class="fa-solid fa-right-from-bracket"></i>
+<a href="../auth/logout.php">
 
 Logout
 
-
 </a>
 
 
 
-
-</nav>
-
-
-</aside>
+</div>
