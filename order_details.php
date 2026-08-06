@@ -2,38 +2,94 @@
 
 session_start();
 
-require_once "config/db.php";
+require_once "../config/db.php";
 
 
-if(!isset($_GET['id'])){
+if(!isset($_SESSION['user_id'])){
 
-header("Location: order.php");
+header("Location: ../auth/login.php");
 
 exit();
 
 }
 
 
+
+$user_id=$_SESSION['user_id'];
+
 $order_id=$_GET['id'];
 
 
 
-$order=$conn->query("
+
+$order=$conn->prepare("
 
 
-SELECT *
+SELECT
+
+
+orders.*,
+
+
+users.name,
+
+
+users.email
+
+
 
 FROM orders
 
-WHERE order_id='$order_id'
 
 
-")->fetch_assoc();
+JOIN users
+
+
+ON orders.customer_id=users.user_id
+
+
+
+WHERE orders.order_id=?
+
+AND orders.customer_id=?
+
+
+
+");
+
+
+
+$order->bind_param(
+
+"ii",
+
+$order_id,
+
+$user_id
+
+);
+
+
+
+$order->execute();
+
+
+
+$order_data=$order->get_result()->fetch_assoc();
+
+
+
+if(!$order_data){
+
+exit("Order not found");
+
+}
 
 
 
 
-$items=$conn->query("
+
+$details=$conn->prepare("
 
 
 SELECT
@@ -41,9 +97,16 @@ SELECT
 
 order_details.*,
 
+
 products.product_name,
 
-products.image
+
+products.image,
+
+
+
+vendors.business_name
+
 
 
 FROM order_details
@@ -52,18 +115,46 @@ FROM order_details
 
 JOIN products
 
+
 ON order_details.product_id=products.product_id
 
 
 
-WHERE order_id='$order_id'
+JOIN vendors
+
+
+ON products.vendor_id=vendors.vendor_id
+
+
+
+WHERE order_id=?
+
 
 
 ");
 
 
 
+$details->bind_param(
+
+"i",
+
+$order_id
+
+);
+
+
+
+$details->execute();
+
+
+
+$items=$details->get_result();
+
+
+
 ?>
+
 
 
 <!DOCTYPE html>
@@ -73,11 +164,12 @@ WHERE order_id='$order_id'
 
 <head>
 
+<title>
+Order Details
+</title>
 
-<title>Order Details</title>
 
-
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/style.css">
 
 
 </head>
@@ -88,19 +180,17 @@ WHERE order_id='$order_id'
 
 
 
-<?php include "includes/navbar.php"; ?>
+<?php include "../includes/navbar.php"; ?>
 
 
 
-<section class="container">
+<div class="order-details">
 
-
-<div class="admin-panel">
 
 
 <h1>
 
-Order #<?php echo $order_id; ?>
+Order #<?= $order_id; ?>
 
 </h1>
 
@@ -109,23 +199,36 @@ Order #<?php echo $order_id; ?>
 
 <p>
 
-Status:
+Customer:
 
-<?php echo $order['order_status']; ?>
+<?= htmlspecialchars($order_data['name']); ?>
 
 </p>
 
 
 
+<p>
 
-<table class="admin-table">
+Status:
+
+<?= $order_data['order_status']; ?>
+
+</p>
+
+
+
+<table border="1">
 
 
 <tr>
 
-
 <th>
 Product
+</th>
+
+
+<th>
+Vendor
 </th>
 
 
@@ -139,12 +242,17 @@ Price
 </th>
 
 
+<th>
+Subtotal
+</th>
+
 </tr>
 
 
 
 
-<?php while($item=$items->fetch_assoc()){ ?>
+<?php while($row=$items->fetch_assoc()){ ?>
+
 
 
 <tr>
@@ -152,7 +260,7 @@ Price
 
 <td>
 
-<?php echo $item['product_name']; ?>
+<?= htmlspecialchars($row['product_name']); ?>
 
 </td>
 
@@ -160,16 +268,34 @@ Price
 
 <td>
 
-<?php echo $item['quantity']; ?>
+<?= htmlspecialchars($row['business_name']); ?>
 
 </td>
+
 
 
 <td>
 
-RM <?php echo number_format($item['subtotal'],2); ?>
+<?= $row['quantity']; ?>
 
 </td>
+
+
+
+<td>
+
+RM <?= number_format($row['unit_price'],2); ?>
+
+</td>
+
+
+
+<td>
+
+RM <?= number_format($row['subtotal'],2); ?>
+
+</td>
+
 
 
 </tr>
@@ -184,27 +310,11 @@ RM <?php echo number_format($item['subtotal'],2); ?>
 
 
 
-<h2>
-
-Total:
-RM <?php echo number_format($order['total_amount'],2); ?>
-
-</h2>
-
-
-
-
 </div>
 
 
 
-</section>
-
-
-
-<?php include "includes/footer.php"; ?>
-
-
 </body>
+
 
 </html>
