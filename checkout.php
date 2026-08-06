@@ -3,7 +3,7 @@
 session_start();
 
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 
@@ -566,7 +566,7 @@ Checkout
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/checkout.css">
+<link rel="stylesheet" href="css/checkout.css">
 
 
 </head>
