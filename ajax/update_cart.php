@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
    CHECK CUSTOMER LOGIN
 ============================================================== */
 
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['customer_id'])) {
 
     http_response_code(401);
 
@@ -97,7 +97,7 @@ if (!isset($_SESSION['user_id'])) {
    USER ID
 ============================================================== */
 
-$userId = (int) $_SESSION['user_id'];
+$userId = (int) $_SESSION['customer_id'];
 
 
 /* ==============================================================
