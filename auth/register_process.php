@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 if(isset($_POST['register'])){
@@ -47,7 +47,7 @@ if($result->num_rows > 0){
 
 $_SESSION['error']="Email already registered";
 
-header("Location: ../register.php");
+header("Location: register.php");
 
 exit();
 
@@ -101,7 +101,7 @@ if($stmt->execute()){
 $_SESSION['success']="Registration successful";
 
 
-header("Location: ../login.php");
+header("Location: login.php");
 
 
 }else{
@@ -110,7 +110,7 @@ header("Location: ../login.php");
 $_SESSION['error']="Registration failed";
 
 
-header("Location: ../register.php");
+header("Location: register.php");
 
 
 }
