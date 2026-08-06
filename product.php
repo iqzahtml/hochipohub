@@ -1,6 +1,6 @@
 <?php
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 
@@ -53,7 +53,7 @@ Products
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/product.css">
+<link rel="stylesheet" href="css/product.css">
 
 
 </head>
@@ -84,7 +84,7 @@ All Products
 
 
 
-<img src="../assets/uploads/products/<?= $row['image']; ?>">
+<img src="uploads/products/<?= $row['image']; ?>">
 
 
 
