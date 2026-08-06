@@ -49,7 +49,7 @@ while($row=$result->fetch_assoc()){
 <div class="search-item">
 
 
-<a href="../hochipohub/product_details.php?id=<?= $row['product_id']; ?>">
+<a href="hochipohub/product_details.php?id=<?= $row['product_id']; ?>">
 
 
 <?= htmlspecialchars($row['product_name']); ?>
