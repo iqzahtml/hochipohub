@@ -7,7 +7,7 @@ require_once "../database/db.php";
 
 if(!isset($_SESSION['user_id']) || $_SESSION['role']!="admin"){
 
-    header("Location: ../auth/login.php");
+    header("Location: auth/login.php");
     exit();
 
 }
@@ -120,13 +120,13 @@ Admin Dashboard
 <body>
 
 
-<?php include "../includes/navbar.php"; ?>
+<?php include "includes/navbar.php"; ?>
 
 
 <div class="admin-layout">
 
 
-<?php include "../includes/admin_sidebar.php"; ?>
+<?php include "includes/admin_sidebar.php"; ?>
 
 
 <main class="admin-content">
