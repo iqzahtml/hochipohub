@@ -1,39 +1,82 @@
 <?php
 
-require_once "config/db.php";
-
-
-$id=$_GET['id'] ?? 0;
+require_once "../config/db.php";
 
 
 
-$category=$conn->query("
+$category_id=$_GET['id'];
 
 
-SELECT *
+
+$category=$conn->prepare("
+
+
+SELECT category_name
 
 FROM categories
 
-WHERE category_id='$id'
+WHERE category_id=?
 
 
-")->fetch_assoc();
+");
+
+
+$category->bind_param(
+
+"i",
+
+$category_id
+
+);
+
+
+
+$category->execute();
+
+
+$category_name=$category->get_result()->fetch_assoc();
 
 
 
 
-$products=$conn->query("
+
+$stmt=$conn->prepare("
 
 
 SELECT *
+
 
 FROM products
 
 
-WHERE category_id='$id'
+WHERE category_id=?
+
+
+AND status='Available'
+
+
+ORDER BY product_id DESC
+
 
 
 ");
+
+
+$stmt->bind_param(
+
+"i",
+
+$category_id
+
+);
+
+
+
+$stmt->execute();
+
+
+
+$products=$stmt->get_result();
 
 
 
@@ -49,36 +92,29 @@ WHERE category_id='$id'
 
 <title>
 
-Category
+<?= $category_name['category_name']; ?>
 
 </title>
 
 
-<link rel="stylesheet" href="assets/css/style.css">
-
-<link rel="stylesheet" href="assets/css/product.css">
+<link rel="stylesheet" href="../assets/css/product.css">
 
 
 </head>
+
 
 
 <body>
 
 
 
-<?php include "includes/navbar.php"; ?>
+<?php include "../includes/navbar.php"; ?>
 
-
-
-<section class="product-page">
-
-
-<div class="product-container">
 
 
 <h1>
 
-<?php echo $category['category_name']; ?>
+<?= htmlspecialchars($category_name['category_name']); ?>
 
 </h1>
 
@@ -94,53 +130,44 @@ Category
 <div class="product-card">
 
 
-<img src="assets/uploads/products/<?php echo $row['image']; ?>">
-
+<img src="../assets/uploads/products/<?= $row['image']; ?>">
 
 
 <h3>
 
-<?php echo $row['product_name']; ?>
+<?= htmlspecialchars($row['product_name']); ?>
 
 </h3>
 
 
 <p>
 
-RM <?php echo $row['price']; ?>
+RM <?= number_format($row['price'],2); ?>
 
 </p>
 
 
 
-<a href="product_details.php?id=<?php echo $row['product_id']; ?>">
+<a href="product_details.php?id=<?= $row['product_id']; ?>">
 
 View
 
 </a>
 
 
-
 </div>
+
 
 
 <?php } ?>
 
 
-</div>
-
-
 
 </div>
 
-
-</section>
-
-
-
-<?php include "includes/footer.php"; ?>
 
 
 </body>
+
 
 </html>
