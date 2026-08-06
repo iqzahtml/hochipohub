@@ -7,7 +7,7 @@ Vendor Panel
 
 
 
-<a href="../seller/dashboard.php">
+<a href="seller/dashboard.php">
 
 Dashboard
 
@@ -15,7 +15,7 @@ Dashboard
 
 
 
-<a href="../seller/products.php">
+<a href="seller/products.php">
 
 Products
 
@@ -23,7 +23,7 @@ Products
 
 
 
-<a href="../seller/add_product.php">
+<a href="seller/add_product.php">
 
 Add Product
 
@@ -31,7 +31,7 @@ Add Product
 
 
 
-<a href="../seller/orders.php">
+<a href="seller/orders.php">
 
 Orders
 
@@ -39,7 +39,7 @@ Orders
 
 
 
-<a href="../seller/sales.php">
+<a href="seller/sales.php">
 
 Sales
 
@@ -47,7 +47,7 @@ Sales
 
 
 
-<a href="../hochipohub/inventory.php">
+<a href="hochipohub/inventory.php">
 
 Inventory
 
@@ -55,7 +55,7 @@ Inventory
 
 
 
-<a href="../hochipohub/commission.php">
+<a href="hochipohub/commission.php">
 
 Commission
 
@@ -63,7 +63,7 @@ Commission
 
 
 
-<a href="../auth/logout.php">
+<a href="auth/logout.php">
 
 Logout
 
