@@ -2,12 +2,12 @@
 
 session_start();
 
-require_once "config/db.php";
+require_once "../config/db.php";
 
 
 if(!isset($_SESSION['user_id'])){
 
-header("Location: login.php");
+header("Location: ../auth/login.php");
 
 exit();
 
@@ -19,14 +19,14 @@ $user_id=$_SESSION['user_id'];
 
 
 
-if(isset($_POST['submit'])){
+if(isset($_POST['submit_review'])){
 
 
 $product_id=$_POST['product_id'];
 
 $rating=$_POST['rating'];
 
-$comment=$_POST['comment'];
+$review=$_POST['review'];
 
 
 
@@ -35,15 +35,25 @@ $stmt=$conn->prepare("
 
 INSERT INTO reviews
 
+
 (
+
 customer_id,
+
 product_id,
+
 rating,
-comment
+
+review
+
 )
 
 
-VALUES(?,?,?,?)
+
+VALUES
+
+(?,?,?,?)
+
 
 
 ");
@@ -60,7 +70,7 @@ $product_id,
 
 $rating,
 
-$comment
+$review
 
 );
 
@@ -70,7 +80,8 @@ $stmt->execute();
 
 
 
-header("Location: review.php");
+header("Location: product_details.php?id=".$product_id);
+
 
 exit();
 
@@ -79,18 +90,8 @@ exit();
 
 
 
-
-$products=$conn->query("
-
-
-SELECT *
-
-FROM products
-
-
-");
-
 ?>
+
 
 
 <!DOCTYPE html>
@@ -100,10 +101,11 @@ FROM products
 
 <head>
 
-<title>Review</title>
+<title>
 
+Write Review
 
-<link rel="stylesheet" href="assets/css/style.css">
+</title>
 
 
 </head>
@@ -113,62 +115,28 @@ FROM products
 
 
 
-<?php include "includes/navbar.php"; ?>
-
-
-
-<section class="container">
-
-
 <h1>
-
 Write Review
-
 </h1>
 
 
 
-
-<form method="POST"
-class="admin-form">
-
-
-<label>
-
-Product
-
-</label>
-
-
-<select name="product_id">
-
-
-<?php while($p=$products->fetch_assoc()){ ?>
-
-
-<option value="<?php echo $p['product_id']; ?>">
-
-
-<?php echo $p['product_name']; ?>
-
-
-</option>
+<form method="POST">
 
 
 
-<?php } ?>
+<input type="hidden"
 
+name="product_id"
 
-</select>
+value="<?= $_GET['id']; ?>">
 
 
 
 
 
 <label>
-
 Rating
-
 </label>
 
 
@@ -176,27 +144,27 @@ Rating
 
 
 <option value="5">
-5 Stars
+5
 </option>
 
 
 <option value="4">
-4 Stars
+4
 </option>
 
 
 <option value="3">
-3 Stars
+3
 </option>
 
 
 <option value="2">
-2 Stars
+2
 </option>
 
 
 <option value="1">
-1 Star
+1
 </option>
 
 
@@ -206,20 +174,17 @@ Rating
 
 
 
-<textarea
 
-name="comment"
+<textarea name="review"
 
-placeholder="Your review"
-
-required></textarea>
+placeholder="Your review"></textarea>
 
 
 
 
-<button name="submit">
+<button name="submit_review">
 
-Submit Review
+Submit
 
 </button>
 
@@ -227,13 +192,6 @@ Submit Review
 
 </form>
 
-
-
-</section>
-
-
-
-<?php include "includes/footer.php"; ?>
 
 
 </body>
