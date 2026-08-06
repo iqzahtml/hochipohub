@@ -8,53 +8,33 @@
 
 require_once dirname(__DIR__) . '/config.php';
 
-
 /*
 |--------------------------------------------------------------------------
-| PDO Database Connection
+| MySQLi Connection
 |--------------------------------------------------------------------------
 */
 
-try {
+$conn = new mysqli(
+    DB_HOST,
+    DB_USER,
+    DB_PASS,
+    DB_NAME
+);
 
-    $dsn = "mysql:host=" . DB_HOST .
-           ";dbname=" . DB_NAME .
-           ";charset=utf8mb4";
-
-    $options = [
-
-        PDO::ATTR_ERRMODE =>
-            PDO::ERRMODE_EXCEPTION,
-
-        PDO::ATTR_DEFAULT_FETCH_MODE =>
-            PDO::FETCH_ASSOC,
-
-        PDO::ATTR_EMULATE_PREPARES =>
-            false
-
-    ];
-
-    $pdo = new PDO(
-        $dsn,
-        DB_USER,
-        DB_PASS,
-        $options
-    );
-
-
-} catch (PDOException $e) {
+if ($conn->connect_error) {
 
     if (DEVELOPMENT_MODE === true) {
 
-        die(
-            "Database Connection Failed: " .
-            htmlspecialchars($e->getMessage())
-        );
+        die("Database Connection Failed: " . $conn->connect_error);
 
     } else {
 
-        die(
-            "Unable to connect to the database. Please try again later."
-        );
+        die("Unable to connect to database.");
+
     }
+
 }
+
+$conn->set_charset("utf8mb4");
+
+?>
