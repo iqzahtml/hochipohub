@@ -2,13 +2,12 @@
 
 session_start();
 
-require_once "database/db.php";
-
+require_once "../database/db.php";
 
 
 if(!isset($_SESSION['user_id'])){
 
-header("Location: login.php");
+header("Location: ../auth/login.php");
 
 exit();
 
@@ -16,21 +15,78 @@ exit();
 
 
 
-$id=$_SESSION['user_id'];
+$user_id=$_SESSION['user_id'];
 
 
 
-$user=$conn->query("
+$orders=$conn->prepare("
 
 
-SELECT *
-
-FROM users
-
-WHERE user_id='$id'
+SELECT COUNT(*) AS total
 
 
-")->fetch_assoc();
+FROM orders
+
+
+WHERE customer_id=?
+
+
+
+");
+
+
+
+$orders->bind_param(
+
+"i",
+
+$user_id
+
+);
+
+
+
+$orders->execute();
+
+
+
+$total_orders=$orders->get_result()->fetch_assoc()['total'];
+
+
+
+
+$wishlist=$conn->prepare("
+
+
+SELECT COUNT(*) AS total
+
+
+FROM wishlist
+
+
+WHERE user_id=?
+
+
+
+");
+
+
+
+$wishlist->bind_param(
+
+"i",
+
+$user_id
+
+);
+
+
+
+$wishlist->execute();
+
+
+
+$total_wishlist=$wishlist->get_result()->fetch_assoc()['total'];
 
 
 
@@ -45,18 +101,12 @@ WHERE user_id='$id'
 
 <head>
 
-
 <title>
-
 Dashboard
-
 </title>
 
 
-
-<link rel="stylesheet" href="assets/css/style.css">
-
-<link rel="stylesheet" href="assets/css/admin.css">
+<link rel="stylesheet" href="../assets/css/style.css">
 
 
 </head>
@@ -66,33 +116,36 @@ Dashboard
 <body>
 
 
-
-<?php include "includes/navbar.php"; ?>
-
-
-
-
-<section class="dashboard-page">
-
-
-<div class="dashboard-container">
+<?php include "../includes/navbar.php"; ?>
 
 
 
 <h1>
-
-Welcome,
-
-<?php echo $user['name']; ?>
-
+Dashboard
 </h1>
 
 
 
+<div class="dashboard-cards">
 
 
-<div class="dashboard-grid">
 
+<div class="dashboard-card">
+
+
+<h3>
+Orders
+</h3>
+
+
+<p>
+
+<?= $total_orders; ?>
+
+</p>
+
+
+</div>
 
 
 
@@ -101,149 +154,26 @@ Welcome,
 
 
 <h3>
-
-My Orders
-
+Wishlist
 </h3>
 
 
-<a href="order.php">
+<p>
 
-View Orders
+<?= $total_wishlist; ?>
 
-</a>
-
-
-</div>
-
-
-
-
-
-<?php if($user['role']=="vendor"){ ?>
-
-
-
-<div class="dashboard-card">
-
-
-<h3>
-
-Inventory
-
-</h3>
-
-
-<a href="inventory.php">
-
-Manage
-
-</a>
+</p>
 
 
 </div>
 
 
 
-
-
-<div class="dashboard-card">
-
-
-<h3>
-
-Commission
-
-</h3>
-
-
-<a href="commission.php">
-
-View
-
-</a>
-
-
 </div>
 
-
-
-
-<?php } ?>
-
-
-
-
-
-<?php if($user['role']=="admin"){ ?>
-
-
-
-<div class="dashboard-card">
-
-
-<h3>
-
-Admin Panel
-
-</h3>
-
-
-<a href="admin/index.php">
-
-Open
-
-</a>
-
-
-</div>
-
-
-
-<?php } ?>
-
-
-
-
-
-<div class="dashboard-card">
-
-
-<h3>
-
-Profile
-
-</h3>
-
-
-<a href="profile.php">
-
-Edit
-
-</a>
-
-
-</div>
-
-
-
-
-
-</div>
-
-
-
-
-</div>
-
-
-</section>
-
-
-
-<?php include "includes/footer.php"; ?>
 
 
 </body>
+
 
 </html>
