@@ -1,7 +1,6 @@
 <?php
 
-require_once "session.php";
-
+require_once __DIR__.'/session.php';
 
 ?>
 
@@ -11,7 +10,7 @@ require_once "session.php";
 
 <div class="logo">
 
-<a href="hochipohub/index.php">
+<a href="<?= BASE_URL ?>index.php">
 
 HochipoHub
 
@@ -26,7 +25,7 @@ HochipoHub
 
 <li>
 
-<a href="hochipohub/catalog.php">
+<a href="<?= BASE_URL ?>catalog.php">
 
 Catalog
 
@@ -35,9 +34,10 @@ Catalog
 </li>
 
 
+
 <li>
 
-<a href="hochipohub/vendor.php">
+<a href="<?= BASE_URL ?>vendor.php">
 
 Vendor
 
@@ -47,13 +47,13 @@ Vendor
 
 
 
-<?php if(isLogin()){ ?>
 
+<?php if(isLoggedIn()): ?>
 
 
 <li>
 
-<a href="hochipohub/cart.php">
+<a href="<?= BASE_URL ?>cart.php">
 
 Cart
 
@@ -65,7 +65,7 @@ Cart
 
 <li>
 
-<a href="hochipohub/wishlist.php">
+<a href="<?= BASE_URL ?>wishlist.php">
 
 Wishlist
 
@@ -75,10 +75,9 @@ Wishlist
 
 
 
-
 <li>
 
-<a href="hochipohub/dashboard.php">
+<a href="<?= BASE_URL ?>dashboard.php">
 
 Dashboard
 
@@ -88,34 +87,9 @@ Dashboard
 
 
 
-<?php } ?>
-
-
-
-
-
-<?php if(!isLogin()){ ?>
-
-
 <li>
 
-<a href="auth/login.php">
-
-Login
-
-</a>
-
-</li>
-
-
-
-<?php }else{ ?>
-
-
-
-<li>
-
-<a href="auth/logout.php">
+<a href="<?= BASE_URL ?>auth/logout.php">
 
 Logout
 
@@ -125,7 +99,32 @@ Logout
 
 
 
-<?php } ?>
+<?php else: ?>
+
+
+<li>
+
+<button onclick="openLoginModal()">
+
+Login
+
+</button>
+
+</li>
+
+
+<li>
+
+<button onclick="openRegisterModal()">
+
+Register
+
+</button>
+
+</li>
+
+
+<?php endif; ?>
 
 
 
@@ -134,3 +133,17 @@ Logout
 
 
 </nav>
+
+
+
+<?php
+
+if(!isLoggedIn()){
+
+    include __DIR__.'/login_modal.php';
+
+    include __DIR__.'/register_modal.php';
+
+}
+
+?>
