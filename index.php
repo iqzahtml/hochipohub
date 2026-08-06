@@ -1,25 +1,18 @@
 <?php
 
-session_start();
-
 require_once "config/db.php";
 
 
-/*
-|--------------------------------------------------------------------------
-| GET FEATURED PRODUCTS
-|--------------------------------------------------------------------------
-*/
 
-$query = "
+$latest=$conn->query("
+
 
 SELECT
 
+
 products.*,
 
-vendors.business_name,
-
-categories.category_name
+vendors.business_name
 
 
 FROM products
@@ -27,63 +20,59 @@ FROM products
 
 JOIN vendors
 
-ON products.vendor_id = vendors.vendor_id
+ON products.vendor_id=vendors.vendor_id
 
 
-JOIN categories
 
-ON products.category_id = categories.category_id
+ORDER BY product_id DESC
 
-
-WHERE products.status='Available'
-
-
-ORDER BY products.created_at DESC
 
 
 LIMIT 8
 
-";
+
+");
 
 
-$products = $conn->query($query);
 
 
+$categories=$conn->query("
 
-/*
-|--------------------------------------------------------------------------
-| GET CATEGORIES
-|--------------------------------------------------------------------------
-*/
-
-$categories = $conn->query("
 
 SELECT *
 
 FROM categories
 
+
 LIMIT 6
+
 
 ");
 
+
+
 ?>
+
 
 <!DOCTYPE html>
 
 <html>
 
+
 <head>
 
-<title>HochipoHub | Marketplace</title>
+
+<title>
+
+HochipoHub Marketplace
+
+</title>
+
 
 
 <link rel="stylesheet" href="assets/css/style.css">
 
 <link rel="stylesheet" href="assets/css/product.css">
-
-
-<link rel="stylesheet"
-href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
 
 </head>
@@ -96,7 +85,9 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
 
 
 
-<section class="hero">
+
+
+<section class="hero-section">
 
 
 <div class="hero-content">
@@ -104,26 +95,29 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
 
 <h1>
 
-Discover Amazing Products
+Discover Local Products
 
-From Local Vendors
+with HochipoHub
 
 </h1>
 
 
+
 <p>
 
-Shop unique products from trusted sellers.
+Support local vendors and shop everything in one place.
 
 </p>
 
 
 
-<a href="product.php" class="primary-btn">
 
-Explore Now
+<a href="catalog.php">
+
+Start Shopping
 
 </a>
+
 
 
 </div>
@@ -138,15 +132,12 @@ Explore Now
 <section class="container">
 
 
-<div class="section-title">
 
 <h2>
 
-Popular Categories
+Categories
 
 </h2>
-
-</div>
 
 
 
@@ -154,19 +145,13 @@ Popular Categories
 <div class="category-grid">
 
 
+
 <?php while($cat=$categories->fetch_assoc()){ ?>
+
 
 
 <a href="category.php?id=<?php echo $cat['category_id']; ?>"
 class="category-card">
-
-
-<div class="category-card-icon">
-
-<i class="fa-solid fa-layer-group"></i>
-
-</div>
-
 
 
 <h3>
@@ -176,18 +161,12 @@ class="category-card">
 </h3>
 
 
-<p>
-
-Explore products
-
-</p>
-
-
 </a>
 
 
 
 <?php } ?>
+
 
 
 </div>
@@ -200,12 +179,8 @@ Explore products
 
 
 
-
-
 <section class="container">
 
-
-<div class="section-title">
 
 
 <h2>
@@ -215,136 +190,57 @@ Latest Products
 </h2>
 
 
-<a href="product.php">
-
-View All
-
-</a>
-
-
-</div>
-
-
-
 
 <div class="product-grid">
 
 
-<?php while($row=$products->fetch_assoc()){ ?>
+
+<?php while($row=$latest->fetch_assoc()){ ?>
 
 
 <div class="product-card">
 
 
-<div class="product-card-image">
-
-
-<?php if($row['image']){ ?>
-
-
 <img src="assets/uploads/products/<?php echo $row['image']; ?>">
 
 
-<?php }else{ ?>
 
-
-<div class="product-image-placeholder">
-
-<i class="fa-solid fa-image"></i>
-
-</div>
-
-
-<?php } ?>
-
-
-</div>
-
-
-
-
-<div class="product-card-content">
-
-
-<span class="product-card-category">
-
-<?php echo $row['category_name']; ?>
-
-</span>
-
-
-
-<h3 class="product-card-title">
-
-
-<a href="product_details.php?id=<?php echo $row['product_id']; ?>">
-
+<h3>
 
 <?php echo $row['product_name']; ?>
-
-
-</a>
-
 
 </h3>
 
 
 
+<p>
 
-<p class="product-card-vendor">
-
-<i class="fa-solid fa-store"></i>
-
-<?php echo $row['business_name']; ?>
-
+RM <?php echo number_format($row['price'],2); ?>
 
 </p>
 
 
 
+<a href="product_details.php?id=<?php echo $row['product_id']; ?>">
 
-<div class="product-card-footer">
-
-
-<strong class="product-price-current">
-
-
-RM <?php echo number_format($row['price'],2); ?>
-
-
-</strong>
-
-
-
-<a href="product_details.php?id=<?php echo $row['product_id']; ?>"
-class="add-cart-btn">
-
-
-<i class="fa-solid fa-eye"></i>
-
+View
 
 </a>
 
 
-
 </div>
 
-
-</div>
-
-
-
-</div>
 
 
 <?php } ?>
 
 
+
 </div>
 
 
-</section>
 
+</section>
 
 
 
