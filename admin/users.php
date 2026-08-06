@@ -7,7 +7,7 @@ require_once "database/db.php";
 
 if($_SESSION['role']!="admin"){
 
-header("Location: ../index.php");
+header("Location: index.php");
 
 exit();
 
