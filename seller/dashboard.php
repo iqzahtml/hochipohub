@@ -2,12 +2,12 @@
 
 session_start();
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] != "vendor"){
 
-    header("Location: ../auth/login.php");
+    header("Location: auth/login.php");
     exit();
 
 }
@@ -179,7 +179,7 @@ Vendor Dashboard
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/vendor.css">
+<link rel="stylesheet" href="css/vendor.css">
 
 
 </head>
@@ -188,13 +188,13 @@ Vendor Dashboard
 <body>
 
 
-<?php include "../includes/navbar.php"; ?>
+<?php include "includes/navbar.php"; ?>
 
 
 <div class="dashboard-container">
 
 
-<?php include "../includes/vendor_sidebar.php"; ?>
+<?php include "includes/vendor_sidebar.php"; ?>
 
 
 
@@ -283,7 +283,7 @@ RM <?= number_format($total_sales,2); ?>
 
 
 
-<?php include "../includes/footer.php"; ?>
+<?php include "includes/footer.php"; ?>
 
 
 </body>
