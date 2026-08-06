@@ -835,7 +835,7 @@
 
 
         <a
-            href="<?php echo BASE_URL; ?>vendor/setup_profile.php"
+            href="<?php echo BASE_URL; ?>seller/setup_profile.php"
             class="auth-submit-btn vendor-setup-btn"
         >
 
