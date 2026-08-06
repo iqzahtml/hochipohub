@@ -1,13 +1,13 @@
 <?php
 
+
 session_start();
+
 
 require_once "../config/db.php";
 
 
-if(!isset($_SESSION['user_id'])){
-
-header("Location: ../login.php");
+if(!isset($_SESSION['user_id']) || $_SESSION['role']!="admin"){
 
 exit();
 
@@ -15,54 +15,72 @@ exit();
 
 
 
-if(isset($_POST['save'])){
+
+if(isset($_POST['update'])){
 
 
-$site_name=$_POST['site_name'];
+$name=$_POST['name'];
 
 $email=$_POST['email'];
 
 
 
-$conn->query("
+$stmt=$conn->prepare("
 
 
-UPDATE settings
-
+UPDATE users
 
 SET
 
+name=?,
 
-site_name='$site_name',
+email=?
 
-email='$email'
-
-
-WHERE id=1
-
+WHERE user_id=?
 
 
 ");
 
 
-$message="Settings updated";
+
+$stmt->bind_param(
+
+"ssi",
+
+$name,
+
+$email,
+
+$_SESSION['user_id']
+
+);
+
+
+
+$stmt->execute();
+
+
+
+$message="Settings Updated";
+
 
 
 }
 
 
 
+$user=$conn->query("
 
-$settings=$conn->query("
 
 SELECT *
 
-FROM settings
+FROM users
 
-LIMIT 1
+WHERE user_id=".$_SESSION['user_id']
 
 
-")->fetch_assoc();
+
+)->fetch_assoc();
 
 
 
@@ -73,16 +91,15 @@ LIMIT 1
 
 <html>
 
+
 <head>
 
 <title>
-Settings
+Admin Settings
 </title>
 
 
-<link rel="stylesheet"
-
-href="../assets/css/admin.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
 
 
 </head>
@@ -91,45 +108,40 @@ href="../assets/css/admin.css">
 <body>
 
 
-<?php include "../includes/navbar.php"; ?>
-
-
-
-<div class="dashboard-container">
-
 
 <h1>
-System Settings
+Account Settings
 </h1>
+
 
 
 
 <?php if(isset($message)){ ?>
 
 <p>
+
 <?= $message; ?>
+
 </p>
 
 <?php } ?>
 
 
 
-<form method="POST"
 
-class="admin-form">
-
+<form method="POST">
 
 
 <label>
-Website Name
+Name
 </label>
 
 
 <input type="text"
 
-name="site_name"
+name="name"
 
-value="<?= $settings['site_name']; ?>">
+value="<?= htmlspecialchars($user['name']); ?>">
 
 
 
@@ -142,15 +154,15 @@ Email
 
 name="email"
 
-value="<?= $settings['email']; ?>">
+value="<?= htmlspecialchars($user['email']); ?>">
 
 
 
-<button type="submit"
 
-name="save">
 
-Save Settings
+<button name="update">
+
+Update
 
 </button>
 
@@ -160,13 +172,7 @@ Save Settings
 
 
 
-</div>
-
-
-
-<?php include "../includes/footer.php"; ?>
-
-
 </body>
+
 
 </html>
