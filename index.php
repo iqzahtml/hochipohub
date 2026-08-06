@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 
@@ -92,7 +92,7 @@ HochipoHub
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="assets/css/style.css">
 
 
 </head>
@@ -102,7 +102,7 @@ HochipoHub
 <body>
 
 
-<?php include "../includes/navbar.php"; ?>
+<?php include "includes/navbar.php"; ?>
 
 
 
@@ -151,7 +151,7 @@ Categories
 
 
 
-<img src="../assets/uploads/categories/<?= $cat['category_image']; ?>">
+<img src="assets/uploads/categories/<?= $cat['category_image']; ?>">
 
 
 <h3>
@@ -197,7 +197,7 @@ Latest Products
 <div class="product-card">
 
 
-<img src="../assets/uploads/products/<?= $row['image']; ?>">
+<img src="assets/uploads/products/<?= $row['image']; ?>">
 
 
 
@@ -241,7 +241,7 @@ View
 
 
 
-<?php include "../includes/footer.php"; ?>
+<?php include "includes/footer.php"; ?>
 
 
 </body>
