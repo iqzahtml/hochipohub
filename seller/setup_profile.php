@@ -4,14 +4,14 @@
 session_start();
 
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 
 if(!isset($_SESSION['user_id'])){
 
 
-header("Location: ../auth/login.php");
+header("Location: auth/login.php");
 
 
 exit();
@@ -202,7 +202,7 @@ Setup Vendor Profile
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/vendor.css">
+<link rel="stylesheet" href="css/vendor.css">
 
 
 </head>
@@ -212,7 +212,7 @@ Setup Vendor Profile
 
 
 
-<?php include "../includes/navbar.php"; ?>
+<?php include "includes/navbar.php"; ?>
 
 
 
