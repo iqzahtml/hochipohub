@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 if(!isset($_SESSION['user_id'])){
@@ -106,7 +106,7 @@ Dashboard
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="css/style.css">
 
 
 </head>
