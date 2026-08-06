@@ -112,7 +112,7 @@ Shopping Cart
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/cart.css">
+<link rel="stylesheet" href="css/cart.css">
 
 
 </head>
@@ -168,7 +168,7 @@ $total += $subtotal;
 
 
 
-<img src="../assets/uploads/products/<?= $row['image']; ?>">
+<img src="uploads/products/<?= $row['image']; ?>">
 
 
 
@@ -276,7 +276,7 @@ Proceed Checkout
 
 
 
-<script src="../assets/js/script.js"></script>
+<script src="js/script.js"></script>
 
 
 </body>
