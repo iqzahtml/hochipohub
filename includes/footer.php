@@ -353,7 +353,7 @@ if (function_exists('isLoggedIn')) {
                             <li>
 
                                 <a
-                                    href="<?php echo BASE_URL; ?>vendor/setup_profile.php"
+                                    href="<?php echo BASE_URL; ?>seller/setup_profile.php"
                                 >
 
                                     Become a Vendor
@@ -366,7 +366,7 @@ if (function_exists('isLoggedIn')) {
                             <li>
 
                                 <a
-                                    href="<?php echo BASE_URL; ?>vendor/dashboard.php"
+                                    href="<?php echo BASE_URL; ?>seller/dashboard.php"
                                 >
 
                                     Vendor Dashboard
@@ -379,7 +379,7 @@ if (function_exists('isLoggedIn')) {
                             <li>
 
                                 <a
-                                    href="<?php echo BASE_URL; ?>vendor/products.php"
+                                    href="<?php echo BASE_URL; ?>seller/products.php"
                                 >
 
                                     Manage Products
@@ -392,7 +392,7 @@ if (function_exists('isLoggedIn')) {
                             <li>
 
                                 <a
-                                    href="<?php echo BASE_URL; ?>vendor/orders.php"
+                                    href="<?php echo BASE_URL; ?>seller/orders.php"
                                 >
 
                                     Manage Orders
@@ -405,7 +405,7 @@ if (function_exists('isLoggedIn')) {
                             <li>
 
                                 <a
-                                    href="<?php echo BASE_URL; ?>vendor/sales.php"
+                                    href="<?php echo BASE_URL; ?>seller/sales.php"
                                 >
 
                                     Sales Analytics
