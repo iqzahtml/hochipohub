@@ -5,72 +5,12 @@ session_start();
 require_once "../config/db.php";
 
 
-if(!isset($_SESSION['user_id'])){
-    header("Location: ../login.php");
-    exit();
-}
-
-
-$admin_id=$_SESSION['user_id'];
-
-$check=$conn->query("
-
-SELECT role 
-
-FROM users 
-
-WHERE user_id='$admin_id'
-
-")->fetch_assoc();
-
-
-
-if($check['role']!="admin"){
-
-    exit("Access denied");
-
-}
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| DELETE PRODUCT
-|--------------------------------------------------------------------------
-*/
-
-
-if(isset($_GET['delete'])){
-
-
-$id=$_GET['delete'];
-
-
-$conn->query("
-
-DELETE FROM products
-
-WHERE product_id='$id'
-
-");
-
-
-header("Location: products.php");
+if($_SESSION['role']!="admin"){
 
 exit();
 
 }
 
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| GET PRODUCTS
-|--------------------------------------------------------------------------
-*/
 
 
 $products=$conn->query("
@@ -81,35 +21,30 @@ SELECT
 
 products.*,
 
-vendors.business_name,
 
-categories.category_name
+vendors.business_name
+
 
 
 FROM products
 
 
 
-LEFT JOIN vendors
+JOIN vendors
 
-ON products.vendor_id=vendors.vendor_id
-
-
-
-LEFT JOIN categories
-
-ON products.category_id=categories.category_id
+ON products.vendor_id = vendors.vendor_id
 
 
 
-ORDER BY products.product_id DESC
+ORDER BY product_id DESC
+
 
 
 ");
 
 
-
 ?>
+
 
 
 <!DOCTYPE html>
@@ -119,7 +54,7 @@ ORDER BY products.product_id DESC
 <head>
 
 <title>
-Products Management
+Products
 </title>
 
 
@@ -129,16 +64,7 @@ Products Management
 </head>
 
 
-
 <body>
-
-
-
-<?php include "../includes/navbar.php"; ?>
-
-
-
-<div class="dashboard-container">
 
 
 <h1>
@@ -147,38 +73,32 @@ Products Management
 
 
 
-
-<a href="../add_product.php" class="admin-btn">
-
-Add Product
-
-</a>
-
-
-
-
-<table class="admin-table">
+<table border="1">
 
 
 <tr>
 
-<th>ID</th>
+<th>
+Product
+</th>
 
-<th>Image</th>
+<th>
+Vendor
+</th>
 
-<th>Name</th>
+<th>
+Price
+</th>
 
-<th>Vendor</th>
+<th>
+Stock
+</th>
 
-<th>Category</th>
-
-<th>Price</th>
-
-<th>Action</th>
-
+<th>
+Status
+</th>
 
 </tr>
-
 
 
 
@@ -190,7 +110,7 @@ Add Product
 
 <td>
 
-<?php echo $row['product_id']; ?>
+<?= $row['product_name']; ?>
 
 </td>
 
@@ -198,27 +118,7 @@ Add Product
 
 <td>
 
-<img width="50"
-
-src="../assets/uploads/products/<?php echo $row['image']; ?>">
-
-</td>
-
-
-
-
-<td>
-
-<?php echo $row['product_name']; ?>
-
-</td>
-
-
-
-
-<td>
-
-<?php echo $row['business_name']; ?>
+<?= $row['business_name']; ?>
 
 </td>
 
@@ -226,7 +126,7 @@ src="../assets/uploads/products/<?php echo $row['image']; ?>">
 
 <td>
 
-<?php echo $row['category_name']; ?>
+RM <?= $row['price']; ?>
 
 </td>
 
@@ -234,31 +134,20 @@ src="../assets/uploads/products/<?php echo $row['image']; ?>">
 
 <td>
 
-RM <?php echo $row['price']; ?>
+<?= $row['stock_quantity']; ?>
 
 </td>
-
 
 
 
 <td>
 
-
-<a href="products.php?delete=<?php echo $row['product_id']; ?>"
-
-onclick="return confirm('Delete product?')">
-
-Delete
-
-</a>
-
+<?= $row['status']; ?>
 
 </td>
-
 
 
 </tr>
-
 
 
 <?php } ?>
@@ -266,13 +155,6 @@ Delete
 
 
 </table>
-
-
-</div>
-
-
-
-<?php include "../includes/footer.php"; ?>
 
 
 </body>
