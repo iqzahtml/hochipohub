@@ -1,204 +1,41 @@
 <?php
 
-session_start();
-
 require_once "../config/db.php";
 
 
-header("Content-Type: application/json");
+header("Content-Type: text/html");
 
 
 
-/*
-|--------------------------------------------------------------------------
-| GET FILTER DATA
-|--------------------------------------------------------------------------
-*/
-
-
-$category_id = $_POST['category_id'] ?? '';
-
-$keyword = $_POST['keyword'] ?? '';
-
-$page = $_POST['page'] ?? 1;
+$category=$_POST['category'] ?? '';
 
 
 
-$limit = 12;
-
-$offset = ($page - 1) * $limit;
+if($category!=""){
 
 
+$stmt=$conn->prepare("
 
-
-/*
-|--------------------------------------------------------------------------
-| BASE QUERY
-|--------------------------------------------------------------------------
-*/
-
-
-$sql = "
-
-SELECT
-
-
-products.product_id,
-
-products.product_name,
-
-products.price,
-
-products.image,
-
-products.stock,
-
-
-categories.category_name,
-
-
-vendors.business_name
-
+SELECT *
 
 FROM products
 
+WHERE category_id=?
 
+AND status='Available'
 
-LEFT JOIN categories
+ORDER BY product_id DESC
 
-ON products.category_id = categories.category_id
-
-
-
-LEFT JOIN vendors
-
-ON products.vendor_id = vendors.vendor_id
-
-
-
-WHERE 1=1
-
-
-
-";
-
-
-
-
-$params = [];
-
-$types = "";
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| CATEGORY FILTER
-|--------------------------------------------------------------------------
-*/
-
-
-if(!empty($category_id)){
-
-
-$sql .= "
-
-AND products.category_id = ?
-
-";
-
-
-$params[] = $category_id;
-
-$types .= "i";
-
-
-}
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| SEARCH FILTER
-|--------------------------------------------------------------------------
-*/
-
-
-if(!empty($keyword)){
-
-
-$sql .= "
-
-AND products.product_name LIKE ?
-
-";
-
-
-$search = "%".$keyword."%";
-
-
-$params[] = $search;
-
-$types .= "s";
-
-
-}
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| ORDER + LIMIT
-|--------------------------------------------------------------------------
-*/
-
-
-$sql .= "
-
-ORDER BY products.product_id DESC
-
-LIMIT ? OFFSET ?
-
-";
-
-
-
-$params[] = $limit;
-
-$params[] = $offset;
-
-
-$types .= "ii";
-
-
-
-
-
-
-
-$stmt = $conn->prepare($sql);
-
-
-
-if(!empty($params)){
+");
 
 
 $stmt->bind_param(
 
-$types,
+"i",
 
-...$params
+$category
 
 );
-
-
-}
 
 
 
@@ -206,81 +43,72 @@ $stmt->execute();
 
 
 
-$result = $stmt->get_result();
+$result=$stmt->get_result();
 
 
 
+}
+
+else{
 
 
-/*
-|--------------------------------------------------------------------------
-| RETURN PRODUCT DATA
-|--------------------------------------------------------------------------
-*/
+$result=$conn->query("
 
+SELECT *
 
-$products = [];
+FROM products
 
+WHERE status='Available'
 
+ORDER BY product_id DESC
 
-while($row = $result->fetch_assoc()){
-
-
-
-$products[] = [
-
-
-"product_id" => $row['product_id'],
-
-
-"product_name" => $row['product_name'],
-
-
-"price" => number_format(
-$row['price'],
-2
-),
-
-
-
-"image" => $row['image'],
-
-
-
-"stock" => $row['stock'],
-
-
-
-"category" => $row['category_name'],
-
-
-
-"vendor" => $row['business_name']
-
-
-
-];
-
+");
 
 
 }
 
 
 
+while($row=$result->fetch_assoc()){
 
 
-echo json_encode([
+?>
+
+<div class="product-card">
 
 
-"status" => "success",
+<img src="../assets/uploads/products/<?= $row['image']; ?>">
 
 
-"data" => $products
+<h3>
+
+<?= htmlspecialchars($row['product_name']); ?>
+
+</h3>
+
+
+<p>
+
+RM <?= number_format($row['price'],2); ?>
+
+</p>
+
+
+<button class="add-cart"
+
+data-id="<?= $row['product_id']; ?>">
+
+Add Cart
+
+</button>
 
 
 
-]);
+</div>
 
 
+<?php
+
+}
 
 ?>
