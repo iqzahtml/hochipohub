@@ -1,0 +1,1163 @@
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - ADMIN CSS
+|--------------------------------------------------------------------------
+| Admin Dashboard
+| Sidebar
+| Statistics
+| Tables
+| User Management
+| Vendor Approval
+| Orders
+| Logs
+| Forms
+|--------------------------------------------------------------------------
+*/
+
+
+/* ==============================================================
+   ADMIN VARIABLES
+============================================================== */
+
+:root {
+
+    --admin-blue-dark:#041b45;
+    --admin-blue:#1464d8;
+    --admin-blue-light:#2185ff;
+    --admin-purple:#725cff;
+    --admin-cyan:#23b8ff;
+
+    --admin-bg:#f2f7ff;
+
+    --admin-card:#ffffff;
+
+    --admin-text:#10213f;
+
+    --admin-muted:#71819a;
+
+    --admin-border:#dce8f5;
+
+    --admin-success:#159364;
+
+    --admin-warning:#c48112;
+
+    --admin-danger:#e0445c;
+
+}
+
+
+
+/* ==============================================================
+   ADMIN PAGE
+============================================================== */
+
+
+.admin-page {
+
+    min-height:100vh;
+
+    display:flex;
+
+    background:
+
+    radial-gradient(
+        circle at top left,
+        rgba(33,133,255,.12),
+        transparent 30%
+    ),
+
+    var(--admin-bg);
+
+}
+
+
+
+/* ==============================================================
+   ADMIN SIDEBAR
+============================================================== */
+
+
+.admin-sidebar {
+
+
+    width:270px;
+
+    min-height:100vh;
+
+
+    position:fixed;
+
+
+    top:0;
+
+    left:0;
+
+
+    padding:25px 18px;
+
+
+    background:
+
+    linear-gradient(
+        180deg,
+        #041b45,
+        #06245a,
+        #102c73
+    );
+
+
+    color:white;
+
+
+    box-shadow:
+
+    8px 0 30px rgba(4,27,69,.25);
+
+
+    z-index:100;
+
+
+
+}
+
+
+
+.admin-logo {
+
+
+    display:flex;
+
+    align-items:center;
+
+    gap:12px;
+
+
+    margin-bottom:35px;
+
+
+}
+
+
+
+.admin-logo-icon {
+
+
+    width:45px;
+
+    height:45px;
+
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+
+    border-radius:15px;
+
+
+    background:
+
+    linear-gradient(
+        135deg,
+        var(--admin-blue-light),
+        var(--admin-purple)
+    );
+
+
+    font-size:20px;
+
+
+}
+
+
+
+.admin-logo h2 {
+
+
+    margin:0;
+
+    font-size:20px;
+
+    font-weight:900;
+
+
+}
+
+
+
+.admin-menu {
+
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:8px;
+
+
+}
+
+
+
+.admin-menu a {
+
+
+    display:flex;
+
+
+    align-items:center;
+
+
+    gap:13px;
+
+
+    padding:13px 15px;
+
+
+    border-radius:13px;
+
+
+    color:
+
+    rgba(255,255,255,.75);
+
+
+    text-decoration:none;
+
+
+    font-size:13px;
+
+
+    font-weight:700;
+
+
+    transition:.25s;
+
+
+}
+
+
+
+.admin-menu a i {
+
+
+    width:20px;
+
+
+}
+
+
+
+.admin-menu a:hover,
+.admin-menu a.active {
+
+
+    color:white;
+
+
+    background:
+
+    linear-gradient(
+        110deg,
+        rgba(33,133,255,.35),
+        rgba(114,92,255,.35)
+    );
+
+
+    transform:translateX(5px);
+
+
+}
+
+
+
+
+/* ==============================================================
+   ADMIN CONTENT
+============================================================== */
+
+
+.admin-content {
+
+
+    margin-left:270px;
+
+
+    width:calc(100% - 270px);
+
+
+    padding:30px;
+
+
+}
+
+
+
+.admin-topbar {
+
+
+    display:flex;
+
+
+    justify-content:space-between;
+
+
+    align-items:center;
+
+
+    margin-bottom:30px;
+
+
+}
+
+
+
+.admin-topbar h1 {
+
+
+    margin:0;
+
+
+    color:var(--admin-text);
+
+
+    font-size:32px;
+
+
+    font-weight:950;
+
+
+}
+
+
+
+.admin-topbar p {
+
+
+    margin-top:7px;
+
+
+    color:var(--admin-muted);
+
+
+}
+
+
+
+/* ==============================================================
+   ADMIN PROFILE
+============================================================== */
+
+
+.admin-profile {
+
+
+    display:flex;
+
+
+    align-items:center;
+
+
+    gap:10px;
+
+
+    padding:8px 14px;
+
+
+    border-radius:15px;
+
+
+    background:white;
+
+
+    border:1px solid var(--admin-border);
+
+
+}
+
+
+
+.admin-profile img {
+
+
+    width:38px;
+
+    height:38px;
+
+
+    border-radius:50%;
+
+
+    object-fit:cover;
+
+
+}
+
+
+
+.admin-profile span {
+
+
+    font-size:12px;
+
+
+    font-weight:800;
+
+
+}
+
+
+
+/* ==============================================================
+   STAT CARDS
+============================================================== */
+
+
+.admin-stats {
+
+
+    display:grid;
+
+
+    grid-template-columns:
+
+    repeat(4,1fr);
+
+
+    gap:18px;
+
+
+    margin-bottom:25px;
+
+
+}
+
+
+
+.admin-stat-card {
+
+
+    padding:22px;
+
+
+    border-radius:22px;
+
+
+    background:white;
+
+
+    border:1px solid var(--admin-border);
+
+
+    box-shadow:
+
+    0 10px 30px rgba(8,39,80,.06);
+
+
+    position:relative;
+
+
+    overflow:hidden;
+
+
+}
+
+
+
+.admin-stat-card::before {
+
+
+    content:"";
+
+
+    position:absolute;
+
+
+    width:120px;
+
+
+    height:120px;
+
+
+    right:-50px;
+
+
+    top:-50px;
+
+
+    border-radius:50%;
+
+
+    background:
+
+    rgba(33,133,255,.12);
+
+
+}
+
+
+
+.admin-stat-icon {
+
+
+    width:45px;
+
+
+    height:45px;
+
+
+    display:flex;
+
+
+    justify-content:center;
+
+
+    align-items:center;
+
+
+    border-radius:15px;
+
+
+    color:white;
+
+
+    background:
+
+    linear-gradient(
+        135deg,
+        var(--admin-blue),
+        var(--admin-purple)
+    );
+
+
+}
+
+
+
+.admin-stat-card h3 {
+
+
+    margin:15px 0 5px;
+
+
+    font-size:28px;
+
+
+    font-weight:950;
+
+
+    color:var(--admin-text);
+
+
+}
+
+
+
+.admin-stat-card p {
+
+
+    margin:0;
+
+
+    color:var(--admin-muted);
+
+
+    font-size:12px;
+
+
+}
+
+
+
+/* ==============================================================
+   ADMIN PANEL
+============================================================== */
+
+
+.admin-panel {
+
+
+    background:white;
+
+
+    border-radius:22px;
+
+
+    padding:22px;
+
+
+    border:1px solid var(--admin-border);
+
+
+    margin-bottom:25px;
+
+
+    box-shadow:
+
+    0 10px 30px rgba(8,39,80,.05);
+
+
+}
+
+
+
+.admin-panel-header {
+
+
+    display:flex;
+
+
+    justify-content:space-between;
+
+
+    align-items:center;
+
+
+    margin-bottom:20px;
+
+
+}
+
+
+
+.admin-panel-header h2 {
+
+
+    margin:0;
+
+
+    font-size:18px;
+
+
+    font-weight:900;
+
+
+    color:var(--admin-text);
+
+
+}
+
+
+
+/* ==============================================================
+   TABLE
+============================================================== */
+
+
+.admin-table-wrapper {
+
+
+    overflow-x:auto;
+
+
+}
+
+
+
+.admin-table {
+
+
+    width:100%;
+
+
+    border-collapse:collapse;
+
+
+}
+
+
+
+.admin-table th {
+
+
+    text-align:left;
+
+
+    padding:13px;
+
+
+    background:#f4f8ff;
+
+
+    color:#64748b;
+
+
+    font-size:11px;
+
+
+    font-weight:850;
+
+
+}
+
+
+
+.admin-table td {
+
+
+    padding:14px;
+
+
+    border-bottom:1px solid #edf2f8;
+
+
+    color:#52627a;
+
+
+    font-size:12px;
+
+
+}
+
+
+
+.admin-table tr:hover {
+
+
+    background:#f8fbff;
+
+
+}
+
+
+
+/* ==============================================================
+   STATUS BADGE
+============================================================== */
+
+
+.admin-status {
+
+
+    display:inline-flex;
+
+
+    padding:6px 12px;
+
+
+    border-radius:20px;
+
+
+    font-size:10px;
+
+
+    font-weight:850;
+
+
+}
+
+
+
+.admin-status.active {
+
+
+    background:#e9fff5;
+
+
+    color:var(--admin-success);
+
+
+}
+
+
+
+.admin-status.pending {
+
+
+    background:#fff8e8;
+
+
+    color:var(--admin-warning);
+
+
+}
+
+
+
+.admin-status.reject {
+
+
+    background:#fff0f3;
+
+
+    color:var(--admin-danger);
+
+
+}
+
+
+
+/* ==============================================================
+   BUTTON
+============================================================== */
+
+
+.admin-btn {
+
+
+    display:inline-flex;
+
+
+    align-items:center;
+
+
+    justify-content:center;
+
+
+    gap:6px;
+
+
+    padding:9px 14px;
+
+
+    border:none;
+
+
+    border-radius:10px;
+
+
+    cursor:pointer;
+
+
+    font-size:11px;
+
+
+    font-weight:800;
+
+
+}
+
+
+
+.admin-btn.primary {
+
+
+    background:
+
+    linear-gradient(
+        110deg,
+        var(--admin-blue),
+        var(--admin-purple)
+    );
+
+
+    color:white;
+
+
+}
+
+
+
+.admin-btn.success {
+
+
+    background:#eafff4;
+
+
+    color:var(--admin-success);
+
+
+}
+
+
+
+.admin-btn.danger {
+
+
+    background:#fff0f3;
+
+
+    color:var(--admin-danger);
+
+
+}
+
+
+
+.admin-btn:hover {
+
+
+    transform:translateY(-2px);
+
+
+}
+
+
+
+/* ==============================================================
+   ADMIN FORM
+============================================================== */
+
+
+.admin-form-group {
+
+
+    margin-bottom:15px;
+
+
+}
+
+
+
+.admin-form-group label {
+
+
+    display:block;
+
+
+    margin-bottom:6px;
+
+
+    color:#52627a;
+
+
+    font-size:12px;
+
+
+    font-weight:750;
+
+
+}
+
+
+
+.admin-input,
+.admin-select,
+.admin-textarea {
+
+
+    width:100%;
+
+
+    border:1px solid var(--admin-border);
+
+
+    border-radius:12px;
+
+
+    min-height:42px;
+
+
+    padding:0 13px;
+
+
+    outline:none;
+
+
+}
+
+
+
+.admin-textarea {
+
+
+    padding:12px;
+
+
+    min-height:100px;
+
+
+}
+
+
+
+.admin-input:focus,
+.admin-select:focus,
+.admin-textarea:focus {
+
+
+    border-color:var(--admin-blue);
+
+
+}
+
+
+
+/* ==============================================================
+   ACTIVITY LOG
+============================================================== */
+
+
+.admin-log {
+
+
+    display:flex;
+
+
+    gap:12px;
+
+
+    padding:13px 0;
+
+
+    border-bottom:1px solid #edf2f8;
+
+
+}
+
+
+
+.admin-log-icon {
+
+
+    width:35px;
+
+
+    height:35px;
+
+
+    border-radius:50%;
+
+
+    display:flex;
+
+
+    align-items:center;
+
+
+    justify-content:center;
+
+
+    background:#edf5ff;
+
+
+    color:var(--admin-blue);
+
+
+}
+
+
+
+.admin-log p {
+
+
+    margin:0;
+
+
+    font-size:12px;
+
+
+    color:var(--admin-text);
+
+
+}
+
+
+
+.admin-log span {
+
+
+    color:var(--admin-muted);
+
+
+    font-size:10px;
+
+
+}
+
+
+
+/* ==============================================================
+   RESPONSIVE
+============================================================== */
+
+
+@media(max-width:1100px){
+
+
+    .admin-stats {
+
+
+        grid-template-columns:
+
+        repeat(2,1fr);
+
+
+    }
+
+
+}
+
+
+
+@media(max-width:850px){
+
+
+    .admin-sidebar {
+
+
+        width:80px;
+
+
+    }
+
+
+
+    .admin-logo h2,
+    .admin-menu span {
+
+
+        display:none;
+
+
+    }
+
+
+
+    .admin-content {
+
+
+        margin-left:80px;
+
+
+        width:calc(100% - 80px);
+
+
+    }
+
+
+}
+
+
+
+@media(max-width:600px){
+
+
+    .admin-content {
+
+
+        padding:15px;
+
+
+    }
+
+
+    .admin-stats {
+
+
+        grid-template-columns:1fr;
+
+
+    }
+
+
+
+    .admin-topbar {
+
+
+        flex-direction:column;
+
+
+        align-items:flex-start;
+
+
+        gap:15px;
+
+
+    }
+
+
+
+}
