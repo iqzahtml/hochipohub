@@ -2,65 +2,35 @@
 
 session_start();
 
-require_once "config/db.php";
-
+require_once "../config/db.php";
 
 
 if(!isset($_SESSION['user_id'])){
 
-header("Location: login.php");
-
-exit();
-
-}
-
-
-
-if($_SERVER['REQUEST_METHOD']!="POST"){
-
-header("Location: cart.php");
-
-exit();
+    header("Location: ../auth/login.php");
+    exit();
 
 }
-
 
 
 $user_id=$_SESSION['user_id'];
 
+$order_id=$_GET['order_id'];
 
-
-$total=$_POST['total'];
-
-$address=$_POST['address'];
-
-$delivery=$_POST['delivery_method'];
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| CREATE ORDER
-|--------------------------------------------------------------------------
-*/
 
 
 $order=$conn->prepare("
 
 
-INSERT INTO orders
-
-(
-customer_id,
-total_amount,
-delivery_method,
-delivery_address
-)
+SELECT *
 
 
-VALUES(?,?,?,?)
+FROM orders
+
+
+WHERE order_id=?
+
+AND customer_id=?
 
 
 
@@ -70,15 +40,11 @@ VALUES(?,?,?,?)
 
 $order->bind_param(
 
-"idss",
+"ii",
 
-$user_id,
+$order_id,
 
-$total,
-
-$delivery,
-
-$address
+$user_id
 
 );
 
@@ -88,150 +54,245 @@ $order->execute();
 
 
 
-$order_id=$conn->insert_id;
+$data=$order->get_result()->fetch_assoc();
 
 
 
+if(!$data){
 
+    exit("Order not found");
 
-/*
-|--------------------------------------------------------------------------
-| MOVE CART TO ORDER DETAILS
-|--------------------------------------------------------------------------
-*/
-
-
-$cart=$conn->query("
-
-
-SELECT *
-
-FROM cart
-
-
-JOIN products
-
-ON cart.product_id=products.product_id
-
-
-WHERE customer_id='$user_id'
-
-
-");
+}
 
 
 
-
-while($item=$cart->fetch_assoc()){
-
+if(isset($_POST['pay'])){
 
 
-$subtotal=$item['price']*$item['quantity'];
+$method=$_POST['payment_method'];
 
 
 
-$conn->query("
+$payment=$conn->prepare("
 
 
-INSERT INTO order_details
+INSERT INTO payments
+
 
 (
+
 order_id,
-product_id,
-quantity,
-unit_price,
-subtotal
+
+payment_method,
+
+payment_status,
+
+payment_date,
+
+amount
+
 
 )
+
 
 VALUES
 
 (
-'$order_id',
-'".$item['product_id']."',
-'".$item['quantity']."',
-'".$item['price']."',
-'$subtotal'
+
+?,
+
+?,
+
+'Paid',
+
+NOW(),
+
+?
 
 )
 
 
+
 ");
+
+
+
+$payment->bind_param(
+
+"isd",
+
+$order_id,
+
+$method,
+
+$data['total_amount']
+
+);
+
+
+
+$payment->execute();
+
+
+
+
+
+$update=$conn->prepare("
+
+
+UPDATE orders
+
+
+SET order_status='Processing'
+
+
+WHERE order_id=?
+
+
+
+");
+
+
+
+$update->bind_param(
+
+"i",
+
+$order_id
+
+);
+
+
+
+$update->execute();
+
+
+
+header("Location: order_details.php?id=".$order_id);
+
+
+exit();
 
 
 
 }
 
 
-
-
-
-/*
-|--------------------------------------------------------------------------
-| PAYMENT RECORD
-|--------------------------------------------------------------------------
-*/
-
-
-
-$conn->query("
-
-
-INSERT INTO payments
-
-(
-order_id,
-payment_method,
-amount
-
-)
-
-
-VALUES
-
-(
-'$order_id',
-'FPX',
-'$total'
-
-)
-
-
-
-");
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| CLEAR CART
-|--------------------------------------------------------------------------
-*/
-
-
-$conn->query("
-
-
-DELETE FROM cart
-
-WHERE customer_id='$user_id'
-
-
-");
-
-
-
-
-header(
-
-"Location: order_details.php?id=".$order_id
-
-);
-
-
-exit();
-
-
 ?>
+
+
+
+<!DOCTYPE html>
+
+<html>
+
+
+<head>
+
+<title>
+Payment
+</title>
+
+
+<link rel="stylesheet" href="../assets/css/checkout.css">
+
+
+</head>
+
+
+
+<body>
+
+
+<?php include "../includes/navbar.php"; ?>
+
+
+
+<div class="payment-box">
+
+
+<h1>
+Payment
+</h1>
+
+
+
+<h3>
+
+Order #<?= $order_id; ?>
+
+</h3>
+
+
+
+<p>
+
+Amount:
+
+RM <?= number_format($data['total_amount'],2); ?>
+
+</p>
+
+
+
+<form method="POST">
+
+
+
+<select name="payment_method">
+
+
+<option value="FPX">
+
+FPX
+
+</option>
+
+
+<option value="Credit Card">
+
+Credit Card
+
+</option>
+
+
+<option value="Debit Card">
+
+Debit Card
+
+</option>
+
+
+<option value="Cash">
+
+Cash
+
+</option>
+
+
+
+</select>
+
+
+
+
+<button name="pay">
+
+Pay Now
+
+</button>
+
+
+
+</form>
+
+
+
+</div>
+
+
+
+</body>
+
+
+</html>
