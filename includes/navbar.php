@@ -11,7 +11,7 @@ require_once "session.php";
 
 <div class="logo">
 
-<a href="../hochipohub/index.php">
+<a href="hochipohub/index.php">
 
 HochipoHub
 
@@ -26,7 +26,7 @@ HochipoHub
 
 <li>
 
-<a href="../hochipohub/catalog.php">
+<a href="hochipohub/catalog.php">
 
 Catalog
 
@@ -37,7 +37,7 @@ Catalog
 
 <li>
 
-<a href="../hochipohub/vendor.php">
+<a href="hochipohub/vendor.php">
 
 Vendor
 
@@ -53,7 +53,7 @@ Vendor
 
 <li>
 
-<a href="../hochipohub/cart.php">
+<a href="hochipohub/cart.php">
 
 Cart
 
@@ -65,7 +65,7 @@ Cart
 
 <li>
 
-<a href="../hochipohub/wishlist.php">
+<a href="hochipohub/wishlist.php">
 
 Wishlist
 
@@ -78,7 +78,7 @@ Wishlist
 
 <li>
 
-<a href="../hochipohub/dashboard.php">
+<a href="hochipohub/dashboard.php">
 
 Dashboard
 
@@ -99,7 +99,7 @@ Dashboard
 
 <li>
 
-<a href="../auth/login.php">
+<a href="auth/login.php">
 
 Login
 
@@ -115,7 +115,7 @@ Login
 
 <li>
 
-<a href="../auth/logout.php">
+<a href="auth/logout.php">
 
 Logout
 
