@@ -1,6 +1,6 @@
 <?php
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 
@@ -97,7 +97,7 @@ $products=$stmt->get_result();
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/product.css">
+<link rel="stylesheet" href="css/product.css">
 
 
 </head>
@@ -130,7 +130,7 @@ $products=$stmt->get_result();
 <div class="product-card">
 
 
-<img src="../assets/uploads/products/<?= $row['image']; ?>">
+<img src="uploads/products/<?= $row['image']; ?>">
 
 
 <h3>
