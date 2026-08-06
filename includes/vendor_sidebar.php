@@ -7,7 +7,7 @@ Vendor Panel
 
 
 
-<a href="../vendor/dashboard.php">
+<a href="../seller/dashboard.php">
 
 Dashboard
 
@@ -15,7 +15,7 @@ Dashboard
 
 
 
-<a href="../vendor/products.php">
+<a href="../seller/products.php">
 
 Products
 
@@ -23,7 +23,7 @@ Products
 
 
 
-<a href="../vendor/add_product.php">
+<a href="../seller/add_product.php">
 
 Add Product
 
@@ -31,7 +31,7 @@ Add Product
 
 
 
-<a href="../vendor/orders.php">
+<a href="../seller/orders.php">
 
 Orders
 
@@ -39,7 +39,7 @@ Orders
 
 
 
-<a href="../vendor/sales.php">
+<a href="../seller/sales.php">
 
 Sales
 
