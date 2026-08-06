@@ -108,7 +108,7 @@ $products=$stmt->get_result();
 
 
 
-<?php include "../includes/navbar.php"; ?>
+<?php include "includes/navbar.php"; ?>
 
 
 
