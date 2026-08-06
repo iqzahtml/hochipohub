@@ -133,10 +133,10 @@ UPDATE users
 SET
 
 
-otp = ?,
+reset_code = ?,
 
 
-otp_expiry = ?
+reset_expiry = ?
 
 
 WHERE email = ?
