@@ -1,12 +1,15 @@
 <?php
 
-if(session_status() == PHP_SESSION_NONE){
-
+if(session_status() === PHP_SESSION_NONE){
     session_start();
-
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Check Login
+|--------------------------------------------------------------------------
+*/
 
 function isLogin(){
 
@@ -15,46 +18,80 @@ function isLogin(){
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Alias
+|--------------------------------------------------------------------------
+*/
 
+function isLoggedIn(){
 
-function requireLogin(){
-
-    if(!isLogin()){
-
-        header("Location: auth/login.php");
-
-        exit();
-
-    }
+    return isset($_SESSION['user_id']);
 
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Current User
+|--------------------------------------------------------------------------
+*/
+
+function currentUserId(){
+
+    return $_SESSION['user_id'] ?? null;
+
+}
 
 
-function userRole(){
+function currentUserName(){
+
+    return $_SESSION['user_name'] ?? null;
+
+}
+
+
+function currentUserRole(){
 
     return $_SESSION['role'] ?? null;
 
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Login Session
+|--------------------------------------------------------------------------
+*/
 
+function loginUser($user){
 
-function requireRole($role){
+    $_SESSION['user_id'] =
+        $user['user_id'];
 
+    $_SESSION['user_name'] =
+        $user['name'];
 
-    if(!isset($_SESSION['role']) || $_SESSION['role'] != $role){
-
-
-        header("Location: hochipohub/index.php");
-
-        exit();
-
-
-    }
-
+    $_SESSION['role'] =
+        $user['role'];
 
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Logout
+|--------------------------------------------------------------------------
+*/
+
+function logoutUser(){
+
+    session_unset();
+
+    session_destroy();
+
+}
+
+
 
 ?>
