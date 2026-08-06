@@ -111,7 +111,7 @@ Admin Dashboard
 </title>
 
 
-<link rel="stylesheet" href="assets/css/admin.css">
+<link rel="stylesheet" href="css/admin.css">
 
 
 </head>
