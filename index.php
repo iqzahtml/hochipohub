@@ -1,9 +1,8 @@
 <?php
 
-session_start();
+$pageTitle = "Home";
 
-require_once "database/db.php";
-
+require_once "includes/header.php";
 
 
 /*
@@ -12,7 +11,7 @@ require_once "database/db.php";
 |--------------------------------------------------------------------------
 */
 
-$products=$conn->query("
+$productQuery = "
 
 SELECT
 
@@ -26,17 +25,17 @@ categories.category_name
 FROM products
 
 
-JOIN vendors
+INNER JOIN vendors
 
 ON products.vendor_id = vendors.vendor_id
 
 
-JOIN categories
+INNER JOIN categories
 
 ON products.category_id = categories.category_id
 
 
-WHERE products.status='Available'
+WHERE products.status = 'Available'
 
 
 ORDER BY products.created_at DESC
@@ -44,8 +43,10 @@ ORDER BY products.created_at DESC
 
 LIMIT 8
 
+";
 
-");
+
+$products = $conn->query($productQuery);
 
 
 
@@ -55,58 +56,30 @@ LIMIT 8
 |--------------------------------------------------------------------------
 */
 
-
-$categories=$conn->query("
-
+$categoryQuery = "
 
 SELECT *
 
-
 FROM categories
-
 
 ORDER BY category_name ASC
 
-
 LIMIT 6
 
+";
 
 
-");
+$categories = $conn->query($categoryQuery);
 
 
 
 ?>
 
 
-
-<!DOCTYPE html>
-
-<html>
-
-
-<head>
-
-<title>
-HochipoHub
-</title>
-
-
-<link rel="stylesheet" href="css/style.css">
-
-
-</head>
-
-
-
-<body>
-
-
-<?php include "includes/navbar.php"; ?>
-
-
-
 <section class="hero">
+
+
+<div class="hero-content">
 
 
 <h1>
@@ -119,12 +92,15 @@ Support local vendors with HochipoHub
 </p>
 
 
-
-<a href="catalog.php">
+<a href="<?= BASE_URL ?>catalog.php"
+class="btn">
 
 Shop Now
 
 </a>
+
+
+</div>
 
 
 </section>
@@ -136,7 +112,7 @@ Shop Now
 
 
 <h2>
-Categories
+Popular Categories
 </h2>
 
 
@@ -144,14 +120,28 @@ Categories
 <div class="category-grid">
 
 
-<?php while($cat=$categories->fetch_assoc()){ ?>
+
+<?php if($categories && $categories->num_rows > 0): ?>
 
 
-<a href="category.php?id=<?= $cat['category_id']; ?>">
+<?php while($cat = $categories->fetch_assoc()): ?>
+
+
+<div class="category-card">
+
+
+<a href="<?= BASE_URL ?>category.php?id=<?= $cat['category_id']; ?>">
 
 
 
-<img src="uploads/categories/<?= $cat['category_image']; ?>">
+<?php if(!empty($cat['category_image'])): ?>
+
+
+<img src="<?= BASE_URL ?>uploads/categories/<?= htmlspecialchars($cat['category_image']); ?>">
+
+
+<?php endif; ?>
+
 
 
 <h3>
@@ -161,11 +151,25 @@ Categories
 </h3>
 
 
+
 </a>
 
 
+</div>
 
-<?php } ?>
+
+<?php endwhile; ?>
+
+
+<?php else: ?>
+
+
+<p>
+No categories available.
+</p>
+
+
+<?php endif; ?>
 
 
 
@@ -173,6 +177,7 @@ Categories
 
 
 </section>
+
 
 
 
@@ -190,37 +195,58 @@ Latest Products
 
 
 
-<?php while($row=$products->fetch_assoc()){ ?>
+<?php if($products && $products->num_rows > 0): ?>
+
+
+
+<?php while($product = $products->fetch_assoc()): ?>
 
 
 
 <div class="product-card">
 
 
-<img src="uploads/products/<?= $row['image']; ?>">
+
+<?php if(!empty($product['image'])): ?>
+
+
+<img src="<?= BASE_URL ?>uploads/products/<?= htmlspecialchars($product['image']); ?>">
+
+
+<?php endif; ?>
 
 
 
 <h3>
 
-<?= htmlspecialchars($row['product_name']); ?>
+<?= htmlspecialchars($product['product_name']); ?>
 
 </h3>
 
 
 
-<p>
+<p class="vendor-name">
 
-RM <?= number_format($row['price'],2); ?>
+<?= htmlspecialchars($product['business_name']); ?>
 
 </p>
 
 
 
+<p class="price">
 
-<a href="product_details.php?id=<?= $row['product_id']; ?>">
+RM <?= number_format($product['price'],2); ?>
 
-View
+</p>
+
+
+
+<a href="<?= BASE_URL ?>product_details.php?id=<?= $product['product_id']; ?>"
+class="btn">
+
+
+View Product
+
 
 </a>
 
@@ -230,7 +256,20 @@ View
 
 
 
-<?php } ?>
+<?php endwhile; ?>
+
+
+
+<?php else: ?>
+
+
+<p>
+No products available.
+</p>
+
+
+
+<?php endif; ?>
 
 
 
@@ -241,10 +280,4 @@ View
 
 
 
-<?php include "includes/footer.php"; ?>
-
-
-</body>
-
-
-</html>
+<?php require_once "includes/footer.php"; ?>
