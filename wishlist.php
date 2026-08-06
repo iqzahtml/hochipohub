@@ -2,12 +2,12 @@
 
 session_start();
 
-require_once "../database/db.php";
+require_once "database/db.php";
 
 
 if(!isset($_SESSION['user_id'])){
 
-header("Location: ../auth/login.php");
+header("Location: auth/login.php");
 
 exit();
 
@@ -107,7 +107,7 @@ Wishlist
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/wishlist.css">
+<link rel="stylesheet" href="css/wishlist.css">
 
 
 </head>
@@ -117,7 +117,7 @@ Wishlist
 <body>
 
 
-<?php include "../includes/navbar.php"; ?>
+<?php include "includes/navbar.php"; ?>
 
 
 
@@ -154,7 +154,7 @@ No wishlist item.
 
 
 
-<img src="../assets/uploads/products/<?= $row['image']; ?>">
+<img src="uploads/products/<?= $row['image']; ?>">
 
 
 
@@ -218,7 +218,7 @@ View Product
 
 
 
-<script src="../assets/js/wishlist.js"></script>
+<script src="js/wishlist.js"></script>
 
 
 
