@@ -1,74 +1,154 @@
-<div class="sidebar">
+<aside class="sidebar vendor-sidebar">
+
+
+
+<div class="sidebar-title">
 
 
 <h2>
+
 Vendor Panel
+
 </h2>
 
 
+</div>
 
-<a href="seller/dashboard.php">
+
+
+
+
+<ul>
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>seller/dashboard.php">
+
+
+<i class="fa-solid fa-store"></i>
+
 
 Dashboard
 
+
 </a>
 
 
+</li>
 
-<a href="seller/products.php">
+
+
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>seller/products.php">
+
+
+<i class="fa-solid fa-box"></i>
+
 
 Products
 
+
 </a>
 
 
+</li>
 
-<a href="seller/add_product.php">
+
+
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>seller/add_product.php">
+
+
+<i class="fa-solid fa-plus"></i>
+
 
 Add Product
 
-</a>
-
-
-
-<a href="seller/orders.php">
-
-Orders
 
 </a>
 
 
-
-<a href="seller/sales.php">
-
-Sales
-
-</a>
+</li>
 
 
 
-<a href="hochipohub/inventory.php">
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>inventory.php">
+
+
+<i class="fa-solid fa-warehouse"></i>
+
 
 Inventory
 
+
 </a>
 
 
+</li>
 
-<a href="hochipohub/commission.php">
+
+
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>commission.php">
+
+
+<i class="fa-solid fa-money-bill"></i>
+
 
 Commission
 
-</a>
-
-
-
-<a href="auth/logout.php">
-
-Logout
 
 </a>
 
 
+</li>
 
-</div>
+
+
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>seller/orders.php">
+
+
+<i class="fa-solid fa-cart-shopping"></i>
+
+
+Orders
+
+
+</a>
+
+
+</li>
+
+
+
+
+
+</ul>
+
+
+
+</aside>
