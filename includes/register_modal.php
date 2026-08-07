@@ -1,54 +1,23 @@
-<?php
-
-/*
-|--------------------------------------------------------------------------
-| HochipoHub Register Modal
-|--------------------------------------------------------------------------
-|
-| Used by:
-| - navbar.php
-|
-|--------------------------------------------------------------------------
-*/
-
-?>
-
-
 <div 
-class="modal-overlay" 
 id="registerModal"
+class="modal"
 >
 
 
-<div class="modal-box register-modal">
+
+<div class="modal-content">
 
 
 
-
-
-<button 
-class="modal-close"
+<span 
+class="close-modal"
 onclick="closeRegisterModal()"
 >
 
 &times;
 
-</button>
+</span>
 
-
-
-
-
-
-<div class="modal-header">
-
-
-
-<img 
-src="<?= IMAGE_URL; ?>logo.jpg"
-alt="HochipoHub"
-class="modal-logo"
->
 
 
 
@@ -60,33 +29,15 @@ Create Account
 
 
 
-<p>
-
-Join HochipoHub today
-
-</p>
 
 
-
-</div>
-
-
-
-
-
-
-
-<form
+<form 
 
 action="<?= BASE_URL; ?>auth/register_process.php"
 
 method="POST"
 
-class="auth-form"
-
 >
-
-
 
 
 
@@ -108,15 +59,12 @@ type="text"
 
 name="name"
 
-placeholder="Enter your name"
-
 required
 
 >
 
 
 </div>
-
 
 
 
@@ -139,8 +87,6 @@ type="email"
 
 name="email"
 
-placeholder="Enter your email"
-
 required
 
 >
@@ -159,7 +105,7 @@ required
 
 <label>
 
-Phone Number
+Phone
 
 </label>
 
@@ -170,14 +116,13 @@ type="text"
 
 name="phone"
 
-placeholder="01X-XXXXXXX"
-
 required
 
 >
 
 
 </div>
+
 
 
 
@@ -201,8 +146,6 @@ type="password"
 
 name="password"
 
-placeholder="Create password"
-
 required
 
 >
@@ -221,22 +164,31 @@ required
 
 <label>
 
-Confirm Password
+Register As
 
 </label>
 
 
-<input
 
-type="password"
+<select name="role">
 
-name="confirm_password"
 
-placeholder="Confirm password"
+<option value="customer">
 
-required
+Customer
 
->
+</option>
+
+
+<option value="vendor">
+
+Vendor
+
+</option>
+
+
+</select>
+
 
 
 </div>
@@ -252,13 +204,11 @@ required
 
 type="submit"
 
-class="auth-btn"
+class="btn-primary"
 
 >
 
-
-Create Account
-
+Register
 
 </button>
 
@@ -276,41 +226,27 @@ Create Account
 
 
 
-
-<div class="modal-footer">
-
-
 <p>
 
 
-Already have an account?
-
+Already have account?
 
 
 <button
 
-type="button"
+onclick="openLoginModal()"
 
-class="switch-btn"
-
-onclick="switchLogin()"
+class="link-button"
 
 >
 
-
 Login
-
 
 </button>
 
 
 
 </p>
-
-
-</div>
-
-
 
 
 
