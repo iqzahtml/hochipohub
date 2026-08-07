@@ -1,69 +1,113 @@
 <?php
 
-session_start();
+require_once "../config.php";
 
-require_once "database/db.php";
+require_once "../database/db.php";
 
-
-
-$email=$_SESSION['otp_email'] ?? '';
-
-$otp=$_POST['otp'];
+require_once "../includes/functions.php";
 
 
 
-$stmt=$conn->prepare("
 
 
-SELECT *
-
-FROM users
-
-WHERE email=?
-
-AND otp=?
+if(!isset($_SESSION['reset_email'])){
 
 
-");
+header(
+
+"Location: forgot_password.php"
+
+);
 
 
-$stmt->bind_param(
+exit();
 
-"ss",
 
-$email,
+}
 
-$otp
+
+
+
+$email=$_SESSION['reset_email'];
+
+
+
+
+
+
+if($_SERVER['REQUEST_METHOD']=="POST"){
+
+
+
+$otp=mysqli_real_escape_string(
+
+$conn,
+
+$_POST['otp']
 
 );
 
 
 
-$stmt->execute();
 
 
 
-$result=$stmt->get_result();
+$result=$conn->query("
+
+SELECT *
+
+FROM password_reset
+
+WHERE email='$email'
+
+AND otp='$otp'
+
+AND expires_at > NOW()
+
+ORDER BY reset_id DESC
+
+LIMIT 1
+
+
+");
 
 
 
-if($result->num_rows==1){
-
-
-$user=$result->fetch_assoc();
 
 
 
-if(strtotime($user['otp_expiry']) >= time()){
+
+if($result->num_rows>0){
 
 
-$_SESSION['reset_email']=$email;
+
+$_SESSION['otp_verified']=true;
 
 
-header("Location: ../reset_password.php");
+
+header(
+
+"Location: reset_password.php"
+
+);
+
 
 
 exit();
+
+
+
+}else{
+
+
+
+setFlashMessage(
+
+"error",
+
+"Invalid or expired OTP."
+
+);
 
 
 
@@ -72,17 +116,82 @@ exit();
 
 
 }
-
-
-
-$_SESSION['error']="Invalid OTP";
-
-
-header("Location: ../verify_otp.php");
-
-
-exit();
 
 
 
 ?>
+
+
+
+<?php include "../includes/header.php"; ?>
+
+
+
+<section class="auth-page">
+
+
+<div class="auth-box">
+
+
+<h1>
+
+Verify OTP
+
+</h1>
+
+
+
+
+<form method="POST">
+
+
+
+<div class="form-group">
+
+
+<label>
+
+OTP Code
+
+</label>
+
+
+<input
+
+type="text"
+
+name="otp"
+
+maxlength="6"
+
+required
+
+>
+
+
+</div>
+
+
+
+
+
+<button class="btn-primary">
+
+Verify
+
+</button>
+
+
+
+</form>
+
+
+
+</div>
+
+
+</section>
+
+
+
+<?php include "../includes/footer.php"; ?>
