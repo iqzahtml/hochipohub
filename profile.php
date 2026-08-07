@@ -1,74 +1,64 @@
 <?php
 
-session_start();
-
+require_once "config.php";
 require_once "database/db.php";
+require_once "includes/functions.php";
+require_once "includes/session.php";
 
 
-if(!isset($_SESSION['user_id'])){
-
-header("Location: auth/login.php");
-
-exit();
-
-}
+$pageTitle = "Profile";
 
 
-
-$user_id=$_SESSION['user_id'];
-
+requireLogin();
 
 
-if(isset($_POST['update'])){
-
-
-$name=$_POST['name'];
-
-$phone=$_POST['phone'];
+$userID = currentUserID();
 
 
 
-$stmt=$conn->prepare("
 
 
-UPDATE users
+/*
+|--------------------------------------------------------------------------
+| Update Profile
+|--------------------------------------------------------------------------
+*/
 
 
-SET
+if($_SERVER['REQUEST_METHOD']=="POST"){
 
 
-name=?,
+$name = mysqli_real_escape_string(
+$conn,
+$_POST['name']
+);
 
 
-phone=?
-
-
-WHERE user_id=?
-
-
-
-");
-
-
-$stmt->bind_param(
-
-"ssi",
-
-$name,
-
-$phone,
-
-$user_id
-
+$phone = mysqli_real_escape_string(
+$conn,
+$_POST['phone']
 );
 
 
 
-$stmt->execute();
+$sql = "
+
+UPDATE users
+
+SET
+
+name='$name',
+
+phone='$phone'
+
+
+WHERE user_id='$userID'
+
+";
 
 
 
-$message="Profile updated";
+$conn->query($sql);
 
 
 
@@ -76,124 +66,129 @@ $message="Profile updated";
 
 
 
-$user=$conn->query("
 
+
+/*
+|--------------------------------------------------------------------------
+| Get User
+|--------------------------------------------------------------------------
+*/
+
+
+$query = "
 
 SELECT *
 
-
 FROM users
 
+WHERE user_id='$userID'
 
-WHERE user_id=$user_id
+LIMIT 1
+
+";
 
 
+$result=$conn->query($query);
 
-")->fetch_assoc();
+
+$user=$result->fetch_assoc();
 
 
 
 ?>
 
-
-<!DOCTYPE html>
-
-<html>
+<?php include "includes/header.php"; ?>
 
 
-<head>
-
-<title>
-Profile
-</title>
+<section class="profile-page">
 
 
-<link rel="stylesheet" href="css/style.css">
-
-
-</head>
-
-
-
-<body>
-
-
-
-<?php include "includes/navbar.php"; ?>
-
-
+<div class="page-title">
 
 <h1>
 My Profile
 </h1>
 
+</div>
 
 
 
-<?php if(isset($message)){ ?>
 
-<p>
-
-<?= $message; ?>
-
-</p>
-
-<?php } ?>
-
+<div class="profile-box">
 
 
 <form method="POST">
 
 
 
+<div class="form-group">
+
 <label>
 Name
 </label>
 
+<input
 
-<input type="text"
+type="text"
 
 name="name"
 
-value="<?= htmlspecialchars($user['name']); ?>">
+value="<?= htmlspecialchars($user['name']); ?>"
+
+>
+
+</div>
 
 
 
 
+
+<div class="form-group">
 
 <label>
 Email
 </label>
 
+<input
 
-<input type="email"
+type="email"
 
 value="<?= htmlspecialchars($user['email']); ?>"
 
-readonly>
+disabled
+
+>
+
+</div>
 
 
 
 
+
+<div class="form-group">
 
 <label>
 Phone
 </label>
 
+<input
 
-<input type="text"
+type="text"
 
 name="phone"
 
-value="<?= htmlspecialchars($user['phone']); ?>">
+value="<?= htmlspecialchars($user['phone']); ?>"
+
+>
+
+</div>
 
 
 
 
+<button class="btn-primary">
 
-<button name="update">
-
-Update
+Save Profile
 
 </button>
 
@@ -202,8 +197,10 @@ Update
 </form>
 
 
+</div>
 
-</body>
+
+</section>
 
 
-</html>
+<?php include "includes/footer.php"; ?>
