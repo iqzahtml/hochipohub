@@ -1,58 +1,28 @@
-<?php
-
-/*
-|--------------------------------------------------------------------------
-| HochipoHub Footer
-|--------------------------------------------------------------------------
-|
-| Used by:
-| - all pages
-|
-|--------------------------------------------------------------------------
-*/
-
-?>
-
-
 </main>
 
 
 <footer class="footer">
 
 
-
 <div class="footer-container">
 
 
 
-<div class="footer-brand">
+<div class="footer-logo">
 
 
-<img
-
-src="<?= IMAGE_URL; ?>logo.jpg"
-
-alt="HochipoHub Logo"
-
->
-
-
-
-<h3>
+<h2>
 
 HochipoHub
 
-</h3>
-
+</h2>
 
 
 <p>
 
-Discover local products.
-Support local vendors.
+Support Local Vendors, Discover Unique Products.
 
 </p>
-
 
 
 </div>
@@ -65,13 +35,11 @@ Support local vendors.
 <div class="footer-links">
 
 
-
-<h4>
+<h3>
 
 Quick Links
 
-</h4>
-
+</h3>
 
 
 <a href="<?= BASE_URL; ?>index.php">
@@ -81,7 +49,6 @@ Home
 </a>
 
 
-
 <a href="<?= BASE_URL; ?>catalog.php">
 
 Catalog
@@ -89,13 +56,11 @@ Catalog
 </a>
 
 
-
 <a href="<?= BASE_URL; ?>vendor.php">
 
-Vendors
+Vendor
 
 </a>
-
 
 
 <a href="<?= BASE_URL; ?>contact.php">
@@ -114,124 +79,36 @@ Contact
 
 
 
-
-<div class="footer-links">
-
-
-
-<h4>
-
-Account
-
-</h4>
-
-
-
-<?php if(isLogin()){ ?>
-
-
-
-<a href="<?= BASE_URL; ?>profile.php">
-
-Profile
-
-</a>
-
-
-
-<a href="<?= BASE_URL; ?>auth/logout.php">
-
-Logout
-
-</a>
-
-
-
-<?php }else{ ?>
-
-
-
-<a href="#" onclick="openLoginModal()">
-
-Login
-
-</a>
-
-
-
-<a href="#" onclick="openRegisterModal()">
-
-Register
-
-</a>
-
-
-
-<?php } ?>
-
-
-
-</div>
-
-
-
-
-
-
-
-
 <div class="footer-social">
 
 
-
-<h4>
+<h3>
 
 Follow Us
 
-</h4>
+</h3>
 
 
+<div>
 
-
-<div class="social-icons">
-
-
-<a href="#">
 
 <i class="fa-brands fa-facebook"></i>
 
-</a>
-
-
-
-<a href="#">
-
 <i class="fa-brands fa-instagram"></i>
-
-</a>
-
-
-
-<a href="#">
 
 <i class="fa-brands fa-tiktok"></i>
 
-</a>
 
+</div>
 
 
 </div>
 
 
 
-</div>
-
-
 
 
 </div>
-
-
 
 
 
@@ -242,10 +119,7 @@ Follow Us
 
 <p>
 
-
-© <?= date('Y'); ?> HochipoHub.
-All Rights Reserved.
-
+© <?= date('Y'); ?> HochipoHub. All Rights Reserved.
 
 </p>
 
@@ -261,21 +135,12 @@ All Rights Reserved.
 
 
 
+<?php include __DIR__."/login_modal.php"; ?>
 
 
-<!-- LOGIN REGISTER POPUP -->
-
-<?php include dirname(__FILE__) . '/login_modal.php'; ?>
-
-<?php include dirname(__FILE__) . '/register_modal.php'; ?>
+<?php include __DIR__."/register_modal.php"; ?>
 
 
-
-
-
-
-
-<!-- JAVASCRIPT -->
 
 
 <script src="<?= BASE_URL; ?>js/script.js"></script>
@@ -284,27 +149,8 @@ All Rights Reserved.
 <script src="<?= BASE_URL; ?>js/modal.js"></script>
 
 
-<script src="<?= BASE_URL; ?>js/search.js"></script>
-
-
-
-<?php if(isset($additionalJS)): ?>
-
-
-<?php foreach($additionalJS as $js): ?>
-
-
-<script src="<?= BASE_URL; ?>js/<?= $js; ?>"></script>
-
-
-<?php endforeach; ?>
-
-
-<?php endif; ?>
-
-
-
 
 </body>
+
 
 </html>
