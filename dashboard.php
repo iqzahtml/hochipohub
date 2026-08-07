@@ -1,149 +1,127 @@
 <?php
 
-session_start();
-
+require_once "config.php";
 require_once "database/db.php";
+require_once "includes/functions.php";
+require_once "includes/session.php";
 
+$pageTitle = "Dashboard";
 
-if(!isset($_SESSION['user_id'])){
+requireLogin();
 
-header("Location: auth/login.php");
-
-exit();
-
-}
-
-
-
-$user_id=$_SESSION['user_id'];
+$userID = currentUserID();
 
 
 
-$orders=$conn->prepare("
+/*
+|--------------------------------------------------------------------------
+| Count Orders
+|--------------------------------------------------------------------------
+*/
 
+$orderQuery = "
 
 SELECT COUNT(*) AS total
-
 
 FROM orders
 
+WHERE user_id='$userID'
 
-WHERE customer_id=?
-
-
-
-");
+";
 
 
+$orderResult = $conn->query($orderQuery);
 
-$orders->bind_param(
-
-"i",
-
-$user_id
-
-);
-
-
-
-$orders->execute();
-
-
-
-$total_orders=$orders->get_result()->fetch_assoc()['total'];
+$orderCount = $orderResult->fetch_assoc()['total'];
 
 
 
 
-$wishlist=$conn->prepare("
 
+/*
+|--------------------------------------------------------------------------
+| Count Wishlist
+|--------------------------------------------------------------------------
+*/
+
+$wishQuery = "
 
 SELECT COUNT(*) AS total
 
-
 FROM wishlist
 
+WHERE user_id='$userID'
 
-WHERE user_id=?
-
-
-
-");
+";
 
 
+$wishResult = $conn->query($wishQuery);
 
-$wishlist->bind_param(
-
-"i",
-
-$user_id
-
-);
+$wishCount = $wishResult->fetch_assoc()['total'];
 
 
 
-$wishlist->execute();
 
 
+/*
+|--------------------------------------------------------------------------
+| Recent Orders
+|--------------------------------------------------------------------------
+*/
 
-$total_wishlist=$wishlist->get_result()->fetch_assoc()['total'];
+$recentQuery = "
+
+SELECT *
+
+FROM orders
+
+WHERE user_id='$userID'
+
+ORDER BY created_at DESC
+
+LIMIT 5
+
+";
+
+
+$recentOrders = $conn->query($recentQuery);
 
 
 
 ?>
 
+<?php include "includes/header.php"; ?>
+
+<section class="dashboard-page">
 
 
-<!DOCTYPE html>
-
-<html>
-
-
-<head>
-
-<title>
-Dashboard
-</title>
-
-
-<link rel="stylesheet" href="css/style.css">
-
-
-</head>
-
-
-
-<body>
-
-
-<?php include "includes/navbar.php"; ?>
-
-
+<div class="page-title">
 
 <h1>
-Dashboard
+My Dashboard
 </h1>
 
+<p>
+Welcome back to HochipoHub.
+</p>
+
+</div>
 
 
-<div class="dashboard-cards">
 
+
+<div class="dashboard-card-grid">
 
 
 <div class="dashboard-card">
-
 
 <h3>
 Orders
 </h3>
 
-
-<p>
-
-<?= $total_orders; ?>
-
-</p>
-
+<strong>
+<?= $orderCount; ?>
+</strong>
 
 </div>
 
@@ -152,28 +130,98 @@ Orders
 
 <div class="dashboard-card">
 
-
 <h3>
 Wishlist
 </h3>
 
+<strong>
+<?= $wishCount; ?>
+</strong>
+
+</div>
+
+
+
+
+<div class="dashboard-card">
+
+<h3>
+Account
+</h3>
+
+<a href="profile.php">
+Manage Profile
+</a>
+
+</div>
+
+
+</div>
+
+
+
+
+
+<div class="dashboard-section">
+
+<h2>
+Recent Orders
+</h2>
+
+
+
+<?php if($recentOrders && $recentOrders->num_rows > 0){ ?>
+
+
+<?php while($order=$recentOrders->fetch_assoc()){ ?>
+
+
+<div class="order-card">
+
+
+<h3>
+Order #<?= $order['order_id']; ?>
+</h3>
+
 
 <p>
-
-<?= $total_wishlist; ?>
-
+Status:
+<?= htmlspecialchars($order['order_status']); ?>
 </p>
 
 
+<p>
+RM <?= number_format($order['total_amount'],2); ?>
+</p>
+
+
+<a href="order_details.php?id=<?= $order['order_id']; ?>">
+View
+</a>
+
+
+</div>
+
+
+<?php } ?>
+
+
+<?php }else{ ?>
+
+
+<p>
+No order yet.
+</p>
+
+
+<?php } ?>
+
+
 </div>
 
 
 
-</div>
+</section>
 
 
-
-</body>
-
-
-</html>
+<?php include "includes/footer.php"; ?>
