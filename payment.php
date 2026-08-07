@@ -1,290 +1,208 @@
 <?php
 
-session_start();
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Payment Page
+|--------------------------------------------------------------------------
+|
+| Payment selection before creating order
+|
+|--------------------------------------------------------------------------
+*/
+
+
+require_once "config.php";
 
 require_once "database/db.php";
 
+require_once "includes/functions.php";
 
-if(!isset($_SESSION['user_id'])){
+require_once "includes/session.php";
 
-    header("Location: auth/login.php");
+
+
+$pageTitle = "Payment";
+
+
+
+requireLogin();
+
+
+
+if($_SERVER['REQUEST_METHOD'] !== 'POST'){
+
+
+    header(
+
+        "Location: cart.php"
+
+    );
+
+
     exit();
 
-}
-
-
-$user_id=$_SESSION['user_id'];
-
-$order_id=$_GET['order_id'];
-
-
-
-$order=$conn->prepare("
-
-
-SELECT *
-
-
-FROM orders
-
-
-WHERE order_id=?
-
-AND customer_id=?
-
-
-
-");
-
-
-
-$order->bind_param(
-
-"ii",
-
-$order_id,
-
-$user_id
-
-);
-
-
-
-$order->execute();
-
-
-
-$data=$order->get_result()->fetch_assoc();
-
-
-
-if(!$data){
-
-    exit("Order not found");
 
 }
 
 
 
-if(isset($_POST['pay'])){
+$name = htmlspecialchars($_POST['name']);
 
+$phone = htmlspecialchars($_POST['phone']);
 
-$method=$_POST['payment_method'];
+$address = htmlspecialchars($_POST['address']);
 
+$total = htmlspecialchars($_POST['total']);
 
-
-$payment=$conn->prepare("
-
-
-INSERT INTO payments
-
-
-(
-
-order_id,
-
-payment_method,
-
-payment_status,
-
-payment_date,
-
-amount
-
-
-)
-
-
-VALUES
-
-(
-
-?,
-
-?,
-
-'Paid',
-
-NOW(),
-
-?
-
-)
-
-
-
-");
-
-
-
-$payment->bind_param(
-
-"isd",
-
-$order_id,
-
-$method,
-
-$data['total_amount']
-
-);
-
-
-
-$payment->execute();
-
-
-
-
-
-$update=$conn->prepare("
-
-
-UPDATE orders
-
-
-SET order_status='Processing'
-
-
-WHERE order_id=?
-
-
-
-");
-
-
-
-$update->bind_param(
-
-"i",
-
-$order_id
-
-);
-
-
-
-$update->execute();
-
-
-
-header("Location: order_details.php?id=".$order_id);
-
-
-exit();
-
-
-
-}
 
 
 ?>
 
 
 
-<!DOCTYPE html>
-
-<html>
-
-
-<head>
-
-<title>
-Payment
-</title>
-
-
-<link rel="stylesheet" href="css/checkout.css">
-
-
-</head>
+<?php include "includes/header.php"; ?>
 
 
 
-<body>
-
-
-<?php include "includes/navbar.php"; ?>
 
 
 
-<div class="payment-box">
+
+<section class="payment-page">
+
+
+
+
+
+
+<div class="page-title">
 
 
 <h1>
-Payment
+
+Choose Payment Method
+
 </h1>
-
-
-
-<h3>
-
-Order #<?= $order_id; ?>
-
-</h3>
 
 
 
 <p>
 
-Amount:
-
-RM <?= number_format($data['total_amount'],2); ?>
+Select your preferred payment option.
 
 </p>
 
 
-
-<form method="POST">
-
-
-
-<select name="payment_method">
-
-
-<option value="FPX">
-
-FPX
-
-</option>
-
-
-<option value="Credit Card">
-
-Credit Card
-
-</option>
-
-
-<option value="Debit Card">
-
-Debit Card
-
-</option>
-
-
-<option value="Cash">
-
-Cash
-
-</option>
-
-
-
-</select>
+</div>
 
 
 
 
-<button name="pay">
-
-Pay Now
-
-</button>
 
 
 
-</form>
+
+<div class="payment-container">
+
+
+
+
+
+
+
+<form
+
+action="order.php"
+
+method="POST"
+
+>
+
+
+
+
+
+
+<input
+
+type="hidden"
+
+name="name"
+
+value="<?= $name; ?>"
+
+>
+
+
+
+<input
+
+type="hidden"
+
+name="phone"
+
+value="<?= $phone; ?>"
+
+>
+
+
+
+<input
+
+type="hidden"
+
+name="address"
+
+value="<?= $address; ?>"
+
+>
+
+
+
+<input
+
+type="hidden"
+
+name="total"
+
+value="<?= $total; ?>"
+
+>
+
+
+
+
+
+
+
+<div class="payment-option">
+
+
+
+<label>
+
+
+<input
+
+type="radio"
+
+name="payment_method"
+
+value="Online Banking"
+
+required
+
+>
+
+
+<span>
+
+Online Banking
+
+</span>
+
+
+</label>
 
 
 
@@ -292,7 +210,155 @@ Pay Now
 
 
 
-</body>
 
 
-</html>
+
+
+
+<div class="payment-option">
+
+
+
+<label>
+
+
+<input
+
+type="radio"
+
+name="payment_method"
+
+value="E-Wallet"
+
+>
+
+
+<span>
+
+E-Wallet
+
+</span>
+
+
+</label>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+<div class="payment-option">
+
+
+
+<label>
+
+
+<input
+
+type="radio"
+
+name="payment_method"
+
+value="Cash On Delivery"
+
+>
+
+
+<span>
+
+Cash On Delivery
+
+</span>
+
+
+</label>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+<div class="payment-summary">
+
+
+<h3>
+
+Total Payment
+
+</h3>
+
+
+<h2>
+
+RM <?= number_format($total,2); ?>
+
+</h2>
+
+
+
+</div>
+
+
+
+
+
+
+
+<button
+
+type="submit"
+
+class="btn-primary"
+
+>
+
+
+Confirm Order
+
+
+</button>
+
+
+
+
+
+
+</form>
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+
+</section>
+
+
+
+
+
+
+
+
+<?php include "includes/footer.php"; ?>
