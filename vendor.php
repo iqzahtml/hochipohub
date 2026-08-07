@@ -1,87 +1,126 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Vendor Listing
+|--------------------------------------------------------------------------
+|
+| Database:
+| - vendors
+|
+|--------------------------------------------------------------------------
+*/
+
+
+require_once "config.php";
+
 require_once "database/db.php";
 
+require_once "includes/functions.php";
 
-$vendors=$conn->query("
-
-
-SELECT
+require_once "includes/session.php";
 
 
-vendors.*,
+
+$pageTitle = "Vendors";
 
 
-users.name,
 
 
-users.email
 
 
+/*
+|--------------------------------------------------------------------------
+| Get Vendors
+|--------------------------------------------------------------------------
+*/
+
+
+$query = "
+
+SELECT *
 
 FROM vendors
 
+WHERE status='Approved'
 
+ORDER BY created_at DESC
 
-JOIN users
-
-
-ON vendors.user_id=users.user_id
-
-
-
-WHERE vendors.approval_status='Approved'
+";
 
 
 
-ORDER BY vendors.vendor_id DESC
-
-
-
-");
+$vendors = $conn->query($query);
 
 
 
 ?>
 
 
-<!DOCTYPE html>
 
-<html>
-
-
-<head>
-
-<title>
-Vendors
-</title>
-
-
-<link rel="stylesheet" href="css/vendor.css">
-
-
-</head>
+<?php include "includes/header.php"; ?>
 
 
 
-<body>
 
 
 
-<?php include "includes/navbar.php"; ?>
 
+<section class="vendor-page">
+
+
+
+
+
+
+
+<div class="page-title">
 
 
 <h1>
+
 Local Vendors
+
 </h1>
+
+
+
+<p>
+
+Support local businesses through HochipoHub.
+
+</p>
+
+
+</div>
+
+
+
+
+
+
 
 
 
 <div class="vendor-grid">
 
 
-<?php while($row=$vendors->fetch_assoc()){ ?>
+
+
+
+
+<?php if($vendors && $vendors->num_rows > 0){ ?>
+
+
+
+
+
+
+
+<?php while($vendor = $vendors->fetch_assoc()){ ?>
+
+
+
 
 
 
@@ -89,62 +128,144 @@ Local Vendors
 
 
 
-<?php if($row['business_logo']){ ?>
 
 
-<img src="uploads/vendors/<?= $row['business_logo']; ?>">
+
+
+
+<div class="vendor-image">
+
+
+
+
+
+<?php if(!empty($vendor['business_logo'])){ ?>
+
+
+
+<img
+
+src="<?= BASE_URL; ?>uploads/vendors/<?= htmlspecialchars($vendor['business_logo']); ?>"
+
+alt="<?= htmlspecialchars($vendor['business_name']); ?>"
+
+>
+
+
+
+<?php }else{ ?>
+
+
+
+<img
+
+src="<?= IMAGE_URL; ?>logo.jpg"
+
+alt="Vendor Logo"
+
+>
+
 
 
 <?php } ?>
 
 
 
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="vendor-info">
+
+
+
+
+
+
+
 <h2>
 
-<?= htmlspecialchars($row['business_name']); ?>
+
+<?= htmlspecialchars($vendor['business_name']); ?>
+
 
 </h2>
 
 
 
 
+
+
 <p>
 
-Owner:
 
-<?= htmlspecialchars($row['name']); ?>
+<?= htmlspecialchars(
+
+substr(
+
+$vendor['business_description'],
+
+0,
+
+120
+
+)
+
+); ?>
+
+
+...
+
 
 </p>
 
 
 
-<p>
-
-Category:
-
-<?= htmlspecialchars($row['category']); ?>
-
-</p>
 
 
 
-<p>
-
-<?= htmlspecialchars($row['business_description']); ?>
-
-</p>
 
 
+<a
 
-<a href="catalog.php?vendor=<?= $row['vendor_id']; ?>">
+href="<?= BASE_URL; ?>product.php?vendor=<?= $vendor['vendor_id']; ?>"
+
+class="view-product-btn"
+
+>
+
 
 View Products
+
 
 </a>
 
 
 
+
+
+
+
 </div>
+
+
+
+
+
+
+
+</div>
+
+
+
 
 
 
@@ -152,11 +273,65 @@ View Products
 
 
 
+
+
+
+
+
+<?php }else{ ?>
+
+
+
+
+
+<div class="empty-product">
+
+
+<h3>
+
+No Vendors Available
+
+</h3>
+
+
+
+<p>
+
+No approved vendors yet.
+
+</p>
+
+
 </div>
 
 
 
-</body>
 
 
-</html>
+<?php } ?>
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+</section>
+
+
+
+
+
+
+
+<?php include "includes/footer.php"; ?>
