@@ -1,90 +1,182 @@
-<div class="sidebar">
+<aside class="sidebar admin-sidebar">
+
+
+
+<div class="sidebar-title">
 
 
 <h2>
+
 Admin Panel
+
 </h2>
 
 
+</div>
 
-<a href="admin/dashboard.php">
+
+
+
+
+
+<ul>
+
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>admin/dashboard.php">
+
+
+<i class="fa-solid fa-chart-line"></i>
+
 
 Dashboard
 
+
 </a>
 
 
+</li>
 
-<a href="admin/users.php">
+
+
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>admin/users.php">
+
+
+<i class="fa-solid fa-users"></i>
+
 
 Users
 
+
 </a>
 
 
+</li>
 
-<a href="admin/vendors.php">
+
+
+
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>admin/vendors.php">
+
+
+<i class="fa-solid fa-store"></i>
+
 
 Vendors
 
+
 </a>
 
 
+</li>
 
-<a href="admin/products.php">
+
+
+
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>admin/products.php">
+
+
+<i class="fa-solid fa-box"></i>
+
 
 Products
 
+
 </a>
 
 
+</li>
 
-<a href="admin/orders.php">
+
+
+
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>admin/orders.php">
+
+
+<i class="fa-solid fa-cart-shopping"></i>
+
 
 Orders
 
+
 </a>
 
 
+</li>
 
-<a href="admin/payment.php">
+
+
+
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>admin/payments.php">
+
+
+<i class="fa-solid fa-credit-card"></i>
+
 
 Payments
 
-</a>
-
-
-
-<a href="admin/commission.php">
-
-Commission
 
 </a>
 
 
-
-<a href="admin/reviews.php">
-
-Reviews
-
-</a>
+</li>
 
 
 
-<a href="admin/settings.php">
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>admin/settings.php">
+
+
+<i class="fa-solid fa-gear"></i>
+
 
 Settings
 
-</a>
-
-
-
-<a href="auth/logout.php">
-
-Logout
 
 </a>
 
 
+</li>
 
-</div>
+
+
+
+
+</ul>
+
+
+
+
+</aside>
