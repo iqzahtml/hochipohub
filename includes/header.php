@@ -1,27 +1,84 @@
 <?php
 
-
-require_once dirname(__DIR__).'/config.php';
-
-require_once dirname(__DIR__).'/database/db.php';
-
-require_once __DIR__.'/session.php';
-
-require_once __DIR__.'/functions.php';
-
-
-
-$pageTitle =
-$pageTitle ?? SITE_NAME;
-
-
-$currentPage =
-basename($_SERVER['PHP_SELF']);
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Header
+|--------------------------------------------------------------------------
+|
+| Loads:
+| - config
+| - database
+| - functions
+| - session
+| - CSS
+|
+|--------------------------------------------------------------------------
+*/
 
 
-$isLoggedIn =
-isLoggedIn();
+require_once dirname(__DIR__) . '/config.php';
 
+require_once dirname(__DIR__) . '/database/db.php';
+
+require_once dirname(__DIR__) . '/includes/session.php';
+
+require_once dirname(__DIR__) . '/includes/functions.php';
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Page Settings
+|--------------------------------------------------------------------------
+*/
+
+
+$pageTitle = $pageTitle ?? SITE_NAME;
+
+$pageDescription = $pageDescription ?? 
+'HochipoHub - Discover Local Products';
+
+
+
+/*
+|--------------------------------------------------------------------------
+| User Data
+|--------------------------------------------------------------------------
+*/
+
+
+$loggedIn = isLogin();
+
+$userID = currentUserID();
+
+$userName = currentUserName();
+
+$userRole = currentUserRole();
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Cart & Wishlist Count
+|--------------------------------------------------------------------------
+*/
+
+
+$cartCount = 0;
+
+$wishlistCount = 0;
+
+
+if($loggedIn && $userRole == 'customer'){
+
+
+    $cartCount = getCartCount($userID);
+
+
+    $wishlistCount = getWishlistCount($userID);
+
+
+}
 
 
 ?>
@@ -37,64 +94,132 @@ isLoggedIn();
 <meta charset="UTF-8">
 
 
-<meta name="viewport"
-content="width=device-width, initial-scale=1.0">
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 
 <title>
 
 <?= htmlspecialchars($pageTitle); ?>
 
+| <?= SITE_NAME; ?>
+
 </title>
 
 
 
-<link rel="stylesheet"
-href="<?= BASE_URL ?>css/style.css">
+<meta name="description"
+
+content="<?= htmlspecialchars($pageDescription); ?>">
 
 
-<link rel="stylesheet"
-href="<?= BASE_URL ?>css/responsive.css">
+
+<!-- Google Font -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
 
-<link rel="stylesheet"
-href="<?= BASE_URL ?>css/modal.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
 
 
-<link rel="stylesheet"
-href="<?= BASE_URL ?>css/login.css">
 
-
-<link rel="stylesheet"
-href="<?= BASE_URL ?>css/product.css">
-
-
-<link rel="stylesheet"
-href="<?= BASE_URL ?>css/cart.css">
-
+<!-- Font Awesome -->
 
 <link rel="stylesheet"
-href="<?= BASE_URL ?>css/vendor.css">
+
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
 
-<link rel="stylesheet"
-href="<?= BASE_URL ?>css/admin.css">
+
+<!-- Main CSS -->
 
 
 <link rel="stylesheet"
-href="<?= BASE_URL ?>css/wishlist.css">
+
+href="<?= BASE_URL; ?>css/style.css">
+
+
+
+<link rel="stylesheet"
+
+href="<?= BASE_URL; ?>css/responsive.css">
+
+
+
+<link rel="stylesheet"
+
+href="<?= BASE_URL; ?>css/modal.css">
+
+
+
+<link rel="stylesheet"
+
+href="<?= BASE_URL; ?>css/login.css">
+
+
+
+<link rel="stylesheet"
+
+href="<?= BASE_URL; ?>css/product.css">
+
+
+
+<link rel="stylesheet"
+
+href="<?= BASE_URL; ?>css/dashboard.css">
+
+
+
+<link rel="stylesheet"
+
+href="<?= BASE_URL; ?>css/cart.css">
+
+
+
+<link rel="stylesheet"
+
+href="<?= BASE_URL; ?>css/checkout.css">
+
+
+
+<link rel="stylesheet"
+
+href="<?= BASE_URL; ?>css/vendor.css">
+
+
+
+<link rel="stylesheet"
+
+href="<?= BASE_URL; ?>css/admin.css">
+
+
+
+<link rel="stylesheet"
+
+href="<?= BASE_URL; ?>css/wishlist.css">
 
 
 
 </head>
 
 
+
 <body>
 
 
-<?php include __DIR__.'/navbar.php'; ?>
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| Navbar
+|--------------------------------------------------------------------------
+*/
+
+include dirname(__FILE__) . '/navbar.php';
 
 
+?>
 
-<main>
+
+<main class="main-container">
