@@ -1,171 +1,392 @@
 <?php
 
-session_start();
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Create Order
+|--------------------------------------------------------------------------
+|
+| Flow:
+| Cart -> Order -> Order Details
+|
+|--------------------------------------------------------------------------
+*/
+
+
+require_once "config.php";
 
 require_once "database/db.php";
 
+require_once "includes/functions.php";
 
-if(!isset($_SESSION['user_id'])){
+require_once "includes/session.php";
 
-header("Location: auth/login.php");
 
-exit();
+
+$pageTitle = "Order Success";
+
+
+
+requireLogin();
+
+
+
+$userID = currentUserID();
+
+
+
+
+
+
+if($_SERVER['REQUEST_METHOD'] !== 'POST'){
+
+
+    header(
+        "Location: cart.php"
+    );
+
+
+    exit();
+
 
 }
 
 
 
-$user_id=$_SESSION['user_id'];
+
+
+$name = mysqli_real_escape_string(
+    $conn,
+    $_POST['name']
+);
+
+
+$phone = mysqli_real_escape_string(
+    $conn,
+    $_POST['phone']
+);
+
+
+$address = mysqli_real_escape_string(
+    $conn,
+    $_POST['address']
+);
+
+
+$total = mysqli_real_escape_string(
+    $conn,
+    $_POST['total']
+);
+
+
+$paymentMethod = mysqli_real_escape_string(
+    $conn,
+    $_POST['payment_method']
+);
 
 
 
-$orders=$conn->prepare("
 
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Get Cart Items
+|--------------------------------------------------------------------------
+*/
+
+
+$cartQuery = "
 
 SELECT
 
+cart.product_id,
 
-orders.*
+cart.quantity,
 
-
-
-FROM orders
-
+products.price
 
 
-WHERE customer_id=?
+FROM cart
 
 
 
-ORDER BY order_id DESC
+INNER JOIN products
+
+ON cart.product_id = products.product_id
 
 
+
+WHERE cart.user_id='$userID'
+
+
+";
+
+
+
+$cartResult = $conn->query($cartQuery);
+
+
+
+
+if(!$cartResult || $cartResult->num_rows == 0){
+
+
+    header(
+        "Location: cart.php"
+    );
+
+
+    exit();
+
+
+}
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Create Order
+|--------------------------------------------------------------------------
+*/
+
+
+$orderSQL = "
+
+INSERT INTO orders
+
+(
+
+user_id,
+
+total_amount,
+
+shipping_address,
+
+payment_method,
+
+payment_status,
+
+order_status,
+
+created_at
+
+)
+
+
+VALUES
+
+(
+
+'$userID',
+
+'$total',
+
+'$address',
+
+'$paymentMethod',
+
+'Pending',
+
+'Processing',
+
+NOW()
+
+)
+
+
+";
+
+
+
+
+
+if($conn->query($orderSQL)){
+
+
+    $orderID = $conn->insert_id;
+
+
+
+}else{
+
+
+    die("Order failed");
+
+
+}
+
+
+
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Insert Order Details
+|--------------------------------------------------------------------------
+*/
+
+
+while($item = $cartResult->fetch_assoc()){
+
+
+
+$productID = $item['product_id'];
+
+$quantity = $item['quantity'];
+
+$price = $item['price'];
+
+
+
+
+
+$detailSQL = "
+
+INSERT INTO order_details
+
+(
+
+order_id,
+
+product_id,
+
+quantity,
+
+price
+
+)
+
+
+VALUES
+
+(
+
+'$orderID',
+
+'$productID',
+
+'$quantity',
+
+'$price'
+
+)
+
+
+
+";
+
+
+
+$conn->query($detailSQL);
+
+
+
+}
+
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Clear Cart
+|--------------------------------------------------------------------------
+*/
+
+
+$conn->query("
+
+DELETE FROM cart
+
+WHERE user_id='$userID'
 
 ");
 
 
 
-$orders->bind_param(
-
-"i",
-
-$user_id
-
-);
 
 
-
-$orders->execute();
-
-
-
-$result=$orders->get_result();
 
 
 
 ?>
 
 
-<!DOCTYPE html>
 
-<html>
-
-
-<head>
-
-<title>
-My Orders
-</title>
-
-
-<link rel="stylesheet" href="css/style.css">
-
-
-</head>
+<?php include "includes/header.php"; ?>
 
 
 
-<body>
 
 
 
-<?php include "includes/navbar.php"; ?>
+
+<section class="order-success">
 
 
 
-<div class="order-container">
+
+
+<div class="success-box">
+
+
+
+
+
+<i class="fa-solid fa-circle-check"></i>
+
 
 
 
 <h1>
-My Orders
+
+Order Placed Successfully!
+
 </h1>
 
 
 
 
-<?php while($row=$result->fetch_assoc()){ ?>
-
-
-
-<div class="order-card">
-
-
-
-<h3>
-
-Order #<?= $row['order_id']; ?>
-
-</h3>
-
-
 
 <p>
 
-Date:
-
-<?= $row['order_date']; ?>
+Thank you for shopping with HochipoHub.
 
 </p>
 
 
 
 
-<p>
-
-Total:
-
-RM <?= number_format($row['total_amount'],2); ?>
-
-</p>
 
 
 
-<p>
+<a
 
-Status:
+href="<?= BASE_URL; ?>order_details.php?id=<?= $orderID; ?>"
 
-<?= $row['order_status']; ?>
+class="btn-primary"
 
-</p>
-
-
-
-<a href="order_details.php?id=<?= $row['order_id']; ?>">
+>
 
 
-View Details
+View Order
 
 
 </a>
 
 
 
-</div>
 
-
-
-<?php } ?>
 
 
 
@@ -173,7 +394,16 @@ View Details
 
 
 
-</body>
 
 
-</html>
+
+</section>
+
+
+
+
+
+
+
+
+<?php include "includes/footer.php"; ?>
