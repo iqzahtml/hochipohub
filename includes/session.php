@@ -1,97 +1,435 @@
 <?php
 
-if(session_status() === PHP_SESSION_NONE){
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Session Management
+|--------------------------------------------------------------------------
+|
+| Handles:
+| - Login session
+| - User information
+| - Role checking
+|
+|--------------------------------------------------------------------------
+*/
+
+
+if (session_status() === PHP_SESSION_NONE) {
+
     session_start();
+
 }
+
 
 
 /*
 |--------------------------------------------------------------------------
-| Check Login
+| Check User Login
 |--------------------------------------------------------------------------
 */
 
-function isLogin(){
+
+function isLogin()
+
+{
 
     return isset($_SESSION['user_id']);
 
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Alias
-|--------------------------------------------------------------------------
-*/
-
-function isLoggedIn(){
-
-    return isset($_SESSION['user_id']);
-
-}
-
 
 /*
 |--------------------------------------------------------------------------
-| Current User
+| Get Current User ID
 |--------------------------------------------------------------------------
 */
 
-function currentUserId(){
+
+function currentUserID()
+
+{
 
     return $_SESSION['user_id'] ?? null;
 
 }
 
 
-function currentUserName(){
 
-    return $_SESSION['user_name'] ?? null;
+/*
+|--------------------------------------------------------------------------
+| Get Current User Name
+|--------------------------------------------------------------------------
+*/
+
+
+function currentUserName()
+
+{
+
+    return $_SESSION['user_name'] ?? '';
 
 }
 
-
-function currentUserRole(){
-
-    return $_SESSION['role'] ?? null;
-
-}
 
 
 /*
 |--------------------------------------------------------------------------
-| Login Session
+| Get Current User Email
 |--------------------------------------------------------------------------
 */
 
-function loginUser($user){
 
-    $_SESSION['user_id'] =
-        $user['user_id'];
+function currentUserEmail()
 
-    $_SESSION['user_name'] =
-        $user['name'];
+{
 
-    $_SESSION['role'] =
-        $user['role'];
+    return $_SESSION['user_email'] ?? '';
 
 }
 
 
+
 /*
 |--------------------------------------------------------------------------
-| Logout
+| Get Current User Role
 |--------------------------------------------------------------------------
 */
 
-function logoutUser(){
 
-    session_unset();
+function currentUserRole()
+
+{
+
+    return $_SESSION['role'] ?? '';
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Login User
+|--------------------------------------------------------------------------
+*/
+
+
+function loginUser($user)
+
+{
+
+    session_regenerate_id(true);
+
+
+
+    $_SESSION['user_id'] = $user['user_id'];
+
+    $_SESSION['user_name'] = $user['name'];
+
+    $_SESSION['user_email'] = $user['email'];
+
+    $_SESSION['role'] = $user['role'];
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Logout User
+|--------------------------------------------------------------------------
+*/
+
+
+function logoutUser()
+
+{
+
+    $_SESSION = [];
+
+
+
+    if(isset($_COOKIE[session_name()])){
+
+
+        setcookie(
+
+            session_name(),
+
+            '',
+
+            time()-42000,
+
+            '/'
+
+        );
+
+
+    }
+
+
 
     session_destroy();
 
+
 }
 
+
+
+/*
+|--------------------------------------------------------------------------
+| Role Checking
+|--------------------------------------------------------------------------
+*/
+
+
+function checkRole($role)
+
+{
+
+    if(!isset($_SESSION['role'])){
+
+
+        return false;
+
+
+    }
+
+
+
+    return $_SESSION['role'] === $role;
+
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Customer
+|--------------------------------------------------------------------------
+*/
+
+
+function isCustomer()
+
+{
+
+    return checkRole('customer');
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Seller / Vendor
+|--------------------------------------------------------------------------
+*/
+
+
+function isSeller()
+
+{
+
+    return checkRole('vendor');
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Admin
+|--------------------------------------------------------------------------
+*/
+
+
+function isAdmin()
+
+{
+
+    return checkRole('admin');
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Protect Page
+|--------------------------------------------------------------------------
+*/
+
+
+function requireLogin()
+
+{
+
+    if(!isLogin()){
+
+
+        header(
+
+            "Location: "
+
+            .BASE_URL
+
+            ."auth/login.php"
+
+        );
+
+
+        exit();
+
+
+    }
+
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Protect Seller Page
+|--------------------------------------------------------------------------
+*/
+
+
+function requireSeller()
+
+{
+
+    requireLogin();
+
+
+
+    if(!isSeller()){
+
+
+        header(
+
+            "Location: "
+
+            .BASE_URL
+
+            ."index.php"
+
+        );
+
+
+        exit();
+
+
+    }
+
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Protect Admin Page
+|--------------------------------------------------------------------------
+*/
+
+
+function requireAdmin()
+
+{
+
+    requireLogin();
+
+
+
+    if(!isAdmin()){
+
+
+        header(
+
+            "Location: "
+
+            .BASE_URL
+
+            ."index.php"
+
+        );
+
+
+        exit();
+
+
+    }
+
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Session Timeout
+|--------------------------------------------------------------------------
+*/
+
+
+function checkSessionTimeout()
+
+{
+
+    if(isset($_SESSION['last_activity'])){
+
+
+        if(
+
+            time()
+
+            -
+
+            $_SESSION['last_activity']
+
+            >
+
+            SESSION_TIMEOUT
+
+        ){
+
+
+            logoutUser();
+
+
+
+            header(
+
+                "Location: "
+
+                .BASE_URL
+
+                ."auth/login.php"
+
+            );
+
+
+            exit();
+
+
+        }
+
+
+    }
+
+
+
+    $_SESSION['last_activity']=time();
+
+
+}
+
+
+
+checkSessionTimeout();
 
 
 ?>
