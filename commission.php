@@ -1,73 +1,99 @@
 <?php
 
-session_start();
-
+require_once "config.php";
 require_once "database/db.php";
+require_once "includes/functions.php";
+require_once "includes/session.php";
 
 
-if(!isset($_SESSION['user_id'])){
+$pageTitle="Commission";
+
+
+requireLogin();
+
+
+if(currentUserRole()!="vendor"){
+
+
+header(
+"Location: dashboard.php"
+);
+
 
 exit();
+
 
 }
 
 
 
-$user_id=$_SESSION['user_id'];
+$userID=currentUserID();
 
 
 
-$stmt=$conn->prepare("
 
+
+$query="
 
 SELECT
 
 
-commission.*,
+orders.order_id,
 
 
-vendors.business_name
+orders.total_amount,
 
 
-
-FROM commission
-
-
-
-JOIN vendors
-
-
-ON commission.vendor_id=vendors.vendor_id
+orders.created_at
 
 
 
-WHERE vendors.user_id=?
+
+FROM orders
 
 
 
-ORDER BY commission_id DESC
+
+
+INNER JOIN order_details
+
+ON orders.order_id = order_details.order_id
 
 
 
-");
+
+
+INNER JOIN products
+
+ON order_details.product_id = products.product_id
 
 
 
-$stmt->bind_param(
 
-"i",
 
-$user_id
+INNER JOIN vendors
 
-);
+ON products.vendor_id = vendors.vendor_id
 
 
 
-$stmt->execute();
+
+
+WHERE vendors.user_id='$userID'
 
 
 
-$result=$stmt->get_result();
+
+ORDER BY orders.created_at DESC
+
+
+
+";
+
+
+
+$result=$conn->query($query);
+
 
 
 
@@ -75,52 +101,43 @@ $result=$stmt->get_result();
 
 
 
-<!DOCTYPE html>
-
-<html>
+<?php include "includes/header.php"; ?>
 
 
-<head>
-
-<title>
-Commission
-</title>
+<section class="commission-page">
 
 
-</head>
-
-
-<body>
-
-
+<div class="page-title">
 
 <h1>
-Commission History
+Vendor Commission
 </h1>
 
+</div>
 
 
 
-<table border="1">
+
+
+<table class="commission-table">
 
 
 <tr>
 
 <th>
-Order
+Order ID
 </th>
 
-<th>
-Rate
-</th>
 
 <th>
-Amount
+Sales
 </th>
 
+
 <th>
-Status
+Commission (5%)
 </th>
+
 
 </tr>
 
@@ -140,33 +157,21 @@ Status
 </td>
 
 
-
 <td>
 
-<?= $row['commission_rate']; ?>%
+RM <?= number_format($row['total_amount'],2); ?>
 
 </td>
 
 
-
 <td>
 
-RM <?= number_format($row['commission_amount'],2); ?>
+RM <?= number_format($row['total_amount']*0.05,2); ?>
 
 </td>
-
-
-
-<td>
-
-<?= $row['status']; ?>
-
-</td>
-
 
 
 </tr>
-
 
 
 <?php } ?>
@@ -177,7 +182,8 @@ RM <?= number_format($row['commission_amount'],2); ?>
 
 
 
-</body>
+</section>
 
 
-</html>
+
+<?php include "includes/footer.php"; ?>
