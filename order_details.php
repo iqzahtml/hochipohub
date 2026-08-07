@@ -1,105 +1,150 @@
 <?php
 
-session_start();
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Order Details
+|--------------------------------------------------------------------------
+|
+| Customer order information
+|
+|--------------------------------------------------------------------------
+*/
+
+
+require_once "config.php";
 
 require_once "database/db.php";
 
+require_once "includes/functions.php";
 
-if(!isset($_SESSION['user_id'])){
+require_once "includes/session.php";
 
-header("Location: auth/login.php");
 
-exit();
+
+$pageTitle = "Order Details";
+
+
+
+requireLogin();
+
+
+
+$userID = currentUserID();
+
+
+
+
+
+
+if(!isset($_GET['id'])){
+
+
+    header(
+
+        "Location: order.php"
+
+    );
+
+
+    exit();
+
 
 }
 
 
 
-$user_id=$_SESSION['user_id'];
-
-$order_id=$_GET['id'];
 
 
+$orderID = mysqli_real_escape_string(
 
+    $conn,
 
-$order=$conn->prepare("
-
-
-SELECT
-
-
-orders.*,
-
-
-users.name,
-
-
-users.email
-
-
-
-FROM orders
-
-
-
-JOIN users
-
-
-ON orders.customer_id=users.user_id
-
-
-
-WHERE orders.order_id=?
-
-AND orders.customer_id=?
-
-
-
-");
-
-
-
-$order->bind_param(
-
-"ii",
-
-$order_id,
-
-$user_id
+    $_GET['id']
 
 );
 
 
 
-$order->execute();
 
 
 
-$order_data=$order->get_result()->fetch_assoc();
 
 
 
-if(!$order_data){
+/*
+|--------------------------------------------------------------------------
+| Get Order Information
+|--------------------------------------------------------------------------
+*/
 
-exit("Order not found");
+
+$orderQuery = "
+
+SELECT *
+
+FROM orders
+
+WHERE order_id='$orderID'
+
+AND user_id='$userID'
+
+LIMIT 1
+
+";
+
+
+
+$orderResult = $conn->query($orderQuery);
+
+
+
+
+if(!$orderResult || $orderResult->num_rows == 0){
+
+
+    header(
+
+        "Location: order.php"
+
+    );
+
+
+    exit();
+
 
 }
 
 
 
 
+$order = $orderResult->fetch_assoc();
 
-$details=$conn->prepare("
 
+
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Get Order Items
+|--------------------------------------------------------------------------
+*/
+
+
+$itemQuery = "
 
 SELECT
+
 
 
 order_details.*,
 
 
-products.product_name,
 
+products.product_name,
 
 products.image,
 
@@ -109,47 +154,43 @@ vendors.business_name
 
 
 
+
 FROM order_details
 
 
 
-JOIN products
 
 
-ON order_details.product_id=products.product_id
+INNER JOIN products
 
-
-
-JOIN vendors
-
-
-ON products.vendor_id=vendors.vendor_id
+ON order_details.product_id = products.product_id
 
 
 
-WHERE order_id=?
 
 
 
-");
+INNER JOIN vendors
+
+ON products.vendor_id = vendors.vendor_id
 
 
 
-$details->bind_param(
 
-"i",
 
-$order_id
-
-);
+WHERE order_details.order_id='$orderID'
 
 
 
-$details->execute();
+";
 
 
 
-$items=$details->get_result();
+
+
+$items = $conn->query($itemQuery);
+
+
 
 
 
@@ -157,53 +198,63 @@ $items=$details->get_result();
 
 
 
-<!DOCTYPE html>
-
-<html>
-
-
-<head>
-
-<title>
-Order Details
-</title>
-
-
-<link rel="stylesheet" href="css/style.css">
-
-
-</head>
+<?php include "includes/header.php"; ?>
 
 
 
-<body>
 
 
 
-<?php include "includes/navbar.php"; ?>
+
+<section class="order-detail-page">
 
 
 
-<div class="order-details">
 
+
+
+
+<div class="page-title">
 
 
 <h1>
 
-Order #<?= $order_id; ?>
+Order Details
 
 </h1>
 
 
 
-
 <p>
 
-Customer:
-
-<?= htmlspecialchars($order_data['name']); ?>
+Order #<?= $order['order_id']; ?>
 
 </p>
+
+
+</div>
+
+
+
+
+
+
+
+
+<div class="order-summary-card">
+
+
+
+
+
+<h2>
+
+Order Information
+
+</h2>
+
+
+
 
 
 
@@ -211,102 +262,76 @@ Customer:
 
 Status:
 
-<?= $order_data['order_status']; ?>
+<span class="status">
+
+<?= htmlspecialchars($order['order_status']); ?>
+
+</span>
+
 
 </p>
 
 
 
-<table border="1">
 
 
-<tr>
 
-<th>
-Product
-</th>
+<p>
 
+Payment:
 
-<th>
-Vendor
-</th>
+<?= htmlspecialchars($order['payment_method']); ?>
 
 
-<th>
-Quantity
-</th>
-
-
-<th>
-Price
-</th>
-
-
-<th>
-Subtotal
-</th>
-
-</tr>
+</p>
 
 
 
 
-<?php while($row=$items->fetch_assoc()){ ?>
+
+
+<p>
+
+Payment Status:
+
+<?= htmlspecialchars($order['payment_status']); ?>
+
+
+</p>
 
 
 
-<tr>
-
-
-<td>
-
-<?= htmlspecialchars($row['product_name']); ?>
-
-</td>
 
 
 
-<td>
+<p>
 
-<?= htmlspecialchars($row['business_name']); ?>
+Shipping Address:
 
-</td>
+<br>
+
+<?= nl2br(htmlspecialchars($order['shipping_address'])); ?>
 
 
-
-<td>
-
-<?= $row['quantity']; ?>
-
-</td>
+</p>
 
 
 
-<td>
-
-RM <?= number_format($row['unit_price'],2); ?>
-
-</td>
 
 
 
-<td>
 
-RM <?= number_format($row['subtotal'],2); ?>
+<h3>
 
-</td>
+Total:
 
-
-
-</tr>
+RM <?= number_format($order['total_amount'],2); ?>
 
 
-
-<?php } ?>
+</h3>
 
 
 
-</table>
 
 
 
@@ -314,7 +339,194 @@ RM <?= number_format($row['subtotal'],2); ?>
 
 
 
-</body>
 
 
-</html>
+
+
+
+
+<h2 class="section-title">
+
+Products
+
+</h2>
+
+
+
+
+
+
+
+
+
+<div class="order-products">
+
+
+
+
+
+
+
+<?php while($item = $items->fetch_assoc()){ ?>
+
+
+
+
+
+
+
+<div class="order-product-card">
+
+
+
+
+
+<div class="order-product-image">
+
+
+
+<img
+
+src="<?= productImage($item['image']); ?>"
+
+alt="<?= htmlspecialchars($item['product_name']); ?>"
+
+>
+
+
+</div>
+
+
+
+
+
+
+
+<div class="order-product-info">
+
+
+
+
+
+<h3>
+
+
+<?= htmlspecialchars($item['product_name']); ?>
+
+
+</h3>
+
+
+
+
+
+
+<p>
+
+
+Seller:
+
+
+<?= htmlspecialchars($item['business_name']); ?>
+
+
+</p>
+
+
+
+
+
+
+<p>
+
+
+Quantity:
+
+<?= $item['quantity']; ?>
+
+
+</p>
+
+
+
+
+
+
+<p>
+
+
+Price:
+
+RM <?= number_format($item['price'],2); ?>
+
+
+</p>
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+
+<?php } ?>
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+
+
+<a
+
+href="<?= BASE_URL; ?>order.php"
+
+class="btn-primary"
+
+>
+
+
+Back To Orders
+
+
+</a>
+
+
+
+
+
+
+
+</section>
+
+
+
+
+
+
+
+
+<?php include "includes/footer.php"; ?>
