@@ -1,40 +1,57 @@
 <?php
 
-session_start();
-
+require_once "config.php";
 require_once "database/db.php";
+require_once "includes/functions.php";
+require_once "includes/session.php";
 
 
-if(!isset($_SESSION['user_id'])){
-
-header("Location: auth/login.php");
-
-exit();
-
-}
+$pageTitle = "Reviews";
 
 
-
-$user_id=$_SESSION['user_id'];
-
+requireLogin();
 
 
-if(isset($_POST['submit_review'])){
-
-
-$product_id=$_POST['product_id'];
-
-$rating=$_POST['rating'];
-
-$review=$_POST['review'];
+$userID = currentUserID();
 
 
 
-$stmt=$conn->prepare("
 
+
+/*
+|--------------------------------------------------------------------------
+| Submit Review
+|--------------------------------------------------------------------------
+*/
+
+
+if($_SERVER['REQUEST_METHOD']=="POST"){
+
+
+
+$productID = mysqli_real_escape_string(
+    $conn,
+    $_POST['product_id']
+);
+
+
+$rating = mysqli_real_escape_string(
+    $conn,
+    $_POST['rating']
+);
+
+
+$review = mysqli_real_escape_string(
+    $conn,
+    $_POST['review']
+);
+
+
+
+
+$sql = "
 
 INSERT INTO reviews
-
 
 (
 
@@ -44,49 +61,93 @@ product_id,
 
 rating,
 
-review
+review,
+
+status,
+
+review_date
 
 )
 
 
-
 VALUES
 
-(?,?,?,?)
+(
+
+'$userID',
+
+'$productID',
+
+'$rating',
+
+'$review',
+
+'Visible',
+
+NOW()
+
+)
+
+";
 
 
 
-");
+$conn->query($sql);
 
-
-
-$stmt->bind_param(
-
-"iiis",
-
-$user_id,
-
-$product_id,
-
-$rating,
-
-$review
-
-);
-
-
-
-$stmt->execute();
-
-
-
-header("Location: product_details.php?id=".$product_id);
-
-
-exit();
 
 
 }
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Customer Purchased Products
+|--------------------------------------------------------------------------
+*/
+
+
+$query = "
+
+SELECT DISTINCT
+
+
+products.product_id,
+
+products.product_name
+
+
+
+FROM order_details
+
+
+
+INNER JOIN orders
+
+ON order_details.order_id = orders.order_id
+
+
+
+
+INNER JOIN products
+
+ON order_details.product_id = products.product_id
+
+
+
+
+
+WHERE orders.user_id='$userID'
+
+
+
+";
+
+
+
+$products=$conn->query($query);
 
 
 
@@ -94,45 +155,67 @@ exit();
 
 
 
-<!DOCTYPE html>
-
-<html>
+<?php include "includes/header.php"; ?>
 
 
-<head>
-
-<title>
-
-Write Review
-
-</title>
+<section class="review-page">
 
 
-</head>
 
-
-<body>
-
-
+<div class="page-title">
 
 <h1>
 Write Review
 </h1>
 
+</div>
+
+
+
+
+
+
+<div class="review-box">
 
 
 <form method="POST">
 
 
-
-<input type="hidden"
-
-name="product_id"
-
-value="<?= $_GET['id']; ?>">
+<div class="form-group">
 
 
+<label>
+Product
+</label>
 
+
+<select name="product_id">
+
+
+<?php while($product=$products->fetch_assoc()){ ?>
+
+
+<option value="<?= $product['product_id']; ?>">
+
+<?= htmlspecialchars($product['product_name']); ?>
+
+</option>
+
+
+<?php } ?>
+
+
+</select>
+
+
+
+</div>
+
+
+
+
+
+<div class="form-group">
 
 
 <label>
@@ -144,57 +227,80 @@ Rating
 
 
 <option value="5">
-5
+★★★★★
 </option>
 
 
 <option value="4">
-4
+★★★★
 </option>
 
 
 <option value="3">
-3
+★★★
 </option>
 
 
 <option value="2">
-2
+★★
 </option>
 
 
 <option value="1">
-1
+★
 </option>
-
 
 
 </select>
 
 
-
-
-
-<textarea name="review"
-
-placeholder="Your review"></textarea>
+</div>
 
 
 
 
-<button name="submit_review">
 
-Submit
+
+<div class="form-group">
+
+
+<label>
+Review
+</label>
+
+
+<textarea
+
+name="review"
+
+rows="5"
+
+required
+
+></textarea>
+
+
+</div>
+
+
+
+
+
+<button class="btn-primary">
+
+Submit Review
 
 </button>
-
 
 
 </form>
 
 
+</div>
 
-</body>
+
+</section>
 
 
-</html>
+
+<?php include "includes/footer.php"; ?>
