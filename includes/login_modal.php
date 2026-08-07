@@ -1,78 +1,35 @@
-<?php
-
-/*
-|--------------------------------------------------------------------------
-| HochipoHub Login Modal
-|--------------------------------------------------------------------------
-|
-| Used by:
-| - navbar.php
-|
-|--------------------------------------------------------------------------
-*/
-
-?>
-
-
 <div 
-class="modal-overlay" 
 id="loginModal"
+class="modal"
 >
 
 
-<div class="modal-box login-modal">
+
+<div class="modal-content">
 
 
 
-<button 
-class="modal-close"
+<span 
+class="close-modal"
 onclick="closeLoginModal()"
 >
 
 &times;
 
-</button>
+</span>
 
-
-
-
-<div class="modal-header">
-
-
-<img 
-src="<?= IMAGE_URL; ?>logo.jpg"
-alt="HochipoHub"
-class="modal-logo"
->
 
 
 <h2>
 
-Welcome Back
+Login
 
 </h2>
 
 
-<p>
-
-Login to continue shopping
-
-</p>
 
 
-</div>
-
-
-
-
-
-
-<form 
-action="<?= BASE_URL; ?>auth/login_process.php"
-method="POST"
-class="auth-form"
->
-
+<form action="<?= BASE_URL; ?>auth/login_process.php" method="POST">
 
 
 
@@ -91,8 +48,6 @@ Email
 type="email"
 
 name="email"
-
-placeholder="Enter your email"
 
 required
 
@@ -122,8 +77,6 @@ type="password"
 
 name="password"
 
-placeholder="Enter your password"
-
 required
 
 >
@@ -136,60 +89,14 @@ required
 
 
 
-
-<div class="form-options">
-
-
-<label class="remember">
-
-
-<input
-
-type="checkbox"
-
-name="remember"
-
->
-
-
-Remember me
-
-
-</label>
-
-
-
-
-
-<a href="<?= BASE_URL; ?>auth/forgot_password.php">
-
-
-Forgot Password?
-
-
-</a>
-
-
-</div>
-
-
-
-
-
-
-
-
 <button 
 type="submit"
-class="auth-btn"
+class="btn-primary"
 >
-
 
 Login
 
-
 </button>
-
 
 
 
@@ -199,30 +106,18 @@ Login
 
 
 
-
-
-
-<div class="modal-footer">
-
-
 <p>
 
-Don't have an account?
+
+Don't have account?
 
 
-<button
-
-type="button"
-
-class="switch-btn"
-
-onclick="switchRegister()"
-
+<button 
+onclick="openRegisterModal()"
+class="link-button"
 >
 
-
 Register
-
 
 </button>
 
@@ -230,13 +125,18 @@ Register
 </p>
 
 
+
+
+<a href="<?= BASE_URL; ?>auth/forgot_password.php">
+
+Forgot Password?
+
+</a>
+
+
+
 </div>
 
-
-
-
-
-</div>
 
 
 </div>
