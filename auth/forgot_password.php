@@ -1,52 +1,99 @@
 <?php
 
-session_start();
+require_once "../config.php";
+
+require_once "../database/db.php";
+
+require_once "../includes/functions.php";
+
+
+$pageTitle="Forgot Password";
 
 
 ?>
 
 
-<!DOCTYPE html>
+<?php include "../includes/header.php"; ?>
 
-<html>
 
-<head>
 
-<title>
+<section class="auth-page">
+
+
+<div class="auth-box">
+
+
+<h1>
+
 Forgot Password
-</title>
 
-</head>
-
-
-<body>
+</h1>
 
 
-<form method="POST"
+<p>
 
-action="send_otp.php">
+Enter your email to receive OTP.
+
+</p>
 
 
-<input type="email"
+
+
+
+<form action="send_otp.php" method="POST">
+
+
+
+<div class="form-group">
+
+
+<label>
+
+Email
+
+</label>
+
+
+<input
+
+type="email"
 
 name="email"
 
-placeholder="Email"
+required
 
-required>
+>
+
+
+</div>
 
 
 
-<button>
+
+
+<button
+
+class="btn-primary"
+
+type="submit"
+
+>
 
 Send OTP
 
 </button>
 
 
+
 </form>
 
 
-</body>
 
-</html>
+</div>
+
+
+</section>
+
+
+
+<?php include "../includes/footer.php"; ?>
