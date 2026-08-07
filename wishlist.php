@@ -1,26 +1,24 @@
 <?php
 
-session_start();
-
+require_once "config.php";
 require_once "database/db.php";
+require_once "includes/functions.php";
+require_once "includes/session.php";
 
 
-if(!isset($_SESSION['user_id'])){
-
-header("Location: auth/login.php");
-
-exit();
-
-}
+$pageTitle="Wishlist";
 
 
+requireLogin();
 
-$user_id=$_SESSION['user_id'];
+
+$userID=currentUserID();
 
 
 
-$stmt=$conn->prepare("
 
+
+$query="
 
 SELECT
 
@@ -28,17 +26,7 @@ SELECT
 wishlist.wishlist_id,
 
 
-products.product_id,
-
-
-products.product_name,
-
-
-products.price,
-
-
-products.image,
-
+products.*,
 
 vendors.business_name
 
@@ -48,119 +36,85 @@ FROM wishlist
 
 
 
-JOIN products
 
 
-ON wishlist.product_id=products.product_id
+INNER JOIN products
 
-
-
-JOIN vendors
-
-
-ON products.vendor_id=vendors.vendor_id
+ON wishlist.product_id = products.product_id
 
 
 
-WHERE wishlist.user_id=?
+
+
+INNER JOIN vendors
+
+ON products.vendor_id = vendors.vendor_id
 
 
 
-ORDER BY wishlist_id DESC
+
+
+WHERE wishlist.user_id='$userID'
 
 
 
-");
+ORDER BY wishlist.created_at DESC
 
 
 
-$stmt->bind_param(
-
-"i",
-
-$user_id
-
-);
+";
 
 
 
-$stmt->execute();
-
-
-
-$result=$stmt->get_result();
+$wishlist=$conn->query($query);
 
 
 
 ?>
 
 
-<!DOCTYPE html>
-
-<html>
+<?php include "includes/header.php"; ?>
 
 
-<head>
-
-<title>
-Wishlist
-</title>
-
-
-<link rel="stylesheet" href="css/wishlist.css">
-
-
-</head>
+<section class="wishlist-page">
 
 
 
-<body>
-
-
-<?php include "includes/navbar.php"; ?>
-
-
-
-<div class="wishlist-container">
-
-
+<div class="page-title">
 
 <h1>
-
 My Wishlist
-
 </h1>
 
-
-
-
-<?php if($result->num_rows==0){ ?>
-
-<p>
-No wishlist item.
-</p>
-
-<?php } ?>
+</div>
 
 
 
 
 
-<?php while($row=$result->fetch_assoc()){ ?>
+<div class="product-grid">
+
+
+<?php if($wishlist && $wishlist->num_rows>0){ ?>
+
+
+<?php while($item=$wishlist->fetch_assoc()){ ?>
 
 
 
-<div class="wishlist-card">
+<div class="product-card">
 
 
+<img
 
-<img src="uploads/products/<?= $row['image']; ?>">
+src="<?= productImage($item['image']); ?>"
 
+>
 
 
 <h3>
 
-<?= htmlspecialchars($row['product_name']); ?>
+<?= htmlspecialchars($item['product_name']); ?>
 
 </h3>
 
@@ -168,9 +122,7 @@ No wishlist item.
 
 <p>
 
-Vendor:
-
-<?= htmlspecialchars($row['business_name']); ?>
+<?= htmlspecialchars($item['business_name']); ?>
 
 </p>
 
@@ -178,26 +130,14 @@ Vendor:
 
 <p>
 
-RM <?= number_format($row['price'],2); ?>
+<?= price($item['price']); ?>
 
 </p>
 
 
 
 
-<button class="remove-wishlist"
-
-data-id="<?= $row['product_id']; ?>">
-
-
-Remove
-
-
-</button>
-
-
-
-<a href="product_details.php?id=<?= $row['product_id']; ?>">
+<a href="product_details.php?id=<?= $item['product_id']; ?>">
 
 View Product
 
@@ -206,8 +146,38 @@ View Product
 
 
 
+<a href="ajax/remove_wishlist.php?id=<?= $item['wishlist_id']; ?>">
+
+Remove
+
+</a>
+
+
+
 </div>
 
+
+
+<?php } ?>
+
+
+
+<?php }else{ ?>
+
+
+<div class="empty-product">
+
+<h3>
+Wishlist Empty
+</h3>
+
+
+<p>
+You haven't saved any product yet.
+</p>
+
+
+</div>
 
 
 <?php } ?>
@@ -218,11 +188,7 @@ View Product
 
 
 
-<script src="js/wishlist.js"></script>
+</section>
 
 
-
-</body>
-
-
-</html>
+<?php include "includes/footer.php"; ?>
