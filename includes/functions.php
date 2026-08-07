@@ -1,145 +1,128 @@
 <?php
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Database Connection
+|--------------------------------------------------------------------------
+| Database:
+| - hochipohub
+|
+| Connection:
+| - MySQLi
+|
+| Used by:
+| - index.php
+| - product.php
+| - cart.php
+| - auth/*
+| - seller/*
+| - admin/*
+|--------------------------------------------------------------------------
+*/
 
-require_once dirname(__DIR__) . '/database/db.php';
+
+require_once dirname(__DIR__) . '/config.php';
 
 
 
 /*
 |--------------------------------------------------------------------------
-| Redirect
+| Create Database Connection
 |--------------------------------------------------------------------------
 */
 
-function redirect($url){
 
-    header(
-        "Location: ".$url
-    );
+$conn = new mysqli(
 
-    exit();
+    DB_HOST,
 
-}
+    DB_USER,
+
+    DB_PASS,
+
+    DB_NAME
+
+);
 
 
 
 /*
 |--------------------------------------------------------------------------
-| Flash Message
+| Check Connection
 |--------------------------------------------------------------------------
 */
 
-function setFlashMessage($type,$message){
 
-    $_SESSION['flash']=[
-
-        'type'=>$type,
-
-        'message'=>$message
-
-    ];
-
-}
+if ($conn->connect_error) {
 
 
+    if (DEVELOPMENT_MODE) {
 
-function getFlashMessage(){
 
-    if(isset($_SESSION['flash'])){
+        die(
 
-        $msg=$_SESSION['flash'];
+            "Database Connection Failed: "
 
-        unset($_SESSION['flash']);
+            . $conn->connect_error
 
-        return $msg;
+        );
+
+
+    } else {
+
+
+        die(
+
+            "Unable to connect database."
+
+        );
+
 
     }
 
 
-    return null;
-
 }
 
 
 
 /*
 |--------------------------------------------------------------------------
-| Cart Count
+| Set Charset
 |--------------------------------------------------------------------------
 */
 
-function getCartCount($user_id){
+
+$conn->set_charset(
+
+    "utf8mb4"
+
+);
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Helper Function
+|--------------------------------------------------------------------------
+| Escape database input
+|--------------------------------------------------------------------------
+*/
+
+
+function escape($value)
+
+{
 
     global $conn;
 
 
-    $sql="
-    SELECT SUM(quantity) AS total
+    return $conn->real_escape_string(
 
-    FROM cart
+        trim($value)
 
-    WHERE customer_id='$user_id'
-    ";
-
-
-    $result=$conn->query($sql);
-
-
-    $row=$result->fetch_assoc();
-
-
-    return $row['total'] ?? 0;
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Wishlist Count
-|--------------------------------------------------------------------------
-*/
-
-function getWishlistCount($user_id){
-
-    global $conn;
-
-
-    $sql="
-    SELECT COUNT(*) AS total
-
-    FROM wishlist
-
-    WHERE user_id='$user_id'
-    ";
-
-
-    $result=$conn->query($sql);
-
-
-    $row=$result->fetch_assoc();
-
-
-    return $row['total'] ?? 0;
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Sanitize
-|--------------------------------------------------------------------------
-*/
-
-function clean($data){
-
-    return htmlspecialchars(
-        trim($data),
-        ENT_QUOTES,
-        'UTF-8'
     );
 
 }
+
 
 
 ?>
