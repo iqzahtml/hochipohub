@@ -1,27 +1,97 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Search Page
+|--------------------------------------------------------------------------
+|
+| Search:
+| - Products
+| - Vendors
+| - Categories
+|
+|--------------------------------------------------------------------------
+*/
+
+
+require_once "config.php";
+
 require_once "database/db.php";
 
+require_once "includes/functions.php";
 
-
-$keyword=$_GET['q'] ?? '';
-
-
-
-$search="%".$keyword."%";
+require_once "includes/session.php";
 
 
 
-$stmt=$conn->prepare("
+$pageTitle = "Search";
 
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Search Keyword
+|--------------------------------------------------------------------------
+*/
+
+
+$keyword = "";
+
+
+
+if(isset($_GET['q'])){
+
+
+    $keyword = mysqli_real_escape_string(
+
+        $conn,
+
+        $_GET['q']
+
+    );
+
+
+}
+
+
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Search Query
+|--------------------------------------------------------------------------
+*/
+
+
+$results = null;
+
+
+
+if(!empty($keyword)){
+
+
+
+$query = "
 
 SELECT
+
 
 
 products.*,
 
 
-vendors.business_name
+vendors.business_name,
+
+
+categories.category_name
+
+
 
 
 
@@ -29,123 +99,126 @@ FROM products
 
 
 
-JOIN vendors
 
 
-ON products.vendor_id=vendors.vendor_id
+INNER JOIN vendors
 
-
-
-WHERE products.product_name LIKE ?
-
-
-AND products.status='Available'
-
-
-ORDER BY product_id DESC
+ON products.vendor_id = vendors.vendor_id
 
 
 
-");
-
-
-$stmt->bind_param(
-
-"s",
-
-$search
-
-);
 
 
 
-$stmt->execute();
+INNER JOIN categories
+
+ON products.category_id = categories.category_id
 
 
 
-$result=$stmt->get_result();
+
+
+WHERE products.status='Available'
+
+
+
+
+AND
+
+(
+
+
+products.product_name LIKE '%$keyword%'
+
+
+
+
+OR vendors.business_name LIKE '%$keyword%'
+
+
+
+
+OR categories.category_name LIKE '%$keyword%'
+
+
+
+)
+
+
+
+
+
+ORDER BY products.created_at DESC
+
+
+
+";
+
+
+
+
+
+$results = $conn->query($query);
+
+
+
+}
+
+
+
 
 
 
 ?>
 
 
-<!DOCTYPE html>
 
-<html>
-
-
-<head>
-
-<title>
-Search
-</title>
-
-
-<link rel="stylesheet" href="css/product.css">
-
-
-</head>
+<?php include "includes/header.php"; ?>
 
 
 
-<body>
 
 
 
-<?php include "includes/navbar.php"; ?>
+
+
+<section class="search-page">
+
+
+
+
+
+
+
+<div class="page-title">
 
 
 
 <h1>
 
-Search Result:
-<?= htmlspecialchars($keyword); ?>
+Search Result
 
 </h1>
 
 
 
 
-<div class="product-grid">
 
-
-<?php while($row=$result->fetch_assoc()){ ?>
-
-
-
-<div class="product-card">
-
-
-<img src="uploads/products/<?= $row['image']; ?>">
-
-
-
-<h3>
-
-<?= htmlspecialchars($row['product_name']); ?>
-
-</h3>
-
+<?php if(!empty($keyword)){ ?>
 
 
 <p>
 
-RM <?= number_format($row['price'],2); ?>
+Showing results for:
+
+<strong>
+
+<?= htmlspecialchars($keyword); ?>
+
+</strong>
+
 
 </p>
-
-
-
-<a href="product_details.php?id=<?= $row['product_id']; ?>">
-
-View
-
-</a>
-
-
-
-</div>
 
 
 
@@ -157,7 +230,309 @@ View
 
 
 
-</body>
 
 
-</html>
+
+
+
+<div class="search-box">
+
+
+
+<form method="GET">
+
+
+
+<input
+
+type="text"
+
+name="q"
+
+placeholder="Search products..."
+
+value="<?= htmlspecialchars($keyword); ?>"
+
+>
+
+
+
+
+<button type="submit">
+
+
+<i class="fa-solid fa-search"></i>
+
+
+Search
+
+
+</button>
+
+
+
+</form>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="product-grid">
+
+
+
+
+
+
+<?php if($results && $results->num_rows > 0){ ?>
+
+
+
+
+
+
+<?php while($product = $results->fetch_assoc()){ ?>
+
+
+
+
+
+
+
+<div class="product-card">
+
+
+
+
+
+
+
+<div class="product-image">
+
+
+<img
+
+src="<?= productImage($product['image']); ?>"
+
+alt="<?= htmlspecialchars($product['product_name']); ?>"
+
+>
+
+
+</div>
+
+
+
+
+
+
+
+
+<div class="product-info">
+
+
+
+
+
+
+
+<span class="product-category">
+
+
+<?= htmlspecialchars($product['category_name']); ?>
+
+
+</span>
+
+
+
+
+
+
+
+<h3>
+
+
+<?= htmlspecialchars($product['product_name']); ?>
+
+
+</h3>
+
+
+
+
+
+
+
+
+<p class="vendor-name">
+
+
+<i class="fa-solid fa-store"></i>
+
+
+<?= htmlspecialchars($product['business_name']); ?>
+
+
+</p>
+
+
+
+
+
+
+
+
+<p class="product-price">
+
+
+<?= price($product['price']); ?>
+
+
+</p>
+
+
+
+
+
+
+
+<a
+
+href="<?= BASE_URL; ?>product_details.php?id=<?= $product['product_id']; ?>"
+
+class="view-product-btn"
+
+>
+
+
+View Details
+
+
+</a>
+
+
+
+
+
+</div>
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+<?php } ?>
+
+
+
+
+
+
+
+<?php }elseif(!empty($keyword)){ ?>
+
+
+
+
+
+<div class="empty-product">
+
+
+<h3>
+
+No Result Found
+
+</h3>
+
+
+
+<p>
+
+Try another keyword.
+
+</p>
+
+
+
+</div>
+
+
+
+
+
+
+
+<?php }else{ ?>
+
+
+
+
+<div class="empty-product">
+
+
+<h3>
+
+Search Product
+
+</h3>
+
+
+
+<p>
+
+Enter keyword to find products.
+
+</p>
+
+
+</div>
+
+
+
+
+
+
+<?php } ?>
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+
+
+</section>
+
+
+
+
+
+
+
+
+<?php include "includes/footer.php"; ?>
