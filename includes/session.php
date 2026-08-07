@@ -4,17 +4,10 @@
 |--------------------------------------------------------------------------
 | HochipoHub Session Management
 |--------------------------------------------------------------------------
-|
-| Handles:
-| - Login session
-| - User information
-| - Role checking
-|
-|--------------------------------------------------------------------------
 */
 
 
-if (session_status() === PHP_SESSION_NONE) {
+if(session_status() === PHP_SESSION_NONE){
 
     session_start();
 
@@ -22,261 +15,122 @@ if (session_status() === PHP_SESSION_NONE) {
 
 
 
+
 /*
 |--------------------------------------------------------------------------
-| Check User Login
+| Check Login
 |--------------------------------------------------------------------------
 */
 
 
-function isLogin()
+function isLoggedIn(){
 
-{
 
     return isset($_SESSION['user_id']);
 
+
 }
+
+
 
 
 
 /*
 |--------------------------------------------------------------------------
-| Get Current User ID
+| Alias (support old code)
 |--------------------------------------------------------------------------
 */
 
 
-function currentUserID()
+function isLogin(){
 
-{
+
+    return isLoggedIn();
+
+
+}
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Current User ID
+|--------------------------------------------------------------------------
+*/
+
+
+function currentUserID(){
+
 
     return $_SESSION['user_id'] ?? null;
 
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Get Current User Name
-|--------------------------------------------------------------------------
-*/
-
-
-function currentUserName()
-
-{
-
-    return $_SESSION['user_name'] ?? '';
 
 }
 
 
 
-/*
-|--------------------------------------------------------------------------
-| Get Current User Email
-|--------------------------------------------------------------------------
-*/
-
-
-function currentUserEmail()
-
-{
-
-    return $_SESSION['user_email'] ?? '';
-
-}
 
 
 
 /*
 |--------------------------------------------------------------------------
-| Get Current User Role
+| Current User Role
 |--------------------------------------------------------------------------
 */
 
 
-function currentUserRole()
-
-{
-
-    return $_SESSION['role'] ?? '';
-
-}
+function currentUserRole(){
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Login User
-|--------------------------------------------------------------------------
-*/
-
-
-function loginUser($user)
-
-{
-
-    session_regenerate_id(true);
-
-
-
-    $_SESSION['user_id'] = $user['user_id'];
-
-    $_SESSION['user_name'] = $user['name'];
-
-    $_SESSION['user_email'] = $user['email'];
-
-    $_SESSION['role'] = $user['role'];
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Logout User
-|--------------------------------------------------------------------------
-*/
-
-
-function logoutUser()
-
-{
-
-    $_SESSION = [];
-
-
-
-    if(isset($_COOKIE[session_name()])){
-
-
-        setcookie(
-
-            session_name(),
-
-            '',
-
-            time()-42000,
-
-            '/'
-
-        );
-
-
-    }
-
-
-
-    session_destroy();
+    return $_SESSION['role'] ?? null;
 
 
 }
 
 
 
+
+
+
 /*
 |--------------------------------------------------------------------------
-| Role Checking
+| Current User Name
 |--------------------------------------------------------------------------
 */
 
 
-function checkRole($role)
-
-{
-
-    if(!isset($_SESSION['role'])){
+function currentUserName(){
 
 
-        return false;
-
-
-    }
-
-
-
-    return $_SESSION['role'] === $role;
+    return $_SESSION['name'] ?? null;
 
 
 }
 
 
 
-/*
-|--------------------------------------------------------------------------
-| Customer
-|--------------------------------------------------------------------------
-*/
 
-
-function isCustomer()
-
-{
-
-    return checkRole('customer');
-
-}
 
 
 
 /*
 |--------------------------------------------------------------------------
-| Seller / Vendor
+| Require Login
 |--------------------------------------------------------------------------
 */
 
 
-function isSeller()
-
-{
-
-    return checkRole('vendor');
-
-}
+function requireLogin(){
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Admin
-|--------------------------------------------------------------------------
-*/
-
-
-function isAdmin()
-
-{
-
-    return checkRole('admin');
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Protect Page
-|--------------------------------------------------------------------------
-*/
-
-
-function requireLogin()
-
-{
-
-    if(!isLogin()){
+    if(!isLoggedIn()){
 
 
         header(
-
-            "Location: "
-
-            .BASE_URL
-
-            ."auth/login.php"
-
+            "Location: ".BASE_URL."index.php"
         );
 
 
@@ -290,31 +144,31 @@ function requireLogin()
 
 
 
+
+
+
+
 /*
 |--------------------------------------------------------------------------
-| Protect Seller Page
+| Require Role
 |--------------------------------------------------------------------------
 */
 
 
-function requireSeller()
-
-{
-
-    requireLogin();
+function requireRole($role){
 
 
 
-    if(!isSeller()){
+    if(
+        !isLoggedIn()
+        ||
+        currentUserRole() !== $role
+    ){
 
 
         header(
 
-            "Location: "
-
-            .BASE_URL
-
-            ."index.php"
+            "Location: ".BASE_URL."index.php"
 
         );
 
@@ -325,111 +179,5 @@ function requireSeller()
     }
 
 
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Protect Admin Page
-|--------------------------------------------------------------------------
-*/
-
-
-function requireAdmin()
-
-{
-
-    requireLogin();
-
-
-
-    if(!isAdmin()){
-
-
-        header(
-
-            "Location: "
-
-            .BASE_URL
-
-            ."index.php"
-
-        );
-
-
-        exit();
-
-
-    }
-
 
 }
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Session Timeout
-|--------------------------------------------------------------------------
-*/
-
-
-function checkSessionTimeout()
-
-{
-
-    if(isset($_SESSION['last_activity'])){
-
-
-        if(
-
-            time()
-
-            -
-
-            $_SESSION['last_activity']
-
-            >
-
-            SESSION_TIMEOUT
-
-        ){
-
-
-            logoutUser();
-
-
-
-            header(
-
-                "Location: "
-
-                .BASE_URL
-
-                ."auth/login.php"
-
-            );
-
-
-            exit();
-
-
-        }
-
-
-    }
-
-
-
-    $_SESSION['last_activity']=time();
-
-
-}
-
-
-
-checkSessionTimeout();
-
-
-?>
