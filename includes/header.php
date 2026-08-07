@@ -4,81 +4,31 @@
 |--------------------------------------------------------------------------
 | HochipoHub Header
 |--------------------------------------------------------------------------
-|
-| Loads:
-| - config
-| - database
-| - functions
-| - session
-| - CSS
-|
-|--------------------------------------------------------------------------
 */
 
 
-require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__)."/config.php";
 
-require_once dirname(__DIR__) . '/database/db.php';
+require_once dirname(__DIR__)."/database/db.php";
 
-require_once dirname(__DIR__) . '/includes/session.php';
+require_once __DIR__."/session.php";
 
-require_once dirname(__DIR__) . '/includes/functions.php';
+require_once __DIR__."/functions.php";
 
-
-
-/*
-|--------------------------------------------------------------------------
-| Page Settings
-|--------------------------------------------------------------------------
-*/
 
 
 $pageTitle = $pageTitle ?? SITE_NAME;
 
-$pageDescription = $pageDescription ?? 
-'HochipoHub - Discover Local Products';
+
+$currentPage = basename($_SERVER['PHP_SELF']);
 
 
 
-/*
-|--------------------------------------------------------------------------
-| User Data
-|--------------------------------------------------------------------------
-*/
+$isLoggedIn = isLoggedIn();
+
+$currentRole = currentUserRole();
 
 
-$loggedIn = isLogin();
-
-$userID = currentUserID();
-
-$userName = currentUserName();
-
-$userRole = currentUserRole();
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Cart & Wishlist Count
-|--------------------------------------------------------------------------
-*/
-
-
-$cartCount = 0;
-
-$wishlistCount = 0;
-
-
-if($loggedIn && $userRole == 'customer'){
-
-
-    $cartCount = getCartCount($userID);
-
-
-    $wishlistCount = getWishlistCount($userID);
-
-
-}
 
 
 ?>
@@ -86,7 +36,6 @@ if($loggedIn && $userRole == 'customer'){
 <!DOCTYPE html>
 
 <html lang="en">
-
 
 <head>
 
@@ -101,15 +50,11 @@ if($loggedIn && $userRole == 'customer'){
 
 <?= htmlspecialchars($pageTitle); ?>
 
-| <?= SITE_NAME; ?>
+|
+
+<?= SITE_NAME; ?>
 
 </title>
-
-
-
-<meta name="description"
-
-content="<?= htmlspecialchars($pageDescription); ?>">
 
 
 
@@ -126,78 +71,44 @@ content="<?= htmlspecialchars($pageDescription); ?>">
 
 <!-- Font Awesome -->
 
-<link rel="stylesheet"
-
-href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
 
 
 <!-- Main CSS -->
 
 
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/style.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/style.css">
 
 
-
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/responsive.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/responsive.css">
 
 
-
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/modal.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/modal.css">
 
 
-
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/login.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/login.css">
 
 
-
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/product.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/product.css">
 
 
-
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/dashboard.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/dashboard.css">
 
 
-
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/cart.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/cart.css">
 
 
-
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/checkout.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/checkout.css">
 
 
-
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/vendor.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/vendor.css">
 
 
-
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/admin.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/admin.css">
 
 
-
-<link rel="stylesheet"
-
-href="<?= BASE_URL; ?>css/wishlist.css">
+<link rel="stylesheet" href="<?= BASE_URL; ?>css/wishlist.css">
 
 
 
@@ -208,18 +119,9 @@ href="<?= BASE_URL; ?>css/wishlist.css">
 <body>
 
 
-<?php
 
-/*
-|--------------------------------------------------------------------------
-| Navbar
-|--------------------------------------------------------------------------
-*/
-
-include dirname(__FILE__) . '/navbar.php';
+<?php include __DIR__."/navbar.php"; ?>
 
 
-?>
 
-
-<main class="main-container">
+<main class="main-content">
