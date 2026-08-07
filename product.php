@@ -1,11 +1,43 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Product Listing
+|--------------------------------------------------------------------------
+|
+| Database:
+| - products
+| - vendors
+| - categories
+|
+|--------------------------------------------------------------------------
+*/
+
+
+require_once "config.php";
+
 require_once "database/db.php";
 
+require_once "includes/functions.php";
+
+require_once "includes/session.php";
 
 
-$products=$conn->query("
 
+$pageTitle = "Products";
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Get All Products
+|--------------------------------------------------------------------------
+*/
+
+
+$query = "
 
 SELECT
 
@@ -13,7 +45,13 @@ SELECT
 products.*,
 
 
-vendors.business_name
+vendors.business_name,
+
+
+vendors.business_logo,
+
+
+categories.category_name
 
 
 
@@ -21,54 +59,87 @@ FROM products
 
 
 
-JOIN vendors
 
-ON products.vendor_id=vendors.vendor_id
+INNER JOIN vendors
+
+ON products.vendor_id = vendors.vendor_id
+
+
+
+
+
+
+INNER JOIN categories
+
+ON products.category_id = categories.category_id
+
+
 
 
 
 WHERE products.status='Available'
 
 
-ORDER BY product_id DESC
 
 
 
-");
+ORDER BY products.created_at DESC
+
+
+
+";
+
+
+
+
+$result = $conn->query($query);
+
+
 
 
 
 ?>
 
 
-<!DOCTYPE html>
 
-<html>
-
-
-<head>
-
-<title>
-Products
-</title>
+<?php include "includes/header.php"; ?>
 
 
-<link rel="stylesheet" href="css/product.css">
 
 
-</head>
 
 
-<body>
+<section class="product-page">
 
 
-<?php include "includes/navbar.php"; ?>
 
+
+
+
+<div class="page-title">
 
 
 <h1>
+
 All Products
+
 </h1>
+
+
+
+<p>
+
+Discover products from HochipoHub vendors.
+
+</p>
+
+
+</div>
+
+
+
+
+
 
 
 
@@ -76,7 +147,24 @@ All Products
 <div class="product-grid">
 
 
-<?php while($row=$products->fetch_assoc()){ ?>
+
+
+
+
+
+<?php if($result && $result->num_rows > 0){ ?>
+
+
+
+
+
+
+
+<?php while($product = $result->fetch_assoc()){ ?>
+
+
+
+
 
 
 
@@ -84,47 +172,168 @@ All Products
 
 
 
-<img src="uploads/products/<?= $row['image']; ?>">
+
+
+
+
+<div class="product-image">
+
+
+
+<img
+
+src="<?= productImage($product['image']); ?>"
+
+alt="<?= htmlspecialchars($product['product_name']); ?>"
+
+>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="product-info">
+
+
+
+
+
+
+
+<span class="product-category">
+
+
+<?= htmlspecialchars($product['category_name']); ?>
+
+
+</span>
+
+
+
+
+
+
 
 
 
 <h3>
 
-<?= htmlspecialchars($row['product_name']); ?>
+
+<?= htmlspecialchars($product['product_name']); ?>
+
 
 </h3>
 
 
 
-<p>
 
-Vendor:
 
-<?= htmlspecialchars($row['business_name']); ?>
+
+
+
+
+<p class="vendor-name">
+
+
+<i class="fa-solid fa-shop"></i>
+
+
+<?= htmlspecialchars($product['business_name']); ?>
+
 
 </p>
 
 
 
 
-<p>
-
-RM <?= number_format($row['price'],2); ?>
-
-</p>
 
 
 
 
-<a href="product_details.php?id=<?= $row['product_id']; ?>">
 
-Details
-
-</a>
+<p class="product-description">
 
 
+<?= htmlspecialchars(
 
-</div>
+substr(
+
+$product['description'],
+
+0,
+
+80
+
+)
+
+); ?>
+
+
+...</p>
+
+
+
+
+
+
+
+
+<div class="product-bottom">
+
+
+
+
+
+
+<span class="product-price">
+
+
+<?= price($product['price']); ?>
+
+
+</span>
+
+
+
+
+
+
+
+<?php if($product['stock_quantity'] > 0){ ?>
+
+
+
+<span class="stock available">
+
+
+Available
+
+
+</span>
+
+
+
+
+<?php }else{ ?>
+
+
+
+<span class="stock unavailable">
+
+
+Out of Stock
+
+
+</span>
+
 
 
 
@@ -132,10 +341,123 @@ Details
 
 
 
+
+
+
 </div>
 
 
 
-</body>
 
-</html>
+
+
+
+
+
+<a
+
+href="<?= BASE_URL; ?>product_details.php?id=<?= $product['product_id']; ?>"
+
+class="view-product-btn"
+
+>
+
+
+View Product
+
+
+</a>
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+
+
+<?php } ?>
+
+
+
+
+
+
+
+
+<?php }else{ ?>
+
+
+
+
+
+
+
+<div class="empty-product">
+
+
+<h3>
+
+No Products Available
+
+</h3>
+
+
+
+<p>
+
+Vendor has not uploaded products yet.
+
+</p>
+
+
+
+</div>
+
+
+
+
+
+
+
+<?php } ?>
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+</section>
+
+
+
+
+
+
+
+
+
+<?php include "includes/footer.php"; ?>
