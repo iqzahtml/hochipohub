@@ -1,73 +1,91 @@
 <?php
 
-session_start();
-
+require_once "config.php";
 require_once "database/db.php";
+require_once "includes/functions.php";
+require_once "includes/session.php";
 
 
-if(!isset($_SESSION['user_id'])){
+$pageTitle="Inventory";
 
-exit();
+
+requireLogin();
+
+
+if(currentUserRole() != "vendor"){
+
+
+    header(
+        "Location: dashboard.php"
+    );
+
+    exit();
 
 }
 
 
-$user_id=$_SESSION['user_id'];
+
+$userID=currentUserID();
 
 
 
-$stmt=$conn->prepare("
 
 
-SELECT
+/*
+|--------------------------------------------------------------------------
+| Get Vendor ID
+|--------------------------------------------------------------------------
+*/
 
 
-inventory.*,
+$vendorQuery="
+
+SELECT vendor_id
+
+FROM vendors
+
+WHERE user_id='$userID'
+
+LIMIT 1
+
+";
 
 
-products.product_name
+$vendorResult=$conn->query($vendorQuery);
+
+$vendor=$vendorResult->fetch_assoc();
 
 
-FROM inventory
-
-
-
-JOIN products
-
-
-ON inventory.product_id=products.product_id
-
-
-
-JOIN vendors
-
-
-ON products.vendor_id=vendors.vendor_id
-
-
-
-WHERE vendors.user_id=?
+$vendorID=$vendor['vendor_id'];
 
 
 
-");
-
-
-$stmt->bind_param(
-
-"i",
-
-$user_id
-
-);
 
 
 
-$stmt->execute();
+
+/*
+|--------------------------------------------------------------------------
+| Products
+|--------------------------------------------------------------------------
+*/
+
+
+$query="
+
+SELECT *
+
+FROM products
+
+WHERE vendor_id='$vendorID'
+
+ORDER BY created_at DESC
+
+";
 
 
 
-$result=$stmt->get_result();
+$products=$conn->query($query);
 
 
 
@@ -75,81 +93,71 @@ $result=$stmt->get_result();
 
 
 
-<!DOCTYPE html>
-
-<html>
+<?php include "includes/header.php"; ?>
 
 
-<head>
-
-<title>
-Inventory
-</title>
+<section class="inventory-page">
 
 
-</head>
-
-
-<body>
-
-
+<div class="page-title">
 
 <h1>
 Inventory
 </h1>
 
 
-
-<table border="1">
-
-
-<tr>
-
-<th>
-Product
-</th>
-
-<th>
-Quantity
-</th>
-
-<th>
-Updated
-</th>
-
-</tr>
+</div>
 
 
 
-<?php while($row=$result->fetch_assoc()){ ?>
-
-
-<tr>
-
-
-<td>
-
-<?= htmlspecialchars($row['product_name']); ?>
-
-</td>
-
-
-<td>
-
-<?= $row['quantity']; ?>
-
-</td>
-
-
-<td>
-
-<?= $row['last_updated']; ?>
-
-</td>
 
 
 
-</tr>
+<div class="product-grid">
+
+
+
+<?php while($product=$products->fetch_assoc()){ ?>
+
+
+
+<div class="product-card">
+
+
+<img
+
+src="<?= productImage($product['image']); ?>"
+
+>
+
+
+<h3>
+
+<?= htmlspecialchars($product['product_name']); ?>
+
+</h3>
+
+
+
+<p>
+
+Stock:
+
+<?= $product['stock_quantity']; ?>
+
+</p>
+
+
+
+<a href="seller/edit_product.php?id=<?= $product['product_id']; ?>">
+
+Edit
+
+</a>
+
+
+
+</div>
 
 
 
@@ -157,11 +165,12 @@ Updated
 
 
 
-</table>
+</div>
 
 
 
-</body>
+</section>
 
 
-</html>
+
+<?php include "includes/footer.php"; ?>
