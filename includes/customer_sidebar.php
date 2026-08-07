@@ -1,58 +1,109 @@
-<div class="sidebar">
+<aside class="sidebar customer-sidebar">
+
+
+
+<div class="sidebar-title">
 
 
 <h2>
-Customer Menu
+
+Customer Panel
+
 </h2>
 
 
+</div>
 
-<a href="hochipohub/dashboard.php">
+
+
+
+
+<ul>
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>dashboard.php">
+
+<i class="fa-solid fa-house"></i>
 
 Dashboard
 
 </a>
 
+</li>
 
 
-<a href="hochipohub/profile.php">
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>profile.php">
+
+<i class="fa-solid fa-user"></i>
 
 Profile
 
 </a>
 
+</li>
 
 
-<a href="hochipohub/cart.php">
 
-My Cart
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>order.php">
+
+<i class="fa-solid fa-box"></i>
+
+My Orders
 
 </a>
 
+</li>
 
 
-<a href="hochipohub/wishlist.php">
+
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>wishlist.php">
+
+<i class="fa-solid fa-heart"></i>
 
 Wishlist
 
 </a>
 
+</li>
 
 
-<a href="hochipohub/order.php">
 
-Orders
+
+
+<li>
+
+<a href="<?= BASE_URL; ?>review.php">
+
+<i class="fa-solid fa-star"></i>
+
+Reviews
 
 </a>
 
-
-
-<a href="auth/logout.php">
-
-Logout
-
-</a>
+</li>
 
 
 
-</div>
+
+
+
+</ul>
+
+
+
+</aside>
