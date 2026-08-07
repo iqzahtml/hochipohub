@@ -1,25 +1,51 @@
 <?php
 
-session_start();
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Cart Page
+|--------------------------------------------------------------------------
+|
+| Database:
+| - cart
+| - products
+| - vendors
+|
+|--------------------------------------------------------------------------
+*/
+
+
+require_once "config.php";
 
 require_once "database/db.php";
 
+require_once "includes/functions.php";
 
-if(!isset($_SESSION['user_id'])){
-
-    header("Location: auth/login.php");
-    exit();
-
-}
+require_once "includes/session.php";
 
 
 
-$user_id=$_SESSION['user_id'];
+$pageTitle = "My Cart";
 
 
 
-$cart_stmt=$conn->prepare("
+requireLogin();
 
+
+
+$userID = currentUserID();
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Get Cart Items
+|--------------------------------------------------------------------------
+*/
+
+
+$query = "
 
 SELECT
 
@@ -39,11 +65,10 @@ products.price,
 
 products.image,
 
-products.stock_quantity,
-
 
 
 vendors.business_name
+
 
 
 
@@ -51,78 +76,93 @@ FROM cart
 
 
 
-JOIN products
+
+
+INNER JOIN products
 
 ON cart.product_id = products.product_id
 
 
 
-JOIN vendors
+
+
+INNER JOIN vendors
 
 ON products.vendor_id = vendors.vendor_id
 
 
 
-WHERE cart.customer_id = ?
+
+
+WHERE cart.user_id='$userID'
 
 
 
-ORDER BY cart.cart_id DESC
+
+
+ORDER BY cart.created_at DESC
 
 
 
-");
+";
 
 
 
-$cart_stmt->bind_param(
 
-"i",
-
-$user_id
-
-);
+$cartItems = $conn->query($query);
 
 
 
-$cart_stmt->execute();
 
 
+$total = 0;
 
-$cart_items=$cart_stmt->get_result();
-
-
-
-$total=0;
 
 
 ?>
 
 
 
-<!DOCTYPE html>
-
-<html>
+<?php include "includes/header.php"; ?>
 
 
-<head>
 
-<title>
+
+
+
+
+<section class="cart-page">
+
+
+
+
+
+
+<div class="page-title">
+
+
+<h1>
+
 Shopping Cart
-</title>
 
-
-<link rel="stylesheet" href="css/cart.css">
-
-
-</head>
-
-
-<body>
+</h1>
 
 
 
-<?php include "includes/navbar.php"; ?>
+<p>
+
+Review your selected products before checkout.
+
+</p>
+
+
+</div>
+
+
+
+
+
+
 
 
 
@@ -130,118 +170,238 @@ Shopping Cart
 
 
 
-<h1>
-My Cart
-</h1>
 
 
 
 
-<?php if($cart_items->num_rows==0){ ?>
-
-
-<p>
-Your cart is empty.
-</p>
-
-
-<?php } ?>
+<?php if($cartItems && $cartItems->num_rows > 0){ ?>
 
 
 
 
-<?php while($row=$cart_items->fetch_assoc()){ 
+
+
+<div class="cart-list">
 
 
 
-$subtotal=$row['price']*$row['quantity'];
 
-$total += $subtotal;
 
+<?php while($item = $cartItems->fetch_assoc()){ ?>
+
+
+
+<?php
+
+
+$itemTotal = 
+$item['price'] * $item['quantity'];
+
+
+$total += $itemTotal;
 
 
 ?>
 
 
 
-<div class="cart-item">
 
 
 
-<img src="uploads/products/<?= $row['image']; ?>">
+
+<div class="cart-card">
 
 
 
-<div>
+
+
+
+
+
+<div class="cart-image">
+
+
+<img
+
+src="<?= productImage($item['image']); ?>"
+
+alt="<?= htmlspecialchars($item['product_name']); ?>"
+
+>
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="cart-info">
+
 
 
 <h3>
 
-<?= htmlspecialchars($row['product_name']); ?>
+
+<?= htmlspecialchars($item['product_name']); ?>
+
 
 </h3>
 
 
 
-<p>
-
-Vendor:
-
-<?= htmlspecialchars($row['business_name']); ?>
-
-</p>
-
 
 
 <p>
 
-RM <?= number_format($row['price'],2); ?>
 
-</p>
+Seller:
 
+<?= htmlspecialchars($item['business_name']); ?>
 
-
-<input type="number"
-
-class="cart-qty"
-
-data-id="<?= $row['cart_id']; ?>"
-
-value="<?= $row['quantity']; ?>"
-
-min="1">
-
-
-
-<p>
-
-Subtotal:
-
-RM <?= number_format($subtotal,2); ?>
 
 </p>
 
 
 
 
-<button class="remove-cart"
 
-data-id="<?= $row['cart_id']; ?>">
+<p>
 
-Remove
+
+RM <?= number_format($item['price'],2); ?>
+
+
+</p>
+
+
+
+
+
+
+<form
+
+action="ajax/update_cart.php"
+
+method="POST"
+
+>
+
+
+
+
+<input
+
+type="hidden"
+
+name="cart_id"
+
+value="<?= $item['cart_id']; ?>"
+
+>
+
+
+
+
+
+<input
+
+type="number"
+
+name="quantity"
+
+value="<?= $item['quantity']; ?>"
+
+min="1"
+
+>
+
+
+
+
+
+
+<button type="submit">
+
+
+Update
+
 
 </button>
 
 
 
+</form>
+
+
+
+
+
+
+
+<a
+
+href="ajax/remove_cart.php?id=<?= $item['cart_id']; ?>"
+
+class="remove-cart"
+
+
+>
+
+
+Remove
+
+
+</a>
+
+
+
+
+
 </div>
 
 
+
+
+
+
+
+<div class="cart-total">
+
+
+RM <?= number_format($itemTotal,2); ?>
+
+
 </div>
+
+
+
+
+
+
+
+</div>
+
+
 
 
 
 <?php } ?>
+
+
+
+
+
+</div>
+
+
+
+
+
 
 
 
@@ -249,24 +409,54 @@ Remove
 <div class="cart-summary">
 
 
+
+
+
 <h2>
 
-Total:
-
-RM <?= number_format($total,2); ?>
+Order Summary
 
 </h2>
 
 
 
-<a href="checkout.php">
+
+
+<div>
+
+
+Subtotal:
+
+<strong>
+
+RM <?= number_format($total,2); ?>
+
+</strong>
+
+
+</div>
+
+
+
+
+
+
+
+<a
+
+href="<?= BASE_URL; ?>checkout.php"
+
+class="btn-primary"
+
+>
+
 
 Proceed Checkout
+
 
 </a>
 
 
-</div>
 
 
 
@@ -276,10 +466,84 @@ Proceed Checkout
 
 
 
-<script src="js/script.js"></script>
 
 
-</body>
 
 
-</html>
+
+<?php }else{ ?>
+
+
+
+
+
+
+
+<div class="empty-product">
+
+
+<h2>
+
+Your cart is empty
+
+</h2>
+
+
+
+<p>
+
+Start shopping and add products.
+
+</p>
+
+
+
+
+<a
+
+href="<?= BASE_URL; ?>catalog.php"
+
+class="btn-primary"
+
+>
+
+
+Shop Now
+
+
+</a>
+
+
+
+</div>
+
+
+
+
+
+
+
+<?php } ?>
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+</section>
+
+
+
+
+
+
+
+<?php include "includes/footer.php"; ?>
