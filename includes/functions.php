@@ -4,314 +4,7 @@
 |--------------------------------------------------------------------------
 | HochipoHub Global Functions
 |--------------------------------------------------------------------------
-|
-| Used by:
-| - customer
-| - seller
-| - admin
-| - ajax
-| - auth
-|
-|--------------------------------------------------------------------------
 */
-
-
-require_once dirname(__DIR__) . '/config.php';
-
-require_once dirname(__DIR__) . '/database/db.php';
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Security / Clean Input
-|--------------------------------------------------------------------------
-*/
-
-
-function clean($data)
-
-{
-
-    return htmlspecialchars(
-
-        trim($data),
-
-        ENT_QUOTES,
-
-        'UTF-8'
-
-    );
-
-}
-
-
-
-
-function escape($data)
-
-{
-
-    global $conn;
-
-
-    return $conn->real_escape_string(
-
-        trim($data)
-
-    );
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Redirect
-|--------------------------------------------------------------------------
-*/
-
-
-function redirect($url)
-
-{
-
-    header(
-
-        "Location: ".$url
-
-    );
-
-    exit();
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Flash Message
-|--------------------------------------------------------------------------
-*/
-
-
-function setFlash($type,$message)
-
-{
-
-    $_SESSION['flash'] = [
-
-        'type'=>$type,
-
-        'message'=>$message
-
-    ];
-
-}
-
-
-
-
-function getFlash()
-
-{
-
-    if(isset($_SESSION['flash'])){
-
-
-        $flash = $_SESSION['flash'];
-
-
-        unset($_SESSION['flash']);
-
-
-        return $flash;
-
-
-    }
-
-
-    return null;
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| User Role Checking
-|--------------------------------------------------------------------------
-*/
-
-
-function isCustomer()
-
-{
-
-    return isset($_SESSION['role'])
-
-        && $_SESSION['role']=='customer';
-
-}
-
-
-
-function isSeller()
-
-{
-
-    return isset($_SESSION['role'])
-
-        && $_SESSION['role']=='vendor';
-
-}
-
-
-
-function isAdmin()
-
-{
-
-    return isset($_SESSION['role'])
-
-        && $_SESSION['role']=='admin';
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| User Information
-|--------------------------------------------------------------------------
-*/
-
-
-function userID()
-
-{
-
-    return $_SESSION['user_id'] ?? null;
-
-}
-
-
-
-function userName()
-
-{
-
-    return $_SESSION['user_name'] ?? '';
-
-}
-
-
-
-function userRole()
-
-{
-
-    return $_SESSION['role'] ?? '';
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Cart Function
-|--------------------------------------------------------------------------
-*/
-
-
-function getCartCount($user_id)
-
-{
-
-    global $conn;
-
-
-    $sql = "
-
-    SELECT SUM(quantity) AS total
-
-    FROM cart
-
-    WHERE customer_id='$user_id'
-
-    ";
-
-
-
-    $result = $conn->query($sql);
-
-
-
-    if($result){
-
-
-        $row=$result->fetch_assoc();
-
-
-        return $row['total'] ?? 0;
-
-
-    }
-
-
-    return 0;
-
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Wishlist Function
-|--------------------------------------------------------------------------
-*/
-
-
-function getWishlistCount($user_id)
-
-{
-
-    global $conn;
-
-
-    $sql = "
-
-    SELECT COUNT(*) AS total
-
-    FROM wishlist
-
-    WHERE user_id='$user_id'
-
-    ";
-
-
-
-    $result=$conn->query($sql);
-
-
-
-    if($result){
-
-
-        $row=$result->fetch_assoc();
-
-
-        return $row['total'];
-
-
-    }
-
-
-    return 0;
-
-
-}
 
 
 
@@ -322,24 +15,29 @@ function getWishlistCount($user_id)
 */
 
 
-function productImage($image)
-
-{
+function productImage($image){
 
 
     if(!empty($image)){
 
 
-        return PRODUCT_UPLOAD_URL.$image;
+        return BASE_URL.
+        "uploads/products/".
+        $image;
 
 
     }
 
 
-    return IMAGE_URL.DEFAULT_PRODUCT_IMAGE;
+
+    return BASE_URL.
+    "image/logo.jpg";
 
 
 }
+
+
+
 
 
 
@@ -350,24 +48,29 @@ function productImage($image)
 */
 
 
-function vendorImage($image)
-
-{
+function vendorImage($image){
 
 
     if(!empty($image)){
 
 
-        return VENDOR_UPLOAD_URL.$image;
+        return BASE_URL.
+        "uploads/vendors/".
+        $image;
 
 
     }
 
 
-    return IMAGE_URL."logo.jpg";
+
+    return BASE_URL.
+    "image/logo.jpg";
 
 
 }
+
+
+
 
 
 
@@ -378,18 +81,13 @@ function vendorImage($image)
 */
 
 
-function price($amount)
+function price($amount){
 
-{
 
-    return CURRENCY." "
-
-    .number_format(
-
+    return "RM ".
+    number_format(
         $amount,
-
         2
-
     );
 
 
@@ -397,300 +95,171 @@ function price($amount)
 
 
 
-/*
-|--------------------------------------------------------------------------
-| Generate OTP
-|--------------------------------------------------------------------------
-*/
-
-
-function generateOTP()
-
-{
-
-    return rand(
-
-        100000,
-
-        999999
-
-    );
-
-}
 
 
 
 /*
 |--------------------------------------------------------------------------
-| Generate Random Code
+| Redirect
 |--------------------------------------------------------------------------
 */
 
 
-function generateCode($length=6)
+function redirect($page){
 
-{
 
-    $characters =
+    header(
 
-    '0123456789';
-
-
-
-    $code='';
-
-
-
-    for($i=0;$i<$length;$i++){
-
-
-        $code .=
-
-        $characters[rand(0,strlen($characters)-1)];
-
-
-    }
-
-
-    return $code;
-
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Check Login
-|--------------------------------------------------------------------------
-*/
-
-
-function requireLogin()
-
-{
-
-    if(!isset($_SESSION['user_id'])){
-
-
-        setFlash(
-
-            'error',
-
-            'Please login first.'
-
-        );
-
-
-        redirect(
-
-            BASE_URL.'auth/login.php'
-
-        );
-
-
-    }
-
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Check Seller
-|--------------------------------------------------------------------------
-*/
-
-
-function requireSeller()
-
-{
-
-    requireLogin();
-
-
-
-    if(!isSeller()){
-
-
-        redirect(
-
-            BASE_URL.'index.php'
-
-        );
-
-
-    }
-
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Check Admin
-|--------------------------------------------------------------------------
-*/
-
-
-function requireAdmin()
-
-{
-
-    requireLogin();
-
-
-
-    if(!isAdmin()){
-
-
-        redirect(
-
-            BASE_URL.'index.php'
-
-        );
-
-
-    }
-
-
-}
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Upload Image
-|--------------------------------------------------------------------------
-*/
-
-
-function uploadImage(
-
-    $file,
-
-    $folder
-
-)
-
-
-{
-
-
-    if(!isset($file)
-
-        || $file['error'] !=0)
-
-    {
-
-
-        return false;
-
-
-    }
-
-
-
-    $extension =
-
-    strtolower(
-
-        pathinfo(
-
-            $file['name'],
-
-            PATHINFO_EXTENSION
-
-        )
+        "Location: ".BASE_URL.$page
 
     );
 
 
+    exit();
 
-    $allowed=[
 
-        'jpg',
+}
 
-        'jpeg',
 
-        'png',
 
-        'webp'
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Flash Message
+|--------------------------------------------------------------------------
+*/
+
+
+function setFlashMessage(
+    $type,
+    $message
+){
+
+
+    $_SESSION['flash']=[
+
+
+        'type'=>$type,
+
+        'message'=>$message
+
 
     ];
 
 
 
-    if(!in_array($extension,$allowed)){
+}
 
 
-        return false;
+
+
+
+
+function getFlashMessage(){
+
+
+    if(isset($_SESSION['flash'])){
+
+
+        $msg=$_SESSION['flash'];
+
+
+        unset($_SESSION['flash']);
+
+
+        return $msg;
 
 
     }
 
 
-
-    $filename =
-
-    time()
-
-    .'_'
-
-    .uniqid()
-
-    .'.'
-
-    .$extension;
-
-
-
-    move_uploaded_file(
-
-        $file['tmp_name'],
-
-        $folder.$filename
-
-    );
-
-
-
-    return $filename;
+    return null;
 
 
 }
+
+
+
 
 
 
 /*
 |--------------------------------------------------------------------------
-| Order Status Badge
+| Cart Count
 |--------------------------------------------------------------------------
 */
 
 
-function statusClass($status)
+function getCartCount($userID){
 
-{
 
-    return strtolower(
+    global $conn;
 
-        str_replace(
 
-            ' ',
 
-            '-',
+    $query="
 
-            $status
+    SELECT COUNT(*) AS total
 
-        )
+    FROM cart
 
-    );
+    WHERE user_id='$userID'
+
+    ";
+
+
+
+    $result=$conn->query($query);
+
+
+
+    return 
+    $result->fetch_assoc()['total'] ?? 0;
+
 
 
 }
 
 
-?>
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Wishlist Count
+|--------------------------------------------------------------------------
+*/
+
+
+function getWishlistCount($userID){
+
+
+    global $conn;
+
+
+
+    $query="
+
+    SELECT COUNT(*) AS total
+
+    FROM wishlist
+
+    WHERE user_id='$userID'
+
+    ";
+
+
+
+    $result=$conn->query($query);
+
+
+
+    return 
+    $result->fetch_assoc()['total'] ?? 0;
+
+
+
+}
