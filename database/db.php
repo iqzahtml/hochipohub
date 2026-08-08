@@ -1,57 +1,74 @@
 <?php
+
 /*
 |--------------------------------------------------------------------------
 | HochipoHub Database Connection
 |--------------------------------------------------------------------------
-| This file is included by:
-| - includes/header.php
-| - auth/*
-| - seller/*
-| - admin/*
-| - ajax/*
-| - root pages
+|
+| MySQLi connection
+|
 |--------------------------------------------------------------------------
 */
 
+
 require_once dirname(__DIR__) . '/config.php';
+
+
 
 /*
 |--------------------------------------------------------------------------
-| MySQLi Connection
+| Create Connection
 |--------------------------------------------------------------------------
 */
 
 $conn = new mysqli(
+
     DB_HOST,
+
     DB_USER,
+
     DB_PASS,
+
     DB_NAME
+
 );
+
+
 
 /*
 |--------------------------------------------------------------------------
-| Connection Error
+| Check Connection
 |--------------------------------------------------------------------------
 */
 
-if ($conn->connect_errno) {
+if ($conn->connect_error) {
 
-    if (DEVELOPMENT_MODE) {
 
-        die(
-            "Database Connection Failed : "
-            . $conn->connect_error
-        );
+    if (defined('DEVELOPMENT_MODE') && DEVELOPMENT_MODE === true) {
 
-    } else {
 
         die(
-            "Unable to connect to database."
+
+            "Database Connection Failed: " .
+
+            htmlspecialchars(
+                $conn->connect_error
+            )
+
         );
+
 
     }
 
+
+    die(
+        "Unable to connect to database."
+    );
+
+
 }
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -61,109 +78,15 @@ if ($conn->connect_errno) {
 
 $conn->set_charset("utf8mb4");
 
-/*
-|--------------------------------------------------------------------------
-| Helper Functions
-|--------------------------------------------------------------------------
-*/
 
-/*
-| Execute SELECT query
-*/
-
-function dbSelect($sql)
-{
-    global $conn;
-
-    return $conn->query($sql);
-}
-
-/*
-| Execute INSERT / UPDATE / DELETE
-*/
-
-function dbExecute($sql)
-{
-    global $conn;
-
-    return $conn->query($sql);
-}
-
-/*
-| Escape String
-*/
-
-function dbEscape($value)
-{
-    global $conn;
-
-    return $conn->real_escape_string($value);
-}
-
-/*
-| Last Insert ID
-*/
-
-function dbInsertId()
-{
-    global $conn;
-
-    return $conn->insert_id;
-}
-
-/*
-| Number of affected rows
-*/
-
-function dbAffectedRows()
-{
-    global $conn;
-
-    return $conn->affected_rows;
-}
-
-/*
-| Begin Transaction
-*/
-
-function dbBegin()
-{
-    global $conn;
-
-    $conn->begin_transaction();
-}
-
-/*
-| Commit
-*/
-
-function dbCommit()
-{
-    global $conn;
-
-    $conn->commit();
-}
-
-/*
-| Rollback
-*/
-
-function dbRollback()
-{
-    global $conn;
-
-    $conn->rollback();
-}
 
 /*
 |--------------------------------------------------------------------------
-| Prepared Statement Helper
+| Optional PDO Compatibility
+|--------------------------------------------------------------------------
+|
+| Do NOT use $pdo in the current HochipoHub files.
+| The project is standardized on $conn / MySQLi.
+|
 |--------------------------------------------------------------------------
 */
-
-function dbPrepare($sql)
-{
-    global $conn;
-
-    return $conn->prepare($sql);
-}
