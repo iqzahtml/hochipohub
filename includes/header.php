@@ -10,42 +10,32 @@ if (!defined('BASE_URL')) {
     require_once dirname(__DIR__) . '/config.php';
 }
 
-if (session_status() === PHP_SESSION_NONE) {
-    require_once dirname(__DIR__) . '/includes/session.php';
+if (!function_exists('isLoggedIn')) {
+    require_once __DIR__ . '/session.php';
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| PAGE DEFAULTS
+| PAGE SETTINGS
 |--------------------------------------------------------------------------
 */
 
-$pageTitle = $pageTitle ?? 'HochipoHub';
+$pageTitle =
+    $pageTitle
+    ?? 'HochipoHub';
 
 $pageDescription =
     $pageDescription
-    ??
-    'Discover and support local businesses with HochipoHub.';
+    ?? 'Discover local products and support local businesses.';
 
-$pageKeywords =
-    $pageKeywords
-    ??
-    'HochipoHub, local marketplace, Malaysia, local vendors, products';
-
-
-/*
-|--------------------------------------------------------------------------
-| CURRENT PAGE
-|--------------------------------------------------------------------------
-*/
-
-$currentPage =
-    basename(
-        $_SERVER['PHP_SELF'] ?? 'index.php'
-    );
+$bodyClass =
+    $bodyClass
+    ?? '';
 
 ?>
+
+
 <!DOCTYPE html>
 
 <html
@@ -54,9 +44,12 @@ $currentPage =
 
 <head>
 
-    <meta
-        charset="UTF-8"
-    >
+
+    <!-- =====================================================
+         BASIC META
+    ====================================================== -->
+
+    <meta charset="UTF-8">
 
     <meta
         name="viewport"
@@ -73,34 +66,30 @@ $currentPage =
     >
 
     <meta
-        name="keywords"
-        content="<?php echo htmlspecialchars(
-            $pageKeywords,
-            ENT_QUOTES,
-            'UTF-8'
-        ); ?>"
-    >
-
-    <meta
         name="theme-color"
         content="#2563eb"
     >
 
+
+    <!-- =====================================================
+         TITLE
+    ====================================================== -->
+
     <title>
+
         <?php echo htmlspecialchars(
             $pageTitle,
             ENT_QUOTES,
             'UTF-8'
         ); ?>
 
-        <?php if ($pageTitle !== 'HochipoHub'): ?>
-            | HochipoHub
-        <?php endif; ?>
+        | HochipoHub
+
     </title>
 
 
     <!-- =====================================================
-         GOOGLE FONTS
+         GOOGLE FONT
     ====================================================== -->
 
     <link
@@ -115,7 +104,7 @@ $currentPage =
     >
 
     <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet"
     >
 
@@ -127,11 +116,14 @@ $currentPage =
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        integrity="sha512-SnH5WK+bZxgPHs44uWixLJ8tW0Yp8qJk0j9JfF7qL9jX8j5m7K3m8sYQ2mJ6J7Y7dY7k2fF5J0kY7j3A8Q=="
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"
     >
 
 
     <!-- =====================================================
-         MAIN CSS
+         GLOBAL CSS
     ====================================================== -->
 
     <link
@@ -179,7 +171,11 @@ $currentPage =
 
     if (
         isset(
-            $pageCss[$currentPage]
+            $pageCss[
+                basename(
+                    $_SERVER['PHP_SELF']
+                )
+            ]
         )
     ):
 
@@ -187,122 +183,54 @@ $currentPage =
 
         <link
             rel="stylesheet"
-            href="<?php echo BASE_URL; ?>css/<?php echo $pageCss[$currentPage]; ?>"
+            href="<?php echo BASE_URL; ?>css/<?php echo $pageCss[
+                basename(
+                    $_SERVER['PHP_SELF']
+                )
+            ]; ?>"
         >
 
     <?php endif; ?>
 
-
-    <!-- =====================================================
-         MODAL CSS
-    ====================================================== -->
-
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/modal.css"
-    >
-
-
-    <!-- =====================================================
-         LOGIN CSS
-    ====================================================== -->
-
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/login.css"
-    >
-
-
-    <!-- =====================================================
-         ADMIN CSS
-    ====================================================== -->
-
-    <?php
-
-    $isAdminPage =
-        strpos(
-            $_SERVER['PHP_SELF'] ?? '',
-            '/admin/'
-        ) !== false;
-
-    if ($isAdminPage):
-
-    ?>
-
-        <link
-            rel="stylesheet"
-            href="<?php echo BASE_URL; ?>css/admin.css"
-        >
-
-    <?php endif; ?>
-
-
-    <!-- =====================================================
-         DASHBOARD CSS
-    ====================================================== -->
-
-    <?php
-
-    $dashboardPages = [
-
-        'dashboard.php',
-        'inventory.php',
-        'commission.php',
-        'profile.php',
-        'order.php',
-        'order_details.php',
-        'review.php'
-
-    ];
-
-    if (
-        in_array(
-            $currentPage,
-            $dashboardPages,
-            true
-        )
-    ):
-
-    ?>
-
-        <link
-            rel="stylesheet"
-            href="<?php echo BASE_URL; ?>css/dashboard.css"
-        >
-
-    <?php endif; ?>
-
-
-    <!-- =====================================================
-         EXTRA HEAD CONTENT
-    ====================================================== -->
-
-    <?php
-
-    if (
-        isset(
-            $extraHead
-        )
-    ) {
-
-        echo $extraHead;
-    }
-
-    ?>
 
 </head>
 
 
 <body
     class="<?php echo htmlspecialchars(
-        pathinfo(
-            $currentPage,
-            PATHINFO_FILENAME
-        ),
+        $bodyClass,
         ENT_QUOTES,
         'UTF-8'
     ); ?>"
 >
+
+
+<!-- =========================================================
+     PAGE LOADER
+========================================================= -->
+
+<div
+    class="page-loader"
+    id="pageLoader"
+>
+
+    <div class="loader-content">
+
+        <div class="loader-logo">
+
+            <i class="fa-solid fa-bolt"></i>
+
+        </div>
+
+        <div class="loader-spinner"></div>
+
+        <span>
+            Loading HochipoHub...
+        </span>
+
+    </div>
+
+</div>
 
 
 <!-- =========================================================
@@ -311,8 +239,17 @@ $currentPage =
 
 <?php
 
-require_once dirname(__DIR__) .
-    '/includes/navbar.php';
+$navbarPath =
+    __DIR__ . '/navbar.php';
+
+if (
+    file_exists(
+        $navbarPath
+    )
+) {
+
+    require $navbarPath;
+}
 
 ?>
 
@@ -322,6 +259,6 @@ require_once dirname(__DIR__) .
 ========================================================= -->
 
 <main
-    id="main-content"
-    class="site-main"
+    id="mainContent"
+    class="main-content"
 >
