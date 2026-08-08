@@ -6,14 +6,11 @@
 |--------------------------------------------------------------------------
 */
 
-
-if(session_status() === PHP_SESSION_NONE){
+if (session_status() === PHP_SESSION_NONE) {
 
     session_start();
 
 }
-
-
 
 
 /*
@@ -22,37 +19,11 @@ if(session_status() === PHP_SESSION_NONE){
 |--------------------------------------------------------------------------
 */
 
-
-function isLoggedIn(){
-
-
-    return isset($_SESSION['user_id']);
-
-
+function isLoggedIn(): bool
+{
+    return isset($_SESSION['user_id'])
+        && !empty($_SESSION['user_id']);
 }
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Alias (support old code)
-|--------------------------------------------------------------------------
-*/
-
-
-function isLogin(){
-
-
-    return isLoggedIn();
-
-
-}
-
-
-
-
 
 
 /*
@@ -61,38 +32,14 @@ function isLogin(){
 |--------------------------------------------------------------------------
 */
 
+function currentUserId(): ?int
+{
+    if (!isLoggedIn()) {
+        return null;
+    }
 
-function currentUserID(){
-
-
-    return $_SESSION['user_id'] ?? null;
-
-
+    return (int) $_SESSION['user_id'];
 }
-
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Current User Role
-|--------------------------------------------------------------------------
-*/
-
-
-function currentUserRole(){
-
-
-    return $_SESSION['role'] ?? null;
-
-
-}
-
-
-
-
 
 
 /*
@@ -101,19 +48,74 @@ function currentUserRole(){
 |--------------------------------------------------------------------------
 */
 
+function currentUserName(): string
+{
+    return $_SESSION['user_name'] ?? '';
+}
 
-function currentUserName(){
+
+/*
+|--------------------------------------------------------------------------
+| Current User Role
+|--------------------------------------------------------------------------
+*/
+
+function currentUserRole(): string
+{
+    return $_SESSION['user_role'] ?? 'customer';
+}
 
 
-    return $_SESSION['name'] ?? null;
+/*
+|--------------------------------------------------------------------------
+| Login User
+|--------------------------------------------------------------------------
+*/
 
+function loginUser(
+    int $userId,
+    string $name,
+    string $role
+): void {
+
+    session_regenerate_id(true);
+
+    $_SESSION['user_id'] = $userId;
+
+    $_SESSION['user_name'] = $name;
+
+    $_SESSION['user_role'] = $role;
 
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Logout User
+|--------------------------------------------------------------------------
+*/
 
+function logoutUser(): void
+{
+    $_SESSION = [];
 
+    if (ini_get("session.use_cookies")) {
 
+        $params = session_get_cookie_params();
+
+        setcookie(
+            session_name(),
+            '',
+            time() - 42000,
+            $params["path"],
+            $params["domain"],
+            $params["secure"],
+            $params["httponly"]
+        );
+    }
+
+    session_destroy();
+}
 
 
 /*
@@ -122,30 +124,26 @@ function currentUserName(){
 |--------------------------------------------------------------------------
 */
 
+function requireLogin(): void
+{
+    if (!isLoggedIn()) {
 
-function requireLogin(){
-
-
-    if(!isLoggedIn()){
-
+        $_SESSION['flash'] = [
+            'type' => 'warning',
+            'message' => 'Please login to continue.'
+        ];
 
         header(
-            "Location: ".BASE_URL."index.php"
+            'Location: ' .
+            (defined('BASE_URL')
+                ? BASE_URL
+                : '/'
+            )
         );
 
-
-        exit();
-
-
+        exit;
     }
-
-
 }
-
-
-
-
-
 
 
 /*
@@ -154,30 +152,25 @@ function requireLogin(){
 |--------------------------------------------------------------------------
 */
 
+function requireRole(string $role): void
+{
+    requireLogin();
 
-function requireRole($role){
+    if (currentUserRole() !== $role) {
 
-
-
-    if(
-        !isLoggedIn()
-        ||
-        currentUserRole() !== $role
-    ){
-
+        $_SESSION['flash'] = [
+            'type' => 'error',
+            'message' => 'You do not have permission to access this page.'
+        ];
 
         header(
-
-            "Location: ".BASE_URL."index.php"
-
+            'Location: ' .
+            (defined('BASE_URL')
+                ? BASE_URL . 'index.php'
+                : '/'
+            )
         );
 
-
-        exit();
-
-
+        exit;
     }
-
-
-
 }
