@@ -1,209 +1,252 @@
 <?php
 
-
-session_start();
-
-
-require_once "database/db.php";
-
+require_once "../config.php";
+require_once "../database/db.php";
+require_once "../includes/session.php";
+require_once "../includes/functions.php";
 
 
-if(!isset($_SESSION['user_id'])){
+
+$pageTitle = "My Products";
 
 
-header("Location: auth/login.php");
+
+requireRole('vendor');
 
 
-exit();
 
+$userID = currentUserID();
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Get Vendor
+|--------------------------------------------------------------------------
+*/
+
+$vendorQuery = $conn->prepare("
+
+    SELECT vendor_id
+
+    FROM vendors
+
+    WHERE user_id = ?
+
+    LIMIT 1
+
+");
+
+$vendorQuery->bind_param(
+    "i",
+    $userID
+);
+
+$vendorQuery->execute();
+
+$vendorResult =
+    $vendorQuery->get_result();
+
+
+
+if ($vendorResult->num_rows === 0) {
+
+    header(
+        "Location: setup_profile.php"
+    );
+
+    exit();
 
 }
 
 
 
-$user_id=$_SESSION['user_id'];
+$vendor =
+    $vendorResult->fetch_assoc();
+
+
+
+$vendorID =
+    $vendor['vendor_id'];
 
 
 
 
-$stmt=$conn->prepare("
 
-SELECT vendor_id
+/*
+|--------------------------------------------------------------------------
+| Products
+|--------------------------------------------------------------------------
+*/
 
-FROM vendors
+$query = $conn->prepare("
 
-WHERE user_id=?
+    SELECT
 
-");
+        products.*,
 
+        categories.category_name
 
+    FROM products
 
-$stmt->bind_param(
+    LEFT JOIN categories
 
-"i",
+        ON products.category_id =
+           categories.category_id
 
-$user_id
+    WHERE products.vendor_id = ?
 
-);
-
-
-
-$stmt->execute();
-
-
-
-$vendor=$stmt->get_result()->fetch_assoc();
-
-
-
-
-$products=$conn->prepare("
-
-SELECT *
-
-FROM products
-
-WHERE vendor_id=?
-
-ORDER BY product_id DESC
+    ORDER BY products.created_at DESC
 
 ");
 
-
-
-$products->bind_param(
-
-"i",
-
-$vendor['vendor_id']
-
+$query->bind_param(
+    "i",
+    $vendorID
 );
 
+$query->execute();
 
-
-$products->execute();
-
-
-
-$result=$products->get_result();
+$products =
+    $query->get_result();
 
 
 
 ?>
 
-
-
-<!DOCTYPE html>
-
-<html>
-
-<head>
-
-<title>
-My Products
-</title>
-
-
-<link rel="stylesheet" href="css/vendor.css">
-
-
-</head>
+<?php include "../includes/header.php"; ?>
 
 
 
-<body>
+<section class="product-page">
 
+
+<div class="page-title">
+
+
+<div>
 
 <h1>
 My Products
 </h1>
 
+<p>
+Manage products sold through HochipoHub.
+</p>
 
-<a href="add_product.php">
+</div>
 
-Add Product
+
+
+<a
+href="add_product.php"
+class="btn-primary"
+>
+
++ Add Product
 
 </a>
 
 
-
-<table border="1">
-
-
-<tr>
-
-<th>
-Image
-</th>
-
-<th>
-Name
-</th>
-
-<th>
-Price
-</th>
-
-<th>
-Stock
-</th>
-
-<th>
-Action
-</th>
-
-
-</tr>
-
-
-
-<?php while($row=$result->fetch_assoc()){ ?>
-
-
-<tr>
-
-
-<td>
-
-
-<img src="../assets/uploads/products/<?= $row['image']; ?>"
-
-width="70">
-
-
-</td>
-
-
-
-<td>
-
-<?= $row['product_name']; ?>
-
-</td>
-
-
-
-<td>
-
-RM <?= $row['price']; ?>
-
-</td>
+</div>
 
 
 
 
-<td>
 
-<?= $row['stock_quantity']; ?>
-
-</td>
+<div class="product-grid">
 
 
 
-<td>
+<?php if ($products->num_rows > 0): ?>
 
 
-<a href="edit_product.php?id=<?= $row['product_id']; ?>">
+
+<?php while ($product = $products->fetch_assoc()): ?>
+
+
+
+<div class="product-card">
+
+
+
+<img
+
+src="<?= productImage($product['image']); ?>"
+
+alt="<?= htmlspecialchars($product['product_name']); ?>"
+
+>
+
+
+
+
+<h3>
+
+<?= htmlspecialchars(
+    $product['product_name']
+); ?>
+
+</h3>
+
+
+
+
+<p>
+
+<?= htmlspecialchars(
+    $product['category_name'] ?? 'Uncategorized'
+); ?>
+
+</p>
+
+
+
+
+<p>
+
+<?= price($product['price']); ?>
+
+</p>
+
+
+
+
+<p>
+
+Stock:
+
+<?= (int)$product['stock_quantity']; ?>
+
+</p>
+
+
+
+
+<p>
+
+Status:
+
+<?= htmlspecialchars(
+    $product['status']
+); ?>
+
+</p>
+
+
+
+
+
+<div class="product-actions">
+
+
+<a
+
+href="edit_product.php?id=<?= $product['product_id']; ?>"
+
+>
 
 Edit
 
@@ -211,25 +254,72 @@ Edit
 
 
 
-<a href="delete_product.php?id=<?= $row['product_id']; ?>">
+
+<a
+
+href="delete_product.php?id=<?= $product['product_id']; ?>"
+
+onclick="return confirm('Delete this product?');"
+
+>
 
 Delete
 
 </a>
 
 
-</td>
+</div>
 
 
-</tr>
+
+</div>
 
 
-<?php } ?>
+
+<?php endwhile; ?>
 
 
-</table>
+
+<?php else: ?>
 
 
-</body>
 
-</html>
+<div class="empty-product">
+
+
+<h3>
+No Products Yet
+</h3>
+
+
+<p>
+Start selling by adding your first product.
+</p>
+
+
+<a
+href="add_product.php"
+class="btn-primary"
+>
+
+Add Product
+
+</a>
+
+
+</div>
+
+
+
+<?php endif; ?>
+
+
+
+</div>
+
+
+</section>
+
+
+
+<?php include "../includes/footer.php"; ?>
