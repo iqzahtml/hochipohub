@@ -6,19 +6,27 @@ require_once "../includes/session.php";
 require_once "../includes/functions.php";
 
 
-
 $pageTitle = "Add Product";
 
 
+if (!isLoggedIn()) {
 
-requireRole('vendor');
+    header("Location: " . BASE_URL . "index.php");
+    exit();
+
+}
 
 
+if (currentUserRole() !== 'vendor') {
 
-$userID = currentUserID();
+    header("Location: " . BASE_URL . "index.php");
+    exit();
+
+}
 
 
-
+$userID =
+    (int) currentUserID();
 
 
 /*
@@ -29,7 +37,10 @@ $userID = currentUserID();
 
 $vendorQuery = $conn->prepare("
 
-    SELECT vendor_id
+    SELECT
+
+        vendor_id,
+        approval_status
 
     FROM vendors
 
@@ -39,16 +50,18 @@ $vendorQuery = $conn->prepare("
 
 ");
 
+
 $vendorQuery->bind_param(
     "i",
     $userID
 );
 
+
 $vendorQuery->execute();
+
 
 $vendorResult =
     $vendorQuery->get_result();
-
 
 
 if ($vendorResult->num_rows === 0) {
@@ -62,17 +75,37 @@ if ($vendorResult->num_rows === 0) {
 }
 
 
-
 $vendor =
     $vendorResult->fetch_assoc();
 
 
-
 $vendorID =
-    $vendor['vendor_id'];
+    (int)$vendor['vendor_id'];
 
 
+/*
+|--------------------------------------------------------------------------
+| Only Approved Vendor Can Add Products
+|--------------------------------------------------------------------------
+*/
 
+if (
+    $vendor['approval_status']
+    !== 'Approved'
+) {
+
+    setFlashMessage(
+        "error",
+        "Your vendor account must be approved before adding products."
+    );
+
+    header(
+        "Location: dashboard.php"
+    );
+
+    exit();
+
+}
 
 
 /*
@@ -84,7 +117,10 @@ $vendorID =
 $categories =
     $conn->query("
 
-        SELECT *
+        SELECT
+
+            category_id,
+            category_name
 
         FROM categories
 
@@ -93,254 +129,323 @@ $categories =
     ");
 
 
-
-
-
 /*
 |--------------------------------------------------------------------------
 | Add Product
 |--------------------------------------------------------------------------
 */
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
+if (
+    $_SERVER['REQUEST_METHOD']
+    === 'POST'
+) {
 
 
     $productName =
-        trim($_POST['product_name'] ?? '');
-
+        trim(
+            $_POST['product_name']
+            ?? ''
+        );
 
 
     $description =
-        trim($_POST['description'] ?? '');
-
+        trim(
+            $_POST['description']
+            ?? ''
+        );
 
 
     $price =
-        (float)($_POST['price'] ?? 0);
-
+        (float)(
+            $_POST['price']
+            ?? 0
+        );
 
 
     $stock =
-        (int)($_POST['stock_quantity'] ?? 0);
-
+        (int)(
+            $_POST['stock_quantity']
+            ?? 0
+        );
 
 
     $categoryID =
-        (int)($_POST['category_id'] ?? 0);
-
+        (int)(
+            $_POST['category_id']
+            ?? 0
+        );
 
 
     $status =
-        $_POST['status'] ?? 'Available';
+        $_POST['status']
+        ?? 'Available';
 
 
+    $allowedStatus = [
 
+        'Available',
+        'Out of Stock',
+        'Hidden'
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | Image
-    |--------------------------------------------------------------------------
-    */
-
-    $imageName = '';
-
+    ];
 
 
     if (
-        isset($_FILES['image'])
-        &&
-        $_FILES['image']['error'] === UPLOAD_ERR_OK
+        !in_array(
+            $status,
+            $allowedStatus,
+            true
+        )
     ) {
 
-
-
-        $extension =
-            strtolower(
-                pathinfo(
-                    $_FILES['image']['name'],
-                    PATHINFO_EXTENSION
-                )
-            );
-
-
-
-        $allowed = [
-            'jpg',
-            'jpeg',
-            'png',
-            'webp'
-        ];
-
-
-
-        if (
-            in_array(
-                $extension,
-                $allowed,
-                true
-            )
-        ) {
-
-
-
-            $imageName =
-                uniqid(
-                    'product_',
-                    true
-                )
-                . '.'
-                . $extension;
-
-
-
-            $uploadDirectory =
-                dirname(__DIR__)
-                . '/uploads/products/';
-
-
-
-            if (
-                !is_dir($uploadDirectory)
-            ) {
-
-                mkdir(
-                    $uploadDirectory,
-                    0777,
-                    true
-                );
-
-            }
-
-
-
-            move_uploaded_file(
-
-                $_FILES['image']['tmp_name'],
-
-                $uploadDirectory .
-                $imageName
-
-            );
-
-        }
+        $status =
+            'Available';
 
     }
 
 
-
-
-
     /*
     |--------------------------------------------------------------------------
-    | Insert Product
+    | Validation
     |--------------------------------------------------------------------------
     */
 
-    $insert = $conn->prepare("
-
-        INSERT INTO products
-
-        (
-
-            vendor_id,
-
-            category_id,
-
-            product_name,
-
-            description,
-
-            price,
-
-            stock_quantity,
-
-            image,
-
-            status,
-
-            created_at
-
-        )
-
-        VALUES
-
-        (
-
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            NOW()
-
-        )
-
-    ");
-
-
-
-    $insert->bind_param(
-
-        "iissdiss",
-
-        $vendorID,
-
-        $categoryID,
-
-        $productName,
-
-        $description,
-
-        $price,
-
-        $stock,
-
-        $imageName,
-
-        $status
-
-    );
-
-
-
-    if ($insert->execute()) {
-
-
+    if (
+        $productName === ''
+        ||
+        $categoryID <= 0
+        ||
+        $price < 0
+        ||
+        $stock < 0
+    ) {
 
         setFlashMessage(
-
-            'success',
-
-            'Product added successfully.'
-
+            "error",
+            "Please fill in all required fields correctly."
         );
-
-
-
-        header(
-            "Location: products.php"
-        );
-
-        exit();
-
-
 
     } else {
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Image Upload
+        |--------------------------------------------------------------------------
+        */
 
-        setFlashMessage(
+        $imageName = null;
 
-            'error',
 
-            'Unable to add product.'
+        if (
+            isset($_FILES['image'])
+            &&
+            $_FILES['image']['error']
+            === UPLOAD_ERR_OK
+        ) {
+
+
+            $extension =
+                strtolower(
+                    pathinfo(
+                        $_FILES['image']['name'],
+                        PATHINFO_EXTENSION
+                    )
+                );
+
+
+            $allowedExtensions = [
+
+                'jpg',
+                'jpeg',
+                'png',
+                'webp'
+
+            ];
+
+
+            if (
+                in_array(
+                    $extension,
+                    $allowedExtensions,
+                    true
+                )
+            ) {
+
+
+                $imageName =
+                    uniqid(
+                        'product_',
+                        true
+                    )
+                    . '.'
+                    . $extension;
+
+
+                $uploadDirectory =
+                    dirname(__DIR__)
+                    . '/uploads/products/';
+
+
+                if (
+                    !is_dir(
+                        $uploadDirectory
+                    )
+                ) {
+
+                    mkdir(
+                        $uploadDirectory,
+                        0777,
+                        true
+                    );
+
+                }
+
+
+                move_uploaded_file(
+
+                    $_FILES['image']['tmp_name'],
+
+                    $uploadDirectory
+                    . $imageName
+
+                );
+
+            }
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Automatically Mark Out Of Stock
+        |--------------------------------------------------------------------------
+        */
+
+        if ($stock <= 0) {
+
+            $status =
+                'Out of Stock';
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Insert Product
+        |--------------------------------------------------------------------------
+        */
+
+        $insert = $conn->prepare("
+
+            INSERT INTO products
+
+            (
+                vendor_id,
+                category_id,
+                product_name,
+                description,
+                price,
+                stock_quantity,
+                image,
+                status
+            )
+
+            VALUES
+
+            (
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?
+            )
+
+        ");
+
+
+        $insert->bind_param(
+
+            "iissdiss",
+
+            $vendorID,
+            $categoryID,
+            $productName,
+            $description,
+            $price,
+            $stock,
+            $imageName,
+            $status
 
         );
+
+
+        if ($insert->execute()) {
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Create Inventory Record
+            |--------------------------------------------------------------------------
+            */
+
+            $productID =
+                $insert->insert_id;
+
+
+            $inventory = $conn->prepare("
+
+                INSERT INTO inventory
+
+                (
+                    product_id,
+                    quantity
+                )
+
+                VALUES
+                (
+                    ?,
+                    ?
+                )
+
+            ");
+
+
+            $inventory->bind_param(
+                "ii",
+                $productID,
+                $stock
+            );
+
+
+            $inventory->execute();
+
+
+            setFlashMessage(
+                "success",
+                "Product added successfully."
+            );
+
+
+            header(
+                "Location: products.php"
+            );
+
+            exit();
+
+
+        } else {
+
+
+            setFlashMessage(
+                "error",
+                "Unable to add product."
+            );
+
+        }
 
     }
 
@@ -350,272 +455,190 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <?php include "../includes/header.php"; ?>
 
-
-
 <section class="product-form-page">
 
+    <div class="page-title">
 
+        <h1>
+            Add Product
+        </h1>
 
-<div class="page-title">
+        <p>
+            Create a new product listing.
+        </p>
 
-<h1>
-Add Product
-</h1>
+    </div>
 
-<p>
-Create a new product listing.
-</p>
 
-</div>
+    <div class="form-box">
 
+        <form
+            method="POST"
+            enctype="multipart/form-data"
+        >
 
 
+            <div class="form-group">
 
+                <label for="product_name">
+                    Product Name
+                </label>
 
-<div class="form-box">
+                <input
+                    type="text"
+                    id="product_name"
+                    name="product_name"
+                    maxlength="150"
+                    required
+                >
 
+            </div>
 
 
-<form
+            <div class="form-group">
 
-method="POST"
+                <label for="category_id">
+                    Category
+                </label>
 
-enctype="multipart/form-data"
+                <select
+                    id="category_id"
+                    name="category_id"
+                    required
+                >
 
->
+                    <option value="">
+                        Select Category
+                    </option>
 
+                    <?php while (
+                        $category =
+                        $categories->fetch_assoc()
+                    ): ?>
 
+                        <option
+                            value="<?= $category['category_id']; ?>"
+                        >
 
-<div class="form-group">
+                            <?= htmlspecialchars(
+                                $category['category_name']
+                            ); ?>
 
+                        </option>
 
-<label>
-Product Name
-</label>
+                    <?php endwhile; ?>
 
+                </select>
 
-<input
+            </div>
 
-type="text"
 
-name="product_name"
+            <div class="form-group">
 
-required
+                <label for="description">
+                    Description
+                </label>
 
->
+                <textarea
+                    id="description"
+                    name="description"
+                    rows="6"
+                ></textarea>
 
-</div>
+            </div>
 
 
+            <div class="form-group">
 
+                <label for="price">
+                    Price (RM)
+                </label>
 
+                <input
+                    type="number"
+                    id="price"
+                    name="price"
+                    step="0.01"
+                    min="0"
+                    required
+                >
 
-<div class="form-group">
+            </div>
 
 
-<label>
-Category
-</label>
+            <div class="form-group">
 
+                <label for="stock_quantity">
+                    Stock Quantity
+                </label>
 
-<select
-name="category_id"
-required
->
+                <input
+                    type="number"
+                    id="stock_quantity"
+                    name="stock_quantity"
+                    min="0"
+                    required
+                >
 
+            </div>
 
-<option value="">
-Select Category
-</option>
 
+            <div class="form-group">
 
+                <label for="image">
+                    Product Image
+                </label>
 
-<?php while ($category = $categories->fetch_assoc()): ?>
+                <input
+                    type="file"
+                    id="image"
+                    name="image"
+                    accept=".jpg,.jpeg,.png,.webp"
+                >
 
+            </div>
 
-<option
 
-value="<?= $category['category_id']; ?>"
+            <div class="form-group">
 
->
+                <label for="status">
+                    Status
+                </label>
 
-<?= htmlspecialchars(
-    $category['category_name']
-); ?>
+                <select
+                    id="status"
+                    name="status"
+                >
 
-</option>
+                    <option value="Available">
+                        Available
+                    </option>
 
+                    <option value="Out of Stock">
+                        Out of Stock
+                    </option>
 
-<?php endwhile; ?>
+                    <option value="Hidden">
+                        Hidden
+                    </option>
 
+                </select>
 
-</select>
+            </div>
 
 
-</div>
+            <button
+                type="submit"
+                class="btn-primary"
+            >
+                Add Product
+            </button>
 
 
+        </form>
 
-
-
-<div class="form-group">
-
-
-<label>
-Description
-</label>
-
-
-<textarea
-
-name="description"
-
-rows="6"
-
-required
-
-></textarea>
-
-
-</div>
-
-
-
-
-
-<div class="form-group">
-
-
-<label>
-Price (RM)
-</label>
-
-
-<input
-
-type="number"
-
-name="price"
-
-step="0.01"
-
-min="0"
-
-required
-
->
-
-
-</div>
-
-
-
-
-
-<div class="form-group">
-
-
-<label>
-Stock Quantity
-</label>
-
-
-<input
-
-type="number"
-
-name="stock_quantity"
-
-min="0"
-
-required
-
->
-
-
-</div>
-
-
-
-
-
-<div class="form-group">
-
-
-<label>
-Product Image
-</label>
-
-
-<input
-
-type="file"
-
-name="image"
-
-accept=".jpg,.jpeg,.png,.webp"
-
->
-
-
-</div>
-
-
-
-
-
-<div class="form-group">
-
-
-<label>
-Status
-</label>
-
-
-<select name="status">
-
-
-<option value="Available">
-Available
-</option>
-
-
-<option value="Unavailable">
-Unavailable
-</option>
-
-
-</select>
-
-
-</div>
-
-
-
-
-
-<button
-
-type="submit"
-
-class="btn-primary"
-
->
-
-Add Product
-
-</button>
-
-
-
-</form>
-
-
-</div>
-
+    </div>
 
 </section>
-
-
 
 <?php include "../includes/footer.php"; ?>
