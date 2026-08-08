@@ -1,213 +1,251 @@
 <?php
 
-session_start();
-
-require_once "database/db.php";
-
-
-header("Content-Type: application/json");
+require_once "../config.php";
+require_once "../database/db.php";
+require_once "../includes/session.php";
 
 
-if(!isset($_SESSION['user_id'])){
 
-echo json_encode([
-    "status"=>"error",
-    "message"=>"Please login first"
-]);
+/*
+|--------------------------------------------------------------------------
+| Login Check
+|--------------------------------------------------------------------------
+*/
 
-exit();
+if (!isLoggedIn()) {
+
+    header(
+        "Location: " . BASE_URL . "index.php"
+    );
+
+    exit();
 
 }
 
 
 
-$user_id=$_SESSION['user_id'];
+/*
+|--------------------------------------------------------------------------
+| Only POST
+|--------------------------------------------------------------------------
+*/
 
-$product_id=$_POST['product_id'];
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
-$quantity=$_POST['quantity'] ?? 1;
+    header(
+        "Location: " . BASE_URL . "catalog.php"
+    );
+
+    exit();
+
+}
+
+
+
+$userID = currentUserID();
+
+$productID = isset($_POST['product_id'])
+    ? (int) $_POST['product_id']
+    : 0;
+
+$quantity = isset($_POST['quantity'])
+    ? (int) $_POST['quantity']
+    : 1;
+
+
+
+if ($productID <= 0) {
+
+    header(
+        "Location: " . BASE_URL . "catalog.php"
+    );
+
+    exit();
+
+}
+
+
+
+if ($quantity < 1) {
+
+    $quantity = 1;
+
+}
 
 
 
 /*
-CHECK PRODUCT
+|--------------------------------------------------------------------------
+| Check Product
+|--------------------------------------------------------------------------
 */
 
-$product=$conn->prepare("
+$productQuery = $conn->prepare("
 
-SELECT product_id, stock_quantity
+    SELECT product_id, status
 
-FROM products
+    FROM products
 
-WHERE product_id=?
+    WHERE product_id = ?
 
-AND status='Available'
+    LIMIT 1
 
 ");
 
-
-$product->bind_param(
-
-"i",
-
-$product_id
-
+$productQuery->bind_param(
+    "i",
+    $productID
 );
 
+$productQuery->execute();
 
-$product->execute();
-
-
-$result=$product->get_result();
+$productResult = $productQuery->get_result();
 
 
 
-if($result->num_rows==0){
+if ($productResult->num_rows === 0) {
 
-echo json_encode([
-"status"=>"error",
-"message"=>"Product unavailable"
-]);
+    header(
+        "Location: " . BASE_URL . "catalog.php"
+    );
 
-exit();
+    exit();
 
 }
 
 
 
-
-$data=$result->fetch_assoc();
-
+$product = $productResult->fetch_assoc();
 
 
-if($data['stock_quantity'] < $quantity){
 
-echo json_encode([
-"status"=>"error",
-"message"=>"Not enough stock"
-]);
+if (strtolower($product['status']) !== 'available') {
 
-exit();
+    header(
+        "Location: " . BASE_URL .
+        "product_details.php?id=" . $productID
+    );
+
+    exit();
 
 }
 
 
 
 /*
-CHECK EXIST CART
+|--------------------------------------------------------------------------
+| Check Existing Cart Item
+|--------------------------------------------------------------------------
 */
 
+$check = $conn->prepare("
 
-$check=$conn->prepare("
+    SELECT cart_id, quantity
 
-SELECT cart_id
+    FROM cart
 
-FROM cart
+    WHERE user_id = ?
 
-WHERE customer_id=?
+    AND product_id = ?
 
-AND product_id=?
+    LIMIT 1
 
 ");
-
 
 $check->bind_param(
-
-"ii",
-
-$user_id,
-
-$product_id
-
+    "ii",
+    $userID,
+    $productID
 );
-
 
 $check->execute();
 
-
-
-$exist=$check->get_result();
-
-
-
-if($exist->num_rows>0){
-
-
-$update=$conn->prepare("
-
-UPDATE cart
-
-SET quantity = quantity + ?
-
-WHERE customer_id=?
-
-AND product_id=?
-
-");
-
-
-$update->bind_param(
-
-"iii",
-
-$quantity,
-
-$user_id,
-
-$product_id
-
-);
+$existing = $check->get_result();
 
 
 
-$update->execute();
+if ($existing->num_rows > 0) {
+
+    $cart = $existing->fetch_assoc();
+
+    $newQuantity =
+        (int)$cart['quantity'] + $quantity;
 
 
+
+    $update = $conn->prepare("
+
+        UPDATE cart
+
+        SET quantity = ?
+
+        WHERE cart_id = ?
+
+    ");
+
+    $update->bind_param(
+        "ii",
+        $newQuantity,
+        $cart['cart_id']
+    );
+
+    $update->execute();
+
+
+
+} else {
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Add New Item
+    |--------------------------------------------------------------------------
+    */
+
+    $insert = $conn->prepare("
+
+        INSERT INTO cart
+
+        (
+            user_id,
+            product_id,
+            quantity,
+            created_at
+        )
+
+        VALUES
+
+        (
+            ?,
+            ?,
+            ?,
+            NOW()
+        )
+
+    ");
+
+    $insert->bind_param(
+        "iii",
+        $userID,
+        $productID,
+        $quantity
+    );
+
+    $insert->execute();
 
 }
 
-else{
 
 
-$insert=$conn->prepare("
+/*
+|--------------------------------------------------------------------------
+| Redirect
+|--------------------------------------------------------------------------
+*/
 
-INSERT INTO cart
-
-(customer_id,product_id,quantity)
-
-VALUES(?,?,?)
-
-");
-
-
-$insert->bind_param(
-
-"iii",
-
-$user_id,
-
-$product_id,
-
-$quantity
-
+header(
+    "Location: " . BASE_URL . "cart.php"
 );
 
-
-
-$insert->execute();
-
-
-
-}
-
-
-
-echo json_encode([
-
-"status"=>"success",
-
-"message"=>"Added to cart"
-
-]);
-
-?>
+exit();
