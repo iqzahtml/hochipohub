@@ -1,57 +1,84 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| HochipoHub Mail Service
+|--------------------------------------------------------------------------
+|
+| Uses PHPMailer through Composer autoload.
+|
+|--------------------------------------------------------------------------
+*/
+
+
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 
-require_once "vendor/autoload.php";
+/*
+|--------------------------------------------------------------------------
+| Load PHPMailer
+|--------------------------------------------------------------------------
+*/
+
+require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 
 
-function sendMail($to, $subject, $message)
-{
 
+
+/*
+|--------------------------------------------------------------------------
+| Send Email
+|--------------------------------------------------------------------------
+*/
+
+function sendMail(
+    $to,
+    $subject,
+    $message
+) {
 
     $mail = new PHPMailer(true);
 
 
-
     try {
-
 
         /*
         |--------------------------------------------------------------------------
-        | SMTP CONFIGURATION
+        | SMTP
         |--------------------------------------------------------------------------
         */
 
-
         $mail->isSMTP();
 
-
-        $mail->Host = "smtp.gmail.com";
-
+        $mail->Host = 'smtp.gmail.com';
 
         $mail->SMTPAuth = true;
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Gmail Account
+        |--------------------------------------------------------------------------
+        |
+        | CHANGE THESE.
+        |
+        */
+
+        $mail->Username = 'your_email@gmail.com';
+
+        $mail->Password = 'your_app_password';
+
 
         /*
         |--------------------------------------------------------------------------
-        | CHANGE THIS
+        | Encryption
         |--------------------------------------------------------------------------
         */
 
-
-        $mail->Username = "your_email@gmail.com";
-
-
-        $mail->Password = "your_app_password";
-
-
-
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-
+        $mail->SMTPSecure =
+            PHPMailer::ENCRYPTION_STARTTLS;
 
         $mail->Port = 587;
 
@@ -60,49 +87,56 @@ function sendMail($to, $subject, $message)
 
         /*
         |--------------------------------------------------------------------------
-        | EMAIL INFO
+        | Email Sender
         |--------------------------------------------------------------------------
         */
 
-
         $mail->setFrom(
-
-            "your_email@gmail.com",
-
-            "HochipoHub"
-
+            'your_email@gmail.com',
+            'HochipoHub'
         );
 
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Recipient
+        |--------------------------------------------------------------------------
+        */
 
         $mail->addAddress($to);
 
 
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Email Content
+        |--------------------------------------------------------------------------
+        */
+
         $mail->isHTML(true);
 
-
-
         $mail->Subject = $subject;
-
-
 
         $mail->Body = $message;
 
 
 
-        $mail->send();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Send
+        |--------------------------------------------------------------------------
+        */
+
+        $mail->send();
 
 
         return true;
 
 
-
-    }
-
-
-    catch(Exception $e){
+    } catch (Exception $e) {
 
 
         return false;
@@ -110,7 +144,4 @@ function sendMail($to, $subject, $message)
 
     }
 
-
 }
-
-?>
