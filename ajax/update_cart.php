@@ -5,66 +5,33 @@ require_once "../database/db.php";
 require_once "../includes/session.php";
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Login Check
-|--------------------------------------------------------------------------
-*/
-
 if (!isLoggedIn()) {
 
-    header(
-        "Location: " . BASE_URL . "index.php"
-    );
-
+    header("Location: " . BASE_URL . "index.php");
     exit();
 
 }
 
 
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-
-    header(
-        "Location: " . BASE_URL . "cart.php"
-    );
-
-    exit();
-
-}
+$customerID =
+    (int) currentUserID();
 
 
+$cartID =
+    (int) ($_POST['cart_id'] ?? 0);
 
-$userID = currentUserID();
 
-$cartID = isset($_POST['cart_id'])
-    ? (int) $_POST['cart_id']
-    : 0;
-
-$quantity = isset($_POST['quantity'])
-    ? (int) $_POST['quantity']
-    : 1;
-
+$quantity =
+    (int) ($_POST['quantity'] ?? 1);
 
 
 if ($cartID <= 0) {
 
-    header(
-        "Location: " . BASE_URL . "cart.php"
-    );
-
+    header("Location: " . BASE_URL . "cart.php");
     exit();
 
 }
 
-
-
-/*
-|--------------------------------------------------------------------------
-| Quantity Validation
-|--------------------------------------------------------------------------
-*/
 
 if ($quantity < 1) {
 
@@ -73,38 +40,119 @@ if ($quantity < 1) {
 }
 
 
-
 /*
 |--------------------------------------------------------------------------
-| Update Only User's Own Cart
+| Check Stock
 |--------------------------------------------------------------------------
 */
 
-$query = $conn->prepare("
+$check = $conn->prepare("
 
-    UPDATE cart
+    SELECT
+        products.stock_quantity
 
-    SET quantity = ?
+    FROM cart
 
-    WHERE cart_id = ?
+    INNER JOIN products
 
-    AND user_id = ?
+        ON cart.product_id =
+           products.product_id
+
+    WHERE cart.cart_id = ?
+
+    AND cart.customer_id = ?
+
+    LIMIT 1
 
 ");
 
-$query->bind_param(
-    "iii",
-    $quantity,
+$check->bind_param(
+    "ii",
     $cartID,
-    $userID
+    $customerID
 );
 
-$query->execute();
+$check->execute();
 
+$result =
+    $check->get_result();
+
+
+if ($result->num_rows === 0) {
+
+    header("Location: " . BASE_URL . "cart.php");
+    exit();
+
+}
+
+
+$product =
+    $result->fetch_assoc();
+
+
+$stock =
+    (int)$product['stock_quantity'];
+
+
+if ($quantity > $stock) {
+
+    $quantity = $stock;
+
+}
+
+
+if ($quantity <= 0) {
+
+    $delete = $conn->prepare("
+
+        DELETE FROM cart
+
+        WHERE cart_id = ?
+
+        AND customer_id = ?
+
+    ");
+
+    $delete->bind_param(
+        "ii",
+        $cartID,
+        $customerID
+    );
+
+    $delete->execute();
+
+
+} else {
+
+
+    $update = $conn->prepare("
+
+        UPDATE cart
+
+        SET quantity = ?
+
+        WHERE cart_id = ?
+
+        AND customer_id = ?
+
+    ");
+
+    $update->bind_param(
+        "iii",
+        $quantity,
+        $cartID,
+        $customerID
+    );
+
+    $update->execute();
+
+}
 
 
 header(
-    "Location: " . BASE_URL . "cart.php"
+    "Location: " .
+    BASE_URL .
+    "cart.php"
 );
 
 exit();
