@@ -4,6 +4,7 @@ require_once "../config.php";
 require_once "../database/db.php";
 require_once "../includes/session.php";
 
+
 if (!isLoggedIn()) {
 
     header("Location: " . BASE_URL . "index.php");
@@ -11,20 +12,22 @@ if (!isLoggedIn()) {
 
 }
 
-$userID = currentUserID();
 
-$wishlistID = isset($_GET['id'])
-    ? (int) $_GET['id']
-    : 0;
+$userID =
+    (int) currentUserID();
 
-$productID = isset($_GET['product_id'])
-    ? (int) $_GET['product_id']
-    : 0;
+
+$wishlistID =
+    (int) ($_GET['id'] ?? 0);
+
+
+$productID =
+    (int) ($_GET['product_id'] ?? 0);
 
 
 /*
 |--------------------------------------------------------------------------
-| Remove Using Wishlist ID
+| Remove By Wishlist ID
 |--------------------------------------------------------------------------
 */
 
@@ -46,16 +49,14 @@ if ($wishlistID > 0) {
         $userID
     );
 
-}
-
 
 /*
 |--------------------------------------------------------------------------
-| Remove Using Product ID
+| Remove By Product ID
 |--------------------------------------------------------------------------
 */
 
-elseif ($productID > 0) {
+} elseif ($productID > 0) {
 
     $query = $conn->prepare("
 
@@ -73,16 +74,8 @@ elseif ($productID > 0) {
         $userID
     );
 
-}
 
-
-/*
-|--------------------------------------------------------------------------
-| Invalid Request
-|--------------------------------------------------------------------------
-*/
-
-else {
+} else {
 
     header(
         "Location: " .
