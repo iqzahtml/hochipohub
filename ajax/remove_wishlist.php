@@ -1,116 +1,107 @@
 <?php
 
-session_start();
+require_once "../config.php";
+require_once "../database/db.php";
+require_once "../includes/session.php";
+
+if (!isLoggedIn()) {
+
+    header("Location: " . BASE_URL . "index.php");
+    exit();
+
+}
+
+$userID = currentUserID();
+
+$wishlistID = isset($_GET['id'])
+    ? (int) $_GET['id']
+    : 0;
+
+$productID = isset($_GET['product_id'])
+    ? (int) $_GET['product_id']
+    : 0;
 
 
-require_once "database/db.php";
+/*
+|--------------------------------------------------------------------------
+| Remove Using Wishlist ID
+|--------------------------------------------------------------------------
+*/
 
+if ($wishlistID > 0) {
 
-header("Content-Type: application/json");
+    $query = $conn->prepare("
 
+        DELETE FROM wishlist
 
+        WHERE wishlist_id = ?
 
-if(!isset($_SESSION['user_id'])){
+        AND user_id = ?
 
+    ");
 
-echo json_encode([
-
-"status"=>"error",
-
-"message"=>"Login required"
-
-]);
-
-
-exit();
-
+    $query->bind_param(
+        "ii",
+        $wishlistID,
+        $userID
+    );
 
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Remove Using Product ID
+|--------------------------------------------------------------------------
+*/
 
-if(!isset($_POST['product_id'])){
+elseif ($productID > 0) {
 
+    $query = $conn->prepare("
 
-echo json_encode([
+        DELETE FROM wishlist
 
-"status"=>"error",
+        WHERE product_id = ?
 
-"message"=>"Product ID required"
+        AND user_id = ?
 
-]);
+    ");
 
-
-exit();
-
+    $query->bind_param(
+        "ii",
+        $productID,
+        $userID
+    );
 
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Invalid Request
+|--------------------------------------------------------------------------
+*/
 
-$user_id=$_SESSION['user_id'];
+else {
 
-$product_id=$_POST['product_id'];
+    header(
+        "Location: " .
+        BASE_URL .
+        "wishlist.php"
+    );
 
+    exit();
 
-
-$stmt=$conn->prepare("
-
-
-DELETE FROM wishlist
-
-
-WHERE user_id=?
-
-AND product_id=?
-
-
-
-");
+}
 
 
+$query->execute();
 
-$stmt->bind_param(
 
-"ii",
-
-$user_id,
-
-$product_id
-
+header(
+    "Location: " .
+    BASE_URL .
+    "wishlist.php"
 );
 
-
-
-if($stmt->execute()){
-
-
-
-echo json_encode([
-
-"status"=>"success",
-
-"message"=>"Removed from wishlist"
-
-]);
-
-
-
-}else{
-
-
-echo json_encode([
-
-"status"=>"error",
-
-"message"=>"Failed"
-
-]);
-
-
-
-}
-
-
-
-?>
+exit();
