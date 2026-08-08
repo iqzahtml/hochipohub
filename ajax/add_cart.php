@@ -5,65 +5,32 @@ require_once "../database/db.php";
 require_once "../includes/session.php";
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Login Check
-|--------------------------------------------------------------------------
-*/
-
 if (!isLoggedIn()) {
 
-    header(
-        "Location: " . BASE_URL . "index.php"
-    );
-
+    header("Location: " . BASE_URL . "index.php");
     exit();
 
 }
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Only POST
-|--------------------------------------------------------------------------
-*/
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-
-    header(
-        "Location: " . BASE_URL . "catalog.php"
-    );
-
-    exit();
-
-}
+$customerID =
+    (int) currentUserID();
 
 
+$productID =
+    (int) ($_POST['product_id'] ?? 0);
 
-$userID = currentUserID();
 
-$productID = isset($_POST['product_id'])
-    ? (int) $_POST['product_id']
-    : 0;
-
-$quantity = isset($_POST['quantity'])
-    ? (int) $_POST['quantity']
-    : 1;
-
+$quantity =
+    (int) ($_POST['quantity'] ?? 1);
 
 
 if ($productID <= 0) {
 
-    header(
-        "Location: " . BASE_URL . "catalog.php"
-    );
-
+    header("Location: " . BASE_URL . "catalog.php");
     exit();
 
 }
-
 
 
 if ($quantity < 1) {
@@ -73,16 +40,18 @@ if ($quantity < 1) {
 }
 
 
-
 /*
 |--------------------------------------------------------------------------
 | Check Product
 |--------------------------------------------------------------------------
 */
 
-$productQuery = $conn->prepare("
+$product = $conn->prepare("
 
-    SELECT product_id, status
+    SELECT
+        product_id,
+        stock_quantity,
+        status
 
     FROM products
 
@@ -92,21 +61,36 @@ $productQuery = $conn->prepare("
 
 ");
 
-$productQuery->bind_param(
+$product->bind_param(
     "i",
     $productID
 );
 
-$productQuery->execute();
+$product->execute();
 
-$productResult = $productQuery->get_result();
+$result =
+    $product->get_result();
 
 
+if ($result->num_rows === 0) {
 
-if ($productResult->num_rows === 0) {
+    header("Location: " . BASE_URL . "catalog.php");
+    exit();
+
+}
+
+
+$productData =
+    $result->fetch_assoc();
+
+
+if ($productData['status'] !== 'Available') {
 
     header(
-        "Location: " . BASE_URL . "catalog.php"
+        "Location: " .
+        BASE_URL .
+        "product_details.php?id=" .
+        $productID
     );
 
     exit();
@@ -114,37 +98,43 @@ if ($productResult->num_rows === 0) {
 }
 
 
+if ($quantity > (int)$productData['stock_quantity']) {
 
-$product = $productResult->fetch_assoc();
+    $quantity =
+        (int)$productData['stock_quantity'];
+
+}
 
 
-
-if (strtolower($product['status']) !== 'available') {
+if ($quantity <= 0) {
 
     header(
-        "Location: " . BASE_URL .
-        "product_details.php?id=" . $productID
+        "Location: " .
+        BASE_URL .
+        "product_details.php?id=" .
+        $productID
     );
 
     exit();
 
 }
-
 
 
 /*
 |--------------------------------------------------------------------------
-| Check Existing Cart Item
+| Check Existing Cart
 |--------------------------------------------------------------------------
 */
 
 $check = $conn->prepare("
 
-    SELECT cart_id, quantity
+    SELECT
+        cart_id,
+        quantity
 
     FROM cart
 
-    WHERE user_id = ?
+    WHERE customer_id = ?
 
     AND product_id = ?
 
@@ -154,23 +144,35 @@ $check = $conn->prepare("
 
 $check->bind_param(
     "ii",
-    $userID,
+    $customerID,
     $productID
 );
 
 $check->execute();
 
-$existing = $check->get_result();
-
+$existing =
+    $check->get_result();
 
 
 if ($existing->num_rows > 0) {
 
-    $cart = $existing->fetch_assoc();
+    $cart =
+        $existing->fetch_assoc();
+
 
     $newQuantity =
         (int)$cart['quantity'] + $quantity;
 
+
+    if (
+        $newQuantity >
+        (int)$productData['stock_quantity']
+    ) {
+
+        $newQuantity =
+            (int)$productData['stock_quantity'];
+
+    }
 
 
     $update = $conn->prepare("
@@ -181,53 +183,45 @@ if ($existing->num_rows > 0) {
 
         WHERE cart_id = ?
 
+        AND customer_id = ?
+
     ");
 
     $update->bind_param(
-        "ii",
+        "iii",
         $newQuantity,
-        $cart['cart_id']
+        $cart['cart_id'],
+        $customerID
     );
 
     $update->execute();
 
 
-
 } else {
 
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Add New Item
-    |--------------------------------------------------------------------------
-    */
 
     $insert = $conn->prepare("
 
         INSERT INTO cart
 
         (
-            user_id,
+            customer_id,
             product_id,
-            quantity,
-            created_at
+            quantity
         )
 
         VALUES
-
         (
             ?,
             ?,
-            ?,
-            NOW()
+            ?
         )
 
     ");
 
     $insert->bind_param(
         "iii",
-        $userID,
+        $customerID,
         $productID,
         $quantity
     );
@@ -237,15 +231,10 @@ if ($existing->num_rows > 0) {
 }
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Redirect
-|--------------------------------------------------------------------------
-*/
-
 header(
-    "Location: " . BASE_URL . "cart.php"
+    "Location: " .
+    BASE_URL .
+    "cart.php"
 );
 
 exit();
