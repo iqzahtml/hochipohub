@@ -6,19 +6,27 @@ require_once "../includes/session.php";
 require_once "../includes/functions.php";
 
 
-
 $pageTitle = "My Products";
 
 
+if (!isLoggedIn()) {
 
-requireRole('vendor');
+    header("Location: " . BASE_URL . "index.php");
+    exit();
+
+}
 
 
+if (currentUserRole() !== 'vendor') {
 
-$userID = currentUserID();
+    header("Location: " . BASE_URL . "index.php");
+    exit();
+
+}
 
 
-
+$userID =
+    (int) currentUserID();
 
 
 /*
@@ -39,16 +47,18 @@ $vendorQuery = $conn->prepare("
 
 ");
 
+
 $vendorQuery->bind_param(
     "i",
     $userID
 );
 
+
 $vendorQuery->execute();
+
 
 $vendorResult =
     $vendorQuery->get_result();
-
 
 
 if ($vendorResult->num_rows === 0) {
@@ -62,22 +72,17 @@ if ($vendorResult->num_rows === 0) {
 }
 
 
-
 $vendor =
     $vendorResult->fetch_assoc();
 
 
-
 $vendorID =
-    $vendor['vendor_id'];
-
-
-
+    (int) $vendor['vendor_id'];
 
 
 /*
 |--------------------------------------------------------------------------
-| Products
+| Get Products
 |--------------------------------------------------------------------------
 */
 
@@ -85,7 +90,14 @@ $query = $conn->prepare("
 
     SELECT
 
-        products.*,
+        products.product_id,
+        products.product_name,
+        products.description,
+        products.price,
+        products.stock_quantity,
+        products.image,
+        products.status,
+        products.created_at,
 
         categories.category_name
 
@@ -102,224 +114,160 @@ $query = $conn->prepare("
 
 ");
 
+
 $query->bind_param(
     "i",
     $vendorID
 );
 
+
 $query->execute();
+
 
 $products =
     $query->get_result();
-
-
 
 ?>
 
 <?php include "../includes/header.php"; ?>
 
-
-
 <section class="product-page">
 
+    <div class="page-title">
 
-<div class="page-title">
+        <div>
 
+            <h1>
+                My Products
+            </h1>
 
-<div>
+            <p>
+                Manage your HochipoHub products.
+            </p>
 
-<h1>
-My Products
-</h1>
+        </div>
 
-<p>
-Manage products sold through HochipoHub.
-</p>
 
-</div>
+        <a
+            href="add_product.php"
+            class="btn-primary"
+        >
+            + Add Product
+        </a>
 
+    </div>
 
 
-<a
-href="add_product.php"
-class="btn-primary"
->
+    <div class="product-grid">
 
-+ Add Product
+        <?php if ($products->num_rows > 0): ?>
 
-</a>
+            <?php while (
+                $product =
+                $products->fetch_assoc()
+            ): ?>
 
+                <div class="product-card">
 
-</div>
+                    <?php if (
+                        !empty($product['image'])
+                    ): ?>
 
+                        <img
+                            src="<?= BASE_URL; ?>uploads/products/<?= htmlspecialchars(
+                                $product['image']
+                            ); ?>"
+                            alt="<?= htmlspecialchars(
+                                $product['product_name']
+                            ); ?>"
+                        >
 
+                    <?php endif; ?>
 
 
+                    <h3>
+                        <?= htmlspecialchars(
+                            $product['product_name']
+                        ); ?>
+                    </h3>
 
-<div class="product-grid">
 
+                    <p>
+                        <?= htmlspecialchars(
+                            $product['category_name']
+                            ?? 'Uncategorized'
+                        ); ?>
+                    </p>
 
 
-<?php if ($products->num_rows > 0): ?>
+                    <p>
+                        RM <?= number_format(
+                            $product['price'],
+                            2
+                        ); ?>
+                    </p>
 
 
+                    <p>
+                        Stock:
+                        <?= (int)$product['stock_quantity']; ?>
+                    </p>
 
-<?php while ($product = $products->fetch_assoc()): ?>
 
+                    <p>
+                        Status:
+                        <?= htmlspecialchars(
+                            $product['status']
+                        ); ?>
+                    </p>
 
 
-<div class="product-card">
+                    <div class="product-actions">
 
+                        <a
+                            href="edit_product.php?id=<?= $product['product_id']; ?>"
+                        >
+                            Edit
+                        </a>
 
+                        <a
+                            href="delete_product.php?id=<?= $product['product_id']; ?>"
+                            onclick="return confirm('Delete this product?');"
+                        >
+                            Delete
+                        </a>
 
-<img
+                    </div>
 
-src="<?= productImage($product['image']); ?>"
+                </div>
 
-alt="<?= htmlspecialchars($product['product_name']); ?>"
+            <?php endwhile; ?>
 
->
+        <?php else: ?>
 
+            <div class="empty-product">
 
+                <h3>
+                    No Products Yet
+                </h3>
 
+                <p>
+                    Add your first product to start selling.
+                </p>
 
-<h3>
+                <a
+                    href="add_product.php"
+                    class="btn-primary"
+                >
+                    Add Product
+                </a>
 
-<?= htmlspecialchars(
-    $product['product_name']
-); ?>
+            </div>
 
-</h3>
+        <?php endif; ?>
 
-
-
-
-<p>
-
-<?= htmlspecialchars(
-    $product['category_name'] ?? 'Uncategorized'
-); ?>
-
-</p>
-
-
-
-
-<p>
-
-<?= price($product['price']); ?>
-
-</p>
-
-
-
-
-<p>
-
-Stock:
-
-<?= (int)$product['stock_quantity']; ?>
-
-</p>
-
-
-
-
-<p>
-
-Status:
-
-<?= htmlspecialchars(
-    $product['status']
-); ?>
-
-</p>
-
-
-
-
-
-<div class="product-actions">
-
-
-<a
-
-href="edit_product.php?id=<?= $product['product_id']; ?>"
-
->
-
-Edit
-
-</a>
-
-
-
-
-<a
-
-href="delete_product.php?id=<?= $product['product_id']; ?>"
-
-onclick="return confirm('Delete this product?');"
-
->
-
-Delete
-
-</a>
-
-
-</div>
-
-
-
-</div>
-
-
-
-<?php endwhile; ?>
-
-
-
-<?php else: ?>
-
-
-
-<div class="empty-product">
-
-
-<h3>
-No Products Yet
-</h3>
-
-
-<p>
-Start selling by adding your first product.
-</p>
-
-
-<a
-href="add_product.php"
-class="btn-primary"
->
-
-Add Product
-
-</a>
-
-
-</div>
-
-
-
-<?php endif; ?>
-
-
-
-</div>
-
+    </div>
 
 </section>
-
-
 
 <?php include "../includes/footer.php"; ?>
