@@ -4,6 +4,7 @@ require_once "../config.php";
 require_once "../database/db.php";
 require_once "../includes/session.php";
 
+
 if (!isLoggedIn()) {
 
     header("Location: " . BASE_URL . "index.php");
@@ -11,18 +12,14 @@ if (!isLoggedIn()) {
 
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
-    header("Location: " . BASE_URL . "catalog.php");
-    exit();
+$userID =
+    (int) currentUserID();
 
-}
 
-$userID = currentUserID();
+$productID =
+    (int) ($_POST['product_id'] ?? 0);
 
-$productID = isset($_POST['product_id'])
-    ? (int) $_POST['product_id']
-    : 0;
 
 if ($productID <= 0) {
 
@@ -38,7 +35,7 @@ if ($productID <= 0) {
 |--------------------------------------------------------------------------
 */
 
-$productQuery = $conn->prepare("
+$product = $conn->prepare("
 
     SELECT product_id
 
@@ -50,17 +47,17 @@ $productQuery = $conn->prepare("
 
 ");
 
-$productQuery->bind_param(
+$product->bind_param(
     "i",
     $productID
 );
 
-$productQuery->execute();
-
-$productResult = $productQuery->get_result();
+$product->execute();
 
 
-if ($productResult->num_rows === 0) {
+if (
+    $product->get_result()->num_rows === 0
+) {
 
     header("Location: " . BASE_URL . "catalog.php");
     exit();
@@ -70,72 +67,34 @@ if ($productResult->num_rows === 0) {
 
 /*
 |--------------------------------------------------------------------------
-| Check Existing Wishlist
+| Insert Wishlist
 |--------------------------------------------------------------------------
 */
 
-$check = $conn->prepare("
+$insert = $conn->prepare("
 
-    SELECT wishlist_id
+    INSERT IGNORE INTO wishlist
 
-    FROM wishlist
+    (
+        user_id,
+        product_id
+    )
 
-    WHERE user_id = ?
-
-    AND product_id = ?
-
-    LIMIT 1
+    VALUES
+    (
+        ?,
+        ?
+    )
 
 ");
 
-$check->bind_param(
+$insert->bind_param(
     "ii",
     $userID,
     $productID
 );
 
-$check->execute();
-
-$existing = $check->get_result();
-
-
-/*
-|--------------------------------------------------------------------------
-| Add If Not Existing
-|--------------------------------------------------------------------------
-*/
-
-if ($existing->num_rows === 0) {
-
-    $insert = $conn->prepare("
-
-        INSERT INTO wishlist
-
-        (
-            user_id,
-            product_id,
-            created_at
-        )
-
-        VALUES
-
-        (
-            ?,
-            ?,
-            NOW()
-        )
-
-    ");
-
-    $insert->bind_param(
-        "ii",
-        $userID,
-        $productID
-    );
-
-    $insert->execute();
-
-}
+$insert->execute();
 
 
 header(
