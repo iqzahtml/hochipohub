@@ -2,571 +2,1155 @@
 
 /*
 |--------------------------------------------------------------------------
-| HochipoHub Homepage
-|--------------------------------------------------------------------------
-|
-| Uses:
-| - products
-| - vendors
-| - categories
-|
+| HochipoHub - Homepage
 |--------------------------------------------------------------------------
 */
 
+require_once __DIR__ . '/config.php';
 
-require_once "config.php";
+require_once __DIR__ . '/database/db.php';
 
-require_once "database/db.php";
+require_once __DIR__ . '/includes/session.php';
 
-require_once "includes/functions.php";
-
-require_once "includes/session.php";
-
+require_once __DIR__ . '/includes/functions.php';
 
 
 /*
 |--------------------------------------------------------------------------
-| Page Title
+| PAGE SETTINGS
 |--------------------------------------------------------------------------
 */
 
-$pageTitle = "Home";
+$pageTitle =
+    'Home';
 
+$pageDescription =
+    'Discover local products, support local vendors and shop with HochipoHub.';
 
 
 /*
 |--------------------------------------------------------------------------
-| Get Categories
+| CATEGORIES
 |--------------------------------------------------------------------------
 */
 
+$categoryStmt = $pdo->query("
+    SELECT
+        category_id,
+        category_name,
+        category_image
 
-$categoryQuery = "
+    FROM categories
 
-SELECT *
+    ORDER BY category_name ASC
 
-FROM categories
+    LIMIT 6
+");
 
-ORDER BY created_at DESC
-
-LIMIT 6
-
-";
-
-
-$categories = $conn->query($categoryQuery);
-
-
+$categories =
+    $categoryStmt->fetchAll();
 
 
 /*
 |--------------------------------------------------------------------------
-| Get Latest Products
+| FEATURED PRODUCTS
 |--------------------------------------------------------------------------
 */
 
+$productStmt = $pdo->query("
+    SELECT
 
-$productQuery = "
+        p.product_id,
+        p.product_name,
+        p.description,
+        p.price,
+        p.stock_quantity,
+        p.image,
+        p.status,
+        p.created_at,
 
-SELECT
+        v.vendor_id,
+        v.business_name,
+        v.business_logo,
 
-products.*,
+        c.category_id,
+        c.category_name,
 
-vendors.business_name,
+        COALESCE(
+            AVG(
+                CASE
+                    WHEN r.status = 'Visible'
+                    THEN r.rating
+                END
+            ),
+            0
+        ) AS average_rating,
 
-categories.category_name
+        COUNT(
+            CASE
+                WHEN r.status = 'Visible'
+                THEN r.review_id
+            END
+        ) AS review_count
+
+    FROM products p
+
+    INNER JOIN vendors v
+        ON p.vendor_id = v.vendor_id
+
+    INNER JOIN categories c
+        ON p.category_id = c.category_id
+
+    LEFT JOIN reviews r
+        ON p.product_id = r.product_id
+
+    WHERE p.status = 'Available'
+
+    AND p.stock_quantity > 0
+
+    AND v.approval_status = 'Approved'
+
+    GROUP BY
+
+        p.product_id,
+        p.product_name,
+        p.description,
+        p.price,
+        p.stock_quantity,
+        p.image,
+        p.status,
+        p.created_at,
+
+        v.vendor_id,
+        v.business_name,
+        v.business_logo,
+
+        c.category_id,
+        c.category_name
+
+    ORDER BY p.created_at DESC
+
+    LIMIT 8
+");
+
+$featuredProducts =
+    $productStmt->fetchAll();
 
 
-FROM products
+/*
+|--------------------------------------------------------------------------
+| APPROVED VENDORS
+|--------------------------------------------------------------------------
+*/
+
+$vendorStmt = $pdo->query("
+    SELECT
+
+        v.vendor_id,
+        v.business_name,
+        v.business_logo,
+        v.business_description,
+        v.category,
+
+        COUNT(p.product_id) AS product_count
+
+    FROM vendors v
+
+    LEFT JOIN products p
+        ON v.vendor_id = p.vendor_id
+        AND p.status = 'Available'
+
+    WHERE v.approval_status = 'Approved'
+
+    GROUP BY
+
+        v.vendor_id,
+        v.business_name,
+        v.business_logo,
+        v.business_description,
+        v.category
+
+    ORDER BY v.created_at DESC
+
+    LIMIT 4
+");
+
+$featuredVendors =
+    $vendorStmt->fetchAll();
 
 
-INNER JOIN vendors
+/*
+|--------------------------------------------------------------------------
+| HEADER
+|--------------------------------------------------------------------------
+*/
 
-ON products.vendor_id = vendors.vendor_id
-
-
-
-INNER JOIN categories
-
-ON products.category_id = categories.category_id
-
-
-
-WHERE products.status = 'Available'
-
-
-ORDER BY products.created_at DESC
-
-
-LIMIT 8
-
-";
-
-
-
-$products = $conn->query($productQuery);
-
-
+require_once __DIR__ . '/includes/header.php';
 
 ?>
 
-
-<?php include "includes/header.php"; ?>
-
-
-
-
-
 <!-- =========================================================
-     HERO SECTION
+     HERO
 ========================================================= -->
-
 
 <section class="hero-section">
 
+    <div class="hero-background-shape shape-one"></div>
 
-<div class="hero-content">
-
-
-
-<h1>
-
-Discover Local Products
-
-</h1>
+    <div class="hero-background-shape shape-two"></div>
 
 
-
-<p>
-
-Support local vendors and discover unique products
-with HochipoHub.
-
-</p>
+    <div class="hero-container">
 
 
+        <!-- HERO CONTENT -->
 
-<div class="hero-buttons">
+        <div class="hero-content">
 
+            <div class="hero-badge">
 
-<a href="<?= BASE_URL; ?>catalog.php"
+                <i class="fa-solid fa-sparkles"></i>
 
-class="btn-primary">
+                <span>
+                    Malaysia's Local Marketplace
+                </span>
 
-Shop Now
-
-</a>
-
-
-
-<a href="<?= BASE_URL; ?>vendor.php"
-
-class="btn-secondary">
-
-Explore Vendors
-
-</a>
+            </div>
 
 
-</div>
+            <h1 class="hero-title">
+
+                Discover.
+
+                <span>
+                    Shop.
+                </span>
+
+                Support Local.
+
+            </h1>
 
 
+            <p class="hero-description">
 
-</div>
+                Your one-stop marketplace to discover
+                amazing products from local vendors
+                around Malaysia.
 
-
-
-
-
-<div class="hero-image">
-
-
-<img
-
-src="<?= BANNER_URL; ?>"
-
-alt="HochipoHub Banner"
-
->
+            </p>
 
 
-</div>
+            <div class="hero-actions">
+
+                <a
+                    href="<?php echo BASE_URL; ?>catalog.php"
+                    class="btn btn-primary btn-large"
+                >
+
+                    <span>
+                        Explore Products
+                    </span>
+
+                    <i class="fa-solid fa-arrow-right"></i>
+
+                </a>
 
 
+                <a
+                    href="<?php echo BASE_URL; ?>vendor.php"
+                    class="btn btn-outline btn-large"
+                >
+
+                    <i class="fa-solid fa-store"></i>
+
+                    <span>
+                        Meet Our Vendors
+                    </span>
+
+                </a>
+
+            </div>
+
+
+            <!-- HERO STATS -->
+
+            <div class="hero-stats">
+
+                <div class="hero-stat">
+
+                    <strong>
+                        <?php echo count($featuredProducts); ?>+
+                    </strong>
+
+                    <span>
+                        Products
+                    </span>
+
+                </div>
+
+
+                <div class="hero-stat-divider"></div>
+
+
+                <div class="hero-stat">
+
+                    <strong>
+                        <?php echo count($featuredVendors); ?>+
+                    </strong>
+
+                    <span>
+                        Local Vendors
+                    </span>
+
+                </div>
+
+
+                <div class="hero-stat-divider"></div>
+
+
+                <div class="hero-stat">
+
+                    <strong>
+                        100%
+                    </strong>
+
+                    <span>
+                        Local Love
+                    </span>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- HERO VISUAL -->
+
+        <div class="hero-visual">
+
+            <div class="hero-card hero-card-main">
+
+                <div class="hero-card-image">
+
+                    <img
+                        src="<?php echo BASE_URL; ?>image/banner.jpg"
+                        alt="HochipoHub"
+                    >
+
+                </div>
+
+
+                <div class="hero-card-content">
+
+                    <span class="hero-card-label">
+                        TRENDING NOW
+                    </span>
+
+                    <h3>
+                        Shop Local,
+                        Shop Different.
+                    </h3>
+
+                    <a
+                        href="<?php echo BASE_URL; ?>catalog.php"
+                    >
+
+                        Discover Now
+
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <div class="floating-card floating-card-one">
+
+                <div class="floating-icon">
+
+                    <i class="fa-solid fa-heart"></i>
+
+                </div>
+
+                <div>
+
+                    <strong>
+                        Local Love
+                    </strong>
+
+                    <span>
+                        Support small businesses
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="floating-card floating-card-two">
+
+                <div class="floating-icon">
+
+                    <i class="fa-solid fa-bolt"></i>
+
+                </div>
+
+                <div>
+
+                    <strong>
+                        Fresh Finds
+                    </strong>
+
+                    <span>
+                        Discover something new
+                    </span>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
 
 </section>
-
-
-
-
-
-
 
 
 <!-- =========================================================
      CATEGORY SECTION
 ========================================================= -->
 
+<section class="home-section categories-section">
 
-<section class="category-section">
+    <div class="section-container">
 
 
-<div class="section-header">
+        <div class="section-heading">
 
+            <div>
 
-<h2>
+                <span class="section-kicker">
+                    EXPLORE
+                </span>
 
-Explore Categories
+                <h2>
+                    Shop by Category
+                </h2>
 
-</h2>
+                <p>
+                    Find exactly what you're looking for.
+                </p>
 
+            </div>
 
 
-<a href="<?= BASE_URL; ?>catalog.php">
+            <a
+                href="<?php echo BASE_URL; ?>catalog.php"
+                class="section-link"
+            >
 
-View All
+                View All
 
-</a>
+                <i class="fa-solid fa-arrow-right"></i>
 
+            </a>
 
-</div>
+        </div>
 
 
+        <?php if (!empty($categories)): ?>
 
+            <div class="category-grid">
 
+                <?php foreach ($categories as $category): ?>
 
-<div class="category-grid">
+                    <a
+                        href="<?php echo BASE_URL; ?>category.php?id=<?php echo (int) $category['category_id']; ?>"
+                        class="category-card"
+                    >
 
+                        <div class="category-image">
 
+                            <?php if (
+                                !empty(
+                                    $category['category_image']
+                                )
+                            ): ?>
 
-<?php if($categories && $categories->num_rows > 0): ?>
+                                <img
+                                    src="<?php echo BASE_URL; ?>image/<?php echo e($category['category_image']); ?>"
+                                    alt="<?php echo e($category['category_name']); ?>"
+                                >
 
+                            <?php else: ?>
 
+                                <div class="category-placeholder">
 
-<?php while($category = $categories->fetch_assoc()): ?>
+                                    <i class="fa-solid fa-layer-group"></i>
 
+                                </div>
 
+                            <?php endif; ?>
 
-<div class="category-card">
+                        </div>
 
 
+                        <div class="category-content">
 
-<a href="<?= BASE_URL; ?>category.php?id=<?= $category['category_id']; ?>">
+                            <h3>
+                                <?php echo e(
+                                    $category['category_name']
+                                ); ?>
+                            </h3>
 
+                            <span>
 
+                                Explore
 
+                                <i class="fa-solid fa-arrow-right"></i>
 
+                            </span>
 
-<?php if(!empty($category['category_image'])): ?>
+                        </div>
 
+                    </a>
 
-<img
+                <?php endforeach; ?>
 
-src="<?= BASE_URL; ?>uploads/categories/<?= htmlspecialchars($category['category_image']); ?>"
+            </div>
 
-alt="<?= htmlspecialchars($category['category_name']); ?>"
+        <?php else: ?>
 
->
+            <div class="empty-state">
 
+                <i class="fa-solid fa-box-open"></i>
 
-<?php else: ?>
+                <h3>
+                    No categories yet
+                </h3>
 
+                <p>
+                    Categories will appear here once they are added.
+                </p>
 
-<img
+            </div>
 
-src="<?= IMAGE_URL; ?>logo.jpg"
+        <?php endif; ?>
 
-alt="Category"
-
->
-
-
-<?php endif; ?>
-
-
-
-
-
-<h3>
-
-<?= htmlspecialchars($category['category_name']); ?>
-
-</h3>
-
-
-
-</a>
-
-
-
-</div>
-
-
-
-
-<?php endwhile; ?>
-
-
-
-<?php endif; ?>
-
-
-
-</div>
-
+    </div>
 
 </section>
-
-
-
-
-
-
-
 
 
 <!-- =========================================================
-     PRODUCT SECTION
+     FEATURED PRODUCTS
 ========================================================= -->
 
+<section class="home-section products-section">
 
-<section class="product-section">
+    <div class="section-container">
 
 
+        <div class="section-heading">
 
-<div class="section-header">
+            <div>
 
+                <span class="section-kicker">
+                    FRESH FINDS
+                </span>
 
-<h2>
+                <h2>
+                    Latest Products
+                </h2>
 
-Latest Products
+                <p>
+                    Fresh products from our local vendors.
+                </p>
 
-</h2>
+            </div>
 
 
+            <a
+                href="<?php echo BASE_URL; ?>catalog.php"
+                class="section-link"
+            >
 
-<a href="<?= BASE_URL; ?>catalog.php">
+                Browse All
 
-View All
+                <i class="fa-solid fa-arrow-right"></i>
 
-</a>
+            </a>
 
+        </div>
 
-</div>
 
+        <?php if (!empty($featuredProducts)): ?>
 
+            <div class="product-grid">
 
+                <?php foreach (
+                    $featuredProducts
+                    as $product
+                ): ?>
 
+                    <article class="product-card">
 
 
+                        <!-- PRODUCT IMAGE -->
 
+                        <div class="product-card-image">
 
-<div class="product-grid">
+                            <a
+                                href="<?php echo BASE_URL; ?>product_details.php?id=<?php echo (int) $product['product_id']; ?>"
+                            >
 
+                                <?php if (
+                                    !empty(
+                                        $product['image']
+                                    )
+                                ): ?>
 
+                                    <img
+                                        src="<?php echo productImageUrl($product['image']); ?>"
+                                        alt="<?php echo e($product['product_name']); ?>"
+                                        loading="lazy"
+                                    >
 
+                                <?php else: ?>
 
+                                    <div class="product-placeholder">
 
-<?php if($products && $products->num_rows > 0): ?>
+                                        <i class="fa-solid fa-image"></i>
 
+                                    </div>
 
+                                <?php endif; ?>
 
-<?php while($product = $products->fetch_assoc()): ?>
+                            </a>
 
 
+                            <!-- WISHLIST -->
 
-<div class="product-card">
+                            <?php if (
+                                isLoggedIn()
+                                &&
+                                currentUserRole()
+                                    === 'customer'
+                            ): ?>
 
+                                <button
+                                    type="button"
+                                    class="product-wishlist-btn"
+                                    data-product-id="<?php echo (int) $product['product_id']; ?>"
+                                    title="Add to wishlist"
+                                >
 
+                                    <i class="fa-regular fa-heart"></i>
 
+                                </button>
 
+                            <?php endif; ?>
 
 
-<div class="product-image">
+                            <!-- CATEGORY -->
 
+                            <span class="product-category-badge">
 
+                                <?php echo e(
+                                    $product['category_name']
+                                ); ?>
 
-<img
+                            </span>
 
-src="<?= productImage($product['image']); ?>"
+                        </div>
 
-alt="<?= htmlspecialchars($product['product_name']); ?>"
 
->
+                        <!-- PRODUCT INFO -->
 
+                        <div class="product-card-content">
 
-</div>
 
+                            <div class="product-vendor">
 
+                                <i class="fa-solid fa-store"></i>
 
+                                <?php echo e(
+                                    $product['business_name']
+                                ); ?>
 
+                            </div>
 
 
+                            <h3 class="product-title">
 
+                                <a
+                                    href="<?php echo BASE_URL; ?>product_details.php?id=<?php echo (int) $product['product_id']; ?>"
+                                >
 
-<div class="product-info">
+                                    <?php echo e(
+                                        $product['product_name']
+                                    ); ?>
 
+                                </a>
 
+                            </h3>
 
-<span class="product-category">
 
-<?= htmlspecialchars($product['category_name']); ?>
+                            <!-- RATING -->
 
-</span>
+                            <div class="product-rating">
 
+                                <span class="stars">
 
+                                    <?php
 
+                                    $rating =
+                                        round(
+                                            (float)
+                                            $product['average_rating']
+                                        );
 
-<h3>
+                                    for (
+                                        $i = 1;
+                                        $i <= 5;
+                                        $i++
+                                    ):
 
+                                    ?>
 
-<?= htmlspecialchars($product['product_name']); ?>
+                                        <?php if (
+                                            $i <= $rating
+                                        ): ?>
 
+                                            <i class="fa-solid fa-star"></i>
 
-</h3>
+                                        <?php else: ?>
 
+                                            <i class="fa-regular fa-star"></i>
 
+                                        <?php endif; ?>
 
+                                    <?php endfor; ?>
 
+                                </span>
 
-<p class="vendor-name">
 
+                                <span class="rating-count">
 
-<i class="fa-solid fa-store"></i>
+                                    (
+                                    <?php echo (int) $product['review_count']; ?>
+                                    )
 
+                                </span>
 
-<?= htmlspecialchars($product['business_name']); ?>
+                            </div>
 
 
-</p>
+                            <!-- PRICE -->
 
+                            <div class="product-card-bottom">
 
+                                <div class="product-price">
 
+                                    <?php echo formatMoney(
+                                        (float) $product['price']
+                                    ); ?>
 
+                                </div>
 
 
-<p class="product-price">
+                                <a
+                                    href="<?php echo BASE_URL; ?>product_details.php?id=<?php echo (int) $product['product_id']; ?>"
+                                    class="product-view-btn"
+                                    title="View product"
+                                >
 
+                                    <i class="fa-solid fa-arrow-right"></i>
 
-<?= price($product['price']); ?>
+                                </a>
 
+                            </div>
 
-</p>
+                        </div>
 
+                    </article>
 
+                <?php endforeach; ?>
 
+            </div>
 
 
+        <?php else: ?>
 
-<a
+            <div class="empty-state">
 
-href="<?= BASE_URL; ?>product_details.php?id=<?= $product['product_id']; ?>"
+                <div class="empty-icon">
 
-class="view-product-btn"
+                    <i class="fa-solid fa-box-open"></i>
 
->
+                </div>
 
+                <h3>
+                    No products available yet
+                </h3>
 
-View Product
+                <p>
+                    Our vendors haven't added their products yet.
+                </p>
 
+                <a
+                    href="<?php echo BASE_URL; ?>vendor.php"
+                    class="btn btn-primary"
+                >
 
-</a>
+                    Meet Our Vendors
 
+                </a>
 
+            </div>
 
+        <?php endif; ?>
 
-
-</div>
-
-
-
-</div>
-
-
-
-
-<?php endwhile; ?>
-
-
-
-<?php else: ?>
-
-
-
-<div class="empty-product">
-
-
-<p>
-
-No products available yet.
-
-</p>
-
-
-</div>
-
-
-
-<?php endif; ?>
-
-
-
-
-
-</div>
-
+    </div>
 
 </section>
-
-
-
-
-
-
-
 
 
 <!-- =========================================================
-     CTA SECTION
+     VENDOR SECTION
 ========================================================= -->
 
+<section class="home-section vendors-section">
 
-<section class="cta-section">
-
-
-<h2>
-
-Want to become a vendor?
-
-</h2>
+    <div class="section-container">
 
 
+        <div class="section-heading">
 
-<p>
+            <div>
 
-Sell your products and grow your business with HochipoHub.
+                <span class="section-kicker">
+                    OUR COMMUNITY
+                </span>
 
-</p>
+                <h2>
+                    Meet Local Vendors
+                </h2>
 
+                <p>
+                    Behind every product is a local entrepreneur.
+                </p>
 
-
-<a href="<?= BASE_URL; ?>vendor.php"
-
-class="btn-primary">
-
-
-Become Vendor
-
-
-</a>
+            </div>
 
 
+            <a
+                href="<?php echo BASE_URL; ?>vendor.php"
+                class="section-link"
+            >
+
+                View Vendors
+
+                <i class="fa-solid fa-arrow-right"></i>
+
+            </a>
+
+        </div>
+
+
+        <?php if (!empty($featuredVendors)): ?>
+
+            <div class="vendor-grid">
+
+                <?php foreach (
+                    $featuredVendors
+                    as $vendor
+                ): ?>
+
+                    <a
+                        href="<?php echo BASE_URL; ?>vendor.php?id=<?php echo (int) $vendor['vendor_id']; ?>"
+                        class="vendor-card"
+                    >
+
+                        <div class="vendor-card-logo">
+
+                            <?php if (
+                                !empty(
+                                    $vendor['business_logo']
+                                )
+                            ): ?>
+
+                                <img
+                                    src="<?php echo vendorLogoUrl($vendor['business_logo']); ?>"
+                                    alt="<?php echo e($vendor['business_name']); ?>"
+                                    loading="lazy"
+                                >
+
+                            <?php else: ?>
+
+                                <div class="vendor-logo-placeholder">
+
+                                    <i class="fa-solid fa-store"></i>
+
+                                </div>
+
+                            <?php endif; ?>
+
+                        </div>
+
+
+                        <div class="vendor-card-content">
+
+                            <h3>
+
+                                <?php echo e(
+                                    $vendor['business_name']
+                                ); ?>
+
+                            </h3>
+
+
+                            <?php if (
+                                !empty(
+                                    $vendor['category']
+                                )
+                            ): ?>
+
+                                <span class="vendor-category">
+
+                                    <?php echo e(
+                                        $vendor['category']
+                                    ); ?>
+
+                                </span>
+
+                            <?php endif; ?>
+
+
+                            <p>
+
+                                <?php
+
+                                $description =
+                                    trim(
+                                        $vendor[
+                                            'business_description'
+                                        ] ?? ''
+                                    );
+
+                                if (
+                                    $description === ''
+                                ) {
+
+                                    $description =
+                                        'Local vendor on HochipoHub.';
+                                }
+
+                                echo e(
+                                    mb_strimwidth(
+                                        $description,
+                                        0,
+                                        90,
+                                        '...'
+                                    )
+                                );
+
+                                ?>
+
+                            </p>
+
+
+                            <div class="vendor-card-footer">
+
+                                <span>
+
+                                    <?php echo (int) $vendor['product_count']; ?>
+
+                                    Products
+
+                                </span>
+
+
+                                <i class="fa-solid fa-arrow-right"></i>
+
+                            </div>
+
+                        </div>
+
+                    </a>
+
+                <?php endforeach; ?>
+
+            </div>
+
+        <?php endif; ?>
+
+    </div>
 
 </section>
 
 
+<!-- =========================================================
+     CTA
+========================================================= -->
+
+<section class="home-cta-section">
+
+    <div class="section-container">
+
+        <div class="home-cta">
 
 
+            <div class="cta-decoration cta-decoration-one"></div>
+
+            <div class="cta-decoration cta-decoration-two"></div>
 
 
-<?php include "includes/footer.php"; ?>
+            <div class="cta-content">
+
+                <span class="section-kicker">
+                    JOIN HOCHIPOHUB
+                </span>
+
+                <h2>
+                    Got something
+                    amazing to sell?
+                </h2>
+
+                <p>
+
+                    Turn your passion into a business
+                    and reach more customers through
+                    HochipoHub.
+
+                </p>
+
+
+                <div class="cta-actions">
+
+                    <?php if (
+                        isLoggedIn()
+                    ): ?>
+
+                        <?php if (
+                            currentUserRole()
+                                === 'vendor'
+                        ): ?>
+
+                            <a
+                                href="<?php echo BASE_URL; ?>dashboard.php"
+                                class="btn btn-white"
+                            >
+
+                                Go to Dashboard
+
+                                <i class="fa-solid fa-arrow-right"></i>
+
+                            </a>
+
+                        <?php else: ?>
+
+                            <a
+                                href="<?php echo BASE_URL; ?>profile.php"
+                                class="btn btn-white"
+                            >
+
+                                Become a Vendor
+
+                                <i class="fa-solid fa-arrow-right"></i>
+
+                            </a>
+
+                        <?php endif; ?>
+
+                    <?php else: ?>
+
+                        <button
+                            type="button"
+                            class="btn btn-white"
+                            id="openRegisterModalCta"
+                        >
+
+                            Join HochipoHub
+
+                            <i class="fa-solid fa-arrow-right"></i>
+
+                        </button>
+
+                    <?php endif; ?>
+
+                </div>
+
+            </div>
+
+
+            <div class="cta-visual">
+
+                <div class="cta-icon">
+
+                    <i class="fa-solid fa-store"></i>
+
+                </div>
+
+                <div class="cta-icon-small icon-one">
+
+                    <i class="fa-solid fa-heart"></i>
+
+                </div>
+
+                <div class="cta-icon-small icon-two">
+
+                    <i class="fa-solid fa-box"></i>
+
+                </div>
+
+                <div class="cta-icon-small icon-three">
+
+                    <i class="fa-solid fa-star"></i>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| LOGIN MODAL
+|--------------------------------------------------------------------------
+*/
+
+require_once __DIR__ .
+    '/includes/login_modal.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| REGISTER MODAL
+|--------------------------------------------------------------------------
+*/
+
+require_once __DIR__ .
+    '/includes/register_modal.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| FOOTER
+|--------------------------------------------------------------------------
+*/
+
+require_once __DIR__ .
+    '/includes/footer.php';
+
+?>
