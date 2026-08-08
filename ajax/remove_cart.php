@@ -1,58 +1,77 @@
 <?php
 
-session_start();
-
-require_once "database/db.php";
-
-
-header("Content-Type: application/json");
+require_once "../config.php";
+require_once "../database/db.php";
+require_once "../includes/session.php";
 
 
-if(!isset($_SESSION['user_id'])){
 
-exit();
+/*
+|--------------------------------------------------------------------------
+| Login Check
+|--------------------------------------------------------------------------
+*/
+
+if (!isLoggedIn()) {
+
+    header(
+        "Location: " . BASE_URL . "index.php"
+    );
+
+    exit();
 
 }
 
 
-$user_id=$_SESSION['user_id'];
 
-$cart_id=$_POST['cart_id'];
+$userID = currentUserID();
+
+$cartID = isset($_GET['id'])
+    ? (int) $_GET['id']
+    : 0;
 
 
 
-$stmt=$conn->prepare("
+if ($cartID <= 0) {
 
-DELETE FROM cart
+    header(
+        "Location: " . BASE_URL . "cart.php"
+    );
 
-WHERE cart_id=?
+    exit();
 
-AND customer_id=?
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Delete Only User's Own Cart Item
+|--------------------------------------------------------------------------
+*/
+
+$query = $conn->prepare("
+
+    DELETE FROM cart
+
+    WHERE cart_id = ?
+
+    AND user_id = ?
 
 ");
 
-
-$stmt->bind_param(
-
-"ii",
-
-$cart_id,
-
-$user_id
-
+$query->bind_param(
+    "ii",
+    $cartID,
+    $userID
 );
 
-
-
-$stmt->execute();
+$query->execute();
 
 
 
-echo json_encode([
+header(
+    "Location: " . BASE_URL . "cart.php"
+);
 
-"status"=>"success"
-
-]);
-
-
-?>
+exit();
