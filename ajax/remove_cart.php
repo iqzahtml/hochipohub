@@ -5,73 +5,55 @@ require_once "../database/db.php";
 require_once "../includes/session.php";
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Login Check
-|--------------------------------------------------------------------------
-*/
-
 if (!isLoggedIn()) {
 
-    header(
-        "Location: " . BASE_URL . "index.php"
-    );
-
+    header("Location: " . BASE_URL . "index.php");
     exit();
 
 }
 
 
+$customerID =
+    (int) currentUserID();
 
-$userID = currentUserID();
 
-$cartID = isset($_GET['id'])
-    ? (int) $_GET['id']
-    : 0;
-
+$cartID =
+    (int) ($_GET['id'] ?? 0);
 
 
 if ($cartID <= 0) {
 
-    header(
-        "Location: " . BASE_URL . "cart.php"
-    );
-
+    header("Location: " . BASE_URL . "cart.php");
     exit();
 
 }
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Delete Only User's Own Cart Item
-|--------------------------------------------------------------------------
-*/
-
-$query = $conn->prepare("
+$delete = $conn->prepare("
 
     DELETE FROM cart
 
     WHERE cart_id = ?
 
-    AND user_id = ?
+    AND customer_id = ?
 
 ");
 
-$query->bind_param(
+
+$delete->bind_param(
     "ii",
     $cartID,
-    $userID
+    $customerID
 );
 
-$query->execute();
 
+$delete->execute();
 
 
 header(
-    "Location: " . BASE_URL . "cart.php"
+    "Location: " .
+    BASE_URL .
+    "cart.php"
 );
 
 exit();
