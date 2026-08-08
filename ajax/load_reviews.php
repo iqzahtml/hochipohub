@@ -3,13 +3,17 @@
 require_once "../config.php";
 require_once "../database/db.php";
 
-$productID = isset($_GET['product_id'])
-    ? (int) $_GET['product_id']
-    : 0;
+
+$productID =
+    (int) ($_GET['product_id'] ?? 0);
+
+
+header(
+    'Content-Type: application/json'
+);
+
 
 if ($productID <= 0) {
-
-    header('Content-Type: application/json');
 
     echo json_encode([
         'success' => false,
@@ -27,6 +31,7 @@ $query = $conn->prepare("
         reviews.review_id,
         reviews.rating,
         reviews.review,
+        reviews.image,
         reviews.review_date,
 
         users.name
@@ -35,7 +40,8 @@ $query = $conn->prepare("
 
     INNER JOIN users
 
-        ON reviews.customer_id = users.user_id
+        ON reviews.customer_id =
+           users.user_id
 
     WHERE reviews.product_id = ?
 
@@ -51,26 +57,23 @@ $query->bind_param(
     $productID
 );
 
-
 $query->execute();
 
 
-$result = $query->get_result();
+$result =
+    $query->get_result();
 
 
 $reviews = [];
 
 
-while ($row = $result->fetch_assoc()) {
+while (
+    $row = $result->fetch_assoc()
+) {
 
     $reviews[] = $row;
 
 }
-
-
-header(
-    'Content-Type: application/json'
-);
 
 
 echo json_encode([
