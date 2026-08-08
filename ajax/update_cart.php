@@ -1,101 +1,110 @@
 <?php
 
-session_start();
-
-require_once "database/db.php";
-
-
-header("Content-Type: application/json");
+require_once "../config.php";
+require_once "../database/db.php";
+require_once "../includes/session.php";
 
 
-if(!isset($_SESSION['user_id'])){
+
+/*
+|--------------------------------------------------------------------------
+| Login Check
+|--------------------------------------------------------------------------
+*/
+
+if (!isLoggedIn()) {
+
+    header(
+        "Location: " . BASE_URL . "index.php"
+    );
+
+    exit();
+
+}
+
+
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+
+    header(
+        "Location: " . BASE_URL . "cart.php"
+    );
+
+    exit();
+
+}
+
+
+
+$userID = currentUserID();
+
+$cartID = isset($_POST['cart_id'])
+    ? (int) $_POST['cart_id']
+    : 0;
+
+$quantity = isset($_POST['quantity'])
+    ? (int) $_POST['quantity']
+    : 1;
+
+
+
+if ($cartID <= 0) {
+
+    header(
+        "Location: " . BASE_URL . "cart.php"
+    );
+
+    exit();
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Quantity Validation
+|--------------------------------------------------------------------------
+*/
+
+if ($quantity < 1) {
+
+    $quantity = 1;
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Update Only User's Own Cart
+|--------------------------------------------------------------------------
+*/
+
+$query = $conn->prepare("
+
+    UPDATE cart
+
+    SET quantity = ?
+
+    WHERE cart_id = ?
+
+    AND user_id = ?
+
+");
+
+$query->bind_param(
+    "iii",
+    $quantity,
+    $cartID,
+    $userID
+);
+
+$query->execute();
+
+
+
+header(
+    "Location: " . BASE_URL . "cart.php"
+);
 
 exit();
-
-}
-
-
-
-$user_id=$_SESSION['user_id'];
-
-$cart_id=$_POST['cart_id'];
-
-$quantity=$_POST['quantity'];
-
-
-
-if($quantity <=0){
-
-$delete=$conn->prepare("
-
-DELETE FROM cart
-
-WHERE cart_id=?
-
-AND customer_id=?
-
-");
-
-
-$delete->bind_param(
-
-"ii",
-
-$cart_id,
-
-$user_id
-
-);
-
-
-$delete->execute();
-
-
-
-}
-
-else{
-
-
-$update=$conn->prepare("
-
-UPDATE cart
-
-SET quantity=?
-
-WHERE cart_id=?
-
-AND customer_id=?
-
-");
-
-
-$update->bind_param(
-
-"iii",
-
-$quantity,
-
-$cart_id,
-
-$user_id
-
-);
-
-
-$update->execute();
-
-
-
-}
-
-
-
-echo json_encode([
-
-"status"=>"success"
-
-]);
-
-
-?>
