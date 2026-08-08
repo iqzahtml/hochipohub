@@ -1,142 +1,308 @@
-<div 
-id="loginModal"
-class="modal"
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| HochipoHub - Login Modal
+|--------------------------------------------------------------------------
+*/
+
+if (!defined('BASE_URL')) {
+    require_once dirname(__DIR__) . '/config.php';
+}
+
+?>
+
+<!-- =========================================================
+     LOGIN MODAL
+========================================================= -->
+
+<div
+    class="modal-overlay"
+    id="loginModal"
+    aria-hidden="true"
 >
 
+    <div
+        class="modal-container login-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="loginModalTitle"
+    >
 
 
-<div class="modal-content">
+        <!-- =================================================
+             CLOSE BUTTON
+        ================================================== -->
 
+        <button
+            type="button"
+            class="modal-close"
+            data-modal-close="loginModal"
+            aria-label="Close login"
+        >
 
+            <i class="fa-solid fa-xmark"></i>
 
-<span 
-class="close-modal"
-onclick="closeLoginModal()"
->
+        </button>
 
-&times;
 
-</span>
+        <!-- =================================================
+             LOGIN HEADER
+        ================================================== -->
 
+        <div class="modal-header">
 
+            <div class="modal-icon">
 
-<h2>
+                <i class="fa-solid fa-right-to-bracket"></i>
 
-Login
+            </div>
 
-</h2>
 
+            <div>
 
+                <h2 id="loginModalTitle">
+                    Welcome Back!
+                </h2>
 
+                <p>
+                    Login to continue your HochipoHub journey.
+                </p>
 
-<form action="<?= BASE_URL; ?>auth/login_process.php" method="POST">
+            </div>
 
+        </div>
 
 
-<div class="form-group">
+        <!-- =================================================
+             LOGIN FORM
+        ================================================== -->
 
+        <form
+            action="<?php echo BASE_URL; ?>auth/login_process.php"
+            method="POST"
+            id="loginForm"
+            class="auth-form"
+            novalidate
+        >
 
-<label>
 
-Email
+            <!-- CSRF -->
 
-</label>
+            <?php if (
+                function_exists('csrfToken')
+            ): ?>
 
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="<?php echo htmlspecialchars(
+                        csrfToken(),
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ); ?>"
+                >
 
-<input
+            <?php endif; ?>
 
-type="email"
 
-name="email"
+            <!-- =================================================
+                 EMAIL
+            ================================================== -->
 
-required
+            <div class="form-group">
 
->
+                <label
+                    for="loginEmail"
+                >
 
+                    <i class="fa-solid fa-envelope"></i>
 
-</div>
+                    Email Address
 
+                </label>
 
 
+                <div class="input-wrapper">
 
+                    <i class="fa-regular fa-envelope input-icon"></i>
 
+                    <input
+                        type="email"
+                        id="loginEmail"
+                        name="email"
+                        placeholder="Enter your email"
+                        autocomplete="email"
+                        required
+                    >
 
-<div class="form-group">
+                </div>
 
 
-<label>
+                <small
+                    class="form-error"
+                    id="loginEmailError"
+                ></small>
 
-Password
+            </div>
 
-</label>
 
+            <!-- =================================================
+                 PASSWORD
+            ================================================== -->
 
-<input
+            <div class="form-group">
 
-type="password"
+                <div class="form-label-row">
 
-name="password"
+                    <label
+                        for="loginPassword"
+                    >
 
-required
+                        <i class="fa-solid fa-lock"></i>
 
->
+                        Password
 
+                    </label>
 
-</div>
 
+                    <a
+                        href="<?php echo BASE_URL; ?>auth/forgot_password.php"
+                        class="forgot-password-link"
+                    >
+                        Forgot password?
+                    </a>
 
+                </div>
 
 
+                <div class="input-wrapper">
 
+                    <i class="fa-solid fa-lock input-icon"></i>
 
-<button 
-type="submit"
-class="btn-primary"
->
 
-Login
+                    <input
+                        type="password"
+                        id="loginPassword"
+                        name="password"
+                        placeholder="Enter your password"
+                        autocomplete="current-password"
+                        required
+                    >
 
-</button>
 
+                    <button
+                        type="button"
+                        class="password-toggle"
+                        data-password-toggle="loginPassword"
+                        aria-label="Show password"
+                    >
 
+                        <i class="fa-regular fa-eye"></i>
 
+                    </button>
 
-</form>
+                </div>
 
 
+                <small
+                    class="form-error"
+                    id="loginPasswordError"
+                ></small>
 
+            </div>
 
-<p>
 
+            <!-- =================================================
+                 REMEMBER ME
+            ================================================== -->
 
-Don't have account?
+            <div class="form-options">
 
+                <label
+                    class="checkbox-label"
+                >
 
-<button 
-onclick="openRegisterModal()"
-class="link-button"
->
+                    <input
+                        type="checkbox"
+                        name="remember"
+                        value="1"
+                    >
 
-Register
+                    <span class="custom-checkbox"></span>
 
-</button>
+                    <span>
+                        Remember me
+                    </span>
 
+                </label>
 
-</p>
+            </div>
 
 
+            <!-- =================================================
+                 SUBMIT
+            ================================================== -->
 
+            <button
+                type="submit"
+                class="auth-submit-btn"
+                id="loginSubmitBtn"
+            >
 
-<a href="<?= BASE_URL; ?>auth/forgot_password.php">
+                <span class="btn-text">
+                    Login
+                </span>
 
-Forgot Password?
+                <span
+                    class="btn-loading"
+                    hidden
+                >
 
-</a>
+                    <i class="fa-solid fa-spinner fa-spin"></i>
 
+                    Signing in...
 
+                </span>
 
-</div>
+            </button>
 
 
+            <!-- =================================================
+                 REGISTER LINK
+            ================================================== -->
+
+            <div class="auth-switch">
+
+                <span>
+                    Don't have an account?
+                </span>
+
+                <button
+                    type="button"
+                    class="auth-switch-btn"
+                    data-modal-open="registerModal"
+                    data-modal-close="loginModal"
+                >
+                    Create one
+                </button>
+
+            </div>
+
+        </form>
+
+
+        <!-- =================================================
+             LOGIN STATUS
+        ================================================== -->
+
+        <div
+            class="auth-message"
+            id="loginMessage"
+            role="alert"
+            aria-live="polite"
+        ></div>
+
+    </div>
 
 </div>
