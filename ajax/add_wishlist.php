@@ -1,109 +1,147 @@
 <?php
 
-session_start();
+require_once "../config.php";
+require_once "../database/db.php";
+require_once "../includes/session.php";
 
-require_once "database/db.php";
+if (!isLoggedIn()) {
 
+    header("Location: " . BASE_URL . "index.php");
+    exit();
 
-header("Content-Type: application/json");
+}
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
+    header("Location: " . BASE_URL . "catalog.php");
+    exit();
 
-if(!isset($_SESSION['user_id'])){
+}
 
-echo json_encode([
-"status"=>"error"
-]);
+$userID = currentUserID();
 
-exit();
+$productID = isset($_POST['product_id'])
+    ? (int) $_POST['product_id']
+    : 0;
+
+if ($productID <= 0) {
+
+    header("Location: " . BASE_URL . "catalog.php");
+    exit();
 
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Check Product
+|--------------------------------------------------------------------------
+*/
 
-$user_id=$_SESSION['user_id'];
+$productQuery = $conn->prepare("
 
-$product_id=$_POST['product_id'];
+    SELECT product_id
 
+    FROM products
 
+    WHERE product_id = ?
 
-$check=$conn->prepare("
-
-SELECT wishlist_id
-
-FROM wishlist
-
-WHERE user_id=?
-
-AND product_id=?
+    LIMIT 1
 
 ");
 
-
-$check->bind_param(
-
-"ii",
-
-$user_id,
-
-$product_id
-
+$productQuery->bind_param(
+    "i",
+    $productID
 );
 
+$productQuery->execute();
 
+$productResult = $productQuery->get_result();
+
+
+if ($productResult->num_rows === 0) {
+
+    header("Location: " . BASE_URL . "catalog.php");
+    exit();
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Check Existing Wishlist
+|--------------------------------------------------------------------------
+*/
+
+$check = $conn->prepare("
+
+    SELECT wishlist_id
+
+    FROM wishlist
+
+    WHERE user_id = ?
+
+    AND product_id = ?
+
+    LIMIT 1
+
+");
+
+$check->bind_param(
+    "ii",
+    $userID,
+    $productID
+);
 
 $check->execute();
 
+$existing = $check->get_result();
 
 
-if($check->get_result()->num_rows>0){
+/*
+|--------------------------------------------------------------------------
+| Add If Not Existing
+|--------------------------------------------------------------------------
+*/
 
+if ($existing->num_rows === 0) {
 
-echo json_encode([
+    $insert = $conn->prepare("
 
-"status"=>"exists"
+        INSERT INTO wishlist
 
-]);
+        (
+            user_id,
+            product_id,
+            created_at
+        )
 
+        VALUES
 
-exit();
+        (
+            ?,
+            ?,
+            NOW()
+        )
 
+    ");
+
+    $insert->bind_param(
+        "ii",
+        $userID,
+        $productID
+    );
+
+    $insert->execute();
 
 }
 
 
-
-$stmt=$conn->prepare("
-
-INSERT INTO wishlist
-
-(user_id,product_id)
-
-VALUES(?,?)
-
-");
-
-
-$stmt->bind_param(
-
-"ii",
-
-$user_id,
-
-$product_id
-
+header(
+    "Location: " .
+    BASE_URL .
+    "wishlist.php"
 );
 
-
-
-$stmt->execute();
-
-
-
-echo json_encode([
-
-"status"=>"success"
-
-]);
-
-?>
+exit();
