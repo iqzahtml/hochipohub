@@ -1,217 +1,220 @@
 <?php
 
-session_start();
+require_once "../config.php";
+require_once "../database/db.php";
+require_once "../includes/session.php";
+require_once "../includes/functions.php";
 
-require_once "database/db.php";
 
 
-if(!isset($_SESSION['user_id']) || $_SESSION['role'] != "vendor"){
+$pageTitle = "Vendor Dashboard";
 
-    header("Location: auth/login.php");
+
+
+requireRole('vendor');
+
+
+
+$userID = currentUserID();
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Get Vendor
+|--------------------------------------------------------------------------
+*/
+
+$vendorQuery = $conn->prepare("
+
+    SELECT
+
+        vendor_id,
+        business_name
+
+    FROM vendors
+
+    WHERE user_id = ?
+
+    LIMIT 1
+
+");
+
+$vendorQuery->bind_param(
+    "i",
+    $userID
+);
+
+$vendorQuery->execute();
+
+$vendorResult =
+    $vendorQuery->get_result();
+
+
+
+if ($vendorResult->num_rows === 0) {
+
+    header(
+        "Location: setup_profile.php"
+    );
+
     exit();
 
 }
 
 
-$user_id = $_SESSION['user_id'];
+
+$vendor =
+    $vendorResult->fetch_assoc();
 
 
 
-$vendor_query = $conn->prepare("
+$vendorID =
+    $vendor['vendor_id'];
 
-SELECT *
-
-FROM vendors
-
-WHERE user_id = ?
-
-");
-
-
-$vendor_query->bind_param(
-
-    "i",
-
-    $user_id
-
-);
-
-
-$vendor_query->execute();
-
-
-$vendor = $vendor_query->get_result()->fetch_assoc();
-
-
-
-if(!$vendor){
-
-    header("Location: setup_profile.php");
-
-    exit();
-
-}
-
-
-
-$vendor_id = $vendor['vendor_id'];
 
 
 
 
 /*
 |--------------------------------------------------------------------------
-| TOTAL PRODUCTS
+| Product Count
 |--------------------------------------------------------------------------
 */
 
-$product_query = $conn->prepare("
+$productQuery = $conn->prepare("
 
-SELECT COUNT(*) AS total
+    SELECT COUNT(*) AS total
 
-FROM products
+    FROM products
 
-WHERE vendor_id = ?
+    WHERE vendor_id = ?
 
 ");
 
-
-$product_query->bind_param(
-
+$productQuery->bind_param(
     "i",
-
-    $vendor_id
-
+    $vendorID
 );
 
+$productQuery->execute();
 
-$product_query->execute();
+$productCount =
+    $productQuery
+        ->get_result()
+        ->fetch_assoc()['total'];
 
-
-$total_products = $product_query->get_result()->fetch_assoc()['total'];
 
 
 
 
 /*
 |--------------------------------------------------------------------------
-| TOTAL VENDOR ORDERS
+| Total Orders
 |--------------------------------------------------------------------------
 */
 
+$orderQuery = $conn->prepare("
 
-$order_query = $conn->prepare("
+    SELECT COUNT(DISTINCT order_details.order_id) AS total
 
-SELECT COUNT(*) AS total
+    FROM order_details
 
-FROM vendor_orders
+    INNER JOIN products
 
-WHERE vendor_id = ?
+        ON order_details.product_id =
+           products.product_id
+
+    WHERE products.vendor_id = ?
 
 ");
 
-
-$order_query->bind_param(
-
+$orderQuery->bind_param(
     "i",
-
-    $vendor_id
-
+    $vendorID
 );
 
+$orderQuery->execute();
 
-$order_query->execute();
+$orderCount =
+    $orderQuery
+        ->get_result()
+        ->fetch_assoc()['total'];
 
-
-$total_orders = $order_query->get_result()->fetch_assoc()['total'];
 
 
 
 
 /*
 |--------------------------------------------------------------------------
-| TOTAL SALES
+| Total Sales
 |--------------------------------------------------------------------------
 */
 
+$salesQuery = $conn->prepare("
 
-$sales_query = $conn->prepare("
+    SELECT
 
-SELECT SUM(subtotal) AS total
+        COALESCE(
+            SUM(
+                order_details.quantity *
+                order_details.price
+            ),
+            0
+        ) AS total
 
-FROM vendor_orders
+    FROM order_details
 
-WHERE vendor_id = ?
+    INNER JOIN products
 
-AND vendor_status != 'Cancelled'
+        ON order_details.product_id =
+           products.product_id
+
+    WHERE products.vendor_id = ?
 
 ");
 
-
-$sales_query->bind_param(
-
+$salesQuery->bind_param(
     "i",
-
-    $vendor_id
-
+    $vendorID
 );
 
+$salesQuery->execute();
 
-$sales_query->execute();
-
-
-
-$total_sales = $sales_query->get_result()->fetch_assoc()['total'] ?? 0;
+$totalSales =
+    $salesQuery
+        ->get_result()
+        ->fetch_assoc()['total'];
 
 
 
 ?>
 
-
-<!DOCTYPE html>
-
-<html>
-
-<head>
-
-<title>
-Vendor Dashboard
-</title>
-
-
-<link rel="stylesheet" href="css/vendor.css">
-
-
-</head>
-
-
-<body>
-
-
-<?php include "includes/navbar.php"; ?>
-
-
-<div class="dashboard-container">
-
-
-<?php include "includes/vendor_sidebar.php"; ?>
+<?php include "../includes/header.php"; ?>
 
 
 
-<main class="dashboard-content">
+<section class="dashboard-page">
 
+
+<div class="page-title">
 
 <h1>
-
-Welcome,
-
-<?= htmlspecialchars($vendor['business_name']); ?>
-
+Vendor Dashboard
 </h1>
 
+<p>
+Welcome back,
+<?= htmlspecialchars($vendor['business_name']); ?>
+</p>
+
+</div>
 
 
-<div class="dashboard-cards">
+
+
+
+<div class="dashboard-card-grid">
 
 
 
@@ -221,13 +224,9 @@ Welcome,
 Products
 </h3>
 
-
-<p>
-
-<?= $total_products; ?>
-
-</p>
-
+<strong>
+<?= $productCount; ?>
+</strong>
 
 </div>
 
@@ -240,16 +239,11 @@ Products
 Orders
 </h3>
 
-
-<p>
-
-<?= $total_orders; ?>
-
-</p>
-
+<strong>
+<?= $orderCount; ?>
+</strong>
 
 </div>
-
 
 
 
@@ -257,15 +251,15 @@ Orders
 <div class="dashboard-card">
 
 <h3>
-Sales
+Total Sales
 </h3>
 
+<strong>
+RM <?= number_format($totalSales, 2); ?>
+</strong>
 
-<p>
+</div>
 
-RM <?= number_format($total_sales,2); ?>
-
-</p>
 
 
 </div>
@@ -273,19 +267,52 @@ RM <?= number_format($total_sales,2); ?>
 
 
 
+
+<div class="dashboard-section">
+
+<h2>
+Quick Actions
+</h2>
+
+
+<a
+href="add_product.php"
+class="btn-primary"
+>
+
+Add Product
+
+</a>
+
+
+
+<a
+href="products.php"
+class="btn-primary"
+>
+
+Manage Products
+
+</a>
+
+
+
+<a
+href="orders.php"
+class="btn-primary"
+>
+
+View Orders
+
+</a>
+
+
+
 </div>
 
 
-</main>
-
-
-</div>
+</section>
 
 
 
-<?php include "includes/footer.php"; ?>
-
-
-</body>
-
-</html>
+<?php include "../includes/footer.php"; ?>
