@@ -4,154 +4,132 @@ require_once "../config.php";
 require_once "../database/db.php";
 
 
-
-$search = isset($_GET['search'])
-    ? trim($_GET['search'])
-    : '';
-
-$categoryID = isset($_GET['category_id'])
-    ? (int) $_GET['category_id']
-    : 0;
+$search =
+    trim($_GET['search'] ?? '');
 
 
+$categoryID =
+    (int) ($_GET['category_id'] ?? 0);
 
-/*
-|--------------------------------------------------------------------------
-| Base Query
-|--------------------------------------------------------------------------
-*/
 
 $sql = "
 
-SELECT
+    SELECT
 
-    products.product_id,
+        products.product_id,
+        products.product_name,
+        products.description,
+        products.price,
+        products.stock_quantity,
+        products.image,
+        products.status,
 
-    products.product_name,
+        vendors.business_name,
 
-    products.price,
+        categories.category_name
 
-    products.image,
+    FROM products
 
-    products.status,
+    INNER JOIN vendors
 
-    vendors.business_name,
+        ON products.vendor_id =
+           vendors.vendor_id
 
-    categories.category_name
+    INNER JOIN categories
 
+        ON products.category_id =
+           categories.category_id
 
-FROM products
-
-
-INNER JOIN vendors
-
-ON products.vendor_id = vendors.vendor_id
-
-
-INNER JOIN categories
-
-ON products.category_id = categories.category_id
-
-
-WHERE products.status = 'Available'
+    WHERE products.status = 'Available'
 
 ";
 
 
+$params = [];
+$types = "";
 
-/*
-|--------------------------------------------------------------------------
-| Search
-|--------------------------------------------------------------------------
-*/
 
 if ($search !== '') {
-
-    $safeSearch =
-        $conn->real_escape_string($search);
-
 
     $sql .= "
 
         AND (
 
-            products.product_name
-            LIKE '%$safeSearch%'
+            products.product_name LIKE ?
 
-            OR
+            OR vendors.business_name LIKE ?
 
-            categories.category_name
-            LIKE '%$safeSearch%'
-
-            OR
-
-            vendors.business_name
-            LIKE '%$safeSearch%'
+            OR categories.category_name LIKE ?
 
         )
 
     ";
 
+    $searchValue =
+        "%" . $search . "%";
+
+    $params[] = $searchValue;
+    $params[] = $searchValue;
+    $params[] = $searchValue;
+
+    $types .= "sss";
+
 }
 
-
-
-/*
-|--------------------------------------------------------------------------
-| Category Filter
-|--------------------------------------------------------------------------
-*/
 
 if ($categoryID > 0) {
 
     $sql .= "
 
-        AND products.category_id = $categoryID
+        AND products.category_id = ?
 
     ";
+
+    $params[] = $categoryID;
+
+    $types .= "i";
 
 }
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Latest Products
-|--------------------------------------------------------------------------
-*/
-
 $sql .= "
 
-ORDER BY products.created_at DESC
+    ORDER BY products.created_at DESC
 
 ";
 
 
+$stmt =
+    $conn->prepare($sql);
 
-$result = $conn->query($sql);
+
+if (!empty($params)) {
+
+    $stmt->bind_param(
+        $types,
+        ...$params
+    );
+
+}
 
 
+$stmt->execute();
 
-/*
-|--------------------------------------------------------------------------
-| Return JSON
-|--------------------------------------------------------------------------
-*/
+
+$result =
+    $stmt->get_result();
+
 
 $products = [];
 
 
+while (
+    $row = $result->fetch_assoc()
+) {
 
-if ($result) {
-
-    while ($row = $result->fetch_assoc()) {
-
-        $products[] = $row;
-
-    }
+    $products[] = $row;
 
 }
-
 
 
 header(
