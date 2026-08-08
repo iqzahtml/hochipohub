@@ -2,37 +2,42 @@
 
 /*
 |--------------------------------------------------------------------------
-| HochipoHub Configuration
-|--------------------------------------------------------------------------
-| Main configuration file for:
-| - Database
-| - Website URL
-| - System settings
-| - Upload folders
+| HOCHIPOHUB - GLOBAL CONFIGURATION
 |--------------------------------------------------------------------------
 */
+
+/*
+|--------------------------------------------------------------------------
+| ERROR REPORTING
+|--------------------------------------------------------------------------
+|
+| Development mode.
+| Tukar kepada false bila deploy ke production.
+|
+*/
+
+define('APP_DEBUG', true);
+
+if (APP_DEBUG) {
+
+    error_reporting(E_ALL);
+    ini_set('display_errors', '1');
+
+} else {
+
+    error_reporting(0);
+    ini_set('display_errors', '0');
+}
 
 
 /*
 |--------------------------------------------------------------------------
-| DEVELOPMENT MODE
+| APPLICATION
 |--------------------------------------------------------------------------
 */
 
 define(
-    'DEVELOPMENT_MODE',
-    true
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| WEBSITE INFORMATION
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'SITE_NAME',
+    'APP_NAME',
     'HochipoHub'
 );
 
@@ -42,16 +47,7 @@ define(
 | BASE URL
 |--------------------------------------------------------------------------
 |
-| If your project is located at:
-|
-| C:\laragon\www\hochipohub
-|
-| and you access it using:
-|
-| http://localhost/hochipohub/
-|
-| then BASE_URL must be:
-|
+| Laragon:
 | http://localhost/hochipohub/
 |
 */
@@ -88,92 +84,36 @@ define(
     ''
 );
 
+define(
+    'DB_CHARSET',
+    'utf8mb4'
+);
+
 
 /*
 |--------------------------------------------------------------------------
-| DIRECTORY PATHS
+| FILE / UPLOAD PATHS
 |--------------------------------------------------------------------------
-|
-| __DIR__ points to:
-|
-| C:\laragon\www\hochipohub
-|
 */
 
 define(
     'ROOT_PATH',
-    __DIR__
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| IMPORTANT DIRECTORY PATHS
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'INCLUDES_PATH',
-    ROOT_PATH . '/includes'
-);
-
-define(
-    'DATABASE_PATH',
-    ROOT_PATH . '/database'
-);
-
-define(
-    'CSS_PATH',
-    ROOT_PATH . '/css'
-);
-
-define(
-    'JS_PATH',
-    ROOT_PATH . '/js'
-);
-
-define(
-    'IMAGE_PATH',
-    ROOT_PATH . '/image'
+    dirname(__FILE__) . DIRECTORY_SEPARATOR
 );
 
 define(
     'UPLOAD_PATH',
-    ROOT_PATH . '/uploads'
+    ROOT_PATH . 'uploads' . DIRECTORY_SEPARATOR
 );
-
-
-/*
-|--------------------------------------------------------------------------
-| UPLOAD DIRECTORIES
-|--------------------------------------------------------------------------
-*/
 
 define(
     'PRODUCT_UPLOAD_PATH',
-    UPLOAD_PATH . '/products'
+    UPLOAD_PATH . 'products' . DIRECTORY_SEPARATOR
 );
 
 define(
     'VENDOR_UPLOAD_PATH',
-    UPLOAD_PATH . '/vendors'
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| UPLOAD URLS
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'PRODUCT_UPLOAD_URL',
-    BASE_URL . 'uploads/products/'
-);
-
-define(
-    'VENDOR_UPLOAD_URL',
-    BASE_URL . 'uploads/vendors/'
+    UPLOAD_PATH . 'vendors' . DIRECTORY_SEPARATOR
 );
 
 
@@ -188,16 +128,19 @@ define(
     BASE_URL . 'image/'
 );
 
-
-/*
-|--------------------------------------------------------------------------
-| SESSION CONFIGURATION
-|--------------------------------------------------------------------------
-*/
+define(
+    'PRODUCT_IMAGE_URL',
+    IMAGE_URL . 'product/'
+);
 
 define(
-    'SESSION_NAME',
-    'hochipohub_session'
+    'VENDOR_IMAGE_URL',
+    IMAGE_URL . 'vendors/'
+);
+
+define(
+    'UPLOAD_URL',
+    BASE_URL . 'uploads/'
 );
 
 
@@ -208,82 +151,35 @@ define(
 */
 
 define(
-    'PASSWORD_MIN_LENGTH',
-    8
+    'SESSION_NAME',
+    'hochipo_session'
 );
 
 
 /*
 |--------------------------------------------------------------------------
-| MFA
+| PASSWORD RESET / MFA
 |--------------------------------------------------------------------------
 */
 
 define(
-    'MFA_CODE_LENGTH',
-    6
-);
-
-define(
-    'MFA_EXPIRY_MINUTES',
+    'OTP_EXPIRY_MINUTES',
     10
 );
 
 
 /*
 |--------------------------------------------------------------------------
-| PASSWORD RESET
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'RESET_CODE_LENGTH',
-    6
-);
-
-define(
-    'RESET_EXPIRY_MINUTES',
-    15
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| PAGINATION
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'PRODUCTS_PER_PAGE',
-    12
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| COMMISSION
+| MARKETPLACE SETTINGS
 |--------------------------------------------------------------------------
 |
-| Default platform commission.
-| Can later be changed through admin settings
-| if required.
+| Commission rate boleh diubah kemudian.
+| Database commission table memang menyokong rate ini.
 |
 */
 
 define(
     'DEFAULT_COMMISSION_RATE',
-    5.00
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| ORDER SETTINGS
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'DEFAULT_DELIVERY_FEE',
     5.00
 );
 
@@ -296,6 +192,11 @@ define(
 
 define(
     'CURRENCY',
+    'RM'
+);
+
+define(
+    'CURRENCY_SYMBOL',
     'RM'
 );
 
@@ -313,44 +214,327 @@ date_default_timezone_set(
 
 /*
 |--------------------------------------------------------------------------
-| ERROR REPORTING
+| HELPER - BASE URL
 |--------------------------------------------------------------------------
 */
 
-if (DEVELOPMENT_MODE === true) {
-
-    error_reporting(E_ALL);
-
-    ini_set(
-        'display_errors',
-        '1'
-    );
-
-} else {
-
-    error_reporting(0);
-
-    ini_set(
-        'display_errors',
-        '0'
+function baseUrl(string $path = ''): string
+{
+    return BASE_URL . ltrim(
+        $path,
+        '/\\'
     );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| SESSION
+| HELPER - ASSET URL
+|--------------------------------------------------------------------------
+*/
+
+function assetUrl(string $path): string
+{
+    return BASE_URL . ltrim(
+        $path,
+        '/\\'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| HELPER - PRODUCT IMAGE
+|--------------------------------------------------------------------------
+*/
+
+function productImageUrl(
+    ?string $image
+): string {
+
+    if (
+        empty($image)
+    ) {
+
+        return BASE_URL
+            . 'image/product/default-product.jpg';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | If database already stores a full path
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        str_contains(
+            $image,
+            '/'
+        )
+        ||
+        str_contains(
+            $image,
+            '\\'
+        )
+    ) {
+
+        return BASE_URL . ltrim(
+            str_replace(
+                '\\',
+                '/',
+                $image
+            ),
+            '/'
+        );
+    }
+
+    return PRODUCT_IMAGE_URL
+        . rawurlencode($image);
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| HELPER - VENDOR IMAGE
+|--------------------------------------------------------------------------
+*/
+
+function vendorImageUrl(
+    ?string $image
+): string {
+
+    if (
+        empty($image)
+    ) {
+
+        return BASE_URL
+            . 'image/vendors/default-vendor.jpg';
+    }
+
+    if (
+        str_contains(
+            $image,
+            '/'
+        )
+        ||
+        str_contains(
+            $image,
+            '\\'
+        )
+    ) {
+
+        return BASE_URL . ltrim(
+            str_replace(
+                '\\',
+                '/',
+                $image
+            ),
+            '/'
+        );
+    }
+
+    return VENDOR_IMAGE_URL
+        . rawurlencode($image);
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| HELPER - ESCAPE HTML
+|--------------------------------------------------------------------------
+*/
+
+function e(
+    mixed $value
+): string {
+
+    return htmlspecialchars(
+        (string) $value,
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| HELPER - FORMAT PRICE
+|--------------------------------------------------------------------------
+*/
+
+function formatPrice(
+    float|int|string $amount
+): string {
+
+    return CURRENCY_SYMBOL
+        . ' '
+        . number_format(
+            (float) $amount,
+            2
+        );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| HELPER - REDIRECT
+|--------------------------------------------------------------------------
+*/
+
+function redirect(
+    string $url
+): never {
+
+    header(
+        'Location: ' . $url
+    );
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CREATE REQUIRED DIRECTORIES
+|--------------------------------------------------------------------------
+*/
+
+$requiredDirectories = [
+
+    UPLOAD_PATH,
+
+    PRODUCT_UPLOAD_PATH,
+
+    VENDOR_UPLOAD_PATH
+
+];
+
+
+foreach (
+    $requiredDirectories
+    as $directory
+) {
+
+    if (
+        !is_dir($directory)
+    ) {
+
+        @mkdir(
+            $directory,
+            0755,
+            true
+        );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PDO DATABASE CONNECTION
 |--------------------------------------------------------------------------
 |
-| Start session only if it has not already started.
+| One centralized connection.
 |
 */
 
-if (session_status() === PHP_SESSION_NONE) {
+function getDB(): PDO
+{
+    static $pdo = null;
 
-    session_name(
-        SESSION_NAME
-    );
+    if (
+        $pdo instanceof PDO
+    ) {
 
-    session_start();
+        return $pdo;
+    }
+
+
+    $dsn =
+        'mysql:host='
+        . DB_HOST
+        . ';dbname='
+        . DB_NAME
+        . ';charset='
+        . DB_CHARSET;
+
+
+    $options = [
+
+        PDO::ATTR_ERRMODE =>
+            PDO::ERRMODE_EXCEPTION,
+
+        PDO::ATTR_DEFAULT_FETCH_MODE =>
+            PDO::FETCH_ASSOC,
+
+        PDO::ATTR_EMULATE_PREPARES =>
+            false,
+
+        PDO::ATTR_STRINGIFY_FETCHES =>
+            false
+
+    ];
+
+
+    try {
+
+        $pdo = new PDO(
+            $dsn,
+            DB_USER,
+            DB_PASS,
+            $options
+        );
+
+        return $pdo;
+
+    } catch (
+        PDOException $e
+    ) {
+
+        if (APP_DEBUG) {
+
+            die(
+                '<div style="
+                    font-family:Arial;
+                    padding:30px;
+                    background:#0f172a;
+                    color:#fff;
+                    min-height:100vh;
+                ">
+                    <h2 style="color:#60a5fa;">
+                        HochipoHub Database Error
+                    </h2>
+
+                    <p>
+                        Unable to connect to MySQL database.
+                    </p>
+
+                    <pre style="
+                        background:#020617;
+                        padding:20px;
+                        border-radius:12px;
+                        overflow:auto;
+                    ">'
+                    . e($e->getMessage())
+                    . '</pre>
+
+                    <p>
+                        Check:
+                    </p>
+
+                    <ul>
+                        <li>Laragon / MySQL is running</li>
+                        <li>Database name is <strong>hochipohub</strong></li>
+                        <li>MySQL username is correct</li>
+                        <li>MySQL password is correct</li>
+                    </ul>
+                </div>'
+            );
+        }
+
+        http_response_code(500);
+
+        exit(
+            'Database connection failed.'
+        );
+    }
 }
