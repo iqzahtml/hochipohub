@@ -6,17 +6,27 @@ require_once "../includes/session.php";
 require_once "../includes/functions.php";
 
 
-
 $pageTitle = "Vendor Dashboard";
 
 
+if (!isLoggedIn()) {
 
-requireRole('vendor');
+    header("Location: " . BASE_URL . "index.php");
+    exit();
+
+}
 
 
+if (currentUserRole() !== 'vendor') {
 
-$userID = currentUserID();
+    header("Location: " . BASE_URL . "index.php");
+    exit();
 
+}
+
+
+$userID =
+    (int) currentUserID();
 
 
 /*
@@ -30,7 +40,8 @@ $vendorQuery = $conn->prepare("
     SELECT
 
         vendor_id,
-        business_name
+        business_name,
+        approval_status
 
     FROM vendors
 
@@ -40,16 +51,18 @@ $vendorQuery = $conn->prepare("
 
 ");
 
+
 $vendorQuery->bind_param(
     "i",
     $userID
 );
 
+
 $vendorQuery->execute();
+
 
 $vendorResult =
     $vendorQuery->get_result();
-
 
 
 if ($vendorResult->num_rows === 0) {
@@ -63,17 +76,12 @@ if ($vendorResult->num_rows === 0) {
 }
 
 
-
 $vendor =
     $vendorResult->fetch_assoc();
 
 
-
 $vendorID =
-    $vendor['vendor_id'];
-
-
-
+    (int) $vendor['vendor_id'];
 
 
 /*
@@ -82,7 +90,7 @@ $vendorID =
 |--------------------------------------------------------------------------
 */
 
-$productQuery = $conn->prepare("
+$stmt = $conn->prepare("
 
     SELECT COUNT(*) AS total
 
@@ -92,227 +100,198 @@ $productQuery = $conn->prepare("
 
 ");
 
-$productQuery->bind_param(
+
+$stmt->bind_param(
     "i",
     $vendorID
 );
 
-$productQuery->execute();
+
+$stmt->execute();
+
 
 $productCount =
-    $productQuery
+    $stmt
         ->get_result()
         ->fetch_assoc()['total'];
 
 
-
-
-
 /*
 |--------------------------------------------------------------------------
-| Total Orders
+| Vendor Order Count
 |--------------------------------------------------------------------------
 */
 
-$orderQuery = $conn->prepare("
+$stmt = $conn->prepare("
 
-    SELECT COUNT(DISTINCT order_details.order_id) AS total
+    SELECT COUNT(*) AS total
 
-    FROM order_details
+    FROM vendor_orders
 
-    INNER JOIN products
-
-        ON order_details.product_id =
-           products.product_id
-
-    WHERE products.vendor_id = ?
+    WHERE vendor_id = ?
 
 ");
 
-$orderQuery->bind_param(
+
+$stmt->bind_param(
     "i",
     $vendorID
 );
 
-$orderQuery->execute();
+
+$stmt->execute();
+
 
 $orderCount =
-    $orderQuery
+    $stmt
         ->get_result()
         ->fetch_assoc()['total'];
 
 
-
-
-
 /*
 |--------------------------------------------------------------------------
-| Total Sales
+| Vendor Sales
 |--------------------------------------------------------------------------
 */
 
-$salesQuery = $conn->prepare("
+$stmt = $conn->prepare("
 
     SELECT
 
         COALESCE(
-            SUM(
-                order_details.quantity *
-                order_details.price
-            ),
+            SUM(subtotal),
             0
         ) AS total
 
-    FROM order_details
+    FROM vendor_orders
 
-    INNER JOIN products
+    WHERE vendor_id = ?
 
-        ON order_details.product_id =
-           products.product_id
-
-    WHERE products.vendor_id = ?
+    AND vendor_status != 'Cancelled'
 
 ");
 
-$salesQuery->bind_param(
+
+$stmt->bind_param(
     "i",
     $vendorID
 );
 
-$salesQuery->execute();
+
+$stmt->execute();
+
 
 $totalSales =
-    $salesQuery
+    $stmt
         ->get_result()
         ->fetch_assoc()['total'];
-
-
 
 ?>
 
 <?php include "../includes/header.php"; ?>
 
-
-
 <section class="dashboard-page">
 
+    <div class="page-title">
 
-<div class="page-title">
+        <h1>
+            Vendor Dashboard
+        </h1>
 
-<h1>
-Vendor Dashboard
-</h1>
+        <p>
+            Welcome back,
+            <?= htmlspecialchars(
+                $vendor['business_name']
+            ); ?>
+        </p>
 
-<p>
-Welcome back,
-<?= htmlspecialchars($vendor['business_name']); ?>
-</p>
+        <p>
+            Approval Status:
+            <strong>
+                <?= htmlspecialchars(
+                    $vendor['approval_status']
+                ); ?>
+            </strong>
+        </p>
 
-</div>
-
-
-
-
-
-<div class="dashboard-card-grid">
-
-
-
-<div class="dashboard-card">
-
-<h3>
-Products
-</h3>
-
-<strong>
-<?= $productCount; ?>
-</strong>
-
-</div>
+    </div>
 
 
+    <div class="dashboard-card-grid">
+
+        <div class="dashboard-card">
+
+            <h3>
+                Products
+            </h3>
+
+            <strong>
+                <?= (int)$productCount; ?>
+            </strong>
+
+        </div>
 
 
-<div class="dashboard-card">
+        <div class="dashboard-card">
 
-<h3>
-Orders
-</h3>
+            <h3>
+                Vendor Orders
+            </h3>
 
-<strong>
-<?= $orderCount; ?>
-</strong>
+            <strong>
+                <?= (int)$orderCount; ?>
+            </strong>
 
-</div>
-
-
+        </div>
 
 
-<div class="dashboard-card">
+        <div class="dashboard-card">
 
-<h3>
-Total Sales
-</h3>
+            <h3>
+                Sales
+            </h3>
 
-<strong>
-RM <?= number_format($totalSales, 2); ?>
-</strong>
+            <strong>
+                RM <?= number_format(
+                    $totalSales,
+                    2
+                ); ?>
+            </strong>
 
-</div>
+        </div>
 
-
-
-</div>
-
-
-
+    </div>
 
 
-<div class="dashboard-section">
+    <div class="dashboard-section">
 
-<h2>
-Quick Actions
-</h2>
+        <h2>
+            Quick Actions
+        </h2>
 
+        <a
+            href="add_product.php"
+            class="btn-primary"
+        >
+            Add Product
+        </a>
 
-<a
-href="add_product.php"
-class="btn-primary"
->
+        <a
+            href="products.php"
+            class="btn-primary"
+        >
+            Manage Products
+        </a>
 
-Add Product
+        <a
+            href="orders.php"
+            class="btn-primary"
+        >
+            View Orders
+        </a>
 
-</a>
-
-
-
-<a
-href="products.php"
-class="btn-primary"
->
-
-Manage Products
-
-</a>
-
-
-
-<a
-href="orders.php"
-class="btn-primary"
->
-
-View Orders
-
-</a>
-
-
-
-</div>
-
+    </div>
 
 </section>
-
-
 
 <?php include "../includes/footer.php"; ?>
