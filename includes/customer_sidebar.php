@@ -1,109 +1,453 @@
-<aside class="sidebar customer-sidebar">
+<?php
 
+/*
+|--------------------------------------------------------------------------
+| HochipoHub - Customer Sidebar
+|--------------------------------------------------------------------------
+*/
 
+require_once __DIR__ . '/session.php';
 
-<div class="sidebar-title">
+requireCustomer();
 
 
-<h2>
+/*
+|--------------------------------------------------------------------------
+| CURRENT PAGE
+|--------------------------------------------------------------------------
+*/
 
-Customer Panel
+$currentPage =
+    basename(
+        $_SERVER['PHP_SELF'] ?? ''
+    );
 
-</h2>
 
+/*
+|--------------------------------------------------------------------------
+| ACTIVE LINK
+|--------------------------------------------------------------------------
+*/
 
-</div>
+function customerSidebarActive(
+    string $page
+): string {
 
+    global $currentPage;
 
+    return $currentPage === $page
+        ? 'active'
+        : '';
+}
 
+?>
 
 
-<ul>
+<!-- =========================================================
+     CUSTOMER SIDEBAR
+========================================================= -->
 
+<aside
+    class="dashboard-sidebar customer-sidebar"
+    id="customerSidebar"
+>
 
-<li>
 
-<a href="<?= BASE_URL; ?>dashboard.php">
+    <!-- =====================================================
+         SIDEBAR PROFILE
+    ====================================================== -->
 
-<i class="fa-solid fa-house"></i>
+    <div class="sidebar-profile">
 
-Dashboard
+        <div class="sidebar-avatar">
 
-</a>
+            <?php
 
-</li>
+            $profileImage = '';
 
+            if (
+                function_exists(
+                    'getCurrentUser'
+                )
+            ) {
 
+                $currentUser =
+                    getCurrentUser();
 
+                if (
+                    !empty(
+                        $currentUser[
+                            'profile_image'
+                        ]
+                    )
+                ) {
 
+                    $profileImage =
+                        $currentUser[
+                            'profile_image'
+                        ];
+                }
+            }
 
-<li>
+            ?>
 
-<a href="<?= BASE_URL; ?>profile.php">
 
-<i class="fa-solid fa-user"></i>
+            <?php if (
+                $profileImage !== ''
+            ): ?>
 
-Profile
+                <img
+                    src="<?php echo BASE_URL; ?>image/<?php echo htmlspecialchars(
+                        $profileImage,
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ); ?>"
+                    alt="Profile Image"
+                >
 
-</a>
+            <?php else: ?>
 
-</li>
+                <span>
 
+                    <?php
 
+                    echo strtoupper(
+                        substr(
+                            currentUserName()
+                                ?: 'U',
+                            0,
+                            1
+                        )
+                    );
 
+                    ?>
 
+                </span>
 
-<li>
+            <?php endif; ?>
 
-<a href="<?= BASE_URL; ?>order.php">
+        </div>
 
-<i class="fa-solid fa-box"></i>
 
-My Orders
+        <div class="sidebar-profile-info">
 
-</a>
+            <strong>
 
-</li>
+                <?php
 
+                echo htmlspecialchars(
+                    currentUserName()
+                        ?: 'Customer',
+                    ENT_QUOTES,
+                    'UTF-8'
+                );
 
+                ?>
 
+            </strong>
 
 
-<li>
+            <small>
+                Customer Account
+            </small>
 
-<a href="<?= BASE_URL; ?>wishlist.php">
+        </div>
 
-<i class="fa-solid fa-heart"></i>
+    </div>
 
-Wishlist
 
-</a>
+    <!-- =====================================================
+         SIDEBAR NAVIGATION
+    ====================================================== -->
 
-</li>
+    <nav
+        class="sidebar-navigation"
+        aria-label="Customer Navigation"
+    >
 
 
+        <div class="sidebar-section-title">
 
+            <span>
+                MAIN MENU
+            </span>
 
+        </div>
 
-<li>
 
-<a href="<?= BASE_URL; ?>review.php">
+        <!-- DASHBOARD -->
 
-<i class="fa-solid fa-star"></i>
+        <a
+            href="<?php echo BASE_URL; ?>dashboard.php"
+            class="sidebar-link <?php echo customerSidebarActive('dashboard.php'); ?>"
+        >
 
-Reviews
+            <span class="sidebar-link-icon">
 
-</a>
+                <i class="fa-solid fa-gauge-high"></i>
 
-</li>
+            </span>
 
 
+            <span class="sidebar-link-text">
+                Dashboard
+            </span>
 
+        </a>
 
 
+        <!-- SHOP -->
 
-</ul>
+        <a
+            href="<?php echo BASE_URL; ?>catalog.php"
+            class="sidebar-link"
+        >
 
+            <span class="sidebar-link-icon">
 
+                <i class="fa-solid fa-store"></i>
+
+            </span>
+
+
+            <span class="sidebar-link-text">
+                Browse Products
+            </span>
+
+        </a>
+
+
+        <!-- CATEGORIES -->
+
+        <a
+            href="<?php echo BASE_URL; ?>category.php"
+            class="sidebar-link <?php echo customerSidebarActive('category.php'); ?>"
+        >
+
+            <span class="sidebar-link-icon">
+
+                <i class="fa-solid fa-layer-group"></i>
+
+            </span>
+
+
+            <span class="sidebar-link-text">
+                Categories
+            </span>
+
+        </a>
+
+
+        <div class="sidebar-section-title">
+
+            <span>
+                MY SHOPPING
+            </span>
+
+        </div>
+
+
+        <!-- CART -->
+
+        <a
+            href="<?php echo BASE_URL; ?>cart.php"
+            class="sidebar-link <?php echo customerSidebarActive('cart.php'); ?>"
+        >
+
+            <span class="sidebar-link-icon">
+
+                <i class="fa-solid fa-cart-shopping"></i>
+
+            </span>
+
+
+            <span class="sidebar-link-text">
+                My Cart
+            </span>
+
+        </a>
+
+
+        <!-- WISHLIST -->
+
+        <a
+            href="<?php echo BASE_URL; ?>wishlist.php"
+            class="sidebar-link <?php echo customerSidebarActive('wishlist.php'); ?>"
+        >
+
+            <span class="sidebar-link-icon">
+
+                <i class="fa-solid fa-heart"></i>
+
+            </span>
+
+
+            <span class="sidebar-link-text">
+                Wishlist
+            </span>
+
+        </a>
+
+
+        <!-- ORDERS -->
+
+        <a
+            href="<?php echo BASE_URL; ?>order.php"
+            class="sidebar-link <?php echo customerSidebarActive('order.php'); ?>"
+        >
+
+            <span class="sidebar-link-icon">
+
+                <i class="fa-solid fa-box-open"></i>
+
+            </span>
+
+
+            <span class="sidebar-link-text">
+                My Orders
+            </span>
+
+        </a>
+
+
+        <div class="sidebar-section-title">
+
+            <span>
+                ACCOUNT
+            </span>
+
+        </div>
+
+
+        <!-- PROFILE -->
+
+        <a
+            href="<?php echo BASE_URL; ?>profile.php"
+            class="sidebar-link <?php echo customerSidebarActive('profile.php'); ?>"
+        >
+
+            <span class="sidebar-link-icon">
+
+                <i class="fa-solid fa-user"></i>
+
+            </span>
+
+
+            <span class="sidebar-link-text">
+                My Profile
+            </span>
+
+        </a>
+
+
+        <!-- REVIEWS -->
+
+        <a
+            href="<?php echo BASE_URL; ?>review.php"
+            class="sidebar-link <?php echo customerSidebarActive('review.php'); ?>"
+        >
+
+            <span class="sidebar-link-icon">
+
+                <i class="fa-solid fa-star"></i>
+
+            </span>
+
+
+            <span class="sidebar-link-text">
+                My Reviews
+            </span>
+
+        </a>
+
+
+        <!-- CONTACT -->
+
+        <a
+            href="<?php echo BASE_URL; ?>contact.php"
+            class="sidebar-link <?php echo customerSidebarActive('contact.php'); ?>"
+        >
+
+            <span class="sidebar-link-icon">
+
+                <i class="fa-solid fa-headset"></i>
+
+            </span>
+
+
+            <span class="sidebar-link-text">
+                Contact Support
+            </span>
+
+        </a>
+
+
+    </nav>
+
+
+    <!-- =====================================================
+         SELL WITH US
+    ====================================================== -->
+
+    <div class="sidebar-promo">
+
+        <div class="sidebar-promo-icon">
+
+            <i class="fa-solid fa-shop"></i>
+
+        </div>
+
+
+        <div class="sidebar-promo-content">
+
+            <strong>
+                Want to sell?
+            </strong>
+
+            <p>
+                Start your own local store.
+            </p>
+
+
+            <a
+                href="<?php echo BASE_URL; ?>seller/setup_profile.php"
+            >
+
+                Become a Vendor
+
+                <i class="fa-solid fa-arrow-right"></i>
+
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         LOGOUT
+    ====================================================== -->
+
+    <div class="sidebar-bottom">
+
+        <a
+            href="<?php echo BASE_URL; ?>auth/logout.php"
+            class="sidebar-link sidebar-logout"
+        >
+
+            <span class="sidebar-link-icon">
+
+                <i class="fa-solid fa-right-from-bracket"></i>
+
+            </span>
+
+
+            <span class="sidebar-link-text">
+                Logout
+            </span>
+
+        </a>
+
+    </div>
 
 </aside>
