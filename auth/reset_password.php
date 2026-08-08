@@ -1,126 +1,133 @@
 <?php
 
 require_once "../config.php";
-
 require_once "../database/db.php";
-
 require_once "../includes/functions.php";
-
-require_once "../includes/session.php";
-
-
-
 
 
 /*
 |--------------------------------------------------------------------------
-| Check OTP Verification
+| Check Verification
 |--------------------------------------------------------------------------
 */
 
+if (
+    !isset($_SESSION['reset_verified']) ||
+    $_SESSION['reset_verified'] !== true ||
+    !isset($_SESSION['reset_id']) ||
+    !isset($_SESSION['reset_user_id'])
+) {
 
-if(
-    !isset($_SESSION['otp_verified'])
-    ||
-    !isset($_SESSION['reset_email'])
-){
-
-
-    header(
-
-        "Location: forgot_password.php"
-
-    );
-
-
+    header("Location: forgot_password.php");
     exit();
-
 
 }
 
 
+$resetID =
+    (int) $_SESSION['reset_id'];
+
+$userID =
+    (int) $_SESSION['reset_user_id'];
 
 
-
-$email = $_SESSION['reset_email'];
-
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
+    $password =
+        $_POST['password'] ?? '';
+
+    $confirmPassword =
+        $_POST['confirm_password'] ?? '';
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | Validation
+    |--------------------------------------------------------------------------
+    */
 
-/*
-|--------------------------------------------------------------------------
-| Reset Password
-|--------------------------------------------------------------------------
-*/
-
-
-if($_SERVER['REQUEST_METHOD']=="POST"){
-
-
-
-    $password = $_POST['password'];
-
-    $confirmPassword = $_POST['confirm_password'];
-
-
-
-
-
-    if($password !== $confirmPassword){
-
-
+    if (strlen($password) < 8) {
 
         setFlashMessage(
-
             "error",
-
-            "Password does not match."
-
+            "Password must be at least 8 characters."
         );
 
+    } elseif ($password !== $confirmPassword) {
 
-
-    }else{
-
-
-
-        $newPassword = password_hash(
-
-            $password,
-
-            PASSWORD_DEFAULT
-
+        setFlashMessage(
+            "error",
+            "Passwords do not match."
         );
 
+    } else {
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Hash Password
+        |--------------------------------------------------------------------------
+        */
+
+        $hashedPassword =
+            password_hash(
+                $password,
+                PASSWORD_DEFAULT
+            );
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Update User Password
+        |--------------------------------------------------------------------------
+        */
 
-        $update = $conn->query("
+        $update = $conn->prepare("
 
+            UPDATE users
 
-        UPDATE users
+            SET
+                password = ?,
+                reset_code = NULL,
+                reset_expiry = NULL
 
-
-        SET password='$newPassword'
-
-
-        WHERE email='$email'
-
+            WHERE user_id = ?
 
         ");
 
+        $update->bind_param(
+            "si",
+            $hashedPassword,
+            $userID
+        );
 
 
+        if ($update->execute()) {
 
 
+            /*
+            |--------------------------------------------------------------------------
+            | Mark Reset Code Used
+            |--------------------------------------------------------------------------
+            */
 
+            $markUsed = $conn->prepare("
 
-        if($update){
+                UPDATE password_resets
 
+                SET used_at = NOW()
+
+                WHERE reset_id = ?
+
+            ");
+
+            $markUsed->bind_param(
+                "i",
+                $resetID
+            );
+
+            $markUsed->execute();
 
 
             /*
@@ -129,168 +136,101 @@ if($_SERVER['REQUEST_METHOD']=="POST"){
             |--------------------------------------------------------------------------
             */
 
-
-            unset($_SESSION['reset_email']);
-
-            unset($_SESSION['otp_verified']);
-
-
-
+            unset(
+                $_SESSION['reset_user_id'],
+                $_SESSION['reset_email'],
+                $_SESSION['reset_verified'],
+                $_SESSION['reset_id']
+            );
 
 
             setFlashMessage(
-
                 "success",
-
-                "Password successfully changed. Please login."
-
+                "Password changed successfully. Please login."
             );
-
-
 
 
             header(
-
-                "Location: ".BASE_URL."index.php"
-
+                "Location: " .
+                BASE_URL .
+                "index.php"
             );
 
-
             exit();
-
-
-
 
         }
 
 
+        setFlashMessage(
+            "error",
+            "Unable to reset password."
+        );
 
     }
 
-
 }
-
-
 
 ?>
 
-
-
 <?php include "../includes/header.php"; ?>
-
-
 
 <section class="auth-page">
 
+    <div class="auth-box">
 
+        <h1>Create New Password</h1>
 
-<div class="auth-box">
+        <p>
+            Enter your new password below.
+        </p>
 
+        <form method="POST">
 
+            <div class="form-group">
 
-<h1>
+                <label for="password">
+                    New Password
+                </label>
 
-Create New Password
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    minlength="8"
+                    required
+                >
 
-</h1>
+            </div>
 
 
+            <div class="form-group">
 
+                <label for="confirm_password">
+                    Confirm Password
+                </label>
 
-<form method="POST">
+                <input
+                    type="password"
+                    id="confirm_password"
+                    name="confirm_password"
+                    minlength="8"
+                    required
+                >
 
+            </div>
 
 
+            <button
+                type="submit"
+                class="btn-primary"
+            >
+                Reset Password
+            </button>
 
+        </form>
 
-<div class="form-group">
-
-
-<label>
-
-New Password
-
-</label>
-
-
-
-<input
-
-type="password"
-
-name="password"
-
-required
-
->
-
-
-
-</div>
-
-
-
-
-
-
-
-<div class="form-group">
-
-
-<label>
-
-Confirm Password
-
-</label>
-
-
-
-<input
-
-type="password"
-
-name="confirm_password"
-
-required
-
->
-
-
-
-</div>
-
-
-
-
-
-
-
-<button
-
-type="submit"
-
-class="btn-primary"
-
->
-
-Reset Password
-
-</button>
-
-
-
-
-</form>
-
-
-
-
-</div>
-
-
+    </div>
 
 </section>
-
-
 
 <?php include "../includes/footer.php"; ?>
