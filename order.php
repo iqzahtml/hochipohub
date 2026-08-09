@@ -1,409 +1,168 @@
 <?php
 
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/database/db.php';
+require_once __DIR__ . '/includes/session.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 /*
 |--------------------------------------------------------------------------
-| HochipoHub Create Order
+| AUTHENTICATION
+|--------------------------------------------------------------------------
+*/
+
+if (empty($_SESSION['user_id'])) {
+    redirect(baseUrl('index.php'));
+}
+
+$userId = (int) $_SESSION['user_id'];
+
+$db = getDB();
+
+/*
+|--------------------------------------------------------------------------
+| GET CUSTOMER ORDERS
 |--------------------------------------------------------------------------
 |
-| Flow:
-| Cart -> Order -> Order Details
+| orders
+|   ├── order_details
+|   ├── payments
+|   └── vendor_orders
 |
 |--------------------------------------------------------------------------
 */
 
-
-require_once "config.php";
-
-require_once "database/db.php";
-
-require_once "includes/functions.php";
-
-require_once "includes/session.php";
-
-
-
-$pageTitle = "Order Success";
-
-
-
-requireLogin();
-
-
-
-$userID = currentUserID();
-
-
-
-
-
-
-if($_SERVER['REQUEST_METHOD'] !== 'POST'){
-
-
-    header(
-        "Location: cart.php"
-    );
-
-
-    exit();
-
-
-}
-
-
-
-
-
-$name = mysqli_real_escape_string(
-    $conn,
-    $_POST['name']
-);
-
-
-$phone = mysqli_real_escape_string(
-    $conn,
-    $_POST['phone']
-);
-
-
-$address = mysqli_real_escape_string(
-    $conn,
-    $_POST['address']
-);
-
-
-$total = mysqli_real_escape_string(
-    $conn,
-    $_POST['total']
-);
-
-
-$paymentMethod = mysqli_real_escape_string(
-    $conn,
-    $_POST['payment_method']
-);
-
-
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Get Cart Items
-|--------------------------------------------------------------------------
-*/
-
-
-$cartQuery = "
-
-SELECT
-
-cart.product_id,
-
-cart.quantity,
-
-products.price
-
-
-FROM cart
-
-
-
-INNER JOIN products
-
-ON cart.product_id = products.product_id
-
-
-
-WHERE cart.user_id='$userID'
-
-
-";
-
-
-
-$cartResult = $conn->query($cartQuery);
-
-
-
-
-if(!$cartResult || $cartResult->num_rows == 0){
-
-
-    header(
-        "Location: cart.php"
-    );
-
-
-    exit();
-
-
-}
-
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Create Order
-|--------------------------------------------------------------------------
-*/
-
-
-$orderSQL = "
-
-INSERT INTO orders
-
-(
-
-user_id,
-
-total_amount,
-
-shipping_address,
-
-payment_method,
-
-payment_status,
-
-order_status,
-
-created_at
-
-)
-
-
-VALUES
-
-(
-
-'$userID',
-
-'$total',
-
-'$address',
-
-'$paymentMethod',
-
-'Pending',
-
-'Processing',
-
-NOW()
-
-)
-
-
-";
-
-
-
-
-
-if($conn->query($orderSQL)){
-
-
-    $orderID = $conn->insert_id;
-
-
-
-}else{
-
-
-    die("Order failed");
-
-
-}
-
-
-
-
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Insert Order Details
-|--------------------------------------------------------------------------
-*/
-
-
-while($item = $cartResult->fetch_assoc()){
-
-
-
-$productID = $item['product_id'];
-
-$quantity = $item['quantity'];
-
-$price = $item['price'];
-
-
-
-
-
-$detailSQL = "
-
-INSERT INTO order_details
-
-(
-
-order_id,
-
-product_id,
-
-quantity,
-
-price
-
-)
-
-
-VALUES
-
-(
-
-'$orderID',
-
-'$productID',
-
-'$quantity',
-
-'$price'
-
-)
-
-
-
-";
-
-
-
-$conn->query($detailSQL);
-
-
-
-}
-
-
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Clear Cart
-|--------------------------------------------------------------------------
-*/
-
-
-$conn->query("
-
-DELETE FROM cart
-
-WHERE user_id='$userID'
-
+$stmt = $db->prepare("
+    SELECT
+        o.order_id,
+        o.order_date,
+        o.total_amount,
+        o.delivery_method,
+        o.delivery_address,
+        o.tracking_number,
+        o.order_status,
+        o.completed_date,
+
+        p.payment_method,
+        p.payment_status,
+
+        COUNT(DISTINCT od.order_detail_id) AS item_count
+
+    FROM orders o
+
+    LEFT JOIN payments p
+        ON p.order_id = o.order_id
+
+    LEFT JOIN order_details od
+        ON od.order_id = o.order_id
+
+    WHERE o.customer_id = ?
+
+    GROUP BY
+        o.order_id,
+        o.order_date,
+        o.total_amount,
+        o.delivery_method,
+        o.delivery_address,
+        o.tracking_number,
+        o.order_status,
+        o.completed_date,
+        p.payment_method,
+        p.payment_status
+
+    ORDER BY o.order_date DESC
 ");
 
+$stmt->execute([$userId]);
 
+$orders = $stmt->fetchAll();
 
+/*
+|--------------------------------------------------------------------------
+| GET ORDER ITEMS
+|--------------------------------------------------------------------------
+*/
 
+function getOrderItems(PDO $db, int $orderId): array
+{
+    $stmt = $db->prepare("
+        SELECT
+            od.order_detail_id,
+            od.product_id,
+            od.quantity,
+            od.unit_price,
+            od.subtotal,
 
+            p.product_name,
+            p.image,
 
+            v.vendor_id,
+            v.business_name
 
+        FROM order_details od
+
+        INNER JOIN products p
+            ON p.product_id = od.product_id
+
+        INNER JOIN vendors v
+            ON v.vendor_id = p.vendor_id
+
+        WHERE od.order_id = ?
+
+        ORDER BY od.order_detail_id ASC
+    ");
+
+    $stmt->execute([$orderId]);
+
+    return $stmt->fetchAll();
+}
+
+/*
+|--------------------------------------------------------------------------
+| GET VENDOR ORDERS
+|--------------------------------------------------------------------------
+*/
+
+function getVendorOrders(PDO $db, int $orderId): array
+{
+    $stmt = $db->prepare("
+        SELECT
+            vo.vendor_order_id,
+            vo.vendor_id,
+            vo.subtotal,
+            vo.delivery_fee,
+            vo.vendor_status,
+            vo.tracking_number,
+            vo.created_at,
+            vo.completed_at,
+
+            v.business_name,
+            v.business_logo
+
+        FROM vendor_orders vo
+
+        INNER JOIN vendors v
+            ON v.vendor_id = vo.vendor_id
+
+        WHERE vo.order_id = ?
+
+        ORDER BY vo.vendor_order_id ASC
+    ");
+
+    $stmt->execute([$orderId]);
+
+    return $stmt->fetchAll();
+}
+
+/*
+|--------------------------------------------------------------------------
+| PAGE DATA
+|--------------------------------------------------------------------------
+*/
+
+$pageTitle = 'My Orders';
 
 ?>
-
-
-
-<?php include "includes/header.php"; ?>
-
-
-
-
-
-
-
-<section class="order-success">
-
-
-
-
-
-<div class="success-box">
-
-
-
-
-
-<i class="fa-solid fa-circle-check"></i>
-
-
-
-
-<h1>
-
-Order Placed Successfully!
-
-</h1>
-
-
-
-
-
-<p>
-
-Thank you for shopping with HochipoHub.
-
-</p>
-
-
-
-
-
-
-
-<a
-
-href="<?= BASE_URL; ?>order_details.php?id=<?= $orderID; ?>"
-
-class="btn-primary"
-
->
-
-
-View Order
-
-
-</a>
-
-
-
-
-
-
-
-</div>
-
-
-
-
-
-
-</section>
-
-
-
-
-
-
-
-
-<?php include "includes/footer.php"; ?>
