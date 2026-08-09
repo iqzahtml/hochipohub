@@ -1,266 +1,115 @@
 <?php
+
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/database/db.php';
 
-$categoryId = isset($_GET['category'])
-    ? (int) $_GET['category']
-    : 0;
-
-$search = isset($_GET['search'])
-    ? trim($_GET['search'])
-    : '';
-
-$sort = isset($_GET['sort'])
-    ? $_GET['sort']
-    : 'latest';
-
+$db = getDB();
 
 /*
 |--------------------------------------------------------------------------
-| Categories
+| CATALOG DATA
 |--------------------------------------------------------------------------
-*/
-
-$categories = [];
-
-$categoryResult = $conn->query("
-    SELECT
-        category_id,
-        category_name,
-        category_image
-    FROM categories
-    ORDER BY category_name ASC
-");
-
-if ($categoryResult) {
-    while ($row = $categoryResult->fetch_assoc()) {
-        $categories[] = $row;
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Build Product Query
-|--------------------------------------------------------------------------
-*/
-
-$where = [
-    "p.status = 'Available'",
-    "p.stock_quantity > 0",
-    "v.approval_status = 'Approved'"
-];
-
-$params = [];
-$types = '';
-
-if ($categoryId > 0) {
-    $where[] = "p.category_id = ?";
-    $params[] = $categoryId;
-    $types .= 'i';
-}
-
-if ($search !== '') {
-    $where[] = "
-        (
-            p.product_name LIKE ?
-            OR p.description LIKE ?
-            OR v.business_name LIKE ?
-            OR c.category_name LIKE ?
-        )
-    ";
-
-    $searchValue = '%' . $search . '%';
-
-    $params[] = $searchValue;
-    $params[] = $searchValue;
-    $params[] = $searchValue;
-    $params[] = $searchValue;
-
-    $types .= 'ssss';
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Sorting
-|--------------------------------------------------------------------------
-*/
-
-switch ($sort) {
-
-    case 'price_low':
-        $orderBy = "p.price ASC";
-        break;
-
-    case 'price_high':
-        $orderBy = "p.price DESC";
-        break;
-
-    case 'name':
-        $orderBy = "p.product_name ASC";
-        break;
-
-    default:
-        $orderBy = "p.created_at DESC";
-        break;
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Products
+|
+| Products:
+| - product_id
+| - product_name
+| - vendor_id
+| - category_id
+| - price
+| - image
+| - description
+| - stock_quantity
+| - status
+| - created_at
+|
+| Products are joined with:
+| - vendors
+| - categories
 |--------------------------------------------------------------------------
 */
 
 $products = [];
 
-$sql = "
-    SELECT
-        p.product_id,
-        p.product_name,
-        p.description,
-        p.price,
-        p.stock_quantity,
-        p.image,
-        p.status,
-        p.created_at,
+try {
 
-        v.vendor_id,
-        v.business_name,
-        v.business_logo,
-
-        c.category_id,
-        c.category_name
-
-    FROM products p
-
-    INNER JOIN vendors v
-        ON p.vendor_id = v.vendor_id
-
-    INNER JOIN categories c
-        ON p.category_id = c.category_id
-
-    WHERE " . implode(' AND ', $where) . "
-
-    ORDER BY $orderBy
-";
-
-$stmt = $conn->prepare($sql);
-
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
-}
-
-$stmt->execute();
-
-$result = $stmt->get_result();
-
-while ($row = $result->fetch_assoc()) {
-    $products[] = $row;
-}
-
-$stmt->close();
-
-
-/*
-|--------------------------------------------------------------------------
-| Product Rating
-|--------------------------------------------------------------------------
-*/
-
-function catalogRating($conn, $productId)
-{
-    $productId = (int) $productId;
-
-    $result = $conn->query("
+    $stmt = $db->prepare("
         SELECT
-            AVG(rating) AS average_rating,
-            COUNT(review_id) AS total_reviews
-        FROM reviews
-        WHERE product_id = $productId
-        AND status = 'Visible'
+            p.product_id,
+            p.product_name,
+            p.vendor_id,
+            p.category_id,
+            p.price,
+            p.image,
+            p.description,
+            p.stock_quantity,
+            p.status,
+            p.created_at,
+
+            v.business_name AS vendor_name,
+            c.category_name
+
+        FROM products p
+
+        LEFT JOIN vendors v
+            ON p.vendor_id = v.vendor_id
+
+        LEFT JOIN categories c
+            ON p.category_id = c.category_id
+
+        WHERE p.status = 'Available'
+
+        ORDER BY p.created_at DESC
     ");
 
-    if ($result && $row = $result->fetch_assoc()) {
+    $stmt->execute();
 
-        return [
-            'rating' => $row['average_rating']
-                ? round((float) $row['average_rating'], 1)
-                : 0,
+    $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            'reviews' => (int) $row['total_reviews']
-        ];
-    }
+} catch (PDOException $e) {
 
-    return [
-        'rating' => 0,
-        'reviews' => 0
-    ];
-}
+    if (APP_DEBUG) {
 
+        die(
+            '<div style="
+                font-family:Arial,sans-serif;
+                padding:30px;
+                background:#020617;
+                color:#fff;
+                min-height:100vh;
+            ">
+                <h2 style="
+                    color:#60a5fa;
+                    margin-top:0;
+                ">
+                    HochipoHub Catalog Error
+                </h2>
 
-/*
-|--------------------------------------------------------------------------
-| Image Helper
-|--------------------------------------------------------------------------
-*/
+                <p style="
+                    color:#cbd5e1;
+                ">
+                    Unable to load products.
+                </p>
 
-function catalogProductImage($image)
-{
-    if (!empty($image)) {
-        return site_url(
-            'image/product/' . ltrim($image, '/')
+                <pre style="
+                    background:#0f172a;
+                    padding:20px;
+                    border-radius:15px;
+                    overflow:auto;
+                    color:#f87171;
+                ">'
+                . e($e->getMessage())
+                . '</pre>
+            </div>'
         );
     }
 
-    return DEFAULT_PRODUCT_IMAGE;
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Preserve Query
-|--------------------------------------------------------------------------
-*/
-
-function catalogUrl($changes = [])
-{
-    $query = [];
-
-    if (isset($_GET['category']) && (int)$_GET['category'] > 0) {
-        $query['category'] = (int)$_GET['category'];
-    }
-
-    if (isset($_GET['search']) && trim($_GET['search']) !== '') {
-        $query['search'] = trim($_GET['search']);
-    }
-
-    if (isset($_GET['sort']) && $_GET['sort'] !== '') {
-        $query['sort'] = $_GET['sort'];
-    }
-
-    foreach ($changes as $key => $value) {
-
-        if ($value === null || $value === '') {
-            unset($query[$key]);
-        } else {
-            $query[$key] = $value;
-        }
-    }
-
-    $url = site_url('catalog.php');
-
-    if (!empty($query)) {
-        $url .= '?' . http_build_query($query);
-    }
-
-    return $url;
+    $products = [];
 }
 
 ?>
 
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
@@ -273,1207 +122,955 @@ function catalogUrl($changes = [])
     >
 
     <title>
-        Explore Products | <?php echo SITE_NAME; ?>
+        Product Catalog | <?= e(APP_NAME) ?>
     </title>
 
     <link
         rel="stylesheet"
-        href="<?php echo site_url('css/style.css'); ?>"
+        href="<?= BASE_URL ?>css/style.css"
     >
 
     <link
         rel="stylesheet"
-        href="<?php echo site_url('css/product.css'); ?>"
+        href="<?= BASE_URL ?>css/product.css"
     >
 
     <link
         rel="stylesheet"
-        href="<?php echo site_url('css/responsive.css'); ?>"
+        href="<?= BASE_URL ?>css/responsive.css"
     >
+
+    <style>
+
+        /*
+        |--------------------------------------------------------------------------
+        | CATALOG PAGE
+        |--------------------------------------------------------------------------
+        */
+
+        .catalog-page {
+            min-height: 100vh;
+            padding: 35px 4% 60px;
+
+            background:
+                radial-gradient(
+                    circle at 5% 10%,
+                    rgba(37,99,235,.14),
+                    transparent 28%
+                ),
+                radial-gradient(
+                    circle at 95% 20%,
+                    rgba(14,165,233,.12),
+                    transparent 25%
+                ),
+                #f8fbff;
+        }
+
+        .catalog-container {
+            max-width: 1450px;
+            margin: auto;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | HERO
+        |--------------------------------------------------------------------------
+        */
+
+        .catalog-hero {
+            position: relative;
+            overflow: hidden;
+
+            margin-bottom: 30px;
+            padding: 38px;
+
+            border-radius: 30px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #020617 0%,
+                    #0f2b69 42%,
+                    #2563eb 72%,
+                    #0284c7 100%
+                );
+
+            color: #fff;
+
+            box-shadow:
+                0 25px 70px
+                rgba(30,64,175,.25);
+        }
+
+        .catalog-hero::before {
+            content: "";
+
+            position: absolute;
+
+            width: 350px;
+            height: 350px;
+
+            top: -210px;
+            right: -80px;
+
+            border-radius: 50%;
+
+            background:
+                rgba(96,165,250,.16);
+        }
+
+        .catalog-hero::after {
+            content: "";
+
+            position: absolute;
+
+            width: 230px;
+            height: 230px;
+
+            right: 180px;
+            bottom: -180px;
+
+            border-radius: 50%;
+
+            background:
+                rgba(56,189,248,.10);
+        }
+
+        .catalog-hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .catalog-kicker {
+            margin-bottom: 8px;
+
+            color:
+                rgba(255,255,255,.62);
+
+            font-size: 10px;
+            font-weight: 950;
+
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .catalog-hero h1 {
+            margin: 0 0 10px;
+
+            font-size:
+                clamp(
+                    30px,
+                    5vw,
+                    48px
+                );
+
+            line-height: 1.05;
+            font-weight: 950;
+        }
+
+        .catalog-hero p {
+            max-width: 650px;
+
+            margin: 0;
+
+            color:
+                rgba(255,255,255,.75);
+
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .catalog-count {
+            display: inline-flex;
+
+            margin-top: 20px;
+            padding: 8px 13px;
+
+            border:
+                1px solid
+                rgba(255,255,255,.18);
+
+            border-radius: 999px;
+
+            background:
+                rgba(255,255,255,.08);
+
+            color: #dbeafe;
+
+            font-size: 8px;
+            font-weight: 900;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | SECTION HEADER
+        |--------------------------------------------------------------------------
+        */
+
+        .catalog-section-header {
+            display: flex;
+
+            align-items: flex-end;
+            justify-content: space-between;
+
+            gap: 15px;
+
+            margin-bottom: 18px;
+        }
+
+        .catalog-section-header h2 {
+            margin: 0;
+
+            color: #0f172a;
+
+            font-size: 19px;
+            font-weight: 950;
+        }
+
+        .catalog-section-header span {
+            color: #64748b;
+
+            font-size: 9px;
+            font-weight: 700;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCT GRID
+        |--------------------------------------------------------------------------
+        */
+
+        .catalog-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    4,
+                    minmax(0, 1fr)
+                );
+
+            gap: 18px;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCT CARD
+        |--------------------------------------------------------------------------
+        */
+
+        .catalog-card {
+            position: relative;
+
+            overflow: hidden;
+
+            border:
+                1px solid #dbeafe;
+
+            border-radius: 22px;
+
+            background: #fff;
+
+            box-shadow:
+                0 12px 35px
+                rgba(15,23,42,.055);
+
+            transition:
+                transform .25s ease,
+                box-shadow .25s ease,
+                border-color .25s ease;
+        }
+
+        .catalog-card:hover {
+            transform:
+                translateY(-7px);
+
+            border-color:
+                #93c5fd;
+
+            box-shadow:
+                0 22px 50px
+                rgba(37,99,235,.14);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | IMAGE
+        |--------------------------------------------------------------------------
+        */
+
+        .catalog-image-wrap {
+            position: relative;
+
+            overflow: hidden;
+
+            height: 220px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #eff6ff,
+                    #dbeafe
+                );
+        }
+
+        .catalog-image {
+            width: 100%;
+            height: 100%;
+
+            object-fit: cover;
+
+            display: block;
+
+            transition:
+                transform .35s ease;
+        }
+
+        .catalog-card:hover
+        .catalog-image {
+            transform: scale(1.06);
+        }
+
+        .catalog-image-placeholder {
+            width: 100%;
+            height: 100%;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #dbeafe,
+                    #bfdbfe
+                );
+
+            color: #2563eb;
+
+            font-size: 38px;
+            font-weight: 950;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATUS TAG
+        |--------------------------------------------------------------------------
+        */
+
+        .available-tag {
+            position: absolute;
+
+            top: 12px;
+            left: 12px;
+
+            padding: 6px 9px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(255,255,255,.92);
+
+            color: #166534;
+
+            font-size: 7px;
+            font-weight: 950;
+
+            text-transform: uppercase;
+
+            box-shadow:
+                0 5px 15px
+                rgba(15,23,42,.08);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CARD CONTENT
+        |--------------------------------------------------------------------------
+        */
+
+        .catalog-content {
+            padding: 17px;
+        }
+
+        .catalog-category {
+            margin-bottom: 7px;
+
+            color: #2563eb;
+
+            font-size: 7px;
+            font-weight: 950;
+
+            letter-spacing: .7px;
+
+            text-transform: uppercase;
+        }
+
+        .catalog-product-name {
+            min-height: 42px;
+
+            margin: 0 0 7px;
+
+            color: #0f172a;
+
+            font-size: 14px;
+            line-height: 1.35;
+
+            font-weight: 950;
+        }
+
+        .catalog-vendor {
+            display: flex;
+
+            align-items: center;
+
+            gap: 6px;
+
+            margin-bottom: 14px;
+
+            color: #64748b;
+
+            font-size: 8px;
+            font-weight: 750;
+        }
+
+        .vendor-dot {
+            width: 6px;
+            height: 6px;
+
+            flex-shrink: 0;
+
+            border-radius: 50%;
+
+            background:
+                #3b82f6;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRICE
+        |--------------------------------------------------------------------------
+        */
+
+        .catalog-bottom {
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 10px;
+
+            padding-top: 13px;
+
+            border-top:
+                1px solid #eff6ff;
+        }
+
+        .catalog-price {
+            color: #1d4ed8;
+
+            font-size: 17px;
+            font-weight: 950;
+        }
+
+        .catalog-price-label {
+            display: block;
+
+            margin-bottom: 2px;
+
+            color: #94a3b8;
+
+            font-size: 7px;
+            font-weight: 800;
+
+            text-transform: uppercase;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | VIEW BUTTON
+        |--------------------------------------------------------------------------
+        */
+
+        .view-product-btn {
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            min-width: 95px;
+
+            padding: 9px 12px;
+
+            border-radius: 11px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #0284c7
+                );
+
+            color: white;
+
+            text-decoration: none;
+
+            font-size: 8px;
+            font-weight: 950;
+
+            box-shadow:
+                0 7px 18px
+                rgba(37,99,235,.18);
+
+            transition:
+                transform .2s ease,
+                box-shadow .2s ease;
+        }
+
+        .view-product-btn:hover {
+            transform:
+                translateY(-2px);
+
+            box-shadow:
+                0 11px 25px
+                rgba(37,99,235,.25);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | EMPTY STATE
+        |--------------------------------------------------------------------------
+        */
+
+        .catalog-empty {
+            padding: 70px 20px;
+
+            border:
+                1px solid #dbeafe;
+
+            border-radius: 25px;
+
+            background: #fff;
+
+            text-align: center;
+
+            box-shadow:
+                0 12px 35px
+                rgba(15,23,42,.05);
+        }
+
+        .catalog-empty-icon {
+            margin-bottom: 12px;
+
+            font-size: 45px;
+        }
+
+        .catalog-empty h3 {
+            margin: 0 0 7px;
+
+            color: #334155;
+
+            font-size: 16px;
+            font-weight: 950;
+        }
+
+        .catalog-empty p {
+            margin: 0;
+
+            color: #94a3b8;
+
+            font-size: 9px;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSIVE
+        |--------------------------------------------------------------------------
+        */
+
+        @media (max-width: 1150px) {
+
+            .catalog-grid {
+                grid-template-columns:
+                    repeat(
+                        3,
+                        minmax(0, 1fr)
+                    );
+            }
+
+        }
+
+        @media (max-width: 800px) {
+
+            .catalog-page {
+                padding:
+                    25px 15px 50px;
+            }
+
+            .catalog-hero {
+                padding: 28px 23px;
+            }
+
+            .catalog-grid {
+                grid-template-columns:
+                    repeat(
+                        2,
+                        minmax(0, 1fr)
+                    );
+
+                gap: 13px;
+            }
+
+            .catalog-image-wrap {
+                height: 190px;
+            }
+
+        }
+
+        @media (max-width: 520px) {
+
+            .catalog-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .catalog-image-wrap {
+                height: 230px;
+            }
+
+            .catalog-section-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+        }
+
+    </style>
 
 </head>
 
 <body>
 
-<div class="catalog-page">
-
-    <!-- =====================================================
-         HERO
-    ====================================================== -->
-
-    <section class="catalog-hero">
-
-        <div class="catalog-hero-content">
-
-            <span class="catalog-eyebrow">
-                HOCHIPOHUB MARKETPLACE
-            </span>
-
-            <h1>
-                Find Your
-                <span>Next Favourite.</span>
-            </h1>
-
-            <p>
-                Explore products from local businesses,
-                creators and independent vendors.
-            </p>
+<?php
+require_once __DIR__ . '/includes/navbar.php';
+?>
 
 
-            <!-- SEARCH -->
+<main class="catalog-page">
 
-            <form
-                method="GET"
-                action="catalog.php"
-                class="catalog-search"
-            >
-
-                <?php if ($categoryId > 0): ?>
-
-                    <input
-                        type="hidden"
-                        name="category"
-                        value="<?php echo $categoryId; ?>"
-                    >
-
-                <?php endif; ?>
+    <div class="catalog-container">
 
 
-                <div class="search-icon">
-                    ⌕
+        <!-- HERO -->
+
+        <section class="catalog-hero">
+
+            <div class="catalog-hero-content">
+
+                <div class="catalog-kicker">
+                    HochipoHub Marketplace
                 </div>
 
-                <input
-                    type="search"
-                    name="search"
-                    placeholder="Search products, vendors or categories..."
-                    value="<?php
-                        echo htmlspecialchars($search);
-                    ?>"
-                >
+                <h1>
+                    Product Catalog
+                </h1>
 
-                <button type="submit">
-                    Search
-                </button>
+                <p>
+                    Discover products from
+                    different vendors and find
+                    something worth adding to
+                    your cart.
+                </p>
 
-            </form>
+                <div class="catalog-count">
 
-        </div>
+                    <?= number_format(
+                        count($products)
+                    ) ?>
 
-    </section>
-
-
-    <!-- =====================================================
-         MAIN CONTENT
-    ====================================================== -->
-
-    <main class="catalog-container">
-
-        <!-- =================================================
-             CATEGORY FILTER
-        ================================================== -->
-
-        <section class="catalog-categories">
-
-            <div class="catalog-heading">
-
-                <div>
-
-                    <span>
-                        BROWSE
-                    </span>
-
-                    <h2>
-                        Shop by Category
-                    </h2>
+                    &nbsp; products available
 
                 </div>
-
-                <?php if ($categoryId > 0 || $search !== ''): ?>
-
-                    <a
-                        href="<?php echo site_url('catalog.php'); ?>"
-                        class="clear-filter"
-                    >
-                        Clear Filters ×
-                    </a>
-
-                <?php endif; ?>
 
             </div>
 
-
-            <div class="category-scroll">
-
-                <a
-                    href="<?php echo site_url('catalog.php'); ?>"
-                    class="
-                        category-pill
-                        <?php
-                        echo $categoryId === 0
-                            ? 'active'
-                            : '';
-                        ?>
-                    "
-                >
-                    <span>✦</span>
-                    All Products
-                </a>
+        </section>
 
 
-                <?php foreach ($categories as $category): ?>
+        <!-- SECTION HEADER -->
 
-                    <a
-                        href="<?php
-                            echo catalogUrl([
-                                'category' =>
-                                    $category['category_id']
-                            ]);
-                        ?>"
-                        class="
-                            category-pill
-                            <?php
-                            echo $categoryId ===
-                                (int)$category['category_id']
-                                ? 'active'
-                                : '';
-                            ?>
-                        "
+        <div class="catalog-section-header">
+
+            <div>
+
+                <h2>
+                    Explore Products
+                </h2>
+
+            </div>
+
+            <span>
+                Latest products first
+            </span>
+
+        </div>
+
+
+        <!-- PRODUCTS -->
+
+        <?php if (
+            !empty($products)
+        ): ?>
+
+            <div class="catalog-grid">
+
+                <?php foreach (
+                    $products
+                    as $product
+                ): ?>
+
+                    <?php
+
+                    $productImage =
+                        productImageUrl(
+                            $product['image']
+                                ?? null
+                        );
+
+                    $vendorName =
+                        !empty(
+                            $product[
+                                'vendor_name'
+                            ]
+                        )
+                        ? $product[
+                            'vendor_name'
+                        ]
+                        : 'HochipoHub Vendor';
+
+                    $categoryName =
+                        !empty(
+                            $product[
+                                'category_name'
+                            ]
+                        )
+                        ? $product[
+                            'category_name'
+                        ]
+                        : 'Product';
+
+                    ?>
+
+                    <article
+                        class="catalog-card"
                     >
 
-                        <span>◈</span>
 
-                        <?php
-                        echo htmlspecialchars(
-                            $category['category_name']
-                        );
-                        ?>
+                        <!-- IMAGE -->
 
-                    </a>
+                        <div
+                            class="
+                                catalog-image-wrap
+                            "
+                        >
+
+                            <?php if (
+                                !empty(
+                                    $product['image']
+                                )
+                            ): ?>
+
+                                <img
+                                    src="<?= e(
+                                        $productImage
+                                    ) ?>"
+                                    alt="<?= e(
+                                        $product[
+                                            'product_name'
+                                        ]
+                                    ) ?>"
+                                    class="
+                                        catalog-image
+                                    "
+                                    loading="lazy"
+                                    onerror="
+                                        this.style.display='none';
+                                        this.nextElementSibling.style.display='flex';
+                                    "
+                                >
+
+                                <div
+                                    class="
+                                        catalog-image-placeholder
+                                    "
+                                    style="
+                                        display:none;
+                                    "
+                                >
+                                    🛍️
+                                </div>
+
+                            <?php else: ?>
+
+                                <div
+                                    class="
+                                        catalog-image-placeholder
+                                    "
+                                >
+                                    🛍️
+                                </div>
+
+                            <?php endif; ?>
+
+
+                            <span
+                                class="available-tag"
+                            >
+                                Available
+                            </span>
+
+                        </div>
+
+
+                        <!-- CONTENT -->
+
+                        <div
+                            class="catalog-content"
+                        >
+
+                            <div
+                                class="
+                                    catalog-category
+                                "
+                            >
+                                <?= e(
+                                    $categoryName
+                                ) ?>
+                            </div>
+
+
+                            <h3
+                                class="
+                                    catalog-product-name
+                                "
+                            >
+                                <?= e(
+                                    $product[
+                                        'product_name'
+                                    ]
+                                ) ?>
+                            </h3>
+
+
+                            <div
+                                class="
+                                    catalog-vendor
+                                "
+                            >
+
+                                <span
+                                    class="vendor-dot"
+                                ></span>
+
+                                <span>
+                                    <?= e(
+                                        $vendorName
+                                    ) ?>
+                                </span>
+
+                            </div>
+
+
+                            <div
+                                class="
+                                    catalog-bottom
+                                "
+                            >
+
+                                <div>
+
+                                    <span
+                                        class="
+                                            catalog-price-label
+                                        "
+                                    >
+                                        Price
+                                    </span>
+
+                                    <div
+                                        class="
+                                            catalog-price
+                                        "
+                                    >
+                                        <?= formatPrice(
+                                            $product[
+                                                'price'
+                                            ]
+                                        ) ?>
+                                    </div>
+
+                                </div>
+
+
+                                <a
+                                    href="<?= BASE_URL ?>product_details.php?id=<?= (int) $product['product_id'] ?>"
+                                    class="
+                                        view-product-btn
+                                    "
+                                >
+                                    View Product
+                                </a>
+
+                            </div>
+
+                        </div>
+
+                    </article>
 
                 <?php endforeach; ?>
 
             </div>
 
-        </section>
+        <?php else: ?>
 
 
-        <!-- =================================================
-             PRODUCTS HEADER
-        ================================================== -->
+            <!-- EMPTY -->
 
-        <section class="catalog-products">
+            <div
+                class="catalog-empty"
+            >
 
-            <div class="products-toolbar">
-
-                <div>
-
-                    <span class="products-label">
-                        DISCOVER
-                    </span>
-
-                    <h2>
-
-                        <?php if ($search !== ''): ?>
-
-                            Results for
-                            "<?php
-                            echo htmlspecialchars($search);
-                            ?>"
-
-                        <?php elseif ($categoryId > 0): ?>
-
-                            <?php
-
-                            $selectedCategoryName =
-                                'Products';
-
-                            foreach ($categories as $cat) {
-
-                                if (
-                                    (int)$cat['category_id']
-                                    === $categoryId
-                                ) {
-                                    $selectedCategoryName =
-                                        $cat['category_name'];
-                                    break;
-                                }
-                            }
-
-                            echo htmlspecialchars(
-                                $selectedCategoryName
-                            );
-
-                            ?>
-
-                        <?php else: ?>
-
-                            All Products
-
-                        <?php endif; ?>
-
-                    </h2>
-
-                    <p>
-                        <?php echo count($products); ?>
-                        product<?php
-                        echo count($products) === 1
-                            ? ''
-                            : 's';
-                        ?>
-                        found
-                    </p>
-
+                <div
+                    class="
+                        catalog-empty-icon
+                    "
+                >
+                    🛍️
                 </div>
 
+                <h3>
+                    No products available
+                </h3>
 
-                <!-- SORT -->
-
-                <form
-                    method="GET"
-                    action="catalog.php"
-                    class="sort-form"
-                >
-
-                    <?php if ($categoryId > 0): ?>
-
-                        <input
-                            type="hidden"
-                            name="category"
-                            value="<?php echo $categoryId; ?>"
-                        >
-
-                    <?php endif; ?>
-
-
-                    <?php if ($search !== ''): ?>
-
-                        <input
-                            type="hidden"
-                            name="search"
-                            value="<?php
-                                echo htmlspecialchars($search);
-                            ?>"
-                        >
-
-                    <?php endif; ?>
-
-
-                    <label for="sort">
-                        Sort by
-                    </label>
-
-                    <select
-                        name="sort"
-                        id="sort"
-                        onchange="this.form.submit()"
-                    >
-
-                        <option
-                            value="latest"
-                            <?php
-                            echo $sort === 'latest'
-                                ? 'selected'
-                                : '';
-                            ?>
-                        >
-                            Latest
-                        </option>
-
-                        <option
-                            value="price_low"
-                            <?php
-                            echo $sort === 'price_low'
-                                ? 'selected'
-                                : '';
-                            ?>
-                        >
-                            Price: Low to High
-                        </option>
-
-                        <option
-                            value="price_high"
-                            <?php
-                            echo $sort === 'price_high'
-                                ? 'selected'
-                                : '';
-                            ?>
-                        >
-                            Price: High to Low
-                        </option>
-
-                        <option
-                            value="name"
-                            <?php
-                            echo $sort === 'name'
-                                ? 'selected'
-                                : '';
-                            ?>
-                        >
-                            Name: A-Z
-                        </option>
-
-                    </select>
-
-                </form>
+                <p>
+                    There are currently no
+                    available products in the
+                    marketplace.
+                </p>
 
             </div>
 
 
-            <!-- =================================================
-                 PRODUCT GRID
-            ================================================== -->
+        <?php endif; ?>
 
-            <?php if (!empty($products)): ?>
+    </div>
 
-                <div class="catalog-product-grid">
+</main>
 
-                    <?php foreach ($products as $product): ?>
 
-                        <?php
-
-                        $rating = catalogRating(
-                            $conn,
-                            $product['product_id']
-                        );
-
-                        $productImage =
-                            catalogProductImage(
-                                $product['image']
-                            );
-
-                        ?>
-
-                        <article class="catalog-product-card">
-
-                            <!-- IMAGE -->
-
-                            <a
-                                href="<?php
-                                    echo site_url(
-                                        'product_details.php?id=' .
-                                        (int)$product['product_id']
-                                    );
-                                ?>"
-                                class="catalog-product-image"
-                            >
-
-                                <img
-                                    src="<?php
-                                        echo htmlspecialchars(
-                                            $productImage
-                                        );
-                                    ?>"
-                                    alt="<?php
-                                        echo htmlspecialchars(
-                                            $product['product_name']
-                                        );
-                                    ?>"
-                                    loading="lazy"
-                                    onerror="
-                                        this.src='<?php
-                                            echo DEFAULT_PRODUCT_IMAGE;
-                                        ?>';
-                                    "
-                                >
-
-                                <span class="product-status">
-                                    AVAILABLE
-                                </span>
-
-                            </a>
-
-
-                            <!-- CONTENT -->
-
-                            <div class="catalog-product-content">
-
-                                <span class="catalog-product-category">
-
-                                    <?php
-                                    echo htmlspecialchars(
-                                        $product['category_name']
-                                    );
-                                    ?>
-
-                                </span>
-
-
-                                <a
-                                    href="<?php
-                                        echo site_url(
-                                            'product_details.php?id=' .
-                                            (int)$product['product_id']
-                                        );
-                                    ?>"
-                                    class="catalog-product-name"
-                                >
-
-                                    <?php
-                                    echo htmlspecialchars(
-                                        $product['product_name']
-                                    );
-                                    ?>
-
-                                </a>
-
-
-                                <p class="catalog-product-vendor">
-
-                                    by
-                                    <strong>
-                                        <?php
-                                        echo htmlspecialchars(
-                                            $product['business_name']
-                                        );
-                                        ?>
-                                    </strong>
-
-                                </p>
-
-
-                                <?php if (
-                                    !empty(
-                                        $product['description']
-                                    )
-                                ): ?>
-
-                                    <p class="catalog-product-description">
-
-                                        <?php
-                                        echo htmlspecialchars(
-                                            mb_strimwidth(
-                                                $product['description'],
-                                                0,
-                                                90,
-                                                '...'
-                                            )
-                                        );
-                                        ?>
-
-                                    </p>
-
-                                <?php endif; ?>
-
-
-                                <div class="catalog-product-meta">
-
-                                    <div>
-
-                                        <div class="catalog-price">
-
-                                            RM
-                                            <?php
-                                            echo number_format(
-                                                (float)$product['price'],
-                                                2
-                                            );
-                                            ?>
-
-                                        </div>
-
-
-                                        <div class="catalog-rating">
-
-                                            <?php if (
-                                                $rating['reviews'] > 0
-                                            ): ?>
-
-                                                <span>
-                                                    ★
-                                                </span>
-
-                                                <?php
-                                                echo number_format(
-                                                    $rating['rating'],
-                                                    1
-                                                );
-                                                ?>
-
-                                                <small>
-                                                    (
-                                                    <?php
-                                                    echo $rating['reviews'];
-                                                    ?>
-                                                    )
-                                                </small>
-
-                                            <?php else: ?>
-
-                                                <small>
-                                                    No reviews
-                                                </small>
-
-                                            <?php endif; ?>
-
-                                        </div>
-
-                                    </div>
-
-
-                                    <a
-                                        href="<?php
-                                            echo site_url(
-                                                'product_details.php?id=' .
-                                                (int)$product['product_id']
-                                            );
-                                        ?>"
-                                        class="catalog-view-btn"
-                                        title="View product"
-                                    >
-                                        →
-                                    </a>
-
-                                </div>
-
-                            </div>
-
-                        </article>
-
-                    <?php endforeach; ?>
-
-                </div>
-
-            <?php else: ?>
-
-                <!-- =================================================
-                     EMPTY SEARCH
-                ================================================== -->
-
-                <div class="catalog-empty">
-
-                    <div class="empty-icon">
-                        ◌
-                    </div>
-
-                    <h2>
-                        Nothing matched your search.
-                    </h2>
-
-                    <p>
-                        Try another keyword or explore
-                        a different category.
-                    </p>
-
-                    <a
-                        href="<?php echo site_url('catalog.php'); ?>"
-                        class="catalog-empty-btn"
-                    >
-                        View All Products
-                    </a>
-
-                </div>
-
-            <?php endif; ?>
-
-        </section>
-
-    </main>
-
-</div>
-
-
-<!-- =========================================================
-     SMALL INLINE STYLE
-========================================================= -->
-
-<style>
-
-.catalog-page {
-    min-height: 100vh;
-    background:
-        radial-gradient(
-            circle at 10% 10%,
-            rgba(37,99,235,.13),
-            transparent 25%
-        ),
-        #020617;
-    color: #f8fafc;
-}
-
-.catalog-hero {
-    position: relative;
-    overflow: hidden;
-
-    padding:
-        85px 7% 70px;
-
-    background:
-        radial-gradient(
-            circle at 85% 25%,
-            rgba(14,165,233,.25),
-            transparent 30%
-        ),
-        linear-gradient(
-            135deg,
-            #020617,
-            #06285c 55%,
-            #0b4fa3
-        );
-}
-
-.catalog-hero-content {
-    max-width: 900px;
-    margin: auto;
-}
-
-.catalog-eyebrow,
-.products-label,
-.catalog-heading > div > span {
-    color: #38bdf8;
-    font-size: 12px;
-    font-weight: 900;
-    letter-spacing: 2px;
-}
-
-.catalog-hero h1 {
-    margin: 15px 0;
-
-    font-size:
-        clamp(48px, 7vw, 80px);
-
-    line-height: .98;
-    font-weight: 900;
-    letter-spacing: -4px;
-}
-
-.catalog-hero h1 span {
-    background:
-        linear-gradient(
-            90deg,
-            #38bdf8,
-            #60a5fa,
-            #a5f3fc
-        );
-
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.catalog-hero p {
-    max-width: 600px;
-
-    color: #cbd5e1;
-    line-height: 1.7;
-}
-
-.catalog-search {
-    display: flex;
-    align-items: center;
-
-    max-width: 760px;
-
-    margin-top: 30px;
-
-    padding: 7px;
-
-    border:
-        1px solid
-        rgba(148,163,184,.22);
-
-    border-radius: 18px;
-
-    background:
-        rgba(15,23,42,.65);
-
-    backdrop-filter: blur(18px);
-}
-
-.search-icon {
-    padding: 0 15px;
-
-    color: #38bdf8;
-    font-size: 24px;
-}
-
-.catalog-search input {
-    flex: 1;
-
-    min-width: 0;
-
-    padding: 14px 5px;
-
-    border: 0;
-    outline: 0;
-
-    background: transparent;
-
-    color: white;
-
-    font-size: 15px;
-}
-
-.catalog-search input::placeholder {
-    color: #64748b;
-}
-
-.catalog-search button {
-    padding: 14px 24px;
-
-    border: 0;
-    border-radius: 13px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #2563eb,
-            #0ea5e9
-        );
-
-    color: white;
-
-    font-weight: 800;
-
-    cursor: pointer;
-}
-
-.catalog-container {
-    width: 86%;
-    max-width: 1400px;
-
-    margin: auto;
-}
-
-.catalog-categories {
-    padding: 50px 0 35px;
-}
-
-.catalog-heading {
-    display: flex;
-
-    align-items: end;
-    justify-content: space-between;
-
-    gap: 20px;
-
-    margin-bottom: 20px;
-}
-
-.catalog-heading h2,
-.products-toolbar h2 {
-    margin: 6px 0 0;
-
-    font-size: 30px;
-    font-weight: 900;
-}
-
-.clear-filter {
-    color: #f87171;
-    font-weight: 700;
-}
-
-.category-scroll {
-    display: flex;
-
-    gap: 10px;
-
-    overflow-x: auto;
-
-    padding-bottom: 8px;
-}
-
-.category-pill {
-    flex: 0 0 auto;
-
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    padding: 12px 18px;
-
-    border:
-        1px solid
-        rgba(148,163,184,.18);
-
-    border-radius: 999px;
-
-    background:
-        rgba(15,23,42,.65);
-
-    color: #cbd5e1;
-
-    font-size: 14px;
-    font-weight: 700;
-
-    transition: .25s ease;
-}
-
-.category-pill:hover,
-.category-pill.active {
-    border-color:
-        rgba(56,189,248,.55);
-
-    background:
-        rgba(14,165,233,.15);
-
-    color: #7dd3fc;
-}
-
-.products-toolbar {
-    display: flex;
-
-    align-items: end;
-    justify-content: space-between;
-
-    gap: 20px;
-
-    margin-bottom: 30px;
-}
-
-.products-toolbar p {
-    margin: 8px 0 0;
-    color: #64748b;
-}
-
-.sort-form {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.sort-form label {
-    color: #94a3b8;
-    font-size: 13px;
-}
-
-.sort-form select {
-    padding: 11px 15px;
-
-    border:
-        1px solid
-        rgba(148,163,184,.2);
-
-    border-radius: 12px;
-
-    background: #0f172a;
-    color: white;
-
-    outline: none;
-}
-
-.catalog-product-grid {
-    display: grid;
-
-    grid-template-columns:
-        repeat(4, 1fr);
-
-    gap: 22px;
-
-    padding-bottom: 90px;
-}
-
-.catalog-product-card {
-    overflow: hidden;
-
-    border:
-        1px solid
-        rgba(148,163,184,.13);
-
-    border-radius: 23px;
-
-    background:
-        linear-gradient(
-            145deg,
-            rgba(15,23,42,.96),
-            rgba(8,47,87,.7)
-        );
-
-    transition: .3s ease;
-}
-
-.catalog-product-card:hover {
-    transform: translateY(-7px);
-
-    border-color:
-        rgba(56,189,248,.45);
-
-    box-shadow:
-        0 25px 60px
-        rgba(2,132,199,.18);
-}
-
-.catalog-product-image {
-    position: relative;
-
-    display: block;
-
-    height: 245px;
-
-    overflow: hidden;
-
-    background:
-        linear-gradient(
-            135deg,
-            #0f3d78,
-            #172554
-        );
-}
-
-.catalog-product-image img {
-    width: 100%;
-    height: 100%;
-
-    object-fit: cover;
-
-    transition: .4s ease;
-}
-
-.catalog-product-card:hover
-.catalog-product-image img {
-    transform: scale(1.07);
-}
-
-.product-status {
-    position: absolute;
-
-    top: 14px;
-    left: 14px;
-
-    padding: 7px 10px;
-
-    border-radius: 999px;
-
-    background:
-        rgba(15,23,42,.75);
-
-    color: #7dd3fc;
-
-    font-size: 10px;
-    font-weight: 900;
-
-    backdrop-filter: blur(10px);
-}
-
-.catalog-product-content {
-    padding: 20px;
-}
-
-.catalog-product-category {
-    color: #38bdf8;
-
-    font-size: 11px;
-    font-weight: 900;
-
-    letter-spacing: 1px;
-    text-transform: uppercase;
-}
-
-.catalog-product-name {
-    display: block;
-
-    margin-top: 8px;
-
-    color: white;
-
-    font-size: 19px;
-    font-weight: 850;
-
-    line-height: 1.25;
-}
-
-.catalog-product-vendor {
-    margin: 8px 0 0;
-
-    color: #64748b;
-
-    font-size: 13px;
-}
-
-.catalog-product-vendor strong {
-    color: #94a3b8;
-}
-
-.catalog-product-description {
-    color: #64748b;
-
-    font-size: 13px;
-
-    line-height: 1.5;
-
-    min-height: 39px;
-
-    margin: 12px 0 0;
-}
-
-.catalog-product-meta {
-    display: flex;
-
-    align-items: end;
-    justify-content: space-between;
-
-    margin-top: 18px;
-}
-
-.catalog-price {
-    color: #7dd3fc;
-
-    font-size: 22px;
-    font-weight: 900;
-}
-
-.catalog-rating {
-    margin-top: 5px;
-
-    color: #facc15;
-
-    font-size: 13px;
-}
-
-.catalog-rating small {
-    color: #64748b;
-}
-
-.catalog-view-btn {
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    width: 42px;
-    height: 42px;
-
-    border-radius: 13px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #2563eb,
-            #0ea5e9
-        );
-
-    color: white;
-
-    font-size: 20px;
-    font-weight: 900;
-}
-
-.catalog-empty {
-    padding: 90px 20px;
-
-    margin-bottom: 80px;
-
-    text-align: center;
-
-    border:
-        1px dashed
-        rgba(148,163,184,.25);
-
-    border-radius: 25px;
-
-    color: #94a3b8;
-}
-
-.empty-icon {
-    font-size: 55px;
-    color: #38bdf8;
-}
-
-.catalog-empty h2 {
-    color: white;
-}
-
-.catalog-empty-btn {
-    display: inline-block;
-
-    margin-top: 15px;
-
-    padding: 13px 20px;
-
-    border-radius: 13px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #2563eb,
-            #0ea5e9
-        );
-
-    color: white;
-
-    font-weight: 800;
-}
-
-
-/* =========================================================
-   MOBILE
-========================================================= */
-
-@media (max-width: 1000px) {
-
-    .catalog-product-grid {
-        grid-template-columns:
-            repeat(2, 1fr);
-    }
-
-}
-
-@media (max-width: 700px) {
-
-    .catalog-container {
-        width: 92%;
-    }
-
-    .catalog-hero {
-        padding: 65px 6%;
-    }
-
-    .catalog-hero h1 {
-        font-size: 48px;
-        letter-spacing: -2px;
-    }
-
-    .catalog-search {
-        border-radius: 15px;
-    }
-
-    .catalog-search button {
-        padding: 13px 16px;
-    }
-
-    .products-toolbar {
-        display: block;
-    }
-
-    .sort-form {
-        margin-top: 20px;
-    }
-
-    .sort-form select {
-        flex: 1;
-    }
-
-    .catalog-product-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .catalog-product-image {
-        height: 250px;
-    }
-
-}
-
-@media (max-width: 480px) {
-
-    .catalog-hero h1 {
-        font-size: 40px;
-    }
-
-    .catalog-search input {
-        font-size: 13px;
-    }
-
-    .catalog-search button {
-        font-size: 12px;
-    }
-
-    .catalog-heading h2,
-    .products-toolbar h2 {
-        font-size: 25px;
-    }
-
-}
-
-</style>
+<?php
+require_once __DIR__ . '/includes/footer.php';
+?>
 
 </body>
+
 </html>
