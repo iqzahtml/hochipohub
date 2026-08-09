@@ -1,406 +1,1272 @@
 <?php
+// =========================================================
+// HOCHIPO HUB
+// File: checkout.php
+// Customer Checkout
+//
+// FLOW:
+//
+// cart
+//   ↓
+// checkout.php
+//   ↓
+// orders
+//   ↓
+// order_details
+//   ↓
+// vendor_orders
+//   ↓
+// payment.php
+//
+// =========================================================
+
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/database/db.php';
 require_once __DIR__ . '/includes/session.php';
+require_once __DIR__ . '/includes/functions.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+
+// =========================================================
+// DATABASE CONNECTION
+// =========================================================
+
+$db = $conn ?? $pdo ?? null;
+
+if (!$db) {
+    die('Database connection not found.');
 }
 
-/*
-|--------------------------------------------------------------------------
-| Customer Authentication
-|--------------------------------------------------------------------------
-*/
+
+// =========================================================
+// HELPER
+// =========================================================
+
+function checkout_e($value): string
+{
+    return htmlspecialchars(
+        (string) $value,
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
+
+
+// =========================================================
+// LOGIN CHECK
+// =========================================================
 
 if (!isset($_SESSION['user_id'])) {
-    header(
-        'Location: ' .
-        site_url('index.php?login=required')
-    );
+
+    header('Location: index.php');
     exit;
 }
 
-$userId = (int) $_SESSION['user_id'];
+$customer_id = (int) $_SESSION['user_id'];
 
 
-/*
-|--------------------------------------------------------------------------
-| Get Customer
-|--------------------------------------------------------------------------
-*/
+// =========================================================
+// GET CUSTOMER INFORMATION
+// =========================================================
 
-$stmt = $conn->prepare("
-    SELECT
-        user_id,
-        name,
-        email,
-        phone
-    FROM users
-    WHERE user_id = ?
-    LIMIT 1
-");
+$customer = null;
 
-$stmt->bind_param('i', $userId);
-$stmt->execute();
+try {
 
-$userResult = $stmt->get_result();
-$user = $userResult->fetch_assoc();
+    $sql = "
+        SELECT
+            user_id,
+            name,
+            email,
+            phone
 
-$stmt->close();
+        FROM users
 
-if (!$user) {
+        WHERE user_id = ?
+        LIMIT 1
+    ";
+
+    if ($db instanceof PDO) {
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$customer_id]);
+
+        $customer = $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+    } else {
+
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param(
+            'i',
+            $customer_id
+        );
+
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        $customer = $result->fetch_assoc();
+
+        $stmt->close();
+    }
+
+} catch (Throwable $e) {
+
+    $customer = null;
+}
+
+if (!$customer) {
+
     session_destroy();
 
-    header(
-        'Location: ' .
-        site_url('index.php')
-    );
-
+    header('Location: index.php');
     exit;
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Get Cart
-|--------------------------------------------------------------------------
-*/
+// =========================================================
+// GET CART ITEMS
+// =========================================================
 
-$cartItems = [];
+$cart_items = [];
 
-$stmt = $conn->prepare("
-    SELECT
-        c.cart_id,
-        c.product_id,
-        c.quantity,
+try {
 
-        p.product_name,
-        p.description,
-        p.price,
-        p.stock_quantity,
-        p.image,
-        p.status,
+    $sql = "
+        SELECT
 
-        v.vendor_id,
-        v.business_name,
-        v.delivery_method AS vendor_delivery_method,
+            c.cart_id,
+            c.product_id,
+            c.quantity,
 
-        cat.category_name
+            p.product_name,
+            p.description,
+            p.price,
+            p.stock_quantity,
+            p.image,
+            p.status,
 
-    FROM cart c
+            v.vendor_id,
+            v.business_name,
 
-    INNER JOIN products p
-        ON c.product_id = p.product_id
+            cat.category_name
 
-    INNER JOIN vendors v
-        ON p.vendor_id = v.vendor_id
+        FROM cart c
 
-    INNER JOIN categories cat
-        ON p.category_id = cat.category_id
+        INNER JOIN products p
+            ON c.product_id = p.product_id
 
-    WHERE c.customer_id = ?
+        INNER JOIN vendors v
+            ON p.vendor_id = v.vendor_id
 
-    ORDER BY v.business_name ASC,
-             p.product_name ASC
-");
+        LEFT JOIN categories cat
+            ON p.category_id = cat.category_id
 
-$stmt->bind_param('i', $userId);
-$stmt->execute();
+        WHERE c.customer_id = ?
 
-$result = $stmt->get_result();
+        ORDER BY v.business_name ASC,
+                 p.product_name ASC
+    ";
 
-while ($row = $result->fetch_assoc()) {
-    $cartItems[] = $row;
-}
+    if ($db instanceof PDO) {
 
-$stmt->close();
+        $stmt = $db->prepare($sql);
 
+        $stmt->execute([
+            $customer_id
+        ]);
 
-/*
-|--------------------------------------------------------------------------
-| Validate Cart
-|--------------------------------------------------------------------------
-*/
+        $cart_items =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            );
 
-$invalidItems = [];
+    } else {
 
-foreach ($cartItems as $item) {
+        $stmt = $db->prepare($sql);
 
-    if (
-        $item['status'] !== 'Available' ||
-        $item['stock_quantity'] <= 0 ||
-        $item['quantity'] > $item['stock_quantity']
-    ) {
-        $invalidItems[] = $item;
+        $stmt->bind_param(
+            'i',
+            $customer_id
+        );
+
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        while ($row = $result->fetch_assoc()) {
+            $cart_items[] = $row;
+        }
+
+        $stmt->close();
     }
+
+} catch (Throwable $e) {
+
+    $cart_items = [];
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Redirect if Cart Empty
-|--------------------------------------------------------------------------
-*/
+// =========================================================
+// EMPTY CART
+// =========================================================
 
-if (empty($cartItems)) {
+if (empty($cart_items)) {
 
-    header(
-        'Location: ' .
-        site_url('cart.php?empty=1')
-    );
-
+    header('Location: cart.php');
     exit;
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Group Cart by Vendor
-|--------------------------------------------------------------------------
-*/
+// =========================================================
+// VALIDATE STOCK
+// =========================================================
 
-$vendorGroups = [];
+$stock_error = '';
 
-foreach ($cartItems as $item) {
+foreach ($cart_items as $item) {
 
-    $vendorId = (int) $item['vendor_id'];
+    $quantity =
+        (int) $item['quantity'];
 
-    if (!isset($vendorGroups[$vendorId])) {
+    $stock =
+        (int) $item['stock_quantity'];
 
-        $vendorGroups[$vendorId] = [
-            'vendor_id' => $vendorId,
-            'business_name' =>
-                $item['business_name'],
+    $status =
+        $item['status'];
 
-            'delivery_method' =>
-                $item['vendor_delivery_method'],
+    if ($status !== 'Available') {
 
-            'items' => [],
+        $stock_error =
+            $item['product_name'] .
+            ' is currently unavailable.';
 
-            'subtotal' => 0
-        ];
+        break;
     }
 
-    $itemSubtotal =
-        (float)$item['price'] *
-        (int)$item['quantity'];
+    if ($quantity <= 0) {
 
-    $item['item_subtotal'] = $itemSubtotal;
+        $stock_error =
+            'Invalid quantity for ' .
+            $item['product_name'] . '.';
 
-    $vendorGroups[$vendorId]['items'][] = $item;
+        break;
+    }
 
-    $vendorGroups[$vendorId]['subtotal'] +=
-        $itemSubtotal;
+    if ($quantity > $stock) {
+
+        $stock_error =
+            'Not enough stock for ' .
+            $item['product_name'] .
+            '. Available stock: ' .
+            $stock . '.';
+
+        break;
+    }
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Calculate Total
-|--------------------------------------------------------------------------
-*/
+// =========================================================
+// CALCULATE TOTAL
+// =========================================================
 
 $subtotal = 0;
 
-foreach ($cartItems as $item) {
+foreach ($cart_items as $item) {
 
     $subtotal +=
-        (float)$item['price'] *
-        (int)$item['quantity'];
+        (float) $item['price'] *
+        (int) $item['quantity'];
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Delivery Fee
-|--------------------------------------------------------------------------
-|
-| Simple marketplace rule:
-|
-| Pickup  = RM0
-| Postage  = RM5 per vendor
-|
-| This matches the multi-vendor database structure.
-|
-*/
+// =========================================================
+// DELIVERY
+//
+// Database only supports:
+// Pickup
+// Postage
+//
+// No automatic delivery fee is added here.
+// =========================================================
 
-$defaultDelivery = 'Postage';
-
-$deliveryFee = count($vendorGroups) * 5;
-
-$totalAmount =
-    $subtotal +
-    $deliveryFee;
-
-
-/*
-|--------------------------------------------------------------------------
-| Previous Form Values
-|--------------------------------------------------------------------------
-*/
-
-$deliveryMethod =
-    isset($_SESSION['checkout_delivery_method'])
-        ? $_SESSION['checkout_delivery_method']
-        : $defaultDelivery;
-
-$deliveryAddress =
-    isset($_SESSION['checkout_delivery_address'])
-        ? $_SESSION['checkout_delivery_address']
-        : '';
-
-$error = '';
+$delivery_method =
+    $_POST['delivery_method']
+    ?? 'Pickup';
 
 if (
-    isset($_SESSION['checkout_error'])
+    !in_array(
+        $delivery_method,
+        ['Pickup', 'Postage'],
+        true
+    )
 ) {
-    $error = $_SESSION['checkout_error'];
-    unset($_SESSION['checkout_error']);
+
+    $delivery_method = 'Pickup';
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| Delivery Method Change
-|--------------------------------------------------------------------------
-*/
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-    $action =
-        isset($_POST['action'])
-            ? $_POST['action']
-            : '';
-
-    if ($action === 'continue_payment') {
-
-        $deliveryMethod =
-            isset($_POST['delivery_method'])
-                ? trim($_POST['delivery_method'])
-                : '';
-
-        $deliveryAddress =
-            isset($_POST['delivery_address'])
-                ? trim($_POST['delivery_address'])
-                : '';
+$delivery_address =
+    trim(
+        $_POST['delivery_address']
+        ?? ''
+    );
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Validate Delivery Method
-        |--------------------------------------------------------------------------
-        */
+// =========================================================
+// PROCESS CHECKOUT
+// =========================================================
 
-        if (
-            !in_array(
-                $deliveryMethod,
-                ['Pickup', 'Postage'],
-                true
-            )
-        ) {
+$error_message = '';
 
-            $error =
-                'Please select a valid delivery method.';
-        }
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    &&
+    isset($_POST['place_order'])
+) {
+
+    // -----------------------------------------------------
+    // CSRF-LIKE SESSION TOKEN
+    // -----------------------------------------------------
+
+    if (
+        !isset(
+            $_SESSION['checkout_token']
+        )
+    ) {
+
+        $_SESSION['checkout_token'] =
+            bin2hex(
+                random_bytes(32)
+            );
+    }
+
+    $submitted_token =
+        $_POST['checkout_token']
+        ?? '';
+
+    if (
+        !hash_equals(
+            $_SESSION['checkout_token'],
+            $submitted_token
+        )
+    ) {
+
+        $error_message =
+            'Invalid checkout request. Please try again.';
+
+    } elseif ($stock_error !== '') {
+
+        $error_message =
+            $stock_error;
+
+    } elseif (
+        $delivery_method === 'Postage'
+        &&
+        $delivery_address === ''
+    ) {
+
+        $error_message =
+            'Please enter your delivery address.';
+
+    } else {
+
+        try {
+
+            // =================================================
+            // START TRANSACTION
+            // =================================================
+
+            if ($db instanceof PDO) {
+
+                $db->beginTransaction();
+
+            } else {
+
+                $db->begin_transaction();
+            }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Validate Address
-        |--------------------------------------------------------------------------
-        */
+            // =================================================
+            // RE-CHECK CART + STOCK
+            // Prevent checkout using stale cart information.
+            // =================================================
 
-        if (
-            $error === '' &&
-            $deliveryMethod === 'Postage' &&
-            $deliveryAddress === ''
-        ) {
+            $verify_sql = "
+                SELECT
 
-            $error =
-                'Please enter your delivery address.';
-        }
+                    c.cart_id,
+                    c.product_id,
+                    c.quantity,
 
+                    p.product_name,
+                    p.price,
+                    p.stock_quantity,
+                    p.status,
 
-        /*
-        |--------------------------------------------------------------------------
-        | Check Stock Again
-        |--------------------------------------------------------------------------
-        */
+                    p.vendor_id
 
-        if ($error === '') {
+                FROM cart c
 
-            foreach ($cartItems as $item) {
+                INNER JOIN products p
+                    ON c.product_id = p.product_id
 
-                if (
-                    $item['status'] !== 'Available'
+                WHERE c.customer_id = ?
+
+                FOR UPDATE
+            ";
+
+            $verified_items = [];
+
+            if ($db instanceof PDO) {
+
+                $stmt =
+                    $db->prepare(
+                        $verify_sql
+                    );
+
+                $stmt->execute([
+                    $customer_id
+                ]);
+
+                $verified_items =
+                    $stmt->fetchAll(
+                        PDO::FETCH_ASSOC
+                    );
+
+            } else {
+
+                $stmt =
+                    $db->prepare(
+                        $verify_sql
+                    );
+
+                $stmt->bind_param(
+                    'i',
+                    $customer_id
+                );
+
+                $stmt->execute();
+
+                $result =
+                    $stmt->get_result();
+
+                while (
+                    $row =
+                    $result->fetch_assoc()
                 ) {
 
-                    $error =
-                        $item['product_name'] .
-                        ' is no longer available.';
+                    $verified_items[] =
+                        $row;
+                }
 
-                    break;
+                $stmt->close();
+            }
+
+
+            if (empty($verified_items)) {
+
+                throw new Exception(
+                    'Your cart is empty.'
+                );
+            }
+
+
+            // =================================================
+            // CALCULATE VERIFIED TOTAL
+            // =================================================
+
+            $verified_total = 0;
+
+            foreach (
+                $verified_items
+                as $item
+            ) {
+
+                if (
+                    $item['status']
+                    !== 'Available'
+                ) {
+
+                    throw new Exception(
+                        $item['product_name'] .
+                        ' is no longer available.'
+                    );
                 }
 
                 if (
-                    (int)$item['quantity'] >
-                    (int)$item['stock_quantity']
+                    (int)
+                    $item['quantity']
+                    >
+                    (int)
+                    $item['stock_quantity']
                 ) {
 
-                    $error =
+                    throw new Exception(
                         'Not enough stock for ' .
                         $item['product_name'] .
-                        '.';
+                        '.'
+                    );
+                }
 
-                    break;
+                $verified_total +=
+                    (float)
+                    $item['price']
+                    *
+                    (int)
+                    $item['quantity'];
+            }
+
+
+            // =================================================
+            // CREATE MAIN ORDER
+            // =================================================
+
+            $order_sql = "
+                INSERT INTO orders
+                (
+                    customer_id,
+                    total_amount,
+                    delivery_method,
+                    delivery_address,
+                    order_status
+                )
+
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    'Pending'
+                )
+            ";
+
+            if ($db instanceof PDO) {
+
+                $stmt =
+                    $db->prepare(
+                        $order_sql
+                    );
+
+                $stmt->execute([
+                    $customer_id,
+                    $verified_total,
+                    $delivery_method,
+                    $delivery_address
+                ]);
+
+                $order_id =
+                    (int)
+                    $db->lastInsertId();
+
+            } else {
+
+                $stmt =
+                    $db->prepare(
+                        $order_sql
+                    );
+
+                $stmt->bind_param(
+                    'idss',
+                    $customer_id,
+                    $verified_total,
+                    $delivery_method,
+                    $delivery_address
+                );
+
+                $stmt->execute();
+
+                $order_id =
+                    (int)
+                    $db->insert_id;
+
+                $stmt->close();
+            }
+
+
+            if ($order_id <= 0) {
+
+                throw new Exception(
+                    'Unable to create order.'
+                );
+            }
+
+
+            // =================================================
+            // CREATE ORDER DETAILS
+            // =================================================
+
+            $detail_sql = "
+                INSERT INTO order_details
+                (
+                    order_id,
+                    product_id,
+                    quantity,
+                    unit_price,
+                    subtotal
+                )
+
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?
+                )
+            ";
+
+
+            // Used to calculate vendor subtotals.
+            $vendor_totals = [];
+
+
+            foreach (
+                $verified_items
+                as $item
+            ) {
+
+                $product_id =
+                    (int)
+                    $item['product_id'];
+
+                $quantity =
+                    (int)
+                    $item['quantity'];
+
+                $unit_price =
+                    (float)
+                    $item['price'];
+
+                $item_subtotal =
+                    $unit_price *
+                    $quantity;
+
+                $vendor_id =
+                    (int)
+                    $item['vendor_id'];
+
+
+                // ---------------------------------------------
+                // ORDER DETAIL
+                // ---------------------------------------------
+
+                if ($db instanceof PDO) {
+
+                    $stmt =
+                        $db->prepare(
+                            $detail_sql
+                        );
+
+                    $stmt->execute([
+                        $order_id,
+                        $product_id,
+                        $quantity,
+                        $unit_price,
+                        $item_subtotal
+                    ]);
+
+                } else {
+
+                    $stmt =
+                        $db->prepare(
+                            $detail_sql
+                        );
+
+                    $stmt->bind_param(
+                        'iiidd',
+                        $order_id,
+                        $product_id,
+                        $quantity,
+                        $unit_price,
+                        $item_subtotal
+                    );
+
+                    $stmt->execute();
+
+                    $stmt->close();
+                }
+
+
+                // ---------------------------------------------
+                // GROUP BY VENDOR
+                // ---------------------------------------------
+
+                if (
+                    !isset(
+                        $vendor_totals[
+                            $vendor_id
+                        ]
+                    )
+                ) {
+
+                    $vendor_totals[
+                        $vendor_id
+                    ] = 0;
+                }
+
+                $vendor_totals[
+                    $vendor_id
+                ] += $item_subtotal;
+
+
+                // ---------------------------------------------
+                // REDUCE STOCK
+                // ---------------------------------------------
+
+                $stock_sql = "
+                    UPDATE products
+
+                    SET
+                        stock_quantity =
+                            stock_quantity - ?
+
+                    WHERE product_id = ?
+
+                      AND stock_quantity >= ?
+                ";
+
+                if ($db instanceof PDO) {
+
+                    $stmt =
+                        $db->prepare(
+                            $stock_sql
+                        );
+
+                    $stmt->execute([
+                        $quantity,
+                        $product_id,
+                        $quantity
+                    ]);
+
+                    if (
+                        $stmt->rowCount()
+                        !== 1
+                    ) {
+
+                        throw new Exception(
+                            'Unable to update stock for ' .
+                            $item['product_name'] .
+                            '.'
+                        );
+                    }
+
+                } else {
+
+                    $stmt =
+                        $db->prepare(
+                            $stock_sql
+                        );
+
+                    $stmt->bind_param(
+                        'iii',
+                        $quantity,
+                        $product_id,
+                        $quantity
+                    );
+
+                    $stmt->execute();
+
+                    if (
+                        $stmt->affected_rows
+                        !== 1
+                    ) {
+
+                        $stmt->close();
+
+                        throw new Exception(
+                            'Unable to update stock for ' .
+                            $item['product_name'] .
+                            '.'
+                        );
+                    }
+
+                    $stmt->close();
+                }
+
+
+                // ---------------------------------------------
+                // UPDATE PRODUCT STATUS
+                // ---------------------------------------------
+
+                $status_sql = "
+                    UPDATE products
+
+                    SET status =
+                        CASE
+                            WHEN stock_quantity <= 0
+                            THEN 'Out of Stock'
+
+                            ELSE 'Available'
+                        END
+
+                    WHERE product_id = ?
+                ";
+
+                if ($db instanceof PDO) {
+
+                    $stmt =
+                        $db->prepare(
+                            $status_sql
+                        );
+
+                    $stmt->execute([
+                        $product_id
+                    ]);
+
+                } else {
+
+                    $stmt =
+                        $db->prepare(
+                            $status_sql
+                        );
+
+                    $stmt->bind_param(
+                        'i',
+                        $product_id
+                    );
+
+                    $stmt->execute();
+
+                    $stmt->close();
+                }
+
+
+                // ---------------------------------------------
+                // UPDATE INVENTORY TABLE
+                // ---------------------------------------------
+
+                $inventory_check_sql = "
+                    SELECT
+                        inventory_id
+
+                    FROM inventory
+
+                    WHERE product_id = ?
+
+                    LIMIT 1
+                ";
+
+                $inventory_exists = false;
+
+                if ($db instanceof PDO) {
+
+                    $stmt =
+                        $db->prepare(
+                            $inventory_check_sql
+                        );
+
+                    $stmt->execute([
+                        $product_id
+                    ]);
+
+                    $inventory_exists =
+                        (bool)
+                        $stmt->fetch(
+                            PDO::FETCH_ASSOC
+                        );
+
+                } else {
+
+                    $stmt =
+                        $db->prepare(
+                            $inventory_check_sql
+                        );
+
+                    $stmt->bind_param(
+                        'i',
+                        $product_id
+                    );
+
+                    $stmt->execute();
+
+                    $result =
+                        $stmt->get_result();
+
+                    $inventory_exists =
+                        (bool)
+                        $result->fetch_assoc();
+
+                    $stmt->close();
+                }
+
+
+                if ($inventory_exists) {
+
+                    $inventory_update_sql = "
+                        UPDATE inventory
+
+                        SET quantity = ?
+
+                        WHERE product_id = ?
+                    ";
+
+                    /*
+                     * Re-read current product stock.
+                     */
+
+                    $stock_read_sql = "
+                        SELECT stock_quantity
+                        FROM products
+                        WHERE product_id = ?
+                    ";
+
+                    if ($db instanceof PDO) {
+
+                        $stmt =
+                            $db->prepare(
+                                $stock_read_sql
+                            );
+
+                        $stmt->execute([
+                            $product_id
+                        ]);
+
+                        $stock_row =
+                            $stmt->fetch(
+                                PDO::FETCH_ASSOC
+                            );
+
+                        $current_stock =
+                            (int)
+                            $stock_row[
+                                'stock_quantity'
+                            ];
+
+                    } else {
+
+                        $stmt =
+                            $db->prepare(
+                                $stock_read_sql
+                            );
+
+                        $stmt->bind_param(
+                            'i',
+                            $product_id
+                        );
+
+                        $stmt->execute();
+
+                        $result =
+                            $stmt->get_result();
+
+                        $stock_row =
+                            $result->fetch_assoc();
+
+                        $current_stock =
+                            (int)
+                            $stock_row[
+                                'stock_quantity'
+                            ];
+
+                        $stmt->close();
+                    }
+
+
+                    if ($db instanceof PDO) {
+
+                        $stmt =
+                            $db->prepare(
+                                $inventory_update_sql
+                            );
+
+                        $stmt->execute([
+                            $current_stock,
+                            $product_id
+                        ]);
+
+                    } else {
+
+                        $stmt =
+                            $db->prepare(
+                                $inventory_update_sql
+                            );
+
+                        $stmt->bind_param(
+                            'ii',
+                            $current_stock,
+                            $product_id
+                        );
+
+                        $stmt->execute();
+
+                        $stmt->close();
+                    }
+
+                } else {
+
+                    $inventory_insert_sql = "
+                        INSERT INTO inventory
+                        (
+                            product_id,
+                            quantity
+                        )
+
+                        SELECT
+                            product_id,
+                            stock_quantity
+
+                        FROM products
+
+                        WHERE product_id = ?
+                    ";
+
+                    if ($db instanceof PDO) {
+
+                        $stmt =
+                            $db->prepare(
+                                $inventory_insert_sql
+                            );
+
+                        $stmt->execute([
+                            $product_id
+                        ]);
+
+                    } else {
+
+                        $stmt =
+                            $db->prepare(
+                                $inventory_insert_sql
+                            );
+
+                        $stmt->bind_param(
+                            'i',
+                            $product_id
+                        );
+
+                        $stmt->execute();
+
+                        $stmt->close();
+                    }
                 }
             }
-        }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Save Checkout Information
-        |--------------------------------------------------------------------------
-        */
+            // =================================================
+            // CREATE VENDOR ORDERS
+            //
+            // One main order can contain many vendors.
+            // Each vendor gets their own sub-order.
+            // =================================================
 
-        if ($error === '') {
+            $vendor_order_sql = "
+                INSERT INTO vendor_orders
+                (
+                    order_id,
+                    vendor_id,
+                    subtotal,
+                    delivery_fee,
+                    vendor_status
+                )
 
-            $_SESSION[
-                'checkout_delivery_method'
-            ] = $deliveryMethod;
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    0.00,
+                    'Pending'
+                )
+            ";
 
-            $_SESSION[
-                'checkout_delivery_address'
-            ] = $deliveryAddress;
+
+            foreach (
+                $vendor_totals
+                as $vendor_id => $vendor_subtotal
+            ) {
+
+                if ($db instanceof PDO) {
+
+                    $stmt =
+                        $db->prepare(
+                            $vendor_order_sql
+                        );
+
+                    $stmt->execute([
+                        $order_id,
+                        $vendor_id,
+                        $vendor_subtotal
+                    ]);
+
+                } else {
+
+                    $stmt =
+                        $db->prepare(
+                            $vendor_order_sql
+                        );
+
+                    $stmt->bind_param(
+                        'iid',
+                        $order_id,
+                        $vendor_id,
+                        $vendor_subtotal
+                    );
+
+                    $stmt->execute();
+
+                    $stmt->close();
+                }
+            }
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Go to Payment
-            |--------------------------------------------------------------------------
-            */
+            // =================================================
+            // CLEAR CART
+            // =================================================
+
+            $clear_cart_sql = "
+                DELETE FROM cart
+
+                WHERE customer_id = ?
+            ";
+
+            if ($db instanceof PDO) {
+
+                $stmt =
+                    $db->prepare(
+                        $clear_cart_sql
+                    );
+
+                $stmt->execute([
+                    $customer_id
+                ]);
+
+            } else {
+
+                $stmt =
+                    $db->prepare(
+                        $clear_cart_sql
+                    );
+
+                $stmt->bind_param(
+                    'i',
+                    $customer_id
+                );
+
+                $stmt->execute();
+
+                $stmt->close();
+            }
+
+
+            // =================================================
+            // COMMIT
+            // =================================================
+
+            if ($db instanceof PDO) {
+
+                $db->commit();
+
+            } else {
+
+                $db->commit();
+            }
+
+
+            // =================================================
+            // STORE ORDER ID
+            // =================================================
+
+            $_SESSION['last_order_id'] =
+                $order_id;
+
+
+            // Regenerate checkout token
+            $_SESSION['checkout_token'] =
+                bin2hex(
+                    random_bytes(32)
+                );
+
+
+            // =================================================
+            // GO TO PAYMENT
+            // =================================================
 
             header(
-                'Location: ' .
-                site_url('payment.php')
+                'Location: payment.php?order_id=' .
+                $order_id
             );
 
             exit;
+
+        } catch (Throwable $e) {
+
+            // -----------------------------------------------
+            // ROLLBACK
+            // -----------------------------------------------
+
+            try {
+
+                if ($db instanceof PDO) {
+
+                    if (
+                        $db->inTransaction()
+                    ) {
+
+                        $db->rollBack();
+                    }
+
+                } else {
+
+                    $db->rollback();
+                }
+
+            } catch (Throwable $rollbackError) {
+                // Ignore rollback failure.
+            }
+
+
+            $error_message =
+                $e->getMessage();
         }
     }
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Dynamic Delivery Preview
-|--------------------------------------------------------------------------
-*/
+// =========================================================
+// CREATE CHECKOUT TOKEN
+// =========================================================
 
-$postageFee =
-    count($vendorGroups) * 5;
+if (
+    !isset(
+        $_SESSION['checkout_token']
+    )
+) {
+
+    $_SESSION['checkout_token'] =
+        bin2hex(
+            random_bytes(32)
+        );
+}
+
+$checkout_token =
+    $_SESSION['checkout_token'];
+
+
+// =========================================================
+// PREPARE IMAGE PATH
+// =========================================================
+
+function checkout_product_image(
+    $image
+): string {
+
+    $image =
+        trim(
+            (string) $image
+        );
+
+    if ($image === '') {
+        return 'image/logo.jpg';
+    }
+
+    return
+        'image/product/' .
+        ltrim(
+            $image,
+            '/\\'
+        );
+}
 
 ?>
 
@@ -417,152 +1283,888 @@ $postageFee =
     >
 
     <title>
-        Checkout | <?php echo SITE_NAME; ?>
+        Checkout | HochipoHub
     </title>
 
     <link
         rel="stylesheet"
-        href="<?php
-            echo site_url('css/style.css');
-        ?>"
+        href="css/style.css"
     >
 
     <link
         rel="stylesheet"
-        href="<?php
-            echo site_url('css/checkout.css');
-        ?>"
+        href="css/checkout.css"
     >
 
     <link
         rel="stylesheet"
-        href="<?php
-            echo site_url('css/responsive.css');
-        ?>"
+        href="css/responsive.css"
     >
+
+    <style>
+
+        /* =====================================================
+           HOCHIPO HUB CHECKOUT
+        ===================================================== */
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+
+            background:
+                #f4f7ff;
+
+            color:
+                #10265e;
+
+            font-family:
+                Inter,
+                Poppins,
+                Arial,
+                sans-serif;
+        }
+
+        .checkout-page {
+            max-width: 1250px;
+
+            margin: auto;
+
+            padding:
+                45px 25px 80px;
+        }
+
+        /* =====================================================
+           HEADER
+        ===================================================== */
+
+        .checkout-heading {
+            margin-bottom: 30px;
+        }
+
+        .checkout-kicker {
+            display: inline-block;
+
+            padding:
+                7px 12px;
+
+            border-radius:
+                999px;
+
+            background:
+                #e8f2ff;
+
+            color:
+                #0868ff;
+
+            font-size:
+                11px;
+
+            font-weight:
+                900;
+
+            text-transform:
+                uppercase;
+
+            letter-spacing:
+                .7px;
+        }
+
+        .checkout-heading h1 {
+            margin:
+                13px 0 7px;
+
+            font-size:
+                clamp(32px, 5vw, 48px);
+
+            letter-spacing:
+                -2px;
+
+            color:
+                #10265e;
+        }
+
+        .checkout-heading p {
+            margin: 0;
+
+            color:
+                #7d8ba5;
+
+            font-size:
+                14px;
+        }
+
+        /* =====================================================
+           LAYOUT
+        ===================================================== */
+
+        .checkout-layout {
+            display: grid;
+
+            grid-template-columns:
+                minmax(0, 1.5fr)
+                minmax(330px, .8fr);
+
+            gap: 25px;
+
+            align-items: start;
+        }
+
+        .checkout-left,
+        .checkout-right {
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 20px;
+        }
+
+        /* =====================================================
+           CARD
+        ===================================================== */
+
+        .checkout-card {
+            padding:
+                25px;
+
+            border:
+                1px solid
+                rgba(18,70,160,.08);
+
+            border-radius:
+                24px;
+
+            background:
+                #ffffff;
+
+            box-shadow:
+                0 15px 45px
+                rgba(28,65,130,.07);
+        }
+
+        .checkout-card-title {
+            display: flex;
+
+            align-items: center;
+
+            gap: 12px;
+
+            margin-bottom: 22px;
+        }
+
+        .checkout-number {
+            width: 36px;
+            height: 36px;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            flex-shrink: 0;
+
+            border-radius:
+                12px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #0759dc,
+                    #00a5ff
+                );
+
+            color:
+                white;
+
+            font-weight:
+                900;
+        }
+
+        .checkout-card-title h2 {
+            margin: 0;
+
+            font-size:
+                19px;
+
+            color:
+                #10265e;
+        }
+
+        .checkout-card-title p {
+            margin:
+                3px 0 0;
+
+            color:
+                #8995aa;
+
+            font-size:
+                12px;
+        }
+
+        /* =====================================================
+           CUSTOMER INFO
+        ===================================================== */
+
+        .customer-info {
+            display: grid;
+
+            grid-template-columns:
+                repeat(2, 1fr);
+
+            gap: 14px;
+        }
+
+        .info-box {
+            padding:
+                15px;
+
+            border-radius:
+                15px;
+
+            background:
+                #f5f8ff;
+        }
+
+        .info-label {
+            margin-bottom:
+                5px;
+
+            color:
+                #8995aa;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+            text-transform:
+                uppercase;
+        }
+
+        .info-value {
+            color:
+                #18346e;
+
+            font-size:
+                14px;
+
+            font-weight:
+                700;
+
+            word-break:
+                break-word;
+        }
+
+        /* =====================================================
+           DELIVERY
+        ===================================================== */
+
+        .delivery-options {
+            display: grid;
+
+            grid-template-columns:
+                repeat(2, 1fr);
+
+            gap: 13px;
+
+            margin-bottom:
+                18px;
+        }
+
+        .delivery-option {
+            position: relative;
+        }
+
+        .delivery-option input {
+            position: absolute;
+
+            opacity: 0;
+        }
+
+        .delivery-label {
+            display: block;
+
+            padding:
+                17px;
+
+            border:
+                2px solid
+                #e6ebf5;
+
+            border-radius:
+                17px;
+
+            cursor: pointer;
+
+            transition:
+                .2s ease;
+        }
+
+        .delivery-label:hover {
+            border-color:
+                #9bbcff;
+        }
+
+        .delivery-option input:checked
+        + .delivery-label {
+            border-color:
+                #0868ff;
+
+            background:
+                #eef5ff;
+
+            box-shadow:
+                0 8px 20px
+                rgba(0,95,255,.08);
+        }
+
+        .delivery-label strong {
+            display: block;
+
+            margin-bottom:
+                4px;
+
+            color:
+                #18346e;
+
+            font-size:
+                14px;
+        }
+
+        .delivery-label span {
+            color:
+                #8995aa;
+
+            font-size:
+                11px;
+        }
+
+        .address-field {
+            display: none;
+        }
+
+        .address-field.show {
+            display: block;
+        }
+
+        .address-field label {
+            display: block;
+
+            margin-bottom:
+                8px;
+
+            color:
+                #354a76;
+
+            font-size:
+                12px;
+
+            font-weight:
+                800;
+        }
+
+        .address-field textarea {
+            width: 100%;
+
+            min-height:
+                110px;
+
+            padding:
+                14px;
+
+            resize:
+                vertical;
+
+            border:
+                1px solid
+                #dce3f0;
+
+            border-radius:
+                14px;
+
+            outline:
+                none;
+
+            color:
+                #18346e;
+
+            font-family:
+                inherit;
+
+            font-size:
+                13px;
+        }
+
+        .address-field textarea:focus {
+            border-color:
+                #0868ff;
+
+            box-shadow:
+                0 0 0 4px
+                rgba(8,104,255,.08);
+        }
+
+        /* =====================================================
+           CART ITEMS
+        ===================================================== */
+
+        .checkout-items {
+            display:
+                flex;
+
+            flex-direction:
+                column;
+
+            gap:
+                14px;
+        }
+
+        .checkout-item {
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            gap:
+                14px;
+
+            padding:
+                13px;
+
+            border-radius:
+                17px;
+
+            background:
+                #f7f9fd;
+        }
+
+        .checkout-item-image {
+            width:
+                72px;
+
+            height:
+                72px;
+
+            flex-shrink:
+                0;
+
+            object-fit:
+                cover;
+
+            border-radius:
+                14px;
+
+            background:
+                #eaf2ff;
+        }
+
+        .checkout-item-info {
+            min-width:
+                0;
+
+            flex:
+                1;
+        }
+
+        .checkout-item-info h3 {
+            margin:
+                0 0 4px;
+
+            overflow:
+                hidden;
+
+            color:
+                #18346e;
+
+            font-size:
+                14px;
+
+            white-space:
+                nowrap;
+
+            text-overflow:
+                ellipsis;
+        }
+
+        .checkout-item-vendor {
+            margin-bottom:
+                7px;
+
+            color:
+                #8995aa;
+
+            font-size:
+                11px;
+        }
+
+        .checkout-item-quantity {
+            color:
+                #647493;
+
+            font-size:
+                11px;
+        }
+
+        .checkout-item-price {
+            text-align:
+                right;
+
+            color:
+                #0759dc;
+
+            font-size:
+                15px;
+
+            font-weight:
+                900;
+
+            white-space:
+                nowrap;
+        }
+
+        /* =====================================================
+           SUMMARY
+        ===================================================== */
+
+        .summary-card {
+            position:
+                sticky;
+
+            top:
+                20px;
+        }
+
+        .summary-title {
+            margin:
+                0 0 22px;
+
+            color:
+                #10265e;
+
+            font-size:
+                20px;
+        }
+
+        .summary-row {
+            display:
+                flex;
+
+            justify-content:
+                space-between;
+
+            gap:
+                20px;
+
+            margin-bottom:
+                14px;
+
+            color:
+                #75839e;
+
+            font-size:
+                13px;
+        }
+
+        .summary-row strong {
+            color:
+                #18346e;
+        }
+
+        .summary-divider {
+            height:
+                1px;
+
+            margin:
+                18px 0;
+
+            background:
+                #e9edf5;
+        }
+
+        .summary-total {
+            display:
+                flex;
+
+            justify-content:
+                space-between;
+
+            align-items:
+                center;
+        }
+
+        .summary-total span {
+            color:
+                #536482;
+
+            font-size:
+                13px;
+
+            font-weight:
+                700;
+        }
+
+        .summary-total strong {
+            color:
+                #0759dc;
+
+            font-size:
+                25px;
+
+            font-weight:
+                900;
+        }
+
+        .place-order-btn {
+            width:
+                100%;
+
+            margin-top:
+                23px;
+
+            min-height:
+                55px;
+
+            border:
+                0;
+
+            border-radius:
+                16px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #0759dc,
+                    #008cff
+                );
+
+            color:
+                white;
+
+            cursor:
+                pointer;
+
+            font-family:
+                inherit;
+
+            font-size:
+                14px;
+
+            font-weight:
+                900;
+
+            box-shadow:
+                0 12px 30px
+                rgba(0,90,230,.22);
+
+            transition:
+                transform .2s ease,
+                box-shadow .2s ease;
+        }
+
+        .place-order-btn:hover {
+            transform:
+                translateY(-3px);
+
+            box-shadow:
+                0 17px 35px
+                rgba(0,90,230,.28);
+        }
+
+        .back-cart {
+            display:
+                block;
+
+            margin-top:
+                14px;
+
+            text-align:
+                center;
+
+            color:
+                #0868ff;
+
+            font-size:
+                12px;
+
+            font-weight:
+                800;
+        }
+
+        /* =====================================================
+           ERROR
+        ===================================================== */
+
+        .checkout-error {
+            margin-bottom:
+                22px;
+
+            padding:
+                15px 17px;
+
+            border:
+                1px solid
+                #ffc9c9;
+
+            border-radius:
+                15px;
+
+            background:
+                #fff3f3;
+
+            color:
+                #b42323;
+
+            font-size:
+                13px;
+
+            font-weight:
+                700;
+        }
+
+        /* =====================================================
+           SECURE NOTE
+        ===================================================== */
+
+        .secure-note {
+            margin-top:
+                17px;
+
+            padding:
+                13px;
+
+            border-radius:
+                13px;
+
+            background:
+                #f1f8ff;
+
+            color:
+                #6f7e98;
+
+            font-size:
+                11px;
+
+            line-height:
+                1.5;
+
+            text-align:
+                center;
+        }
+
+        /* =====================================================
+           RESPONSIVE
+        ===================================================== */
+
+        @media (max-width: 900px) {
+
+            .checkout-layout {
+                grid-template-columns:
+                    1fr;
+            }
+
+            .summary-card {
+                position:
+                    static;
+            }
+
+        }
+
+        @media (max-width: 600px) {
+
+            .checkout-page {
+                padding:
+                    30px 17px 60px;
+            }
+
+            .customer-info,
+            .delivery-options {
+                grid-template-columns:
+                    1fr;
+            }
+
+            .checkout-card {
+                padding:
+                    19px;
+            }
+
+            .checkout-item-image {
+                width:
+                    60px;
+
+                height:
+                    60px;
+            }
+
+        }
+
+    </style>
 
 </head>
 
+
 <body>
 
-<div class="checkout-page">
+<?php
+require_once __DIR__ . '/includes/navbar.php';
+?>
+
+
+<main class="checkout-page">
 
 
     <!-- =====================================================
-         HEADER
+         HEADING
     ====================================================== -->
 
-    <header class="checkout-topbar">
+    <div class="checkout-heading">
 
-        <a
-            href="<?php
-                echo site_url('cart.php');
-            ?>"
-            class="checkout-back"
-        >
-            ← Back to Cart
-        </a>
+        <span class="checkout-kicker">
+            Checkout
+        </span>
 
-        <div class="checkout-brand">
+        <h1>
+            Almost yours.
+        </h1>
 
-            <span>
-                HOCHIPO
-            </span>
-
-            <strong>
-                HUB
-            </strong>
-
-        </div>
-
-        <div class="secure-label">
-            🔒 Secure Checkout
-        </div>
-
-    </header>
-
-
-    <!-- =====================================================
-         PROGRESS
-    ====================================================== -->
-
-    <div class="checkout-progress">
-
-        <div class="progress-step active">
-
-            <span>
-                01
-            </span>
-
-            <p>
-                Delivery
-            </p>
-
-        </div>
-
-        <div class="progress-line"></div>
-
-        <div class="progress-step">
-
-            <span>
-                02
-            </span>
-
-            <p>
-                Payment
-            </p>
-
-        </div>
-
-        <div class="progress-line"></div>
-
-        <div class="progress-step">
-
-            <span>
-                03
-            </span>
-
-            <p>
-                Confirmation
-            </p>
-
-        </div>
+        <p>
+            Confirm your details before we send your order
+            to the payment step.
+        </p>
 
     </div>
 
 
-    <!-- =====================================================
-         CONTENT
-    ====================================================== -->
+    <?php if (
+        $error_message !== ''
+    ): ?>
 
-    <main class="checkout-container">
+        <div class="checkout-error">
+            ⚠️
+            <?= checkout_e(
+                $error_message
+            ); ?>
+        </div>
+
+    <?php endif; ?>
 
 
-        <?php if ($error !== ''): ?>
+    <form
+        method="POST"
+        action="checkout.php"
+        id="checkoutForm"
+    >
 
-            <div class="checkout-alert">
-
-                <span>
-                    !
-                </span>
-
-                <div>
-
-                    <strong>
-                        Checkout couldn't continue
-                    </strong>
-
-                    <p>
-                        <?php
-                        echo htmlspecialchars($error);
-                        ?>
-                    </p>
-
-                </div>
-
-            </div>
-
-        <?php endif; ?>
+        <input
+            type="hidden"
+            name="checkout_token"
+            value="<?= checkout_e(
+                $checkout_token
+            ); ?>"
+        >
 
 
         <div class="checkout-layout">
@@ -572,558 +2174,339 @@ $postageFee =
                  LEFT
             ================================================== -->
 
-            <section class="checkout-main">
+            <div class="checkout-left">
 
 
-                <!-- CUSTOMER -->
+                <!-- =============================================
+                     CUSTOMER
+                ============================================== -->
 
-                <div class="checkout-card">
+                <section class="checkout-card">
 
                     <div class="checkout-card-title">
 
-                        <div class="checkout-title-icon">
+                        <div class="checkout-number">
                             01
                         </div>
 
                         <div>
 
-                            <span>
-                                CUSTOMER
-                            </span>
-
                             <h2>
-                                Your Details
+                                Customer details
                             </h2>
 
+                            <p>
+                                Your account information
+                            </p>
+
                         </div>
 
                     </div>
 
 
-                    <div class="customer-grid">
+                    <div class="customer-info">
 
-                        <div class="customer-field">
+                        <div class="info-box">
 
-                            <label>
-                                Full Name
-                            </label>
+                            <div class="info-label">
+                                Name
+                            </div>
 
-                            <div class="customer-value">
-                                <?php
-                                echo htmlspecialchars(
-                                    $user['name']
-                                );
-                                ?>
+                            <div class="info-value">
+                                <?= checkout_e(
+                                    $customer['name']
+                                ); ?>
                             </div>
 
                         </div>
 
 
-                        <div class="customer-field">
+                        <div class="info-box">
 
-                            <label>
-                                Email
-                            </label>
-
-                            <div class="customer-value">
-                                <?php
-                                echo htmlspecialchars(
-                                    $user['email']
-                                );
-                                ?>
-                            </div>
-
-                        </div>
-
-
-                        <div class="customer-field">
-
-                            <label>
+                            <div class="info-label">
                                 Phone
-                            </label>
+                            </div>
 
-                            <div class="customer-value">
-
-                                <?php
-                                echo !empty($user['phone'])
-                                    ? htmlspecialchars(
-                                        $user['phone']
-                                    )
-                                    : 'Not provided';
-                                ?>
-
+                            <div class="info-value">
+                                <?= checkout_e(
+                                    $customer['phone']
+                                    ?: 'Not provided'
+                                ); ?>
                             </div>
 
                         </div>
 
 
-                        <a
-                            href="<?php
-                                echo site_url(
-                                    'profile.php'
-                                );
-                            ?>"
-                            class="edit-profile-link"
-                        >
-                            Edit Profile →
-                        </a>
+                        <div class="info-box">
+
+                            <div class="info-label">
+                                Email
+                            </div>
+
+                            <div class="info-value">
+                                <?= checkout_e(
+                                    $customer['email']
+                                ); ?>
+                            </div>
+
+                        </div>
 
                     </div>
 
-                </div>
+                </section>
 
 
-                <!-- DELIVERY -->
+                <!-- =============================================
+                     DELIVERY
+                ============================================== -->
 
-                <form
-                    method="POST"
-                    action="checkout.php"
-                    id="checkoutForm"
-                >
+                <section class="checkout-card">
 
-                    <input
-                        type="hidden"
-                        name="action"
-                        value="continue_payment"
-                    >
+                    <div class="checkout-card-title">
+
+                        <div class="checkout-number">
+                            02
+                        </div>
+
+                        <div>
+
+                            <h2>
+                                Delivery method
+                            </h2>
+
+                            <p>
+                                Choose how you want to receive
+                                your order.
+                            </p>
+
+                        </div>
+
+                    </div>
 
 
-                    <div class="checkout-card">
+                    <div class="delivery-options">
 
-                        <div class="checkout-card-title">
 
-                            <div class="checkout-title-icon">
-                                02
-                            </div>
+                        <!-- PICKUP -->
 
-                            <div>
+                        <div class="delivery-option">
+
+                            <input
+                                type="radio"
+                                name="delivery_method"
+                                id="pickup"
+                                value="Pickup"
+                                <?= $delivery_method === 'Pickup'
+                                    ? 'checked'
+                                    : ''; ?>
+                            >
+
+                            <label
+                                for="pickup"
+                                class="delivery-label"
+                            >
+
+                                <strong>
+                                    📍 Pickup
+                                </strong>
 
                                 <span>
-                                    DELIVERY
+                                    Collect your order
+                                    from the vendor.
                                 </span>
 
-                                <h2>
-                                    How should we get it to you?
-                                </h2>
-
-                            </div>
-
-                        </div>
-
-
-                        <div class="delivery-options">
-
-
-                            <!-- PICKUP -->
-
-                            <label
-                                class="
-                                    delivery-option
-                                    <?php
-                                    echo $deliveryMethod ===
-                                        'Pickup'
-                                        ? 'selected'
-                                        : '';
-                                    ?>
-                                "
-                            >
-
-                                <input
-                                    type="radio"
-                                    name="delivery_method"
-                                    value="Pickup"
-                                    <?php
-                                    echo $deliveryMethod ===
-                                        'Pickup'
-                                        ? 'checked'
-                                        : '';
-                                    ?>
-                                >
-
-                                <div class="delivery-radio"></div>
-
-                                <div class="delivery-icon">
-                                    🛍️
-                                </div>
-
-                                <div class="delivery-info">
-
-                                    <strong>
-                                        Self Pickup
-                                    </strong>
-
-                                    <p>
-                                        Collect directly
-                                        from the vendor.
-                                    </p>
-
-                                </div>
-
-                                <b>
-                                    FREE
-                                </b>
-
-                            </label>
-
-
-                            <!-- POSTAGE -->
-
-                            <label
-                                class="
-                                    delivery-option
-                                    <?php
-                                    echo $deliveryMethod ===
-                                        'Postage'
-                                        ? 'selected'
-                                        : '';
-                                    ?>
-                                "
-                            >
-
-                                <input
-                                    type="radio"
-                                    name="delivery_method"
-                                    value="Postage"
-                                    <?php
-                                    echo $deliveryMethod ===
-                                        'Postage'
-                                        ? 'checked'
-                                        : '';
-                                    ?>
-                                >
-
-                                <div class="delivery-radio"></div>
-
-                                <div class="delivery-icon">
-                                    📦
-                                </div>
-
-                                <div class="delivery-info">
-
-                                    <strong>
-                                        Postage
-                                    </strong>
-
-                                    <p>
-                                        Delivered to your
-                                        address.
-                                    </p>
-
-                                </div>
-
-                                <b>
-                                    RM
-                                    <?php
-                                    echo number_format(
-                                        $postageFee,
-                                        2
-                                    );
-                                    ?>
-                                </b>
-
                             </label>
 
                         </div>
 
 
-                        <!-- ADDRESS -->
+                        <!-- POSTAGE -->
 
-                        <div
-                            class="address-section"
-                            id="addressSection"
-                        >
+                        <div class="delivery-option">
+
+                            <input
+                                type="radio"
+                                name="delivery_method"
+                                id="postage"
+                                value="Postage"
+                                <?= $delivery_method === 'Postage'
+                                    ? 'checked'
+                                    : ''; ?>
+                            >
 
                             <label
-                                for="delivery_address"
+                                for="postage"
+                                class="delivery-label"
                             >
-                                Delivery Address
-                            </label>
 
-                            <textarea
-                                name="delivery_address"
-                                id="delivery_address"
-                                rows="4"
-                                placeholder="House / room number, street, area, postcode, state..."
-                            ><?php
-                            echo htmlspecialchars(
-                                $deliveryAddress
-                            );
-                            ?></textarea>
-
-                            <small>
-                                Make sure your address is
-                                complete and accurate.
-                            </small>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- VENDOR BREAKDOWN -->
-
-                    <div class="checkout-card">
-
-                        <div class="checkout-card-title">
-
-                            <div class="checkout-title-icon">
-                                03
-                            </div>
-
-                            <div>
+                                <strong>
+                                    📦 Postage
+                                </strong>
 
                                 <span>
-                                    MULTI-VENDOR ORDER
+                                    Have your order
+                                    delivered.
                                 </span>
 
-                                <h2>
-                                    Your Vendors
-                                </h2>
-
-                            </div>
-
-                        </div>
-
-
-                        <div class="vendor-order-list">
-
-                            <?php foreach (
-                                $vendorGroups
-                                as $vendor
-                            ): ?>
-
-                                <div class="vendor-order">
-
-                                    <div
-                                        class="vendor-order-header"
-                                    >
-
-                                        <div>
-
-                                            <span>
-                                                VENDOR
-                                            </span>
-
-                                            <strong>
-                                                <?php
-                                                echo htmlspecialchars(
-                                                    $vendor[
-                                                        'business_name'
-                                                    ]
-                                                );
-                                                ?>
-                                            </strong>
-
-                                        </div>
-
-                                        <b>
-                                            RM
-                                            <?php
-                                            echo number_format(
-                                                $vendor['subtotal'],
-                                                2
-                                            );
-                                            ?>
-                                        </b>
-
-                                    </div>
-
-
-                                    <?php foreach (
-                                        $vendor['items']
-                                        as $item
-                                    ): ?>
-
-                                        <div
-                                            class="checkout-item"
-                                        >
-
-                                            <div
-                                                class="
-                                                    checkout-item-image
-                                                "
-                                            >
-
-                                                <?php if (
-                                                    !empty(
-                                                        $item['image']
-                                                    )
-                                                ): ?>
-
-                                                    <img
-                                                        src="<?php
-                                                        echo site_url(
-                                                            'image/product/' .
-                                                            ltrim(
-                                                                $item[
-                                                                    'image'
-                                                                ],
-                                                                '/'
-                                                            )
-                                                        );
-                                                        ?>"
-                                                        alt="<?php
-                                                        echo htmlspecialchars(
-                                                            $item[
-                                                                'product_name'
-                                                            ]
-                                                        );
-                                                        ?>"
-                                                    >
-
-                                                <?php else: ?>
-
-                                                    <div>
-                                                        ✦
-                                                    </div>
-
-                                                <?php endif; ?>
-
-                                            </div>
-
-
-                                            <div
-                                                class="
-                                                    checkout-item-info
-                                                "
-                                            >
-
-                                                <strong>
-                                                    <?php
-                                                    echo htmlspecialchars(
-                                                        $item[
-                                                            'product_name'
-                                                        ]
-                                                    );
-                                                    ?>
-                                                </strong>
-
-                                                <span>
-                                                    Qty:
-                                                    <?php
-                                                    echo (int)
-                                                        $item[
-                                                            'quantity'
-                                                        ];
-                                                    ?>
-                                                </span>
-
-                                            </div>
-
-
-                                            <strong
-                                                class="
-                                                    checkout-item-price
-                                                "
-                                            >
-
-                                                RM
-                                                <?php
-                                                echo number_format(
-                                                    $item[
-                                                        'item_subtotal'
-                                                    ],
-                                                    2
-                                                );
-                                                ?>
-
-                                            </strong>
-
-                                        </div>
-
-                                    <?php endforeach; ?>
-
-                                </div>
-
-                            <?php endforeach; ?>
+                            </label>
 
                         </div>
 
                     </div>
 
 
-                    <!-- CONTINUE -->
-
-                    <button
-                        type="submit"
-                        class="continue-payment-btn"
+                    <div
+                        class="address-field
+                        <?= $delivery_method === 'Postage'
+                            ? 'show'
+                            : ''; ?>"
+                        id="addressField"
                     >
 
-                        Continue to Payment
+                        <label
+                            for="delivery_address"
+                        >
+                            Delivery address
+                        </label>
 
-                        <span>
-                            →
-                        </span>
+                        <textarea
+                            name="delivery_address"
+                            id="delivery_address"
+                            placeholder="Enter your complete delivery address..."
+                        ><?= checkout_e(
+                            $delivery_address
+                        ); ?></textarea>
 
-                    </button>
+                    </div>
 
-                </form>
-
-            </section>
+                </section>
 
 
-            <!-- =================================================
-                 RIGHT SUMMARY
-            ================================================== -->
+                <!-- =============================================
+                     ORDER ITEMS
+                ============================================== -->
 
-            <aside class="checkout-summary">
+                <section class="checkout-card">
 
-                <div class="summary-card">
+                    <div class="checkout-card-title">
 
-                    <div class="summary-header">
+                        <div class="checkout-number">
+                            03
+                        </div>
 
-                        <span>
-                            ORDER SUMMARY
-                        </span>
+                        <div>
 
-                        <h2>
-                            Your Basket
-                        </h2>
+                            <h2>
+                                Your order
+                            </h2>
+
+                            <p>
+                                <?= count(
+                                    $cart_items
+                                ); ?>
+                                product(s) in this order.
+                            </p>
+
+                        </div>
 
                     </div>
 
 
-                    <div class="summary-items">
+                    <div class="checkout-items">
 
                         <?php foreach (
-                            $cartItems
+                            $cart_items
                             as $item
                         ): ?>
 
-                            <div class="summary-item">
+                            <?php
 
-                                <div>
+                                $item_quantity =
+                                    (int)
+                                    $item['quantity'];
 
-                                    <strong>
-                                        <?php
-                                        echo htmlspecialchars(
+                                $item_price =
+                                    (float)
+                                    $item['price'];
+
+                                $item_total =
+                                    $item_quantity *
+                                    $item_price;
+
+                                $item_image =
+                                    checkout_product_image(
+                                        $item['image']
+                                    );
+
+                            ?>
+
+
+                            <div
+                                class="checkout-item"
+                            >
+
+                                <img
+                                    src="<?= checkout_e(
+                                        $item_image
+                                    ); ?>"
+                                    alt="<?= checkout_e(
+                                        $item['product_name']
+                                    ); ?>"
+                                    class="checkout-item-image"
+                                    onerror="
+                                        this.src='image/logo.jpg';
+                                    "
+                                >
+
+
+                                <div
+                                    class="checkout-item-info"
+                                >
+
+                                    <h3>
+                                        <?= checkout_e(
                                             $item[
                                                 'product_name'
                                             ]
-                                        );
-                                        ?>
-                                    </strong>
+                                        ); ?>
+                                    </h3>
 
-                                    <span>
-                                        ×
-                                        <?php
-                                        echo (int)
-                                            $item['quantity'];
-                                        ?>
-                                    </span>
+                                    <div
+                                        class="checkout-item-vendor"
+                                    >
+                                        <?= checkout_e(
+                                            $item[
+                                                'business_name'
+                                            ]
+                                        ); ?>
+                                    </div>
+
+                                    <div
+                                        class="checkout-item-quantity"
+                                    >
+                                        Qty:
+                                        <?= $item_quantity; ?>
+                                        × RM
+                                        <?= number_format(
+                                            $item_price,
+                                            2
+                                        ); ?>
+                                    </div>
 
                                 </div>
 
-                                <b>
+
+                                <div
+                                    class="checkout-item-price"
+                                >
+
                                     RM
-                                    <?php
-                                    echo number_format(
-                                        (float)$item['price'] *
-                                        (int)$item['quantity'],
+                                    <?= number_format(
+                                        $item_total,
                                         2
-                                    );
-                                    ?>
-                                </b>
+                                    ); ?>
+
+                                </div>
 
                             </div>
 
@@ -1131,8 +2514,43 @@ $postageFee =
 
                     </div>
 
+                </section>
 
-                    <div class="summary-divider"></div>
+
+            </div>
+
+
+            <!-- =================================================
+                 RIGHT
+            ================================================== -->
+
+            <div class="checkout-right">
+
+                <section
+                    class="
+                        checkout-card
+                        summary-card
+                    "
+                >
+
+                    <h2 class="summary-title">
+                        Order summary
+                    </h2>
+
+
+                    <div class="summary-row">
+
+                        <span>
+                            Items
+                        </span>
+
+                        <strong>
+                            <?= count(
+                                $cart_items
+                            ); ?>
+                        </strong>
+
+                    </div>
 
 
                     <div class="summary-row">
@@ -1141,14 +2559,12 @@ $postageFee =
                             Subtotal
                         </span>
 
-                        <strong id="summarySubtotal">
+                        <strong>
                             RM
-                            <?php
-                            echo number_format(
+                            <?= number_format(
                                 $subtotal,
                                 2
-                            );
-                            ?>
+                            ); ?>
                         </strong>
 
                     </div>
@@ -1160,68 +2576,74 @@ $postageFee =
                             Delivery
                         </span>
 
-                        <strong id="summaryDelivery">
-                            RM
-                            <?php
-                            echo number_format(
-                                $postageFee,
-                                2
-                            );
-                            ?>
+                        <strong>
+                            Calculated by vendor
                         </strong>
 
                     </div>
+
+
+                    <div class="summary-divider"></div>
 
 
                     <div class="summary-total">
 
                         <span>
-                            Total
+                            Order total
                         </span>
 
-                        <strong id="summaryTotal">
+                        <strong>
                             RM
-                            <?php
-                            echo number_format(
-                                $totalAmount,
+                            <?= number_format(
+                                $subtotal,
                                 2
-                            );
-                            ?>
+                            ); ?>
                         </strong>
 
                     </div>
 
 
-                    <div class="secure-box">
+                    <button
+                        type="submit"
+                        name="place_order"
+                        value="1"
+                        class="place-order-btn"
+                    >
+                        Continue to Payment →
+                    </button>
 
-                        <span>
-                            🔐
-                        </span>
 
-                        <div>
+                    <a
+                        href="cart.php"
+                        class="back-cart"
+                    >
+                        ← Back to cart
+                    </a>
 
-                            <strong>
-                                Secure checkout
-                            </strong>
 
-                            <p>
-                                Your payment details are
-                                protected.
-                            </p>
+                    <div class="secure-note">
 
-                        </div>
+                        🔒 Your order information is processed
+                        securely. Payment details are handled
+                        on the next step.
 
                     </div>
 
-                </div>
+                </section>
 
-            </aside>
+            </div>
+
 
         </div>
 
-    </main>
+    </form>
 
-</div>
+</main>
+
+
+<?php
+require_once __DIR__ . '/includes/footer.php';
+?>
 
 
 <script>
@@ -1230,1142 +2652,76 @@ document.addEventListener(
     'DOMContentLoaded',
     function () {
 
-        const deliveryOptions =
-            document.querySelectorAll(
-                'input[name="delivery_method"]'
-            );
-
-        const addressSection =
+        const pickup =
             document.getElementById(
-                'addressSection'
+                'pickup'
             );
 
-        const addressInput =
+        const postage =
+            document.getElementById(
+                'postage'
+            );
+
+        const addressField =
+            document.getElementById(
+                'addressField'
+            );
+
+        const address =
             document.getElementById(
                 'delivery_address'
             );
 
-        const deliveryDisplay =
-            document.getElementById(
-                'summaryDelivery'
-            );
 
-        const totalDisplay =
-            document.getElementById(
-                'summaryTotal'
-            );
-
-        const subtotal =
-            <?php echo json_encode($subtotal); ?>;
-
-        const vendorCount =
-            <?php echo count($vendorGroups); ?>;
-
-        function updateDelivery() {
-
-            let selected =
-                document.querySelector(
-                    'input[name="delivery_method"]:checked'
-                );
-
-            if (!selected) {
-                return;
-            }
+        function updateDeliveryUI() {
 
             if (
-                selected.value === 'Postage'
+                postage &&
+                postage.checked
             ) {
 
-                addressSection.style.display =
-                    'block';
+                addressField.classList.add(
+                    'show'
+                );
 
-                addressInput.required = true;
-
-                const fee =
-                    vendorCount * 5;
-
-                const total =
-                    subtotal + fee;
-
-                deliveryDisplay.textContent =
-                    'RM ' + fee.toFixed(2);
-
-                totalDisplay.textContent =
-                    'RM ' + total.toFixed(2);
+                address.required = true;
 
             } else {
 
-                addressSection.style.display =
-                    'none';
+                addressField.classList.remove(
+                    'show'
+                );
 
-                addressInput.required = false;
-
-                deliveryDisplay.textContent =
-                    'RM 0.00';
-
-                totalDisplay.textContent =
-                    'RM ' + subtotal.toFixed(2);
+                address.required = false;
             }
-
-            document
-                .querySelectorAll(
-                    '.delivery-option'
-                )
-                .forEach(function (option) {
-
-                    option.classList.remove(
-                        'selected'
-                    );
-
-                });
-
-            selected
-                .closest('.delivery-option')
-                .classList.add('selected');
         }
 
 
-        deliveryOptions.forEach(
-            function (radio) {
+        if (pickup) {
 
-                radio.addEventListener(
-                    'change',
-                    updateDelivery
-                );
-
-            }
-        );
+            pickup.addEventListener(
+                'change',
+                updateDeliveryUI
+            );
+        }
 
 
-        updateDelivery();
+        if (postage) {
+
+            postage.addEventListener(
+                'change',
+                updateDeliveryUI
+            );
+        }
+
+
+        updateDeliveryUI();
 
     }
 );
 
 </script>
 
-
-<style>
-
-/* =========================================================
-   CHECKOUT PAGE
-========================================================= */
-
-.checkout-page {
-    min-height: 100vh;
-
-    background:
-        radial-gradient(
-            circle at 10% 10%,
-            rgba(37,99,235,.12),
-            transparent 25%
-        ),
-        #020617;
-
-    color: #f8fafc;
-}
-
-
-/* =========================================================
-   TOPBAR
-========================================================= */
-
-.checkout-topbar {
-    display: grid;
-
-    grid-template-columns:
-        1fr auto 1fr;
-
-    align-items: center;
-
-    gap: 20px;
-
-    padding: 20px 6%;
-
-    border-bottom:
-        1px solid
-        rgba(148,163,184,.12);
-
-    background:
-        rgba(2,6,23,.8);
-
-    backdrop-filter: blur(18px);
-}
-
-.checkout-back {
-    color: #94a3b8;
-
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.checkout-back:hover {
-    color: #7dd3fc;
-}
-
-.checkout-brand {
-    font-size: 19px;
-    font-weight: 950;
-    letter-spacing: 2px;
-}
-
-.checkout-brand span {
-    color: white;
-}
-
-.checkout-brand strong {
-    color: #38bdf8;
-}
-
-.secure-label {
-    justify-self: end;
-
-    color: #64748b;
-
-    font-size: 12px;
-    font-weight: 700;
-}
-
-
-/* =========================================================
-   PROGRESS
-========================================================= */
-
-.checkout-progress {
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    gap: 13px;
-
-    padding: 28px 20px;
-}
-
-.progress-step {
-    display: flex;
-
-    align-items: center;
-
-    gap: 9px;
-
-    color: #475569;
-}
-
-.progress-step span {
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    width: 31px;
-    height: 31px;
-
-    border-radius: 50%;
-
-    border:
-        1px solid
-        #334155;
-
-    font-size: 10px;
-    font-weight: 900;
-}
-
-.progress-step p {
-    margin: 0;
-
-    font-size: 12px;
-    font-weight: 800;
-}
-
-.progress-step.active {
-    color: #7dd3fc;
-}
-
-.progress-step.active span {
-    border-color: #38bdf8;
-
-    background:
-        rgba(14,165,233,.14);
-
-    color: #38bdf8;
-}
-
-.progress-line {
-    width: 70px;
-    height: 1px;
-
-    background: #1e293b;
-}
-
-
-/* =========================================================
-   CONTAINER
-========================================================= */
-
-.checkout-container {
-    width: 88%;
-    max-width: 1250px;
-
-    margin: auto;
-
-    padding-bottom: 80px;
-}
-
-.checkout-layout {
-    display: grid;
-
-    grid-template-columns:
-        minmax(0, 1.6fr)
-        minmax(320px, .8fr);
-
-    align-items: start;
-
-    gap: 25px;
-}
-
-
-/* =========================================================
-   ALERT
-========================================================= */
-
-.checkout-alert {
-    display: flex;
-
-    gap: 13px;
-
-    margin-bottom: 20px;
-
-    padding: 16px 18px;
-
-    border:
-        1px solid
-        rgba(248,113,113,.25);
-
-    border-radius: 15px;
-
-    background:
-        rgba(127,29,29,.18);
-
-    color: #fecaca;
-}
-
-.checkout-alert > span {
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    width: 28px;
-    height: 28px;
-
-    flex-shrink: 0;
-
-    border-radius: 50%;
-
-    background:
-        rgba(248,113,113,.15);
-
-    color: #f87171;
-
-    font-weight: 900;
-}
-
-.checkout-alert strong {
-    color: #fca5a5;
-}
-
-.checkout-alert p {
-    margin: 4px 0 0;
-
-    color: #94a3b8;
-    font-size: 13px;
-}
-
-
-/* =========================================================
-   CARDS
-========================================================= */
-
-.checkout-card {
-    margin-bottom: 20px;
-
-    padding: 26px;
-
-    border:
-        1px solid
-        rgba(148,163,184,.13);
-
-    border-radius: 22px;
-
-    background:
-        linear-gradient(
-            145deg,
-            rgba(15,23,42,.96),
-            rgba(8,47,87,.58)
-        );
-
-    box-shadow:
-        0 15px 50px
-        rgba(0,0,0,.12);
-}
-
-.checkout-card-title {
-    display: flex;
-
-    align-items: center;
-
-    gap: 14px;
-
-    margin-bottom: 25px;
-}
-
-.checkout-title-icon {
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    width: 42px;
-    height: 42px;
-
-    flex-shrink: 0;
-
-    border-radius: 13px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #2563eb,
-            #0ea5e9
-        );
-
-    color: white;
-
-    font-size: 11px;
-    font-weight: 900;
-}
-
-.checkout-card-title span {
-    color: #38bdf8;
-
-    font-size: 10px;
-    font-weight: 900;
-
-    letter-spacing: 1.5px;
-}
-
-.checkout-card-title h2 {
-    margin: 3px 0 0;
-
-    font-size: 22px;
-    font-weight: 900;
-}
-
-
-/* =========================================================
-   CUSTOMER
-========================================================= */
-
-.customer-grid {
-    display: grid;
-
-    grid-template-columns:
-        repeat(2, 1fr);
-
-    gap: 17px;
-}
-
-.customer-field {
-    padding: 15px;
-
-    border:
-        1px solid
-        rgba(148,163,184,.1);
-
-    border-radius: 13px;
-
-    background:
-        rgba(2,6,23,.3);
-}
-
-.customer-field label {
-    display: block;
-
-    margin-bottom: 7px;
-
-    color: #64748b;
-
-    font-size: 10px;
-    font-weight: 900;
-
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.customer-value {
-    color: #e2e8f0;
-
-    font-size: 14px;
-    font-weight: 700;
-}
-
-.edit-profile-link {
-    align-self: center;
-
-    color: #38bdf8;
-
-    font-size: 12px;
-    font-weight: 800;
-}
-
-
-/* =========================================================
-   DELIVERY
-========================================================= */
-
-.delivery-options {
-    display: grid;
-
-    grid-template-columns:
-        repeat(2, 1fr);
-
-    gap: 13px;
-}
-
-.delivery-option {
-    position: relative;
-
-    display: grid;
-
-    grid-template-columns:
-        auto auto 1fr auto;
-
-    align-items: center;
-
-    gap: 12px;
-
-    padding: 17px;
-
-    border:
-        1px solid
-        rgba(148,163,184,.13);
-
-    border-radius: 16px;
-
-    cursor: pointer;
-
-    transition: .25s ease;
-}
-
-.delivery-option:hover,
-.delivery-option.selected {
-    border-color:
-        rgba(56,189,248,.55);
-
-    background:
-        rgba(14,165,233,.08);
-}
-
-.delivery-option input {
-    position: absolute;
-
-    opacity: 0;
-}
-
-.delivery-radio {
-    width: 17px;
-    height: 17px;
-
-    border:
-        2px solid
-        #475569;
-
-    border-radius: 50%;
-}
-
-.delivery-option.selected
-.delivery-radio {
-    border:
-        5px solid
-        #38bdf8;
-}
-
-.delivery-icon {
-    font-size: 22px;
-}
-
-.delivery-info strong {
-    display: block;
-
-    color: white;
-
-    font-size: 13px;
-}
-
-.delivery-info p {
-    margin: 3px 0 0;
-
-    color: #64748b;
-
-    font-size: 10px;
-}
-
-.delivery-option > b {
-    color: #7dd3fc;
-
-    font-size: 11px;
-}
-
-
-/* =========================================================
-   ADDRESS
-========================================================= */
-
-.address-section {
-    margin-top: 20px;
-}
-
-.address-section label {
-    display: block;
-
-    margin-bottom: 8px;
-
-    color: #cbd5e1;
-
-    font-size: 12px;
-    font-weight: 800;
-}
-
-.address-section textarea {
-    width: 100%;
-
-    box-sizing: border-box;
-
-    resize: vertical;
-
-    padding: 14px;
-
-    border:
-        1px solid
-        rgba(148,163,184,.15);
-
-    border-radius: 14px;
-
-    outline: none;
-
-    background:
-        rgba(2,6,23,.45);
-
-    color: white;
-
-    font: inherit;
-
-    line-height: 1.5;
-}
-
-.address-section textarea:focus {
-    border-color: #38bdf8;
-}
-
-.address-section small {
-    display: block;
-
-    margin-top: 7px;
-
-    color: #475569;
-
-    font-size: 10px;
-}
-
-
-/* =========================================================
-   VENDOR ORDERS
-========================================================= */
-
-.vendor-order {
-    overflow: hidden;
-
-    margin-bottom: 15px;
-
-    border:
-        1px solid
-        rgba(148,163,184,.1);
-
-    border-radius: 16px;
-
-    background:
-        rgba(2,6,23,.25);
-}
-
-.vendor-order:last-child {
-    margin-bottom: 0;
-}
-
-.vendor-order-header {
-    display: flex;
-
-    align-items: center;
-    justify-content: space-between;
-
-    padding: 15px 17px;
-
-    border-bottom:
-        1px solid
-        rgba(148,163,184,.08);
-}
-
-.vendor-order-header span {
-    display: block;
-
-    color: #475569;
-
-    font-size: 9px;
-    font-weight: 900;
-
-    letter-spacing: 1px;
-}
-
-.vendor-order-header strong {
-    display: block;
-
-    margin-top: 3px;
-
-    color: #e2e8f0;
-
-    font-size: 13px;
-}
-
-.vendor-order-header > b {
-    color: #7dd3fc;
-
-    font-size: 14px;
-}
-
-
-/* =========================================================
-   CHECKOUT ITEM
-========================================================= */
-
-.checkout-item {
-    display: flex;
-
-    align-items: center;
-
-    gap: 13px;
-
-    padding: 12px 17px;
-}
-
-.checkout-item-image {
-    width: 52px;
-    height: 52px;
-
-    flex-shrink: 0;
-
-    overflow: hidden;
-
-    border-radius: 11px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #0f3d78,
-            #172554
-        );
-}
-
-.checkout-item-image img {
-    width: 100%;
-    height: 100%;
-
-    object-fit: cover;
-}
-
-.checkout-item-image > div {
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    width: 100%;
-    height: 100%;
-
-    color: #38bdf8;
-}
-
-.checkout-item-info {
-    flex: 1;
-}
-
-.checkout-item-info strong {
-    display: block;
-
-    color: #e2e8f0;
-
-    font-size: 12px;
-}
-
-.checkout-item-info span {
-    display: block;
-
-    margin-top: 4px;
-
-    color: #64748b;
-
-    font-size: 10px;
-}
-
-.checkout-item-price {
-    color: #cbd5e1;
-
-    font-size: 12px;
-}
-
-
-/* =========================================================
-   BUTTON
-========================================================= */
-
-.continue-payment-btn {
-    display: flex;
-
-    align-items: center;
-    justify-content: space-between;
-
-    width: 100%;
-
-    margin-top: 5px;
-
-    padding: 18px 21px;
-
-    border: 0;
-
-    border-radius: 16px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #2563eb,
-            #0ea5e9
-        );
-
-    color: white;
-
-    font-size: 14px;
-    font-weight: 900;
-
-    cursor: pointer;
-
-    box-shadow:
-        0 12px 30px
-        rgba(14,165,233,.18);
-
-    transition: .25s ease;
-}
-
-.continue-payment-btn:hover {
-    transform: translateY(-2px);
-
-    box-shadow:
-        0 18px 35px
-        rgba(14,165,233,.27);
-}
-
-.continue-payment-btn span {
-    font-size: 22px;
-}
-
-
-/* =========================================================
-   SUMMARY
-========================================================= */
-
-.checkout-summary {
-    position: sticky;
-
-    top: 20px;
-}
-
-.summary-card {
-    overflow: hidden;
-
-    border:
-        1px solid
-        rgba(56,189,248,.17);
-
-    border-radius: 22px;
-
-    background:
-        linear-gradient(
-            145deg,
-            #071a35,
-            #020617
-        );
-
-    box-shadow:
-        0 20px 70px
-        rgba(0,0,0,.25);
-}
-
-.summary-header {
-    padding: 25px;
-
-    border-bottom:
-        1px solid
-        rgba(148,163,184,.09);
-}
-
-.summary-header span {
-    color: #38bdf8;
-
-    font-size: 10px;
-    font-weight: 900;
-
-    letter-spacing: 1.5px;
-}
-
-.summary-header h2 {
-    margin: 5px 0 0;
-
-    font-size: 25px;
-    font-weight: 900;
-}
-
-.summary-items {
-    max-height: 310px;
-
-    overflow-y: auto;
-
-    padding: 17px 25px;
-}
-
-.summary-item {
-    display: flex;
-
-    align-items: center;
-    justify-content: space-between;
-
-    gap: 15px;
-
-    padding: 10px 0;
-}
-
-.summary-item > div {
-    min-width: 0;
-}
-
-.summary-item strong {
-    display: block;
-
-    overflow: hidden;
-
-    color: #cbd5e1;
-
-    font-size: 12px;
-
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.summary-item span {
-    color: #475569;
-
-    font-size: 10px;
-}
-
-.summary-item b {
-    flex-shrink: 0;
-
-    color: #94a3b8;
-
-    font-size: 11px;
-}
-
-.summary-divider {
-    height: 1px;
-
-    margin: 0 25px;
-
-    background:
-        rgba(148,163,184,.09);
-}
-
-.summary-row,
-.summary-total {
-    display: flex;
-
-    align-items: center;
-    justify-content: space-between;
-
-    padding: 11px 25px;
-}
-
-.summary-row {
-    color: #64748b;
-
-    font-size: 12px;
-}
-
-.summary-row strong {
-    color: #cbd5e1;
-}
-
-.summary-total {
-    padding-top: 20px;
-    padding-bottom: 22px;
-
-    color: white;
-
-    font-size: 15px;
-}
-
-.summary-total strong {
-    color: #7dd3fc;
-
-    font-size: 25px;
-    font-weight: 950;
-}
-
-.secure-box {
-    display: flex;
-
-    gap: 12px;
-
-    margin: 0 18px 18px;
-
-    padding: 14px;
-
-    border:
-        1px solid
-        rgba(56,189,248,.1);
-
-    border-radius: 14px;
-
-    background:
-        rgba(14,165,233,.05);
-}
-
-.secure-box > span {
-    font-size: 20px;
-}
-
-.secure-box strong {
-    color: #cbd5e1;
-
-    font-size: 11px;
-}
-
-.secure-box p {
-    margin: 3px 0 0;
-
-    color: #475569;
-
-    font-size: 9px;
-}
-
-
-/* =========================================================
-   RESPONSIVE
-========================================================= */
-
-@media (max-width: 950px) {
-
-    .checkout-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .checkout-summary {
-        position: static;
-
-        order: -1;
-    }
-
-}
-
-@media (max-width: 700px) {
-
-    .checkout-topbar {
-        grid-template-columns: 1fr auto;
-    }
-
-    .checkout-brand {
-        display: none;
-    }
-
-    .secure-label {
-        justify-self: end;
-    }
-
-    .checkout-progress {
-        gap: 7px;
-    }
-
-    .progress-line {
-        width: 25px;
-    }
-
-    .progress-step p {
-        display: none;
-    }
-
-    .checkout-container {
-        width: 92%;
-    }
-
-    .checkout-card {
-        padding: 20px;
-    }
-
-    .customer-grid,
-    .delivery-options {
-        grid-template-columns: 1fr;
-    }
-
-    .delivery-option {
-        grid-template-columns:
-            auto auto 1fr auto;
-    }
-
-}
-
-@media (max-width: 450px) {
-
-    .checkout-progress {
-        justify-content: space-between;
-    }
-
-    .checkout-card-title h2 {
-        font-size: 19px;
-    }
-
-    .checkout-card-title {
-        margin-bottom: 20px;
-    }
-
-    .summary-header {
-        padding: 20px;
-    }
-
-    .summary-items {
-        padding-left: 20px;
-        padding-right: 20px;
-    }
-
-    .summary-divider {
-        margin-left: 20px;
-        margin-right: 20px;
-    }
-
-    .summary-row,
-    .summary-total {
-        padding-left: 20px;
-        padding-right: 20px;
-    }
-
-}
-
-</style>
 
 </body>
 </html>
