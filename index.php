@@ -1,82 +1,76 @@
 <?php
+// =========================================================
+// HOCHIPO HUB
+// File: index.php
+// Main landing page
+// =========================================================
 
-/*
-|--------------------------------------------------------------------------
-| HOCHIPOHUB - HOMEPAGE
-|--------------------------------------------------------------------------
-*/
-
+require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/database/db.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| PAGE SETTINGS
-|--------------------------------------------------------------------------
-*/
-
-$pageTitle = 'Home';
-
-$pageDescription =
-    'Discover local products, support local vendors and shop your way on HochipoHub.';
-
-
-/*
-|--------------------------------------------------------------------------
-| SESSION
-|--------------------------------------------------------------------------
-*/
-
 require_once __DIR__ . '/includes/session.php';
+require_once __DIR__ . '/includes/functions.php';
 
+$db = $conn ?? $pdo ?? null;
 
-/*
-|--------------------------------------------------------------------------
-| DATABASE
-|--------------------------------------------------------------------------
-*/
-
-$db = getDB();
-
-
-/*
-|--------------------------------------------------------------------------
-| HELPER
-|--------------------------------------------------------------------------
-*/
-
-function homeProductImage(
-    ?string $image
-): string {
-
-    if (
-        empty($image)
-    ) {
-
-        return BASE_URL
-            . 'image/product/default-product.jpg';
-    }
-
-    return PRODUCT_IMAGE_URL
-        . rawurlencode($image);
+if (!$db) {
+    die("Database connection not found.");
 }
 
+function e($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+}
 
-/*
-|--------------------------------------------------------------------------
-| FEATURED PRODUCTS
-|--------------------------------------------------------------------------
-|
-| Only products belonging to approved vendors
-| and available products are displayed.
-|
-*/
+$logged_in = isset($_SESSION['user_id']);
+$user_name = $_SESSION['name'] ?? '';
+$user_role = $_SESSION['role'] ?? 'customer';
 
-$featuredProducts = [];
+$categories = [];
+$products = [];
+$vendors = [];
+
+// =========================================================
+// LOAD CATEGORIES
+// =========================================================
 
 try {
 
-    $stmt = $db->prepare("
+    $sql = "
+        SELECT
+            category_id,
+            category_name,
+            category_image
+        FROM categories
+        ORDER BY category_name ASC
+        LIMIT 8
+    ";
+
+    if ($db instanceof PDO) {
+
+        $stmt = $db->query($sql);
+        $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    } else {
+
+        $result = $db->query($sql);
+
+        while ($row = $result->fetch_assoc()) {
+            $categories[] = $row;
+        }
+    }
+
+} catch (Throwable $e) {
+    $categories = [];
+}
+
+
+// =========================================================
+// LOAD FEATURED PRODUCTS
+// =========================================================
+
+try {
+
+    $sql = "
         SELECT
             p.product_id,
             p.product_name,
@@ -88,552 +82,1387 @@ try {
 
             v.vendor_id,
             v.business_name,
-            v.business_logo,
 
-            c.category_id,
-            c.category_name,
-
-            COALESCE(
-                AVG(
-                    CASE
-                        WHEN r.status = 'Visible'
-                        THEN r.rating
-                    END
-                ),
-                0
-            ) AS average_rating,
-
-            COUNT(
-                CASE
-                    WHEN r.status = 'Visible'
-                    THEN r.review_id
-                END
-            ) AS review_count
+            c.category_name
 
         FROM products p
 
         INNER JOIN vendors v
             ON p.vendor_id = v.vendor_id
 
-        INNER JOIN categories c
+        LEFT JOIN categories c
             ON p.category_id = c.category_id
 
-        LEFT JOIN reviews r
-            ON p.product_id = r.product_id
+        WHERE p.status = 'Available'
+          AND p.stock_quantity > 0
+          AND v.approval_status = 'Approved'
 
-        WHERE
-            p.status = 'Available'
-            AND p.stock_quantity > 0
-            AND v.approval_status = 'Approved'
-
-        GROUP BY
-            p.product_id,
-            p.product_name,
-            p.description,
-            p.price,
-            p.stock_quantity,
-            p.image,
-            p.status,
-            v.vendor_id,
-            v.business_name,
-            v.business_logo,
-            c.category_id,
-            c.category_name
-
-        ORDER BY
-            p.created_at DESC
+        ORDER BY p.created_at DESC
 
         LIMIT 8
-    ");
+    ";
 
-    $stmt->execute();
+    if ($db instanceof PDO) {
 
-    $featuredProducts =
-        $stmt->fetchAll();
+        $stmt = $db->query($sql);
+        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-} catch (PDOException $e) {
+    } else {
 
-    $featuredProducts = [];
+        $result = $db->query($sql);
+
+        while ($row = $result->fetch_assoc()) {
+            $products[] = $row;
+        }
+    }
+
+} catch (Throwable $e) {
+    $products = [];
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| CATEGORIES
-|--------------------------------------------------------------------------
-*/
-
-$categories = [];
+// =========================================================
+// LOAD APPROVED VENDORS
+// =========================================================
 
 try {
 
-    $stmt = $db->query("
+    $sql = "
         SELECT
-            category_id,
-            category_name,
-            category_image
+            vendor_id,
+            business_name,
+            business_logo,
+            business_description,
+            category
 
-        FROM categories
+        FROM vendors
 
-        ORDER BY category_name ASC
+        WHERE approval_status = 'Approved'
 
-        LIMIT 8
-    ");
+        ORDER BY created_at DESC
 
-    $categories =
-        $stmt->fetchAll();
+        LIMIT 6
+    ";
 
-} catch (PDOException $e) {
+    if ($db instanceof PDO) {
 
-    $categories = [];
-}
+        $stmt = $db->query($sql);
+        $vendors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    } else {
 
-/*
-|--------------------------------------------------------------------------
-| POPULAR VENDORS
-|--------------------------------------------------------------------------
-*/
+        $result = $db->query($sql);
 
-$vendors = [];
+        while ($row = $result->fetch_assoc()) {
+            $vendors[] = $row;
+        }
+    }
 
-try {
-
-    $stmt = $db->query("
-        SELECT
-            v.vendor_id,
-            v.business_name,
-            v.business_logo,
-            v.business_description,
-            v.category,
-
-            COUNT(
-                DISTINCT p.product_id
-            ) AS product_count
-
-        FROM vendors v
-
-        LEFT JOIN products p
-            ON v.vendor_id = p.vendor_id
-            AND p.status = 'Available'
-
-        WHERE
-            v.approval_status = 'Approved'
-
-        GROUP BY
-            v.vendor_id,
-            v.business_name,
-            v.business_logo,
-            v.business_description,
-            v.category
-
-        ORDER BY
-            product_count DESC,
-            v.business_name ASC
-
-        LIMIT 4
-    ");
-
-    $vendors =
-        $stmt->fetchAll();
-
-} catch (PDOException $e) {
-
+} catch (Throwable $e) {
     $vendors = [];
 }
 
+?>
+<!DOCTYPE html>
+<html lang="en">
 
-/*
-|--------------------------------------------------------------------------
-| INCLUDE HEADER
-|--------------------------------------------------------------------------
-*/
+<head>
 
-require_once __DIR__ . '/includes/header.php';
+    <meta charset="UTF-8">
 
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>HochipoHub | Discover. Shop. Support Local.</title>
+
+    <meta
+        name="description"
+        content="HochipoHub - A local marketplace connecting customers with local vendors."
+    >
+
+    <link
+        rel="stylesheet"
+        href="css/style.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="css/responsive.css"
+    >
+
+    <style>
+
+        /* =====================================================
+           HOCHIPO HUB HOME PAGE
+           GEN Z BLUE MARKETPLACE
+        ===================================================== */
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family:
+                Inter,
+                Poppins,
+                Arial,
+                sans-serif;
+
+            background: #f5f8ff;
+            color: #10265e;
+        }
+
+        a {
+            text-decoration: none;
+        }
+
+        .home-page {
+            overflow: hidden;
+        }
+
+        /* =====================================================
+           HERO
+        ===================================================== */
+
+        .home-hero {
+            position: relative;
+            min-height: 620px;
+
+            display: flex;
+            align-items: center;
+
+            padding:
+                80px 7%;
+
+            background:
+                radial-gradient(
+                    circle at 85% 20%,
+                    rgba(0, 210, 255, .35),
+                    transparent 25%
+                ),
+                radial-gradient(
+                    circle at 10% 80%,
+                    rgba(50, 90, 255, .35),
+                    transparent 30%
+                ),
+                linear-gradient(
+                    135deg,
+                    #04133e,
+                    #063a9e 55%,
+                    #007dff
+                );
+
+            color: white;
+        }
+
+        .home-hero::before {
+            content: "";
+
+            position: absolute;
+
+            width: 420px;
+            height: 420px;
+
+            right: -130px;
+            bottom: -180px;
+
+            border-radius: 50%;
+
+            border:
+                60px solid
+                rgba(255,255,255,.06);
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+
+            width: 100%;
+            max-width: 1250px;
+
+            margin: auto;
+        }
+
+        .hero-small-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+
+            padding:
+                8px 14px;
+
+            margin-bottom: 20px;
+
+            border:
+                1px solid
+                rgba(255,255,255,.2);
+
+            border-radius: 999px;
+
+            background:
+                rgba(255,255,255,.08);
+
+            backdrop-filter: blur(10px);
+
+            font-size: 13px;
+            font-weight: 700;
+
+            color:
+                rgba(255,255,255,.9);
+        }
+
+        .hero-content h1 {
+            max-width: 760px;
+
+            margin: 0;
+
+            font-size:
+                clamp(44px, 7vw, 82px);
+
+            line-height: .98;
+
+            letter-spacing:
+                -4px;
+
+            font-weight: 900;
+        }
+
+        .hero-content h1 span {
+            color: #62ddff;
+        }
+
+        .hero-content p {
+            max-width: 620px;
+
+            margin:
+                25px 0 30px;
+
+            color:
+                rgba(255,255,255,.78);
+
+            font-size: 17px;
+            line-height: 1.7;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .hero-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            min-height: 52px;
+
+            padding:
+                0 24px;
+
+            border-radius: 15px;
+
+            font-weight: 800;
+
+            transition:
+                transform .2s ease,
+                box-shadow .2s ease;
+        }
+
+        .hero-btn:hover {
+            transform:
+                translateY(-3px);
+        }
+
+        .hero-btn-primary {
+            background: white;
+            color: #0754d8;
+
+            box-shadow:
+                0 12px 30px
+                rgba(0,0,0,.18);
+        }
+
+        .hero-btn-secondary {
+            color: white;
+
+            border:
+                1px solid
+                rgba(255,255,255,.25);
+
+            background:
+                rgba(255,255,255,.08);
+
+            backdrop-filter:
+                blur(10px);
+        }
+
+        /* =====================================================
+           HERO FLOATING CARD
+        ===================================================== */
+
+        .hero-card {
+            position: absolute;
+
+            right: 7%;
+            bottom: 70px;
+
+            z-index: 3;
+
+            width: 280px;
+
+            padding: 22px;
+
+            border:
+                1px solid
+                rgba(255,255,255,.18);
+
+            border-radius: 25px;
+
+            background:
+                rgba(255,255,255,.11);
+
+            backdrop-filter:
+                blur(18px);
+
+            box-shadow:
+                0 25px 70px
+                rgba(0,0,0,.2);
+        }
+
+        .hero-card-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+
+            margin-bottom: 18px;
+        }
+
+        .hero-card-icon {
+            width: 45px;
+            height: 45px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 14px;
+
+            background:
+                rgba(255,255,255,.15);
+
+            font-size: 21px;
+        }
+
+        .hero-card-label {
+            color:
+                rgba(255,255,255,.65);
+
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .hero-card-value {
+            color: white;
+
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .hero-card-line {
+            height: 1px;
+
+            margin:
+                16px 0;
+
+            background:
+                rgba(255,255,255,.12);
+        }
+
+        .hero-card-text {
+            color:
+                rgba(255,255,255,.7);
+
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* =====================================================
+           SECTIONS
+        ===================================================== */
+
+        .home-section {
+            max-width: 1250px;
+
+            margin:
+                auto;
+
+            padding:
+                75px 25px;
+        }
+
+        .section-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+
+            gap: 20px;
+
+            margin-bottom: 28px;
+        }
+
+        .section-heading h2 {
+            margin: 0;
+
+            font-size: 31px;
+
+            letter-spacing:
+                -.8px;
+
+            color: #10265e;
+        }
+
+        .section-heading p {
+            margin:
+                8px 0 0;
+
+            color: #7b88a1;
+
+            font-size: 14px;
+        }
+
+        .section-link {
+            color: #0868ff;
+
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        /* =====================================================
+           CATEGORY
+        ===================================================== */
+
+        .category-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, 1fr);
+
+            gap: 17px;
+        }
+
+        .category-card {
+            position: relative;
+
+            min-height: 145px;
+
+            overflow: hidden;
+
+            padding: 23px;
+
+            border-radius: 22px;
+
+            background: white;
+
+            border:
+                1px solid
+                rgba(20,65,160,.08);
+
+            box-shadow:
+                0 12px 35px
+                rgba(30,65,130,.07);
+
+            transition:
+                transform .2s ease,
+                box-shadow .2s ease;
+        }
+
+        .category-card:hover {
+            transform:
+                translateY(-6px);
+
+            box-shadow:
+                0 20px 45px
+                rgba(0,80,220,.13);
+        }
+
+        .category-card::after {
+            content: "";
+
+            position: absolute;
+
+            width: 100px;
+            height: 100px;
+
+            right: -40px;
+            bottom: -45px;
+
+            border-radius: 50%;
+
+            background:
+                #e8f2ff;
+        }
+
+        .category-image {
+            width: 55px;
+            height: 55px;
+
+            object-fit: cover;
+
+            border-radius: 16px;
+
+            background: #eaf2ff;
+
+            margin-bottom: 15px;
+        }
+
+        .category-placeholder {
+            width: 55px;
+            height: 55px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            margin-bottom: 15px;
+
+            border-radius: 16px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #e9f2ff,
+                    #d8e8ff
+                );
+
+            color: #0868ff;
+
+            font-size: 22px;
+            font-weight: 900;
+        }
+
+        .category-card h3 {
+            position: relative;
+            z-index: 2;
+
+            margin: 0;
+
+            color: #10265e;
+
+            font-size: 15px;
+        }
+
+        /* =====================================================
+           PRODUCTS
+        ===================================================== */
+
+        .product-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, 1fr);
+
+            gap: 20px;
+        }
+
+        .home-product {
+            overflow: hidden;
+
+            border-radius: 22px;
+
+            background: white;
+
+            border:
+                1px solid
+                rgba(20,65,160,.08);
+
+            box-shadow:
+                0 12px 35px
+                rgba(30,65,130,.07);
+
+            transition:
+                transform .2s ease,
+                box-shadow .2s ease;
+        }
+
+        .home-product:hover {
+            transform:
+                translateY(-6px);
+
+            box-shadow:
+                0 22px 45px
+                rgba(0,80,220,.13);
+        }
+
+        .product-image-wrap {
+            position: relative;
+
+            height: 220px;
+
+            overflow: hidden;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #eaf2ff,
+                    #dcecff
+                );
+        }
+
+        .product-image {
+            width: 100%;
+            height: 100%;
+
+            object-fit: cover;
+
+            transition:
+                transform .3s ease;
+        }
+
+        .home-product:hover
+        .product-image {
+            transform:
+                scale(1.06);
+        }
+
+        .product-tag {
+            position: absolute;
+
+            top: 13px;
+            left: 13px;
+
+            padding:
+                6px 10px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(255,255,255,.92);
+
+            color: #0868ff;
+
+            font-size: 10px;
+            font-weight: 900;
+
+            text-transform: uppercase;
+        }
+
+        .product-info {
+            padding: 18px;
+        }
+
+        .product-category {
+            color: #8090aa;
+
+            font-size: 11px;
+            font-weight: 700;
+
+            text-transform: uppercase;
+        }
+
+        .product-info h3 {
+            margin:
+                7px 0;
+
+            color: #10265e;
+
+            font-size: 16px;
+        }
+
+        .product-vendor {
+            color: #7c89a2;
+
+            font-size: 12px;
+        }
+
+        .product-bottom {
+            display: flex;
+
+            justify-content: space-between;
+            align-items: center;
+
+            margin-top: 16px;
+        }
+
+        .product-price {
+            color: #0759dc;
+
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .product-view {
+            width: 35px;
+            height: 35px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 11px;
+
+            background: #eaf2ff;
+
+            color: #0868ff;
+
+            font-weight: 900;
+        }
+
+        /* =====================================================
+           VENDORS
+        ===================================================== */
+
+        .vendor-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(3, 1fr);
+
+            gap: 18px;
+        }
+
+        .vendor-card {
+            display: flex;
+            align-items: center;
+
+            gap: 15px;
+
+            padding: 20px;
+
+            border-radius: 20px;
+
+            background: white;
+
+            border:
+                1px solid
+                rgba(20,65,160,.08);
+
+            box-shadow:
+                0 10px 30px
+                rgba(30,65,130,.06);
+
+            transition:
+                transform .2s ease;
+        }
+
+        .vendor-card:hover {
+            transform:
+                translateY(-4px);
+        }
+
+        .vendor-logo {
+            width: 62px;
+            height: 62px;
+
+            flex-shrink: 0;
+
+            border-radius: 17px;
+
+            object-fit: cover;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #dceaff,
+                    #eff6ff
+                );
+        }
+
+        .vendor-info h3 {
+            margin: 0 0 5px;
+
+            color: #10265e;
+
+            font-size: 15px;
+        }
+
+        .vendor-info p {
+            margin: 0;
+
+            color: #8491aa;
+
+            font-size: 12px;
+
+            line-height: 1.5;
+        }
+
+        .vendor-pill {
+            display: inline-block;
+
+            margin-top: 8px;
+
+            padding:
+                5px 9px;
+
+            border-radius: 999px;
+
+            background: #eaf2ff;
+
+            color: #0868ff;
+
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        /* =====================================================
+           CTA
+        ===================================================== */
+
+        .home-cta {
+            position: relative;
+
+            overflow: hidden;
+
+            margin:
+                10px auto 70px;
+
+            max-width: 1200px;
+
+            padding:
+                55px 60px;
+
+            border-radius: 30px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #06194b,
+                    #0758d9,
+                    #008cff
+                );
+
+            color: white;
+
+            box-shadow:
+                0 25px 60px
+                rgba(0,75,190,.2);
+        }
+
+        .home-cta::before {
+            content: "";
+
+            position: absolute;
+
+            width: 280px;
+            height: 280px;
+
+            right: -90px;
+            top: -130px;
+
+            border-radius: 50%;
+
+            border:
+                55px solid
+                rgba(255,255,255,.08);
+        }
+
+        .home-cta h2 {
+            position: relative;
+
+            margin: 0 0 10px;
+
+            font-size: 32px;
+        }
+
+        .home-cta p {
+            position: relative;
+
+            max-width: 600px;
+
+            margin:
+                0 0 25px;
+
+            color:
+                rgba(255,255,255,.75);
+
+            line-height: 1.6;
+        }
+
+        .cta-btn {
+            position: relative;
+
+            display: inline-flex;
+
+            padding:
+                13px 20px;
+
+            border-radius: 13px;
+
+            background: white;
+
+            color: #0759dc;
+
+            font-weight: 900;
+        }
+
+        /* =====================================================
+           EMPTY
+        ===================================================== */
+
+        .home-empty {
+            padding: 50px 20px;
+
+            text-align: center;
+
+            border-radius: 22px;
+
+            background: white;
+
+            color: #7b88a1;
+        }
+
+        /* =====================================================
+           RESPONSIVE
+        ===================================================== */
+
+        @media (max-width: 1100px) {
+
+            .hero-card {
+                display: none;
+            }
+
+            .category-grid,
+            .product-grid {
+                grid-template-columns:
+                    repeat(3, 1fr);
+            }
+
+        }
+
+        @media (max-width: 800px) {
+
+            .home-hero {
+                min-height: 560px;
+
+                padding:
+                    70px 25px;
+            }
+
+            .hero-content h1 {
+                letter-spacing: -2px;
+            }
+
+            .category-grid,
+            .product-grid {
+                grid-template-columns:
+                    repeat(2, 1fr);
+            }
+
+            .vendor-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .home-cta {
+                margin:
+                    10px 20px 50px;
+
+                padding: 40px 28px;
+            }
+
+        }
+
+        @media (max-width: 520px) {
+
+            .category-grid,
+            .product-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .home-section {
+                padding:
+                    55px 20px;
+            }
+
+            .section-heading {
+                align-items: start;
+
+                flex-direction: column;
+            }
+
+            .home-hero {
+                min-height: 520px;
+            }
+
+            .hero-content p {
+                font-size: 15px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<?php
+// =========================================================
+// EXISTING NAVBAR
+// =========================================================
+
+require_once __DIR__ . '/includes/navbar.php';
 ?>
 
-<!-- =========================================================
-     HERO SECTION
-========================================================= -->
 
-<section class="hero-section">
+<div class="home-page">
 
-    <div class="hero-background">
+    <!-- =====================================================
+         HERO
+    ====================================================== -->
 
-        <div class="hero-glow hero-glow-one"></div>
-
-        <div class="hero-glow hero-glow-two"></div>
-
-        <div class="hero-grid"></div>
-
-    </div>
-
-
-    <div class="container hero-container">
-
-
-        <!-- =================================================
-             HERO CONTENT
-        ================================================== -->
+    <section class="home-hero">
 
         <div class="hero-content">
 
-            <div class="hero-badge">
-
-                <span class="hero-badge-dot"></span>
-
-                Malaysia's Local Marketplace
-
-                <i class="fa-solid fa-arrow-trend-up"></i>
-
+            <div class="hero-small-title">
+                ✦ LOCAL MARKETPLACE
             </div>
 
+            <?php if ($logged_in): ?>
 
-            <h1>
+                <h1>
+                    Welcome back,
+                    <span><?= e($user_name); ?></span>.
+                </h1>
 
-                Shop Local.
+                <p>
+                    Your local marketplace is ready.
+                    Discover products, support local vendors,
+                    and find something worth adding to your cart.
+                </p>
 
-                <span>
-                    Shop Different.
-                </span>
+            <?php else: ?>
 
-            </h1>
+                <h1>
+                    Your local finds,
+                    <span>all in one place.</span>
+                </h1>
 
+                <p>
+                    Discover unique products from local vendors
+                    around you. Shop smarter, support small
+                    businesses and make every purchase count.
+                </p>
 
-            <p>
-
-                Discover products from local vendors,
-                find hidden gems and support businesses
-                that deserve the spotlight.
-
-            </p>
+            <?php endif; ?>
 
 
             <div class="hero-actions">
 
                 <a
-                    href="<?php echo BASE_URL; ?>catalog.php"
-                    class="btn btn-primary hero-primary-btn"
+                    href="catalog.php"
+                    class="hero-btn hero-btn-primary"
                 >
-
-                    Explore Products
-
-                    <i class="fa-solid fa-arrow-right"></i>
-
+                    Explore Products →
                 </a>
 
+                <?php if (!$logged_in): ?>
 
-                <a
-                    href="<?php echo BASE_URL; ?>vendor.php"
-                    class="btn btn-outline hero-secondary-btn"
-                >
+                    <a
+                        href="vendor.php"
+                        class="hero-btn hero-btn-secondary"
+                    >
+                        Become a Vendor
+                    </a>
 
-                    <i class="fa-solid fa-store"></i>
+                <?php else: ?>
 
-                    Meet Our Vendors
+                    <a
+                        href="dashboard.php"
+                        class="hero-btn hero-btn-secondary"
+                    >
+                        My Dashboard
+                    </a>
 
-                </a>
-
-            </div>
-
-
-            <!-- HERO STATS -->
-
-            <div class="hero-stats">
-
-                <div class="hero-stat">
-
-                    <strong>
-                        <?php
-                        echo number_format(
-                            count($featuredProducts)
-                        );
-                        ?>+
-                    </strong>
-
-                    <span>
-                        Featured Products
-                    </span>
-
-                </div>
-
-
-                <div class="hero-stat-divider"></div>
-
-
-                <div class="hero-stat">
-
-                    <strong>
-                        <?php
-                        echo number_format(
-                            count($vendors)
-                        ); 
-                        ?>+
-                    </strong>
-
-                    <span>
-                        Local Vendors
-                    </span>
-
-                </div>
-
-
-                <div class="hero-stat-divider"></div>
-
-
-                <div class="hero-stat">
-
-                    <strong>
-                        100%
-                    </strong>
-
-                    <span>
-                        Local Spirit
-                    </span>
-
-                </div>
+                <?php endif; ?>
 
             </div>
 
         </div>
 
 
-        <!-- =================================================
-             HERO VISUAL
-        ================================================== -->
+        <!-- FLOATING INFO CARD -->
 
-        <div class="hero-visual">
+        <div class="hero-card">
 
+            <div class="hero-card-top">
 
-            <div class="hero-orbit orbit-one"></div>
-
-            <div class="hero-orbit orbit-two"></div>
-
-
-            <div class="hero-main-card">
-
-                <div class="hero-card-top">
-
-                    <span>
-                        TRENDING NOW
-                    </span>
-
-                    <i class="fa-solid fa-fire"></i>
-
+                <div class="hero-card-icon">
+                    ⚡
                 </div>
 
+                <div>
 
-                <div class="hero-product-showcase">
+                    <div class="hero-card-label">
+                        HochipoHub
+                    </div>
 
-                    <div class="hero-product-icon">
-
-                        <i class="fa-solid fa-bag-shopping"></i>
-
+                    <div class="hero-card-value">
+                        Built for local
                     </div>
 
                 </div>
 
-
-                <div class="hero-card-info">
-
-                    <span>
-                        Local Finds
-                    </span>
-
-                    <strong>
-                        Made. Found. Loved.
-                    </strong>
-
-                </div>
-
-
-                <div class="hero-card-footer">
-
-                    <span>
-                        Explore the hub
-                    </span>
-
-                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
-
-                </div>
-
             </div>
 
+            <div class="hero-card-line"></div>
 
-            <!-- FLOATING CARD 1 -->
-
-            <div class="floating-card floating-card-one">
-
-                <div class="floating-icon">
-
-                    <i class="fa-solid fa-bolt"></i>
-
-                </div>
-
-                <div>
-
-                    <strong>
-                        Discover
-                    </strong>
-
-                    <span>
-                        Something new
-                    </span>
-
-                </div>
-
-            </div>
-
-
-            <!-- FLOATING CARD 2 -->
-
-            <div class="floating-card floating-card-two">
-
-                <div class="floating-icon">
-
-                    <i class="fa-solid fa-heart"></i>
-
-                </div>
-
-                <div>
-
-                    <strong>
-                        Support Local
-                    </strong>
-
-                    <span>
-                        Shop with purpose
-                    </span>
-
-                </div>
-
+            <div class="hero-card-text">
+                One platform connecting customers
+                and local businesses in one place.
             </div>
 
         </div>
 
-    </div>
-
-</section>
+    </section>
 
 
-<!-- =========================================================
-     CATEGORY SECTION
-========================================================= -->
+    <!-- =====================================================
+         CATEGORIES
+    ====================================================== -->
 
-<section class="home-section categories-section">
-
-    <div class="container">
-
+    <section class="home-section">
 
         <div class="section-heading">
 
             <div>
 
-                <span class="section-eyebrow">
-                    EXPLORE
-                </span>
-
                 <h2>
-                    Find your <span>thing.</span>
+                    Explore categories
                 </h2>
+
+                <p>
+                    Find what you're looking for faster.
+                </p>
 
             </div>
 
-
             <a
-                href="<?php echo BASE_URL; ?>category.php"
+                href="category.php"
                 class="section-link"
             >
-
-                View all
-
-                <i class="fa-solid fa-arrow-right"></i>
-
+                View all →
             </a>
 
         </div>
 
 
-        <div class="category-grid">
+        <?php if (!empty($categories)): ?>
 
-            <?php if (
-                !empty($categories)
-            ): ?>
+            <div class="category-grid">
 
+                <?php foreach ($categories as $category): ?>
 
-                <?php foreach (
-                    $categories
-                    as $category
-                ): ?>
+                    <?php
+
+                        $category_image =
+                            trim(
+                                $category[
+                                    'category_image'
+                                ] ?? ''
+                            );
+
+                    ?>
 
                     <a
-                        href="<?php echo BASE_URL; ?>catalog.php?category=<?php echo (int) $category['category_id']; ?>"
+                        href="category.php?id=<?= (int) $category['category_id']; ?>"
                         class="category-card"
                     >
 
-                        <div class="category-card-image">
+                        <?php if (
+                            $category_image !== ''
+                        ): ?>
+
+                            <img
+                                src="image/product/<?= e(
+                                    ltrim(
+                                        $category_image,
+                                        '/\\'
+                                    )
+                                ); ?>"
+                                class="category-image"
+                                alt="<?= e(
+                                    $category['category_name']
+                                ); ?>"
+                                onerror="
+                                    this.style.display='none';
+                                "
+                            >
+
+                        <?php else: ?>
+
+                            <div
+                                class="category-placeholder"
+                            >
+                                #
+                            </div>
+
+                        <?php endif; ?>
+
+
+                        <h3>
+                            <?= e(
+                                $category['category_name']
+                            ); ?>
+                        </h3>
+
+                    </a>
+
+                <?php endforeach; ?>
+
+            </div>
+
+        <?php else: ?>
+
+            <div class="home-empty">
+                Categories will appear here once they are added.
+            </div>
+
+        <?php endif; ?>
+
+    </section>
+
+
+    <!-- =====================================================
+         PRODUCTS
+    ====================================================== -->
+
+    <section class="home-section">
+
+        <div class="section-heading">
+
+            <div>
+
+                <h2>
+                    Fresh from local vendors
+                </h2>
+
+                <p>
+                    Recently added products worth checking out.
+                </p>
+
+            </div>
+
+            <a
+                href="catalog.php"
+                class="section-link"
+            >
+                Shop all →
+            </a>
+
+        </div>
+
+
+        <?php if (!empty($products)): ?>
+
+            <div class="product-grid">
+
+                <?php foreach ($products as $product): ?>
+
+                    <?php
+
+                        $product_image =
+                            trim(
+                                $product['image'] ?? ''
+                            );
+
+                        if ($product_image !== '') {
+
+                            $product_image_path =
+                                'image/product/' .
+                                ltrim(
+                                    $product_image,
+                                    '/\\'
+                                );
+
+                        } else {
+
+                            $product_image_path =
+                                'image/logo.jpg';
+                        }
+
+                    ?>
+
+                    <a
+                        href="product_details.php?id=<?= (int) $product['product_id']; ?>"
+                        class="home-product"
+                    >
+
+                        <div class="product-image-wrap">
+
+                            <img
+                                src="<?= e(
+                                    $product_image_path
+                                ); ?>"
+                                class="product-image"
+                                alt="<?= e(
+                                    $product['product_name']
+                                ); ?>"
+                                onerror="
+                                    this.src='image/logo.jpg';
+                                "
+                            >
 
                             <?php if (
                                 !empty(
-                                    $category[
-                                        'category_image'
-                                    ]
+                                    $product['category_name']
                                 )
                             ): ?>
 
-                                <img
-                                    src="<?php echo IMAGE_URL . htmlspecialchars(
-                                        $category[
-                                            'category_image'
-                                        ],
-                                        ENT_QUOTES,
-                                        'UTF-8'
-                                    ); ?>"
-                                    alt="<?php echo htmlspecialchars(
-                                        $category[
-                                            'category_name'
-                                        ],
-                                        ENT_QUOTES,
-                                        'UTF-8'
-                                    ); ?>"
-                                >
-
-                            <?php else: ?>
-
-                                <div class="category-placeholder">
-
-                                    <i class="fa-solid fa-layer-group"></i>
-
-                                </div>
+                                <span class="product-tag">
+                                    <?= e(
+                                        $product['category_name']
+                                    ); ?>
+                                </span>
 
                             <?php endif; ?>
 
                         </div>
 
 
-                        <div class="category-card-content">
+                        <div class="product-info">
+
+                            <div class="product-category">
+                                <?= e(
+                                    $product['category_name']
+                                    ?? 'Product'
+                                ); ?>
+                            </div>
 
                             <h3>
-
-                                <?php echo htmlspecialchars(
-                                    $category[
-                                        'category_name'
-                                    ],
-                                    ENT_QUOTES,
-                                    'UTF-8'
+                                <?= e(
+                                    $product['product_name']
                                 ); ?>
-
                             </h3>
 
+                            <div class="product-vendor">
+                                by
+                                <?= e(
+                                    $product['business_name']
+                                ); ?>
+                            </div>
 
-                            <span>
 
-                                Explore
+                            <div class="product-bottom">
 
-                                <i class="fa-solid fa-arrow-right"></i>
+                                <div class="product-price">
+                                    RM
+                                    <?= number_format(
+                                        (float)
+                                        $product['price'],
+                                        2
+                                    ); ?>
+                                </div>
 
-                            </span>
+                                <div class="product-view">
+                                    →
+                                </div>
+
+                            </div>
 
                         </div>
 
@@ -641,589 +1470,138 @@ require_once __DIR__ . '/includes/header.php';
 
                 <?php endforeach; ?>
 
+            </div>
 
-            <?php else: ?>
+        <?php else: ?>
 
+            <div class="home-empty">
+                No products are available right now.
+            </div>
 
-                <div class="empty-home-state">
+        <?php endif; ?>
 
-                    <i class="fa-solid fa-layer-group"></i>
-
-                    <h3>
-                        Categories coming soon
-                    </h3>
-
-                    <p>
-                        New local categories will appear here.
-                    </p>
-
-                </div>
+    </section>
 
 
-            <?php endif; ?>
+    <!-- =====================================================
+         VENDORS
+    ====================================================== -->
 
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =========================================================
-     FEATURED PRODUCTS
-========================================================= -->
-
-<section class="home-section products-section">
-
-    <div class="container">
-
+    <section class="home-section">
 
         <div class="section-heading">
 
             <div>
 
-                <span class="section-eyebrow">
-                    FRESH FINDS
-                </span>
-
                 <h2>
-                    Worth adding to <span>cart.</span>
+                    Meet local vendors
                 </h2>
-
-            </div>
-
-
-            <a
-                href="<?php echo BASE_URL; ?>catalog.php"
-                class="section-link"
-            >
-
-                Browse all
-
-                <i class="fa-solid fa-arrow-right"></i>
-
-            </a>
-
-        </div>
-
-
-        <div class="product-grid">
-
-            <?php if (
-                !empty($featuredProducts)
-            ): ?>
-
-
-                <?php foreach (
-                    $featuredProducts
-                    as $product
-                ): ?>
-
-
-                    <article class="product-card">
-
-
-                        <!-- PRODUCT IMAGE -->
-
-                        <a
-                            href="<?php echo BASE_URL; ?>product_details.php?id=<?php echo (int) $product['product_id']; ?>"
-                            class="product-card-image"
-                        >
-
-                            <?php if (
-                                !empty(
-                                    $product['image']
-                                )
-                            ): ?>
-
-                                <img
-                                    src="<?php echo homeProductImage(
-                                        $product['image']
-                                    ); ?>"
-                                    alt="<?php echo htmlspecialchars(
-                                        $product['product_name'],
-                                        ENT_QUOTES,
-                                        'UTF-8'
-                                    ); ?>"
-                                >
-
-                            <?php else: ?>
-
-                                <div class="product-image-placeholder">
-
-                                    <i class="fa-solid fa-box-open"></i>
-
-                                </div>
-
-                            <?php endif; ?>
-
-
-                            <span class="product-category-tag">
-
-                                <?php echo htmlspecialchars(
-                                    $product['category_name'],
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ); ?>
-
-                            </span>
-
-
-                            <button
-                                type="button"
-                                class="product-wishlist-btn"
-                                data-product-id="<?php echo (int) $product['product_id']; ?>"
-                                aria-label="Add to wishlist"
-                            >
-
-                                <i class="fa-regular fa-heart"></i>
-
-                            </button>
-
-                        </a>
-
-
-                        <!-- PRODUCT INFO -->
-
-                        <div class="product-card-body">
-
-
-                            <a
-                                href="<?php echo BASE_URL; ?>product_details.php?id=<?php echo (int) $product['product_id']; ?>"
-                                class="product-name"
-                            >
-
-                                <?php echo htmlspecialchars(
-                                    $product['product_name'],
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ); ?>
-
-                            </a>
-
-
-                            <a
-                                href="<?php echo BASE_URL; ?>vendor.php?id=<?php echo (int) $product['vendor_id']; ?>"
-                                class="product-vendor"
-                            >
-
-                                <i class="fa-solid fa-store"></i>
-
-                                <?php echo htmlspecialchars(
-                                    $product['business_name'],
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ); ?>
-
-                            </a>
-
-
-                            <div class="product-rating">
-
-                                <span class="rating-stars">
-
-                                    <?php
-
-                                    $rating =
-                                        (float)
-                                        $product[
-                                            'average_rating'
-                                        ];
-
-                                    for (
-                                        $i = 1;
-                                        $i <= 5;
-                                        $i++
-                                    ):
-
-                                    ?>
-
-                                        <?php if (
-                                            $i <=
-                                            round($rating)
-                                        ): ?>
-
-                                            <i class="fa-solid fa-star"></i>
-
-                                        <?php else: ?>
-
-                                            <i class="fa-regular fa-star"></i>
-
-                                        <?php endif; ?>
-
-                                    <?php endfor; ?>
-
-                                </span>
-
-
-                                <span>
-
-                                    <?php echo number_format(
-                                        $rating,
-                                        1
-                                    ); ?>
-
-                                    (
-                                    <?php echo (int) $product[
-                                        'review_count'
-                                    ]; ?>
-                                    )
-
-                                </span>
-
-                            </div>
-
-
-                            <div class="product-card-bottom">
-
-                                <strong class="product-price">
-
-                                    <?php echo formatPrice(
-                                        $product['price']
-                                    ); ?>
-
-                                </strong>
-
-
-                                <button
-                                    type="button"
-                                    class="product-add-btn"
-                                    data-product-id="<?php echo (int) $product['product_id']; ?>"
-                                    aria-label="Add to cart"
-                                >
-
-                                    <i class="fa-solid fa-plus"></i>
-
-                                </button>
-
-                            </div>
-
-                        </div>
-
-                    </article>
-
-
-                <?php endforeach; ?>
-
-
-            <?php else: ?>
-
-
-                <div class="empty-home-state">
-
-                    <i class="fa-solid fa-box-open"></i>
-
-                    <h3>
-                        No products yet
-                    </h3>
-
-                    <p>
-                        Local vendors will start appearing here
-                        once products are available.
-                    </p>
-
-                </div>
-
-
-            <?php endif; ?>
-
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =========================================================
-     WHY HOCHIPOHUB
-========================================================= -->
-
-<section class="home-section why-section">
-
-    <div class="container">
-
-        <div class="why-wrapper">
-
-
-            <div class="why-content">
-
-                <span class="section-eyebrow">
-                    WHY HOCHIPOHUB?
-                </span>
-
-
-                <h2>
-
-                    More than a marketplace.
-
-                    <span>
-                        It's a local movement.
-                    </span>
-
-                </h2>
-
 
                 <p>
-
-                    From small businesses to hidden local gems,
-                    HochipoHub brings them into one place so
-                    discovering something good doesn't have
-                    to be complicated.
-
+                    Discover the people behind the products.
                 </p>
 
-
-                <a
-                    href="<?php echo BASE_URL; ?>catalog.php"
-                    class="btn btn-primary"
-                >
-
-                    Start Exploring
-
-                    <i class="fa-solid fa-arrow-right"></i>
-
-                </a>
-
             </div>
-
-
-            <div class="why-features">
-
-
-                <div class="why-feature-card">
-
-                    <div class="why-feature-icon">
-
-                        <i class="fa-solid fa-store"></i>
-
-                    </div>
-
-                    <h3>
-                        Local Vendors
-                    </h3>
-
-                    <p>
-                        Discover products directly from
-                        approved local businesses.
-                    </p>
-
-                </div>
-
-
-                <div class="why-feature-card">
-
-                    <div class="why-feature-icon">
-
-                        <i class="fa-solid fa-shield-halved"></i>
-
-                    </div>
-
-                    <h3>
-                        Safer Shopping
-                    </h3>
-
-                    <p>
-                        Vendor approval and order tracking
-                        keep the marketplace organised.
-                    </p>
-
-                </div>
-
-
-                <div class="why-feature-card">
-
-                    <div class="why-feature-icon">
-
-                        <i class="fa-solid fa-bolt"></i>
-
-                    </div>
-
-                    <h3>
-                        Easy Discovery
-                    </h3>
-
-                    <p>
-                        Search, browse categories and find
-                        products without the usual hassle.
-                    </p>
-
-                </div>
-
-
-                <div class="why-feature-card">
-
-                    <div class="why-feature-icon">
-
-                        <i class="fa-solid fa-heart"></i>
-
-                    </div>
-
-                    <h3>
-                        Support Local
-                    </h3>
-
-                    <p>
-                        Every purchase helps local vendors
-                        grow their businesses.
-                    </p>
-
-                </div>
-
-
-            </div>
-
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =========================================================
-     VENDOR SECTION
-========================================================= -->
-
-<section class="home-section vendor-section">
-
-    <div class="container">
-
-
-        <div class="section-heading">
-
-            <div>
-
-                <span class="section-eyebrow">
-                    MEET THE SELLERS
-                </span>
-
-                <h2>
-                    Shops worth <span>knowing.</span>
-                </h2>
-
-            </div>
-
 
             <a
-                href="<?php echo BASE_URL; ?>vendor.php"
+                href="vendor.php"
                 class="section-link"
             >
-
-                View vendors
-
-                <i class="fa-solid fa-arrow-right"></i>
-
+                View vendors →
             </a>
 
         </div>
 
 
-        <div class="vendor-grid">
+        <?php if (!empty($vendors)): ?>
 
-            <?php if (
-                !empty($vendors)
-            ): ?>
+            <div class="vendor-grid">
 
+                <?php foreach ($vendors as $vendor): ?>
 
-                <?php foreach (
-                    $vendors
-                    as $vendor
-                ): ?>
+                    <?php
+
+                        $vendor_logo =
+                            trim(
+                                $vendor[
+                                    'business_logo'
+                                ] ?? ''
+                            );
+
+                        if (
+                            $vendor_logo !== ''
+                        ) {
+
+                            $vendor_logo_path =
+                                'image/vendors/' .
+                                ltrim(
+                                    $vendor_logo,
+                                    '/\\'
+                                );
+
+                        } else {
+
+                            $vendor_logo_path =
+                                'image/logo.jpg';
+                        }
+
+                    ?>
 
                     <a
-                        href="<?php echo BASE_URL; ?>vendor.php?id=<?php echo (int) $vendor['vendor_id']; ?>"
+                        href="vendor.php?id=<?= (int) $vendor['vendor_id']; ?>"
                         class="vendor-card"
                     >
 
-                        <div class="vendor-card-logo">
+                        <img
+                            src="<?= e(
+                                $vendor_logo_path
+                            ); ?>"
+                            class="vendor-logo"
+                            alt="<?= e(
+                                $vendor['business_name']
+                            ); ?>"
+                            onerror="
+                                this.src='image/logo.jpg';
+                            "
+                        >
+
+
+                        <div class="vendor-info">
+
+                            <h3>
+                                <?= e(
+                                    $vendor['business_name']
+                                ); ?>
+                            </h3>
+
+                            <p>
+                                <?= e(
+                                    mb_strimwidth(
+                                        $vendor[
+                                            'business_description'
+                                        ] ?? 'Local vendor on HochipoHub.',
+                                        0,
+                                        75,
+                                        '...'
+                                    )
+                                ); ?>
+                            </p>
 
                             <?php if (
                                 !empty(
-                                    $vendor[
-                                        'business_logo'
-                                    ]
+                                    $vendor['category']
                                 )
                             ): ?>
 
-                                <img
-                                    src="<?php echo vendorImageUrl(
-                                        $vendor[
-                                            'business_logo'
-                                        ]
-                                    ); ?>"
-                                    alt="<?php echo htmlspecialchars(
-                                        $vendor[
-                                            'business_name'
-                                        ],
-                                        ENT_QUOTES,
-                                        'UTF-8'
-                                    ); ?>"
+                                <span
+                                    class="vendor-pill"
                                 >
-
-                            <?php else: ?>
-
-                                <span>
-
-                                    <?php
-
-                                    echo strtoupper(
-                                        substr(
-                                            $vendor[
-                                                'business_name'
-                                            ],
-                                            0,
-                                            1
-                                        )
-                                    );
-
-                                    ?>
-
+                                    <?= e(
+                                        $vendor['category']
+                                    ); ?>
                                 </span>
 
                             <?php endif; ?>
-
-                        </div>
-
-
-                        <div class="vendor-card-info">
-
-                            <h3>
-
-                                <?php echo htmlspecialchars(
-                                    $vendor[
-                                        'business_name'
-                                    ],
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ); ?>
-
-                            </h3>
-
-
-                            <p>
-
-                                <?php echo htmlspecialchars(
-                                    $vendor[
-                                        'category'
-                                    ]
-                                    ?: 'Local Business',
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ); ?>
-
-                            </p>
-
-
-                            <span>
-
-                                <?php echo (int) $vendor[
-                                    'product_count'
-                                ]; ?>
-
-                                products
-
-                                <i class="fa-solid fa-arrow-right"></i>
-
-                            </span>
 
                         </div>
 
@@ -1231,96 +1609,49 @@ require_once __DIR__ . '/includes/header.php';
 
                 <?php endforeach; ?>
 
-
-            <?php else: ?>
-
-
-                <div class="empty-home-state">
-
-                    <i class="fa-solid fa-store"></i>
-
-                    <h3>
-                        Vendors coming soon
-                    </h3>
-
-                    <p>
-                        Approved vendors will appear here.
-                    </p>
-
-                </div>
-
-
-            <?php endif; ?>
-
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =========================================================
-     CTA
-========================================================= -->
-
-<section class="home-cta">
-
-    <div class="container">
-
-        <div class="cta-box">
-
-            <div class="cta-decoration cta-decoration-one"></div>
-
-            <div class="cta-decoration cta-decoration-two"></div>
-
-
-            <div class="cta-content">
-
-                <span class="section-eyebrow">
-                    READY?
-                </span>
-
-
-                <h2>
-                    Your next favourite find
-                    is probably <span>here.</span>
-                </h2>
-
-
-                <p>
-                    Browse local products and discover
-                    something worth adding to your world.
-                </p>
-
-
-                <a
-                    href="<?php echo BASE_URL; ?>catalog.php"
-                    class="btn btn-white"
-                >
-
-                    Shop HochipoHub
-
-                    <i class="fa-solid fa-arrow-right"></i>
-
-                </a>
-
             </div>
 
-        </div>
+        <?php else: ?>
 
-    </div>
+            <div class="home-empty">
+                Approved vendors will appear here.
+            </div>
 
-</section>
+        <?php endif; ?>
+
+    </section>
+
+
+    <!-- =====================================================
+         CTA
+    ====================================================== -->
+
+    <section class="home-cta">
+
+        <h2>
+            Got something to sell?
+        </h2>
+
+        <p>
+            Turn your local business into an online storefront
+            and reach customers through HochipoHub.
+        </p>
+
+        <a
+            href="vendor.php"
+            class="cta-btn"
+        >
+            Start Selling →
+        </a>
+
+    </section>
+
+</div>
 
 
 <?php
-
-/*
-|--------------------------------------------------------------------------
-| FOOTER
-|--------------------------------------------------------------------------
-*/
-
 require_once __DIR__ . '/includes/footer.php';
-
 ?>
+
+</body>
+</html>
