@@ -1,773 +1,565 @@
 <?php
 
-/*
-|--------------------------------------------------------------------------
-| HOCHIPOHUB - GLOBAL CONFIGURATION
-|--------------------------------------------------------------------------
-| File:
-| config.php
-|
-| Purpose:
-| Central configuration for the whole HochipoHub system.
-|
-|--------------------------------------------------------------------------
-*/
+require_once __DIR__ . '/database/db.php';
+require_once __DIR__ . '/includes/session.php';
+require_once __DIR__ . '/includes/functions.php';
+
+requireLogin();
+
+$db = getDB();
+
+$user_id = (int) $_SESSION['user_id'];
 
 
 /*
 |--------------------------------------------------------------------------
-| ERROR REPORTING
+| CHECK USER
 |--------------------------------------------------------------------------
 */
 
-define('APP_DEBUG', true);
+$stmt = $db->prepare("
+    SELECT
+        user_id,
+        name,
+        role
+    FROM users
+    WHERE user_id = ?
+    LIMIT 1
+");
 
-if (APP_DEBUG) {
+$stmt->execute([$user_id]);
 
-    error_reporting(E_ALL);
-    ini_set('display_errors', '1');
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-} else {
 
-    error_reporting(0);
-    ini_set('display_errors', '0');
-}
+if (!$user) {
 
-
-/*
-|--------------------------------------------------------------------------
-| APPLICATION
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'APP_NAME',
-    'HochipoHub'
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| BASE URL
-|--------------------------------------------------------------------------
-|
-| Laragon:
-| http://localhost/hochipohub/
-|
-*/
-
-define(
-    'BASE_URL',
-    'http://localhost/hochipohub/'
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| DATABASE CONFIGURATION
-|--------------------------------------------------------------------------
-|
-| Database:
-| hochipohub
-|
-| DO NOT create another PDO connection in other files.
-| Use:
-|
-| $db = getDB();
-|
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'DB_HOST',
-    'localhost'
-);
-
-define(
-    'DB_NAME',
-    'hochipohub'
-);
-
-define(
-    'DB_USER',
-    'root'
-);
-
-define(
-    'DB_PASS',
-    ''
-);
-
-define(
-    'DB_CHARSET',
-    'utf8mb4'
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| ROOT PATH
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'ROOT_PATH',
-    __DIR__ . DIRECTORY_SEPARATOR
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| UPLOAD PATHS
-|--------------------------------------------------------------------------
-|
-| Structure:
-|
-| uploads/
-| ├── products/
-| └── vendors/
-|
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'UPLOAD_PATH',
-    ROOT_PATH
-    . 'uploads'
-    . DIRECTORY_SEPARATOR
-);
-
-define(
-    'PRODUCT_UPLOAD_PATH',
-    UPLOAD_PATH
-    . 'products'
-    . DIRECTORY_SEPARATOR
-);
-
-define(
-    'VENDOR_UPLOAD_PATH',
-    UPLOAD_PATH
-    . 'vendors'
-    . DIRECTORY_SEPARATOR
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| UPLOAD URL
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'UPLOAD_URL',
-    BASE_URL . 'uploads/'
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| IMAGE PATHS
-|--------------------------------------------------------------------------
-|
-| Structure:
-|
-| image/
-| ├── banner.jpg
-| ├── logo.jpg
-| ├── product/
-| │   └── default-product.jpg
-| └── vendors/
-|     └── default-vendor.jpg
-|
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'IMAGE_URL',
-    BASE_URL . 'image/'
-);
-
-define(
-    'PRODUCT_IMAGE_URL',
-    IMAGE_URL . 'product/'
-);
-
-define(
-    'VENDOR_IMAGE_URL',
-    IMAGE_URL . 'vendors/'
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| SECURITY / SESSION
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'SESSION_NAME',
-    'hochipo_session'
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| PASSWORD RESET / OTP
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'OTP_EXPIRY_MINUTES',
-    10
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| MARKETPLACE SETTINGS
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'DEFAULT_COMMISSION_RATE',
-    5.00
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| CURRENCY
-|--------------------------------------------------------------------------
-*/
-
-define(
-    'CURRENCY',
-    'RM'
-);
-
-define(
-    'CURRENCY_SYMBOL',
-    'RM'
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| TIMEZONE
-|--------------------------------------------------------------------------
-*/
-
-date_default_timezone_set(
-    'Asia/Kuala_Lumpur'
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| HELPER - BASE URL
-|--------------------------------------------------------------------------
-*/
-
-function baseUrl(
-    string $path = ''
-): string {
-
-    return BASE_URL
-        . ltrim(
-            $path,
-            '/\\'
-        );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| HELPER - ASSET URL
-|--------------------------------------------------------------------------
-*/
-
-function assetUrl(
-    string $path
-): string {
-
-    return BASE_URL
-        . ltrim(
-            $path,
-            '/\\'
-        );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| HELPER - PRODUCT IMAGE URL
-|--------------------------------------------------------------------------
-*/
-
-function productImageUrl(
-    ?string $image
-): string {
-
-    /*
-    |--------------------------------------------------------------------------
-    | Default image
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        empty($image)
-    ) {
-
-        return PRODUCT_IMAGE_URL
-            . 'default-product.jpg';
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Normalize Windows path
-    |--------------------------------------------------------------------------
-    */
-
-    $image = str_replace(
-        '\\',
-        '/',
-        $image
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Already a full URL
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        filter_var(
-            $image,
-            FILTER_VALIDATE_URL
-        )
-    ) {
-
-        return $image;
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Remove leading slash
-    |--------------------------------------------------------------------------
-    */
-
-    $image = ltrim(
-        $image,
-        '/'
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Already contains image/ or uploads/
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        str_starts_with(
-            $image,
-            'image/'
-        )
-        ||
-        str_starts_with(
-            $image,
-            'uploads/'
-        )
-    ) {
-
-        return BASE_URL . $image;
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Filename only
-    |--------------------------------------------------------------------------
-    */
-
-    return PRODUCT_IMAGE_URL
-        . rawurlencode($image);
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| HELPER - VENDOR IMAGE URL
-|--------------------------------------------------------------------------
-*/
-
-function vendorImageUrl(
-    ?string $image
-): string {
-
-    /*
-    |--------------------------------------------------------------------------
-    | Default image
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        empty($image)
-    ) {
-
-        return VENDOR_IMAGE_URL
-            . 'default-vendor.jpg';
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Normalize Windows path
-    |--------------------------------------------------------------------------
-    */
-
-    $image = str_replace(
-        '\\',
-        '/',
-        $image
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Already a full URL
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        filter_var(
-            $image,
-            FILTER_VALIDATE_URL
-        )
-    ) {
-
-        return $image;
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Remove leading slash
-    |--------------------------------------------------------------------------
-    */
-
-    $image = ltrim(
-        $image,
-        '/'
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Already contains image/ or uploads/
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        str_starts_with(
-            $image,
-            'image/'
-        )
-        ||
-        str_starts_with(
-            $image,
-            'uploads/'
-        )
-    ) {
-
-        return BASE_URL . $image;
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Filename only
-    |--------------------------------------------------------------------------
-    */
-
-    return VENDOR_IMAGE_URL
-        . rawurlencode($image);
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| HELPER - ESCAPE HTML
-|--------------------------------------------------------------------------
-*/
-
-function e(
-    mixed $value
-): string {
-
-    return htmlspecialchars(
-        (string) $value,
-        ENT_QUOTES,
-        'UTF-8'
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| HELPER - FORMAT PRICE
-|--------------------------------------------------------------------------
-*/
-
-function formatPrice(
-    float|int|string $amount
-): string {
-
-    return CURRENCY_SYMBOL
-        . ' '
-        . number_format(
-            (float) $amount,
-            2
-        );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| HELPER - REDIRECT
-|--------------------------------------------------------------------------
-*/
-
-function redirect(
-    string $url
-): never {
-
-    header(
-        'Location: ' . $url
-    );
-
+    header("Location: index.php");
     exit;
+
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CREATE REQUIRED DIRECTORIES
+| ONLY VENDOR
 |--------------------------------------------------------------------------
 */
 
-$requiredDirectories = [
+if ($user['role'] !== 'vendor') {
 
-    UPLOAD_PATH,
+    header("Location: dashboard.php");
+    exit;
 
-    PRODUCT_UPLOAD_PATH,
-
-    VENDOR_UPLOAD_PATH
-
-];
-
-
-foreach (
-    $requiredDirectories
-    as $directory
-) {
-
-    if (
-        !is_dir($directory)
-    ) {
-
-        @mkdir(
-            $directory,
-            0755,
-            true
-        );
-    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| PDO DATABASE CONNECTION
-|--------------------------------------------------------------------------
-|
-| Centralized PDO connection.
-|
-| Every PHP file should use:
-|
-| $db = getDB();
-|
-| Do NOT create another PDO connection.
-|
+| GET VENDOR
 |--------------------------------------------------------------------------
 */
 
-function getDB(): PDO
-{
-    static $pdo = null;
+$stmt = $db->prepare("
+    SELECT
+        vendor_id,
+        business_name,
+        approval_status
+    FROM vendors
+    WHERE user_id = ?
+    LIMIT 1
+");
+
+$stmt->execute([$user_id]);
+
+$vendor = $stmt->fetch(PDO::FETCH_ASSOC);
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Reuse existing connection
-    |--------------------------------------------------------------------------
-    */
+if (!$vendor) {
 
-    if (
-        $pdo instanceof PDO
-    ) {
+    header("Location: dashboard.php");
+    exit;
 
-        return $pdo;
-    }
+}
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | PDO DSN
-    |--------------------------------------------------------------------------
-    */
-
-    $dsn =
-        'mysql:host='
-        . DB_HOST
-        . ';dbname='
-        . DB_NAME
-        . ';charset='
-        . DB_CHARSET;
+$vendor_id =
+    (int) $vendor['vendor_id'];
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | PDO OPTIONS
-    |--------------------------------------------------------------------------
-    */
+/*
+|--------------------------------------------------------------------------
+| COMMISSION SUMMARY
+|--------------------------------------------------------------------------
+*/
 
-    $options = [
+$stmt = $db->prepare("
+    SELECT
 
-        PDO::ATTR_ERRMODE =>
-            PDO::ERRMODE_EXCEPTION,
+        COUNT(*) AS total_records,
 
-        PDO::ATTR_DEFAULT_FETCH_MODE =>
-            PDO::FETCH_ASSOC,
+        COALESCE(
+            SUM(commission_amount),
+            0
+        ) AS total_commission,
 
-        PDO::ATTR_EMULATE_PREPARES =>
-            false,
+        COALESCE(
+            SUM(
+                CASE
+                    WHEN status = 'Paid'
+                    THEN commission_amount
+                    ELSE 0
+                END
+            ),
+            0
+        ) AS paid_commission,
 
-        PDO::ATTR_STRINGIFY_FETCHES =>
-            false
+        COALESCE(
+            SUM(
+                CASE
+                    WHEN status = 'Pending'
+                    THEN commission_amount
+                    ELSE 0
+                END
+            ),
+            0
+        ) AS pending_commission
 
-    ];
+    FROM commission
+
+    WHERE vendor_id = ?
+");
+
+$stmt->execute([$vendor_id]);
+
+$summary =
+    $stmt->fetch(PDO::FETCH_ASSOC);
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | CREATE CONNECTION
-    |--------------------------------------------------------------------------
-    */
+/*
+|--------------------------------------------------------------------------
+| COMMISSION RECORDS
+|--------------------------------------------------------------------------
+*/
 
-    try {
+$stmt = $db->prepare("
+    SELECT
 
-        $pdo = new PDO(
-            $dsn,
-            DB_USER,
-            DB_PASS,
-            $options
-        );
+        c.commission_id,
+        c.order_id,
+        c.vendor_order_id,
+        c.commission_rate,
+        c.commission_amount,
+        c.status,
+        c.created_at,
 
-        return $pdo;
+        vo.subtotal,
+        vo.vendor_status,
 
-    } catch (
-        PDOException $e
-    ) {
+        o.order_date,
+        o.order_status
 
-        /*
-        |--------------------------------------------------------------------------
-        | DEVELOPMENT ERROR
-        |--------------------------------------------------------------------------
-        */
+    FROM commission c
 
-        if (
-            APP_DEBUG
-        ) {
+    INNER JOIN orders o
+        ON c.order_id = o.order_id
 
-            die(
-                '<div style="
-                    font-family:Arial,sans-serif;
-                    padding:30px;
-                    background:#0f172a;
-                    color:#fff;
-                    min-height:100vh;
-                ">
+    LEFT JOIN vendor_orders vo
+        ON c.vendor_order_id =
+           vo.vendor_order_id
 
-                    <h2 style="
-                        color:#60a5fa;
-                        margin-bottom:10px;
-                    ">
-                        HochipoHub Database Error
+    WHERE c.vendor_id = ?
+
+    ORDER BY c.created_at DESC
+");
+
+$stmt->execute([$vendor_id]);
+
+$commissions =
+    $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+$pageTitle =
+    "Commission - " .
+    $vendor['business_name'];
+
+require_once __DIR__ . '/includes/header.php';
+require_once __DIR__ . '/includes/navbar.php';
+require_once __DIR__ . '/includes/vendor_sidebar.php';
+
+?>
+
+
+<main class="dashboard-page">
+
+    <div class="dashboard-container">
+
+
+        <section class="dashboard-header">
+
+            <div>
+
+                <span class="small-label">
+                    VENDOR CENTER
+                </span>
+
+                <h1>
+                    Commission
+                </h1>
+
+                <p>
+                    Track commission generated from your orders.
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <?php if (
+            $vendor['approval_status'] !== 'Approved'
+        ): ?>
+
+            <div class="alert alert-warning">
+
+                Your vendor account is currently
+
+                <strong>
+                    <?= htmlspecialchars(
+                        $vendor['approval_status']
+                    ) ?>
+                </strong>.
+
+                Commission information may be limited until
+                your vendor account is approved.
+
+            </div>
+
+        <?php endif; ?>
+
+
+        <section class="stats-grid">
+
+
+            <div class="stat-card">
+
+                <span class="stat-label">
+                    Total Commission
+                </span>
+
+                <strong class="stat-value">
+
+                    RM
+                    <?= number_format(
+                        (float) $summary['total_commission'],
+                        2
+                    ) ?>
+
+                </strong>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <span class="stat-label">
+                    Paid Commission
+                </span>
+
+                <strong class="stat-value">
+
+                    RM
+                    <?= number_format(
+                        (float) $summary['paid_commission'],
+                        2
+                    ) ?>
+
+                </strong>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <span class="stat-label">
+                    Pending Commission
+                </span>
+
+                <strong class="stat-value">
+
+                    RM
+                    <?= number_format(
+                        (float) $summary['pending_commission'],
+                        2
+                    ) ?>
+
+                </strong>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <span class="stat-label">
+                    Commission Records
+                </span>
+
+                <strong class="stat-value">
+
+                    <?= (int) $summary['total_records'] ?>
+
+                </strong>
+
+            </div>
+
+
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="section-heading">
+
+                <div>
+
+                    <span class="small-label">
+                        TRANSACTIONS
+                    </span>
+
+                    <h2>
+                        Commission History
                     </h2>
 
+                </div>
+
+            </div>
+
+
+            <?php if (empty($commissions)): ?>
+
+                <div class="empty-state">
+
+                    <div class="empty-icon">
+                        💰
+                    </div>
+
+                    <h3>
+                        No commission yet
+                    </h3>
+
                     <p>
-                        Unable to connect to MySQL database.
+                        Commission records will appear here
+                        when your products generate orders.
                     </p>
 
-                    <pre style="
-                        background:#020617;
-                        padding:20px;
-                        border-radius:12px;
-                        overflow:auto;
-                        white-space:pre-wrap;
-                    ">'
-                    . e(
-                        $e->getMessage()
-                    )
-                    . '</pre>
+                </div>
 
-                    <p>
-                        Please check:
-                    </p>
-
-                    <ul>
-
-                        <li>
-                            Laragon / MySQL is running
-                        </li>
-
-                        <li>
-                            Database name is
-                            <strong>
-                                hochipohub
-                            </strong>
-                        </li>
-
-                        <li>
-                            MySQL username is correct
-                        </li>
-
-                        <li>
-                            MySQL password is correct
-                        </li>
-
-                    </ul>
-
-                </div>'
-            );
-        }
+            <?php else: ?>
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | PRODUCTION ERROR
-        |--------------------------------------------------------------------------
-        */
+                <div class="table-wrapper">
 
-        http_response_code(
-            500
-        );
+                    <table class="dashboard-table">
 
-        exit(
-            'Database connection failed.'
-        );
-    }
-}
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    Commission ID
+                                </th>
+
+                                <th>
+                                    Order
+                                </th>
+
+                                <th>
+                                    Vendor Order
+                                </th>
+
+                                <th>
+                                    Order Amount
+                                </th>
+
+                                <th>
+                                    Rate
+                                </th>
+
+                                <th>
+                                    Commission
+                                </th>
+
+                                <th>
+                                    Status
+                                </th>
+
+                                <th>
+                                    Date
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+                            <?php foreach (
+                                $commissions
+                                as $commission
+                            ): ?>
+
+                                <tr>
+
+                                    <td>
+
+                                        #
+                                        <?= (int)
+                                            $commission[
+                                                'commission_id'
+                                            ] ?>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        #
+                                        <?= (int)
+                                            $commission[
+                                                'order_id'
+                                            ] ?>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <?php if (
+                                            !empty(
+                                                $commission[
+                                                    'vendor_order_id'
+                                                ]
+                                            )
+                                        ): ?>
+
+                                            #
+
+                                            <?= (int)
+                                                $commission[
+                                                    'vendor_order_id'
+                                                ] ?>
+
+                                        <?php else: ?>
+
+                                            —
+
+                                        <?php endif; ?>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        RM
+                                        <?= number_format(
+                                            (float)
+                                            $commission[
+                                                'subtotal'
+                                            ],
+                                            2
+                                        ) ?>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <?= number_format(
+                                            (float)
+                                            $commission[
+                                                'commission_rate'
+                                            ],
+                                            2
+                                        ) ?>%
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <strong>
+
+                                            RM
+                                            <?= number_format(
+                                                (float)
+                                                $commission[
+                                                    'commission_amount'
+                                                ],
+                                                2
+                                            ) ?>
+
+                                        </strong>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <?php if (
+                                            $commission['status']
+                                            === 'Paid'
+                                        ): ?>
+
+                                            <span class="status-badge status-success">
+                                                Paid
+                                            </span>
+
+                                        <?php else: ?>
+
+                                            <span class="status-badge status-warning">
+                                                Pending
+                                            </span>
+
+                                        <?php endif; ?>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <?= htmlspecialchars(
+                                            date(
+                                                'd M Y, h:i A',
+                                                strtotime(
+                                                    $commission[
+                                                        'created_at'
+                                                    ]
+                                                )
+                                            )
+                                        ) ?>
+
+                                    </td>
+
+                                </tr>
+
+                            <?php endforeach; ?>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            <?php endif; ?>
+
+
+        </section>
+
+
+    </div>
+
+</main>
+
+
+<?php require_once __DIR__ . '/includes/footer.php'; ?>
