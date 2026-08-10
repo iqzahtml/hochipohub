@@ -247,6 +247,7 @@ $baseUrl = defined('BASE_URL')
                 <span>
 
                     I agree to the
+
                     <a href="#">
                         Terms & Conditions
                     </a>
