@@ -1,1136 +1,885 @@
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB - WISHLIST JS
+| HOCHIPOHUB - WISHLIST.JS
 |--------------------------------------------------------------------------
 | Handles:
-| - Add / remove wishlist
-| - Wishlist button state
-| - AJAX wishlist request
-| - Login checking
+| - Add wishlist
+| - Remove wishlist
+| - Toggle wishlist
 | - Wishlist counter
-| - Toast notification
+| - AJAX requests
 |--------------------------------------------------------------------------
 */
 
 document.addEventListener("DOMContentLoaded", function () {
 
-    "use strict";
+    /*
+    |--------------------------------------------------------------------------
+    | WISHLIST BUTTONS
+    |--------------------------------------------------------------------------
+    */
 
+    document.addEventListener(
+        "click",
+        function (event) {
 
-    /* ==============================================================
-       CONFIGURATION
-    ============================================================== */
+            const button =
+                event.target.closest(
+                    ".wishlist-btn, " +
+                    ".add-wishlist, " +
+                    ".wishlist-button, " +
+                    "[data-wishlist]"
+                );
 
-    const WishlistConfig = {
+            if (!button) {
+                return;
+            }
 
-        addUrl: "ajax/wishlist.php",
+            event.preventDefault();
 
-        removeUrl: "ajax/wishlist.php",
-
-        loginUrl: "index.php",
-
-        selectors: {
-
-            wishlistButton: ".product-wishlist",
-
-            wishlistToggle: "[data-wishlist]",
-
-            wishlistCount: ".wishlist-count",
-
-            productCard: ".product-card"
+            toggleWishlist(button);
 
         }
-
-    };
-
-
-    /* ==============================================================
-       INITIALIZATION
-    ============================================================== */
-
-    initWishlist();
+    );
 
 
-    function initWishlist() {
+    /*
+    |--------------------------------------------------------------------------
+    | REMOVE BUTTON
+    |--------------------------------------------------------------------------
+    */
 
-        bindWishlistButtons();
+    document.addEventListener(
+        "click",
+        function (event) {
 
-        updateWishlistCounter();
+            const removeButton =
+                event.target.closest(
+                    ".remove-wishlist"
+                );
 
+            if (!removeButton) {
+                return;
+            }
+
+            event.preventDefault();
+
+            const wishlistId =
+                removeButton.dataset.wishlistId;
+
+            const productId =
+                removeButton.dataset.productId;
+
+            removeWishlist(
+                removeButton,
+                wishlistId,
+                productId
+            );
+
+        }
+    );
+
+});
+
+
+/*
+|--------------------------------------------------------------------------
+| TOGGLE WISHLIST
+|--------------------------------------------------------------------------
+*/
+
+function toggleWishlist(button) {
+
+    if (
+        button.dataset.loading === "true"
+    ) {
+        return;
     }
 
 
-    /* ==============================================================
-       BIND WISHLIST BUTTONS
-    ============================================================== */
+    const productId =
+        button.dataset.productId ||
+        button.getAttribute("data-id");
 
-    function bindWishlistButtons() {
 
-        const buttons = document.querySelectorAll(
-            WishlistConfig.selectors.wishlistButton +
-            ", " +
-            WishlistConfig.selectors.wishlistToggle
+    if (!productId) {
+
+        console.error(
+            "Wishlist: product ID not found."
+        );
+
+        return;
+    }
+
+
+    const isActive =
+        button.classList.contains(
+            "active"
+        ) ||
+        button.classList.contains(
+            "in-wishlist"
         );
 
 
-        buttons.forEach(function (button) {
+    const action =
+        isActive
+            ? "remove"
+            : "add";
 
-            if (button.dataset.wishlistBound === "true") {
-                return;
+
+    button.dataset.loading =
+        "true";
+
+    button.classList.add(
+        "wishlist-loading"
+    );
+
+
+    const formData =
+        new FormData();
+
+    formData.append(
+        "product_id",
+        productId
+    );
+
+    formData.append(
+        "action",
+        action
+    );
+
+
+    fetch(
+        "ajax/add_wishlist.php",
+        {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin"
+        }
+    )
+
+    .then(function (response) {
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Network response failed."
+            );
+
+        }
+
+        return response.json();
+
+    })
+
+    .then(function (data) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | LOGIN REQUIRED
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            data.login_required ||
+            data.status === "login_required"
+        ) {
+
+            showWishlistMessage(
+                "Please login to use wishlist.",
+                "warning"
+            );
+
+            setTimeout(function () {
+
+                window.location.href =
+                    "index.php?login=required";
+
+            }, 900);
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUCCESS
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            data.success === true ||
+            data.status === "success"
+        ) {
+
+            if (action === "add") {
+
+                setWishlistActive(
+                    button,
+                    true
+                );
+
+                showWishlistMessage(
+                    data.message ||
+                    "Added to wishlist.",
+                    "success"
+                );
+
+            } else {
+
+                setWishlistActive(
+                    button,
+                    false
+                );
+
+                showWishlistMessage(
+                    data.message ||
+                    "Removed from wishlist.",
+                    "success"
+                );
+
             }
 
 
-            button.dataset.wishlistBound = "true";
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE COUNTER
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                data.count !== undefined
+            ) {
+
+                updateWishlistCounter(
+                    data.count
+                );
+
+            } else {
+
+                refreshWishlistCounter();
+
+            }
 
 
-            button.addEventListener("click", function (event) {
+            /*
+            |--------------------------------------------------------------------------
+            | REMOVE CARD WHEN ON WISHLIST PAGE
+            |--------------------------------------------------------------------------
+            */
 
-                event.preventDefault();
+            if (
+                action === "remove"
+            ) {
 
-                event.stopPropagation();
+                const item =
+                    button.closest(
+                        ".wishlist-item, " +
+                        ".wishlist-card, " +
+                        "[data-wishlist-item]"
+                    );
 
-                handleWishlistClick(button);
+                if (item) {
 
-            });
+                    item.classList.add(
+                        "wishlist-removing"
+                    );
 
-        });
+                    setTimeout(function () {
 
-    }
+                        item.remove();
 
+                        checkWishlistEmpty();
 
-    /* ==============================================================
-       HANDLE WISHLIST CLICK
-    ============================================================== */
+                    }, 300);
 
-    function handleWishlistClick(button) {
+                }
 
-        const productId =
-            button.dataset.productId ||
-            button.getAttribute("data-product-id");
-
-
-        if (!productId) {
-
-            console.error(
-                "HOCHIPOHUB Wishlist: Product ID is missing."
-            );
-
-            showToast(
-                "Product information is missing.",
-                "error"
-            );
-
-            return;
-
-        }
-
-
-        const isActive =
-            button.classList.contains("active") ||
-            button.dataset.wishlisted === "true";
-
-
-        if (button.dataset.loading === "true") {
-            return;
-        }
-
-
-        if (isActive) {
-
-            removeFromWishlist(
-                productId,
-                button
-            );
+            }
 
         } else {
 
-            addToWishlist(
-                productId,
-                button
+            showWishlistMessage(
+                data.message ||
+                "Unable to update wishlist.",
+                "error"
             );
 
         }
 
+    })
+
+    .catch(function (error) {
+
+        console.error(
+            "Wishlist error:",
+            error
+        );
+
+        showWishlistMessage(
+            "Something went wrong. Please try again.",
+            "error"
+        );
+
+    })
+
+    .finally(function () {
+
+        button.dataset.loading =
+            "false";
+
+        button.classList.remove(
+            "wishlist-loading"
+        );
+
+    });
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| REMOVE WISHLIST
+|--------------------------------------------------------------------------
+*/
+
+function removeWishlist(
+    button,
+    wishlistId,
+    productId
+) {
+
+    if (
+        button.dataset.loading ===
+        "true"
+    ) {
+        return;
     }
 
 
-    /* ==============================================================
-       ADD TO WISHLIST
-    ============================================================== */
+    if (!productId) {
 
-    function addToWishlist(productId, button) {
-
-        setButtonLoading(button, true);
-
-
-        sendWishlistRequest(
-            "add",
-            productId
-        )
-        .then(function (response) {
-
-            if (!response.success) {
-
-                handleWishlistError(
-                    response,
-                    button
-                );
-
-                return;
-
-            }
-
-
-            setWishlistState(
-                button,
-                true
-            );
-
-
-            updateWishlistCounter(
-                response.count
-            );
-
-
-            showToast(
-                response.message ||
-                "Added to wishlist!",
-                "success"
-            );
-
-
-            animateWishlist(button);
-
-        })
-        .catch(function (error) {
-
-            console.error(
-                "Wishlist add error:",
-                error
-            );
-
-
-            showToast(
-                "Something went wrong. Please try again.",
-                "error"
-            );
-
-        })
-        .finally(function () {
-
-            setButtonLoading(
-                button,
-                false
-            );
-
-        });
+        productId =
+            button.dataset.productId;
 
     }
 
 
-    /* ==============================================================
-       REMOVE FROM WISHLIST
-    ============================================================== */
+    if (!productId) {
 
-    function removeFromWishlist(productId, button) {
+        console.error(
+            "Wishlist: product ID missing."
+        );
 
-        setButtonLoading(button, true);
+        return;
+    }
 
 
-        sendWishlistRequest(
-            "remove",
-            productId
-        )
-        .then(function (response) {
+    button.dataset.loading =
+        "true";
 
-            if (!response.success) {
 
-                handleWishlistError(
-                    response,
-                    button
+    const formData =
+        new FormData();
+
+    formData.append(
+        "product_id",
+        productId
+    );
+
+    formData.append(
+        "action",
+        "remove"
+    );
+
+
+    fetch(
+        "ajax/add_wishlist.php",
+        {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin"
+        }
+    )
+
+    .then(function (response) {
+
+        return response.json();
+
+    })
+
+    .then(function (data) {
+
+        if (
+            data.success === true ||
+            data.status === "success"
+        ) {
+
+            const item =
+                button.closest(
+                    ".wishlist-item, " +
+                    ".wishlist-card, " +
+                    "[data-wishlist-item]"
                 );
 
-                return;
+
+            if (item) {
+
+                item.classList.add(
+                    "wishlist-removing"
+                );
+
+                setTimeout(function () {
+
+                    item.remove();
+
+                    checkWishlistEmpty();
+
+                }, 300);
 
             }
 
 
-            setWishlistState(
-                button,
-                false
-            );
-
-
             updateWishlistCounter(
-                response.count
+                data.count
             );
 
 
-            showToast(
-                response.message ||
+            showWishlistMessage(
+                data.message ||
                 "Removed from wishlist.",
                 "success"
             );
 
+        } else {
 
-            removeWishlistCardIfNeeded(button);
-
-        })
-        .catch(function (error) {
-
-            console.error(
-                "Wishlist remove error:",
-                error
-            );
-
-
-            showToast(
-                "Something went wrong. Please try again.",
+            showWishlistMessage(
+                data.message ||
+                "Unable to remove wishlist item.",
                 "error"
             );
 
-        })
-        .finally(function () {
+        }
 
-            setButtonLoading(
-                button,
-                false
-            );
+    })
 
-        });
+    .catch(function (error) {
 
-    }
-
-
-    /* ==============================================================
-       SEND AJAX REQUEST
-    ============================================================== */
-
-    function sendWishlistRequest(
-        action,
-        productId
-    ) {
-
-        const formData = new FormData();
-
-
-        formData.append(
-            "action",
-            action
+        console.error(
+            "Remove wishlist error:",
+            error
         );
 
-
-        formData.append(
-            "product_id",
-            productId
-        );
-
-
-        return fetch(
-            WishlistConfig.addUrl,
-            {
-
-                method: "POST",
-
-                body: formData,
-
-                headers: {
-
-                    "X-Requested-With":
-                        "XMLHttpRequest"
-
-                }
-
-            }
-        )
-        .then(function (response) {
-
-            if (!response.ok) {
-
-                throw new Error(
-                    "HTTP error: " +
-                    response.status
-                );
-
-            }
-
-
-            return response.json();
-
-        });
-
-    }
-
-
-    /* ==============================================================
-       SET WISHLIST STATE
-    ============================================================== */
-
-    function setWishlistState(
-        button,
-        active
-    ) {
-
-        button.classList.toggle(
-            "active",
-            active
-        );
-
-
-        button.dataset.wishlisted =
-            active ? "true" : "false";
-
-
-        const icon =
-            button.querySelector("i");
-
-
-        if (icon) {
-
-            if (active) {
-
-                icon.classList.remove(
-                    "fa-regular"
-                );
-
-                icon.classList.add(
-                    "fa-solid"
-                );
-
-                icon.setAttribute(
-                    "aria-label",
-                    "Remove from wishlist"
-                );
-
-            } else {
-
-                icon.classList.remove(
-                    "fa-solid"
-                );
-
-                icon.classList.add(
-                    "fa-regular"
-                );
-
-                icon.setAttribute(
-                    "aria-label",
-                    "Add to wishlist"
-                );
-
-            }
-
-        }
-
-
-        button.setAttribute(
-            "aria-pressed",
-            active ? "true" : "false"
-        );
-
-
-        button.setAttribute(
-            "title",
-            active
-                ? "Remove from wishlist"
-                : "Add to wishlist"
-        );
-
-    }
-
-
-    /* ==============================================================
-       LOADING STATE
-    ============================================================== */
-
-    function setButtonLoading(
-        button,
-        loading
-    ) {
-
-        button.dataset.loading =
-            loading ? "true" : "false";
-
-
-        if (loading) {
-
-            button.classList.add(
-                "wishlist-loading"
-            );
-
-
-            button.disabled = true;
-
-
-            const icon =
-                button.querySelector("i");
-
-
-            if (icon) {
-
-                button.dataset.originalIcon =
-                    icon.className;
-
-
-                icon.className =
-                    "fa-solid fa-spinner fa-spin";
-
-            }
-
-        } else {
-
-            button.classList.remove(
-                "wishlist-loading"
-            );
-
-
-            button.disabled = false;
-
-
-            const icon =
-                button.querySelector("i");
-
-
-            if (icon) {
-
-                if (
-                    button.dataset.originalIcon
-                ) {
-
-                    icon.className =
-                        button.dataset.originalIcon;
-
-                } else {
-
-                    const active =
-                        button.classList.contains(
-                            "active"
-                        );
-
-
-                    icon.className =
-                        active
-                            ? "fa-solid fa-heart"
-                            : "fa-regular fa-heart";
-
-                }
-
-            }
-
-        }
-
-    }
-
-
-    /* ==============================================================
-       UPDATE WISHLIST COUNTER
-    ============================================================== */
-
-    function updateWishlistCounter(
-        count = null
-    ) {
-
-        const counters =
-            document.querySelectorAll(
-                WishlistConfig.selectors.wishlistCount
-            );
-
-
-        if (!counters.length) {
-            return;
-        }
-
-
-        if (count !== null) {
-
-            setCounterValue(
-                counters,
-                count
-            );
-
-            return;
-
-        }
-
-
-        fetchWishlistCount()
-            .then(function (response) {
-
-                if (
-                    response &&
-                    response.success
-                ) {
-
-                    setCounterValue(
-                        counters,
-                        response.count
-                    );
-
-                }
-
-            })
-            .catch(function (error) {
-
-                console.warn(
-                    "Unable to update wishlist count:",
-                    error
-                );
-
-            });
-
-    }
-
-
-    /* ==============================================================
-       FETCH WISHLIST COUNT
-    ============================================================== */
-
-    function fetchWishlistCount() {
-
-        return fetch(
-            WishlistConfig.addUrl +
-            "?action=count",
-            {
-
-                method: "GET",
-
-                headers: {
-
-                    "X-Requested-With":
-                        "XMLHttpRequest"
-
-                }
-
-            }
-        )
-        .then(function (response) {
-
-            if (!response.ok) {
-
-                throw new Error(
-                    "Unable to fetch wishlist count."
-                );
-
-            }
-
-
-            return response.json();
-
-        });
-
-    }
-
-
-    /* ==============================================================
-       SET COUNTER VALUE
-    ============================================================== */
-
-    function setCounterValue(
-        counters,
-        count
-    ) {
-
-        let numericCount =
-            parseInt(count, 10);
-
-
-        if (isNaN(numericCount)) {
-            numericCount = 0;
-        }
-
-
-        counters.forEach(function (counter) {
-
-            counter.textContent =
-                numericCount;
-
-
-            if (numericCount > 0) {
-
-                counter.classList.add(
-                    "has-items"
-                );
-
-                counter.style.display =
-                    "flex";
-
-            } else {
-
-                counter.classList.remove(
-                    "has-items"
-                );
-
-                counter.style.display =
-                    "none";
-
-            }
-
-        });
-
-    }
-
-
-    /* ==============================================================
-       REMOVE WISHLIST CARD
-    ============================================================== */
-
-    function removeWishlistCardIfNeeded(
-        button
-    ) {
-
-        const wishlistPage =
-            document.body.classList.contains(
-                "wishlist-page"
-            );
-
-
-        if (!wishlistPage) {
-            return;
-        }
-
-
-        const card =
-            button.closest(
-                WishlistConfig.selectors.productCard
-            );
-
-
-        if (!card) {
-            return;
-        }
-
-
-        card.style.transition =
-            "opacity 0.25s ease, transform 0.25s ease";
-
-
-        card.style.opacity = "0";
-
-
-        card.style.transform =
-            "scale(0.95)";
-
-
-        setTimeout(function () {
-
-            card.remove();
-
-            checkWishlistEmptyState();
-
-        }, 260);
-
-    }
-
-
-    /* ==============================================================
-       CHECK EMPTY WISHLIST
-    ============================================================== */
-
-    function checkWishlistEmptyState() {
-
-        const grid =
-            document.querySelector(
-                ".product-grid"
-            );
-
-
-        if (!grid) {
-            return;
-        }
-
-
-        const cards =
-            grid.querySelectorAll(
-                ".product-card"
-            );
-
-
-        if (cards.length > 0) {
-            return;
-        }
-
-
-        const existingEmpty =
-            grid.querySelector(
-                ".product-empty"
-            );
-
-
-        if (existingEmpty) {
-            return;
-        }
-
-
-        const empty =
-            document.createElement("div");
-
-
-        empty.className =
-            "product-empty";
-
-
-        empty.innerHTML = `
-
-            <div class="product-empty-content">
-
-                <div class="product-empty-icon">
-
-                    <i class="fa-regular fa-heart"></i>
-
-                </div>
-
-                <h3>Your wishlist is empty</h3>
-
-                <p>
-                    Save products you love and
-                    come back to them anytime.
-                </p>
-
-                <a
-                    href="catalog.php"
-                    class="product-action-btn primary"
-                    style="margin-top:14px;"
-                >
-                    <i class="fa-solid fa-store"></i>
-                    Browse Products
-                </a>
-
-            </div>
-
-        `;
-
-
-        grid.appendChild(empty);
-
-    }
-
-
-    /* ==============================================================
-       ANIMATE WISHLIST BUTTON
-    ============================================================== */
-
-    function animateWishlist(button) {
-
-        button.classList.remove(
-            "wishlist-pop"
-        );
-
-
-        void button.offsetWidth;
-
-
-        button.classList.add(
-            "wishlist-pop"
-        );
-
-
-        setTimeout(function () {
-
-            button.classList.remove(
-                "wishlist-pop"
-            );
-
-        }, 450);
-
-    }
-
-
-    /* ==============================================================
-       ERROR HANDLER
-    ============================================================== */
-
-    function handleWishlistError(
-        response,
-        button
-    ) {
-
-        if (
-            response.login_required ||
-            response.status === "login_required"
-        ) {
-
-            showLoginRequired();
-
-            return;
-
-        }
-
-
-        showToast(
-            response.message ||
-            "Unable to update wishlist.",
+        showWishlistMessage(
+            "Something went wrong.",
             "error"
         );
 
-    }
+    })
+
+    .finally(function () {
+
+        button.dataset.loading =
+            "false";
+
+    });
+
+}
 
 
-    /* ==============================================================
-       LOGIN REQUIRED
-    ============================================================== */
+/*
+|--------------------------------------------------------------------------
+| SET WISHLIST ACTIVE
+|--------------------------------------------------------------------------
+*/
 
-    function showLoginRequired() {
+function setWishlistActive(
+    button,
+    active
+) {
 
-        const loginModal =
-            document.querySelector(
-                "#loginModal"
-            );
+    if (active) {
 
+        button.classList.add(
+            "active"
+        );
 
-        if (loginModal) {
+        button.classList.add(
+            "in-wishlist"
+        );
 
-            loginModal.classList.add(
-                "active"
-            );
+        button.setAttribute(
+            "aria-pressed",
+            "true"
+        );
 
-            loginModal.style.display =
-                "flex";
-
-
-            document.body.classList.add(
-                "modal-open"
-            );
-
-            return;
-
-        }
-
-
-        showToast(
-            "Please login to use your wishlist.",
-            "info"
+        button.setAttribute(
+            "title",
+            "Remove from wishlist"
         );
 
 
-        setTimeout(function () {
+        /*
+        | Change common icon styles
+        */
 
-            window.location.href =
-                WishlistConfig.loginUrl;
-
-        }, 1200);
-
-    }
-
-
-    /* ==============================================================
-       TOAST NOTIFICATION
-    ============================================================== */
-
-    function showToast(
-        message,
-        type = "info"
-    ) {
-
-        let container =
-            document.querySelector(
-                ".hochipo-toast-container"
+        const icon =
+            button.querySelector(
+                ".wishlist-icon, i, span"
             );
 
+        if (icon) {
 
-        if (!container) {
+            if (
+                icon.dataset.wishlistIcon
+            ) {
 
-            container =
-                document.createElement("div");
-
-
-            container.className =
-                "hochipo-toast-container";
-
-
-            document.body.appendChild(
-                container
-            );
-
-        }
-
-
-        const toast =
-            document.createElement("div");
-
-
-        toast.className =
-            "hochipo-toast " +
-            "hochipo-toast-" +
-            type;
-
-
-        let icon =
-            "fa-circle-info";
-
-
-        if (type === "success") {
-
-            icon = "fa-circle-check";
-
-        } else if (type === "error") {
-
-            icon = "fa-circle-xmark";
-
-        } else if (type === "warning") {
-
-            icon = "fa-triangle-exclamation";
-
-        }
-
-
-        toast.innerHTML = `
-
-            <i class="fa-solid ${icon}"></i>
-
-            <span></span>
-
-            <button
-                type="button"
-                aria-label="Close"
-            >
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-
-        `;
-
-
-        toast.querySelector(
-            "span"
-        ).textContent = message;
-
-
-        container.appendChild(
-            toast
-        );
-
-
-        requestAnimationFrame(function () {
-
-            toast.classList.add(
-                "show"
-            );
-
-        });
-
-
-        const closeButton =
-            toast.querySelector(
-                "button"
-            );
-
-
-        closeButton.addEventListener(
-            "click",
-            function () {
-
-                removeToast(toast);
+                icon.textContent =
+                    icon.dataset.wishlistIcon;
 
             }
+
+        }
+
+    } else {
+
+        button.classList.remove(
+            "active"
+        );
+
+        button.classList.remove(
+            "in-wishlist"
+        );
+
+        button.setAttribute(
+            "aria-pressed",
+            "false"
+        );
+
+        button.setAttribute(
+            "title",
+            "Add to wishlist"
+        );
+
+    }
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE WISHLIST COUNTER
+|--------------------------------------------------------------------------
+*/
+
+function updateWishlistCounter(
+    count
+) {
+
+    if (
+        count === undefined ||
+        count === null
+    ) {
+        return;
+    }
+
+
+    const counters =
+        document.querySelectorAll(
+            ".wishlist-count, " +
+            ".wishlist-counter, " +
+            "[data-wishlist-count]"
         );
 
 
-        const timeout =
-            setTimeout(function () {
+    counters.forEach(function (counter) {
 
-                removeToast(toast);
-
-            }, 3000);
+        counter.textContent =
+            count;
 
 
-        toast.dataset.timeout =
-            timeout;
+        if (
+            parseInt(count, 10) <= 0
+        ) {
+
+            counter.classList.add(
+                "empty"
+            );
+
+        } else {
+
+            counter.classList.remove(
+                "empty"
+            );
+
+        }
+
+    });
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| REFRESH WISHLIST COUNTER
+|--------------------------------------------------------------------------
+*/
+
+function refreshWishlistCounter() {
+
+    fetch(
+        "ajax/add_wishlist.php?action=count",
+        {
+            method: "GET",
+            credentials: "same-origin"
+        }
+    )
+
+    .then(function (response) {
+
+        return response.json();
+
+    })
+
+    .then(function (data) {
+
+        if (
+            data.count !== undefined
+        ) {
+
+            updateWishlistCounter(
+                data.count
+            );
+
+        }
+
+    })
+
+    .catch(function (error) {
+
+        console.error(
+            "Wishlist counter error:",
+            error
+        );
+
+    });
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CHECK EMPTY WISHLIST
+|--------------------------------------------------------------------------
+*/
+
+function checkWishlistEmpty() {
+
+    const items =
+        document.querySelectorAll(
+            ".wishlist-item, " +
+            ".wishlist-card, " +
+            "[data-wishlist-item]"
+        );
+
+
+    if (items.length > 0) {
+        return;
+    }
+
+
+    const container =
+        document.querySelector(
+            ".wishlist-list, " +
+            ".wishlist-grid, " +
+            ".wishlist-container"
+        );
+
+
+    if (!container) {
+        return;
+    }
+
+
+    const empty =
+        document.createElement("div");
+
+    empty.className =
+        "wishlist-empty";
+
+    empty.innerHTML = `
+        <div class="wishlist-empty-icon">♡</div>
+        <h3>Your wishlist is empty</h3>
+        <p>Products you save will appear here.</p>
+    `;
+
+
+    container.innerHTML = "";
+
+    container.appendChild(
+        empty
+    );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| WISHLIST MESSAGE
+|--------------------------------------------------------------------------
+*/
+
+function showWishlistMessage(
+    message,
+    type = "success"
+) {
+
+    let container =
+        document.querySelector(
+            ".wishlist-message-container"
+        );
+
+
+    if (!container) {
+
+        container =
+            document.createElement("div");
+
+        container.className =
+            "wishlist-message-container";
+
+
+        container.style.position =
+            "fixed";
+
+        container.style.top =
+            "90px";
+
+        container.style.right =
+            "20px";
+
+        container.style.zIndex =
+            "99999";
+
+        container.style.display =
+            "flex";
+
+        container.style.flexDirection =
+            "column";
+
+        container.style.gap =
+            "10px";
+
+
+        document.body.appendChild(
+            container
+        );
 
     }
 
 
-    /* ==============================================================
-       REMOVE TOAST
-    ============================================================== */
-
-    function removeToast(toast) {
-
-        if (!toast) {
-            return;
-        }
+    const messageElement =
+        document.createElement("div");
 
 
-        const timeout =
-            toast.dataset.timeout;
+    messageElement.className =
+        "wishlist-message wishlist-message-" +
+        type;
 
 
-        if (timeout) {
-
-            clearTimeout(timeout);
-
-        }
+    messageElement.textContent =
+        message;
 
 
-        toast.classList.remove(
-            "show"
-        );
+    messageElement.style.padding =
+        "12px 16px";
+
+    messageElement.style.borderRadius =
+        "12px";
+
+    messageElement.style.fontSize =
+        "13px";
+
+    messageElement.style.fontWeight =
+        "700";
+
+    messageElement.style.background =
+        "#0f172a";
+
+    messageElement.style.color =
+        "#f8fafc";
+
+    messageElement.style.border =
+        "1px solid rgba(56,189,248,.25)";
+
+    messageElement.style.boxShadow =
+        "0 15px 40px rgba(0,0,0,.25)";
+
+
+    container.appendChild(
+        messageElement
+    );
+
+
+    setTimeout(function () {
+
+        messageElement.style.opacity =
+            "0";
+
+        messageElement.style.transform =
+            "translateY(-5px)";
+
+        messageElement.style.transition =
+            "all .25s ease";
 
 
         setTimeout(function () {
 
-            if (toast.parentNode) {
+            messageElement.remove();
 
-                toast.parentNode.removeChild(
-                    toast
+        }, 250);
+
+    }, 2500);
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| INITIAL WISHLIST STATE
+|--------------------------------------------------------------------------
+*/
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        const buttons =
+            document.querySelectorAll(
+                ".wishlist-btn, " +
+                ".add-wishlist, " +
+                ".wishlist-button, " +
+                "[data-wishlist]"
+            );
+
+
+        buttons.forEach(function (button) {
+
+            const active =
+                button.dataset.wishlisted ===
+                "true";
+
+
+            if (active) {
+
+                setWishlistActive(
+                    button,
+                    true
                 );
 
             }
 
-        }, 250);
+        });
 
     }
-
-
-    /* ==============================================================
-       DYNAMIC CONTENT SUPPORT
-    ============================================================== */
-
-    window.HochipoWishlist = {
-
-        add: function (
-            productId,
-            button
-        ) {
-
-            addToWishlist(
-                productId,
-                button
-            );
-
-        },
-
-
-        remove: function (
-            productId,
-            button
-        ) {
-
-            removeFromWishlist(
-                productId,
-                button
-            );
-
-        },
-
-
-        refresh: function () {
-
-            bindWishlistButtons();
-
-            updateWishlistCounter();
-
-        },
-
-
-        updateCounter: function (
-            count
-        ) {
-
-            updateWishlistCounter(
-                count
-            );
-
-        }
-
-    };
-
-
-});
+);

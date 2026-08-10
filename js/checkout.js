@@ -1,989 +1,1010 @@
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB - CHECKOUT JS
+| HOCHIPOHUB - CHECKOUT JAVASCRIPT
+|--------------------------------------------------------------------------
+| File: js/checkout.js
 |--------------------------------------------------------------------------
 | Handles:
-| - Checkout form validation
+| - Checkout form
 | - Delivery method
-| - Delivery address
 | - Payment method
-| - Order summary
-| - Quantity controls
-| - Payment selection
-| - Checkout submission
+| - Address validation
+| - Order total
+| - Checkout confirmation
 |--------------------------------------------------------------------------
 */
 
-"use strict";
-
-document.addEventListener("DOMContentLoaded", function () {
-
-    /* ==============================================================
-       ELEMENTS
-    ============================================================== */
-
-    const checkoutForm = document.querySelector("#checkoutForm");
-
-    const deliveryMethodInputs = document.querySelectorAll(
-        'input[name="delivery_method"]'
-    );
-
-    const deliveryAddress = document.querySelector("#deliveryAddress");
-
-    const addressWrapper = document.querySelector(
-        "#deliveryAddressWrapper"
-    );
-
-    const paymentMethodInputs = document.querySelectorAll(
-        'input[name="payment_method"]'
-    );
-
-    const quantityInputs = document.querySelectorAll(
-        ".checkout-quantity-input"
-    );
-
-    const decreaseButtons = document.querySelectorAll(
-        ".checkout-quantity-decrease"
-    );
-
-    const increaseButtons = document.querySelectorAll(
-        ".checkout-quantity-increase"
-    );
-
-    const subtotalElement = document.querySelector("#checkoutSubtotal");
-
-    const deliveryFeeElement = document.querySelector("#checkoutDeliveryFee");
-
-    const totalElement = document.querySelector("#checkoutTotal");
-
-    const checkoutMessage = document.querySelector(
-        "#checkoutMessage"
-    );
+'use strict';
 
 
-    /* ==============================================================
-       CONFIGURATION
-    ============================================================== */
+/*
+|--------------------------------------------------------------------------
+| DOM READY
+|--------------------------------------------------------------------------
+*/
 
-    const DELIVERY_FEES = {
-        Pickup: 0,
-        Postage: 5
-    };
+document.addEventListener(
+    'DOMContentLoaded',
+    function () {
 
-
-    /* ==============================================================
-       HELPER - FORMAT MONEY
-    ============================================================== */
-
-    function formatMoney(amount) {
-
-        amount = Number(amount) || 0;
-
-        return "RM " + amount.toFixed(2);
+        initCheckout();
 
     }
+);
 
 
-    /* ==============================================================
-       HELPER - GET NUMBER
-    ============================================================== */
+/*
+|--------------------------------------------------------------------------
+| INITIALIZE CHECKOUT
+|--------------------------------------------------------------------------
+*/
 
-    function getNumber(value) {
+function initCheckout() {
 
-        const number = parseFloat(value);
+    bindDeliveryMethod();
+    bindPaymentMethod();
+    bindCheckoutForm();
+    bindQuantityChanges();
 
-        return Number.isFinite(number) ? number : 0;
+    calculateCheckoutTotal();
 
-    }
+}
 
 
-    /* ==============================================================
-       GET SELECTED DELIVERY METHOD
-    ============================================================== */
+/*
+|--------------------------------------------------------------------------
+| DELIVERY METHOD
+|--------------------------------------------------------------------------
+*/
 
-    function getSelectedDeliveryMethod() {
+function bindDeliveryMethod() {
 
-        const selected = document.querySelector(
+    const deliveryOptions =
+        document.querySelectorAll(
+            'input[name="delivery_method"]'
+        );
+
+
+    deliveryOptions.forEach(
+        function (option) {
+
+            option.addEventListener(
+                'change',
+                function () {
+
+                    updateDeliveryUI(
+                        option.value
+                    );
+
+                    calculateCheckoutTotal();
+
+                }
+            );
+
+        }
+    );
+
+
+    const selected =
+        document.querySelector(
             'input[name="delivery_method"]:checked'
         );
 
-        return selected ? selected.value : "Postage";
 
-    }
+    if (selected) {
 
-
-    /* ==============================================================
-       GET SELECTED PAYMENT METHOD
-    ============================================================== */
-
-    function getSelectedPaymentMethod() {
-
-        const selected = document.querySelector(
-            'input[name="payment_method"]:checked'
-        );
-
-        return selected ? selected.value : "";
-
-    }
-
-
-    /* ==============================================================
-       UPDATE DELIVERY ADDRESS
-    ============================================================== */
-
-    function updateDeliveryAddress() {
-
-        const method = getSelectedDeliveryMethod();
-
-        if (!addressWrapper) {
-            return;
-        }
-
-        if (method === "Pickup") {
-
-            addressWrapper.style.display = "none";
-
-            if (deliveryAddress) {
-
-                deliveryAddress.removeAttribute("required");
-
-            }
-
-        } else {
-
-            addressWrapper.style.display = "block";
-
-            if (deliveryAddress) {
-
-                deliveryAddress.setAttribute("required", "required");
-
-            }
-
-        }
-
-        updateCheckoutTotal();
-
-    }
-
-
-    /* ==============================================================
-       UPDATE CHECKOUT TOTAL
-    ============================================================== */
-
-    function updateCheckoutTotal() {
-
-        let subtotal = 0;
-
-        const checkoutItems = document.querySelectorAll(
-            ".checkout-item"
-        );
-
-
-        /* ----------------------------------------------------------
-           Calculate subtotal from checkout items
-        ---------------------------------------------------------- */
-
-        checkoutItems.forEach(function (item) {
-
-            const priceElement = item.querySelector(
-                ".checkout-item-price"
-            );
-
-            const quantityInput = item.querySelector(
-                ".checkout-quantity-input"
-            );
-
-            const itemSubtotalElement = item.querySelector(
-                ".checkout-item-subtotal"
-            );
-
-            const price = priceElement
-                ? getNumber(
-                    priceElement.dataset.price ||
-                    priceElement.textContent.replace(/[^0-9.]/g, "")
-                )
-                : 0;
-
-            const quantity = quantityInput
-                ? Math.max(
-                    1,
-                    parseInt(quantityInput.value, 10) || 1
-                )
-                : 1;
-
-            const itemSubtotal = price * quantity;
-
-            subtotal += itemSubtotal;
-
-
-            /* Update individual subtotal */
-
-            if (itemSubtotalElement) {
-
-                itemSubtotalElement.textContent =
-                    formatMoney(itemSubtotal);
-
-            }
-
-        });
-
-
-        /* ----------------------------------------------------------
-           Alternative subtotal source
-           If checkout page already provides data-subtotal
-        ---------------------------------------------------------- */
-
-        if (checkoutItems.length === 0 && subtotalElement) {
-
-            subtotal = getNumber(
-                subtotalElement.dataset.subtotal ||
-                subtotalElement.textContent.replace(/[^0-9.]/g, "")
-            );
-
-        }
-
-
-        const deliveryMethod = getSelectedDeliveryMethod();
-
-        const deliveryFee =
-            DELIVERY_FEES[deliveryMethod] !== undefined
-                ? DELIVERY_FEES[deliveryMethod]
-                : 0;
-
-
-        const total = subtotal + deliveryFee;
-
-
-        /* ----------------------------------------------------------
-           Update UI
-        ---------------------------------------------------------- */
-
-        if (subtotalElement) {
-
-            subtotalElement.textContent =
-                formatMoney(subtotal);
-
-        }
-
-
-        if (deliveryFeeElement) {
-
-            deliveryFeeElement.textContent =
-                deliveryFee === 0
-                    ? "FREE"
-                    : formatMoney(deliveryFee);
-
-        }
-
-
-        if (totalElement) {
-
-            totalElement.textContent =
-                formatMoney(total);
-
-        }
-
-
-        /* ----------------------------------------------------------
-           Store values for later use
-        ---------------------------------------------------------- */
-
-        if (checkoutForm) {
-
-            checkoutForm.dataset.subtotal = subtotal.toFixed(2);
-
-            checkoutForm.dataset.deliveryFee =
-                deliveryFee.toFixed(2);
-
-            checkoutForm.dataset.total =
-                total.toFixed(2);
-
-        }
-
-    }
-
-
-    /* ==============================================================
-       QUANTITY - UPDATE
-    ============================================================== */
-
-    function updateQuantity(input, change) {
-
-        if (!input) {
-            return;
-        }
-
-        let currentQuantity =
-            parseInt(input.value, 10) || 1;
-
-        const min =
-            parseInt(input.min, 10) || 1;
-
-        const max =
-            parseInt(input.max, 10) || 999;
-
-        currentQuantity += change;
-
-        if (currentQuantity < min) {
-            currentQuantity = min;
-        }
-
-        if (currentQuantity > max) {
-            currentQuantity = max;
-        }
-
-        input.value = currentQuantity;
-
-        updateCheckoutTotal();
-
-    }
-
-
-    /* ==============================================================
-       DECREASE QUANTITY
-    ============================================================== */
-
-    decreaseButtons.forEach(function (button) {
-
-        button.addEventListener("click", function (event) {
-
-            event.preventDefault();
-
-            const item =
-                button.closest(".checkout-item");
-
-            if (!item) {
-                return;
-            }
-
-            const input =
-                item.querySelector(
-                    ".checkout-quantity-input"
-                );
-
-            updateQuantity(input, -1);
-
-        });
-
-    });
-
-
-    /* ==============================================================
-       INCREASE QUANTITY
-    ============================================================== */
-
-    increaseButtons.forEach(function (button) {
-
-        button.addEventListener("click", function (event) {
-
-            event.preventDefault();
-
-            const item =
-                button.closest(".checkout-item");
-
-            if (!item) {
-                return;
-            }
-
-            const input =
-                item.querySelector(
-                    ".checkout-quantity-input"
-                );
-
-            updateQuantity(input, 1);
-
-        });
-
-    });
-
-
-    /* ==============================================================
-       MANUAL QUANTITY INPUT
-    ============================================================== */
-
-    quantityInputs.forEach(function (input) {
-
-        input.addEventListener("input", function () {
-
-            let value =
-                parseInt(input.value, 10);
-
-            const min =
-                parseInt(input.min, 10) || 1;
-
-            const max =
-                parseInt(input.max, 10) || 999;
-
-
-            if (!Number.isFinite(value)) {
-
-                value = min;
-
-            }
-
-
-            if (value < min) {
-
-                value = min;
-
-            }
-
-
-            if (value > max) {
-
-                value = max;
-
-            }
-
-
-            input.value = value;
-
-            updateCheckoutTotal();
-
-        });
-
-
-        input.addEventListener("change", function () {
-
-            updateCheckoutTotal();
-
-        });
-
-    });
-
-
-    /* ==============================================================
-       DELIVERY METHOD
-    ============================================================== */
-
-    deliveryMethodInputs.forEach(function (input) {
-
-        input.addEventListener("change", function () {
-
-            updateDeliveryAddress();
-
-        });
-
-    });
-
-
-    /* ==============================================================
-       PAYMENT METHOD
-    ============================================================== */
-
-    paymentMethodInputs.forEach(function (input) {
-
-        input.addEventListener("change", function () {
-
-            const method =
-                getSelectedPaymentMethod();
-
-
-            /*
-             * Remove selected state from all payment cards
-             */
-
-            document
-                .querySelectorAll(".payment-method-card")
-                .forEach(function (card) {
-
-                    card.classList.remove("active");
-
-                });
-
-
-            /*
-             * Add selected state
-             */
-
-            const selectedCard =
-                input.closest(".payment-method-card");
-
-            if (selectedCard) {
-
-                selectedCard.classList.add("active");
-
-            }
-
-
-            /*
-             * Store selected method
-             */
-
-            if (checkoutForm) {
-
-                checkoutForm.dataset.paymentMethod =
-                    method;
-
-            }
-
-        });
-
-    });
-
-
-    /* ==============================================================
-       VALIDATE DELIVERY ADDRESS
-    ============================================================== */
-
-    function validateDeliveryAddress() {
-
-        const method =
-            getSelectedDeliveryMethod();
-
-
-        if (method === "Pickup") {
-
-            return true;
-
-        }
-
-
-        if (!deliveryAddress) {
-
-            return true;
-
-        }
-
-
-        const address =
-            deliveryAddress.value.trim();
-
-
-        if (address.length < 10) {
-
-            showCheckoutMessage(
-                "Please enter a complete delivery address.",
-                "error"
-            );
-
-            deliveryAddress.focus();
-
-            return false;
-
-        }
-
-
-        return true;
-
-    }
-
-
-    /* ==============================================================
-       VALIDATE PAYMENT METHOD
-    ============================================================== */
-
-    function validatePaymentMethod() {
-
-        const paymentMethod =
-            getSelectedPaymentMethod();
-
-
-        if (!paymentMethod) {
-
-            showCheckoutMessage(
-                "Please select a payment method.",
-                "error"
-            );
-
-            return false;
-
-        }
-
-
-        return true;
-
-    }
-
-
-    /* ==============================================================
-       VALIDATE CHECKOUT
-    ============================================================== */
-
-    function validateCheckout() {
-
-        if (!checkoutForm) {
-
-            return false;
-
-        }
-
-
-        /*
-         * Browser validation
-         */
-
-        if (!checkoutForm.checkValidity()) {
-
-            checkoutForm.reportValidity();
-
-            return false;
-
-        }
-
-
-        /*
-         * Delivery validation
-         */
-
-        if (!validateDeliveryAddress()) {
-
-            return false;
-
-        }
-
-
-        /*
-         * Payment validation
-         */
-
-        if (!validatePaymentMethod()) {
-
-            return false;
-
-        }
-
-
-        /*
-         * Check total
-         */
-
-        const total =
-            getNumber(
-                checkoutForm.dataset.total
-            );
-
-
-        if (total <= 0) {
-
-            showCheckoutMessage(
-                "Your cart is empty.",
-                "error"
-            );
-
-            return false;
-
-        }
-
-
-        return true;
-
-    }
-
-
-    /* ==============================================================
-       CHECKOUT MESSAGE
-    ============================================================== */
-
-    function showCheckoutMessage(message, type = "error") {
-
-        if (!checkoutMessage) {
-
-            /*
-             * Fallback if no message container exists
-             */
-
-            alert(message);
-
-            return;
-
-        }
-
-
-        checkoutMessage.textContent =
-            message;
-
-        checkoutMessage.className =
-            "checkout-message " + type;
-
-        checkoutMessage.style.display =
-            "block";
-
-
-        /*
-         * Scroll message into view
-         */
-
-        checkoutMessage.scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-        });
-
-    }
-
-
-    /* ==============================================================
-       CLEAR CHECKOUT MESSAGE
-    ============================================================== */
-
-    function clearCheckoutMessage() {
-
-        if (!checkoutMessage) {
-
-            return;
-
-        }
-
-        checkoutMessage.textContent = "";
-
-        checkoutMessage.className =
-            "checkout-message";
-
-        checkoutMessage.style.display =
-            "none";
-
-    }
-
-
-    /* ==============================================================
-       SUBMIT CHECKOUT
-    ============================================================== */
-
-    if (checkoutForm) {
-
-        checkoutForm.addEventListener(
-            "submit",
-            function (event) {
-
-                event.preventDefault();
-
-                clearCheckoutMessage();
-
-
-                /*
-                 * Validate
-                 */
-
-                if (!validateCheckout()) {
-
-                    return;
-
-                }
-
-
-                /*
-                 * Prevent double submission
-                 */
-
-                const submitButton =
-                    checkoutForm.querySelector(
-                        'button[type="submit"]'
-                    );
-
-
-                if (submitButton) {
-
-                    submitButton.disabled = true;
-
-                    submitButton.dataset.originalText =
-                        submitButton.innerHTML;
-
-                    submitButton.innerHTML =
-                        '<i class="fas fa-spinner fa-spin"></i> Processing...';
-
-                }
-
-
-                /*
-                 * Submit normally after JS validation
-                 *
-                 * This allows PHP checkout process
-                 * to handle the actual order creation.
-                 */
-
-                checkoutForm.submit();
-
-            }
+        updateDeliveryUI(
+            selected.value
         );
 
     }
 
-
-    /* ==============================================================
-       PAYMENT METHOD CARD CLICK
-    ============================================================== */
-
-    document
-        .querySelectorAll(".payment-method-card")
-        .forEach(function (card) {
-
-            card.addEventListener("click", function () {
-
-                const radio =
-                    card.querySelector(
-                        'input[type="radio"]'
-                    );
-
-                if (!radio) {
-                    return;
-                }
-
-                radio.checked = true;
-
-                radio.dispatchEvent(
-                    new Event("change", {
-                        bubbles: true
-                    })
-                );
-
-            });
-
-        });
+}
 
 
-    /* ==============================================================
-       DELIVERY CARD CLICK
-    ============================================================== */
+/*
+|--------------------------------------------------------------------------
+| UPDATE DELIVERY UI
+|--------------------------------------------------------------------------
+*/
 
-    document
-        .querySelectorAll(".delivery-method-card")
-        .forEach(function (card) {
+function updateDeliveryUI(
+    method
+) {
 
-            card.addEventListener("click", function () {
-
-                const radio =
-                    card.querySelector(
-                        'input[type="radio"]'
-                    );
-
-                if (!radio) {
-                    return;
-                }
-
-                radio.checked = true;
-
-                radio.dispatchEvent(
-                    new Event("change", {
-                        bubbles: true
-                    })
-                );
-
-            });
-
-        });
-
-
-    /* ==============================================================
-       PREVENT INVALID QUANTITY KEYBOARD INPUT
-    ============================================================== */
-
-    quantityInputs.forEach(function (input) {
-
-        input.addEventListener("keydown", function (event) {
-
-            const blockedKeys = [
-                "-",
-                "+",
-                "e",
-                "E",
-                "."
-            ];
-
-
-            if (blockedKeys.includes(event.key)) {
-
-                event.preventDefault();
-
-            }
-
-        });
-
-    });
-
-
-    /* ==============================================================
-       ADDRESS CHARACTER COUNTER
-    ============================================================== */
-
-    if (deliveryAddress) {
-
-        const counter =
-            document.querySelector(
-                "#addressCharacterCount"
-            );
-
-
-        if (counter) {
-
-            function updateAddressCounter() {
-
-                counter.textContent =
-                    deliveryAddress.value.length;
-
-            }
-
-
-            deliveryAddress.addEventListener(
-                "input",
-                updateAddressCounter
-            );
-
-
-            updateAddressCounter();
-
-        }
-
-    }
-
-
-    /* ==============================================================
-       AUTO-FILL PAYMENT METHOD
-    ============================================================== */
-
-    const firstPaymentMethod =
+    const addressSection =
         document.querySelector(
+            '[data-delivery-address], .delivery-address-section'
+        );
+
+
+    const pickupSection =
+        document.querySelector(
+            '[data-pickup-info], .pickup-info'
+        );
+
+
+    const normalized =
+        String(method)
+            .toLowerCase();
+
+
+    const isPickup =
+        normalized.includes(
+            'pickup'
+        );
+
+
+    if (addressSection) {
+
+        addressSection.style.display =
+            isPickup
+                ? 'none'
+                : '';
+
+    }
+
+
+    if (pickupSection) {
+
+        pickupSection.style.display =
+            isPickup
+                ? ''
+                : 'none';
+
+    }
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PAYMENT METHOD
+|--------------------------------------------------------------------------
+*/
+
+function bindPaymentMethod() {
+
+    const paymentOptions =
+        document.querySelectorAll(
             'input[name="payment_method"]'
         );
 
 
-    if (
-        firstPaymentMethod &&
-        !document.querySelector(
+    paymentOptions.forEach(
+        function (option) {
+
+            option.addEventListener(
+                'change',
+                function () {
+
+                    updatePaymentUI(
+                        option.value
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+    const selected =
+        document.querySelector(
             'input[name="payment_method"]:checked'
-        )
+        );
+
+
+    if (selected) {
+
+        updatePaymentUI(
+            selected.value
+        );
+
+    }
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE PAYMENT UI
+|--------------------------------------------------------------------------
+*/
+
+function updatePaymentUI(
+    method
+) {
+
+    const paymentSections =
+        document.querySelectorAll(
+            '[data-payment-section]'
+        );
+
+
+    paymentSections.forEach(
+        function (section) {
+
+            const sectionMethod =
+                section.dataset.paymentSection;
+
+
+            if (
+                !sectionMethod ||
+                sectionMethod === method
+            ) {
+
+                section.style.display =
+                    '';
+
+            } else {
+
+                section.style.display =
+                    'none';
+
+            }
+
+        }
+    );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CHECKOUT FORM
+|--------------------------------------------------------------------------
+*/
+
+function bindCheckoutForm() {
+
+    const forms =
+        document.querySelectorAll(
+            '#checkout-form, .checkout-form'
+        );
+
+
+    forms.forEach(
+        function (form) {
+
+            form.addEventListener(
+                'submit',
+                function (event) {
+
+                    if (
+                        !validateCheckoutForm(
+                            form
+                        )
+                    ) {
+
+                        event.preventDefault();
+
+                        return;
+
+                    }
+
+
+                    const button =
+                        form.querySelector(
+                            'button[type="submit"]'
+                        );
+
+
+                    if (button) {
+
+                        button.disabled =
+                            true;
+
+
+                        const originalText =
+                            button.textContent;
+
+
+                        button.dataset.originalText =
+                            originalText;
+
+
+                        button.textContent =
+                            'Processing...';
+
+                    }
+
+                }
+            );
+
+        }
+    );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| VALIDATE CHECKOUT FORM
+|--------------------------------------------------------------------------
+*/
+
+function validateCheckoutForm(
+    form
+) {
+
+    clearCheckoutErrors(
+        form
+    );
+
+
+    let valid = true;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELIVERY
+    |--------------------------------------------------------------------------
+    */
+
+    const deliveryMethod =
+        form.querySelector(
+            'input[name="delivery_method"]:checked'
+        );
+
+
+    if (!deliveryMethod) {
+
+        showCheckoutError(
+            form,
+            'Please select a delivery method.'
+        );
+
+        valid = false;
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADDRESS
+    |--------------------------------------------------------------------------
+    */
+
+    if (deliveryMethod) {
+
+        const method =
+            deliveryMethod.value
+                .toLowerCase();
+
+
+        const isPickup =
+            method.includes(
+                'pickup'
+            );
+
+
+        if (!isPickup) {
+
+            const address =
+                form.querySelector(
+                    '[name="address"], [name="shipping_address"]'
+                );
+
+
+            if (
+                address &&
+                address.value.trim() === ''
+            ) {
+
+                markInvalid(
+                    address,
+                    'Please enter your delivery address.'
+                );
+
+                valid = false;
+
+            }
+
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAYMENT
+    |--------------------------------------------------------------------------
+    */
+
+    const paymentMethod =
+        form.querySelector(
+            'input[name="payment_method"]:checked'
+        );
+
+
+    if (!paymentMethod) {
+
+        showCheckoutError(
+            form,
+            'Please select a payment method.'
+        );
+
+        valid = false;
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PHONE
+    |--------------------------------------------------------------------------
+    */
+
+    const phone =
+        form.querySelector(
+            '[name="phone"]'
+        );
+
+
+    if (
+        phone &&
+        phone.value.trim() !== ''
     ) {
 
-        firstPaymentMethod.checked = true;
+        const phonePattern =
+            /^[0-9+\-\s]{8,15}$/;
 
-        firstPaymentMethod.dispatchEvent(
-            new Event("change", {
-                bubbles: true
-            })
+
+        if (
+            !phonePattern.test(
+                phone.value.trim()
+            )
+        ) {
+
+            markInvalid(
+                phone,
+                'Please enter a valid phone number.'
+            );
+
+            valid = false;
+
+        }
+
+    }
+
+
+    return valid;
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| INVALID FIELD
+|--------------------------------------------------------------------------
+*/
+
+function markInvalid(
+    field,
+    message
+) {
+
+    field.classList.add(
+        'checkout-invalid'
+    );
+
+
+    field.setAttribute(
+        'aria-invalid',
+        'true'
+    );
+
+
+    let error =
+        field.parentElement
+            ?.querySelector(
+                '.checkout-field-error'
+            );
+
+
+    if (!error) {
+
+        error =
+            document.createElement(
+                'small'
+            );
+
+        error.className =
+            'checkout-field-error';
+
+
+        field.parentElement?.appendChild(
+            error
         );
 
     }
 
 
-    /* ==============================================================
-       INITIALISE
-    ============================================================== */
-
-    updateDeliveryAddress();
-
-    updateCheckoutTotal();
+    error.textContent =
+        message;
 
 
-    /* ==============================================================
-       EXPOSE FUNCTIONS
-       Useful if HTML buttons call them directly.
-    ============================================================== */
+    field.addEventListener(
+        'input',
+        function removeError() {
 
-    window.HochipoHubCheckout = {
+            field.classList.remove(
+                'checkout-invalid'
+            );
 
-        updateTotal: updateCheckoutTotal,
+            field.removeAttribute(
+                'aria-invalid'
+            );
 
-        validate: validateCheckout,
+            error.remove();
 
-        showMessage: showCheckoutMessage,
+            field.removeEventListener(
+                'input',
+                removeError
+            );
 
-        clearMessage: clearCheckoutMessage,
+        }
+    );
 
-        getDeliveryMethod:
-            getSelectedDeliveryMethod,
+}
 
-        getPaymentMethod:
-            getSelectedPaymentMethod
 
-    };
+/*
+|--------------------------------------------------------------------------
+| CLEAR CHECKOUT ERRORS
+|--------------------------------------------------------------------------
+*/
 
-});
+function clearCheckoutErrors(
+    form
+) {
+
+    form.querySelectorAll(
+        '.checkout-invalid'
+    ).forEach(
+        function (field) {
+
+            field.classList.remove(
+                'checkout-invalid'
+            );
+
+            field.removeAttribute(
+                'aria-invalid'
+            );
+
+        }
+    );
+
+
+    form.querySelectorAll(
+        '.checkout-field-error'
+    ).forEach(
+        function (error) {
+
+            error.remove();
+
+        }
+    );
+
+
+    form.querySelectorAll(
+        '.checkout-form-error'
+    ).forEach(
+        function (error) {
+
+            error.remove();
+
+        }
+    );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CHECKOUT FORM ERROR
+|--------------------------------------------------------------------------
+*/
+
+function showCheckoutError(
+    form,
+    message
+) {
+
+    let error =
+        form.querySelector(
+            '.checkout-form-error'
+        );
+
+
+    if (!error) {
+
+        error =
+            document.createElement(
+                'div'
+            );
+
+        error.className =
+            'checkout-form-error';
+
+
+        form.prepend(
+            error
+        );
+
+    }
+
+
+    error.textContent =
+        message;
+
+
+    error.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+    });
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| QUANTITY CHANGES
+|--------------------------------------------------------------------------
+*/
+
+function bindQuantityChanges() {
+
+    const inputs =
+        document.querySelectorAll(
+            '.checkout-quantity, [data-checkout-quantity]'
+        );
+
+
+    inputs.forEach(
+        function (input) {
+
+            input.addEventListener(
+                'change',
+                function () {
+
+                    calculateCheckoutTotal();
+
+                }
+            );
+
+        }
+    );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CALCULATE CHECKOUT TOTAL
+|--------------------------------------------------------------------------
+*/
+
+function calculateCheckoutTotal() {
+
+    let subtotal = 0;
+
+
+    const items =
+        document.querySelectorAll(
+            '[data-checkout-item], .checkout-item'
+        );
+
+
+    items.forEach(
+        function (item) {
+
+            const priceElement =
+                item.querySelector(
+                    '[data-item-price], .checkout-item-price'
+                );
+
+
+            const quantityElement =
+                item.querySelector(
+                    'input[type="number"], [data-item-quantity], .checkout-item-quantity'
+                );
+
+
+            if (
+                !priceElement ||
+                !quantityElement
+            ) {
+                return;
+            }
+
+
+            const price =
+                parseFloat(
+                    priceElement.dataset.price ||
+                    priceElement.textContent
+                        .replace(/[^0-9.-]+/g, '')
+                ) || 0;
+
+
+            const quantity =
+                parseInt(
+                    quantityElement.value ||
+                    quantityElement.textContent,
+                    10
+                ) || 0;
+
+
+            subtotal +=
+                price * quantity;
+
+        }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | If PHP already provides subtotal
+    |--------------------------------------------------------------------------
+    */
+
+    const subtotalElement =
+        document.querySelector(
+            '[data-checkout-subtotal]'
+        );
+
+
+    if (
+        subtotalElement &&
+        subtotal === 0
+    ) {
+
+        subtotal =
+            parseFloat(
+                subtotalElement.dataset.amount
+            ) || 0;
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELIVERY FEE
+    |--------------------------------------------------------------------------
+    */
+
+    let deliveryFee = 0;
+
+
+    const selectedDelivery =
+        document.querySelector(
+            'input[name="delivery_method"]:checked'
+        );
+
+
+    if (selectedDelivery) {
+
+        const selectedContainer =
+            selectedDelivery.closest(
+                '[data-delivery-option], .delivery-option'
+            );
+
+
+        if (selectedContainer) {
+
+            deliveryFee =
+                parseFloat(
+                    selectedContainer.dataset.fee ||
+                    selectedDelivery.dataset.fee ||
+                    0
+                ) || 0;
+
+        } else {
+
+            deliveryFee =
+                parseFloat(
+                    selectedDelivery.dataset.fee ||
+                    0
+                ) || 0;
+
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FALLBACK DELIVERY ELEMENT
+    |--------------------------------------------------------------------------
+    */
+
+    const deliveryElement =
+        document.querySelector(
+            '[data-checkout-delivery]'
+        );
+
+
+    if (
+        deliveryElement &&
+        selectedDelivery
+    ) {
+
+        const fee =
+            parseFloat(
+                deliveryElement.dataset.amount
+            );
+
+
+        if (!isNaN(fee)) {
+
+            deliveryFee = fee;
+
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TOTAL
+    |--------------------------------------------------------------------------
+    */
+
+    const total =
+        subtotal +
+        deliveryFee;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE UI
+    |--------------------------------------------------------------------------
+    */
+
+    updateCheckoutMoney(
+        '[data-checkout-subtotal]',
+        subtotal
+    );
+
+
+    updateCheckoutMoney(
+        '[data-checkout-delivery]',
+        deliveryFee
+    );
+
+
+    updateCheckoutMoney(
+        '[data-checkout-total]',
+        total
+    );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE MONEY
+|--------------------------------------------------------------------------
+*/
+
+function updateCheckoutMoney(
+    selector,
+    amount
+) {
+
+    const elements =
+        document.querySelectorAll(
+            selector
+        );
+
+
+    elements.forEach(
+        function (element) {
+
+            element.textContent =
+                formatCheckoutMoney(
+                    amount
+                );
+
+        }
+    );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| FORMAT MONEY
+|--------------------------------------------------------------------------
+*/
+
+function formatCheckoutMoney(
+    amount
+) {
+
+    const number =
+        parseFloat(amount) || 0;
+
+
+    return 'RM ' +
+        number.toLocaleString(
+            'en-MY',
+            {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }
+        );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PREVENT DOUBLE SUBMISSION
+|--------------------------------------------------------------------------
+*/
+
+window.addEventListener(
+    'beforeunload',
+    function () {
+
+        const forms =
+            document.querySelectorAll(
+                '#checkout-form, .checkout-form'
+            );
+
+
+        forms.forEach(
+            function (form) {
+
+                const button =
+                    form.querySelector(
+                        'button[type="submit"]'
+                    );
+
+
+                if (
+                    button &&
+                    button.disabled
+                ) {
+
+                    button.disabled =
+                        false;
+
+
+                    if (
+                        button.dataset.originalText
+                    ) {
+
+                        button.textContent =
+                            button.dataset.originalText;
+
+                    }
+
+                }
+
+            }
+        );
+
+    }
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| GLOBAL FUNCTIONS
+|--------------------------------------------------------------------------
+*/
+
+window.calculateCheckoutTotal =
+    calculateCheckoutTotal;
+
+window.validateCheckoutForm =
+    validateCheckoutForm;
+
+window.updateDeliveryUI =
+    updateDeliveryUI;
+
+window.updatePaymentUI =
+    updatePaymentUI;
