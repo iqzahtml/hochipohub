@@ -1420,4 +1420,4 @@ require_once dirname(__DIR__) . '/includes/footer.php';
 
 </body>
 
-</html>
+</html> 
