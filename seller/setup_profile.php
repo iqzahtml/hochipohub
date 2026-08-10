@@ -1,310 +1,847 @@
 <?php
+require_once '../database/db.php';
+require_once '../includes/session.php';
 
-
-session_start();
-
-
-require_once "database/db.php";
-
-
-
-if(!isset($_SESSION['user_id'])){
-
-
-header("Location: auth/login.php");
-
-
-exit();
-
-
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../index.php");
+    exit;
+}
 
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'vendor') {
+    header("Location: ../dashboard.php");
+    exit;
+}
 
-$user_id=$_SESSION['user_id'];
+$user_id = (int) $_SESSION['user_id'];
 
+$errors = [];
 
-
-
-
-if(isset($_POST['save'])){
-
-
-$business_name = $_POST['business_name'];
-
-$description = $_POST['business_description'];
-
-$address = $_POST['business_address'];
-
-$delivery = $_POST['delivery_method'];
-
-
-
-$check = $conn->prepare("
-
-SELECT vendor_id
-
-FROM vendors
-
-WHERE user_id = ?
-
+/*
+|--------------------------------------------------------------------------
+| GET EXISTING VENDOR
+|--------------------------------------------------------------------------
+*/
+$stmt = $conn->prepare("
+    SELECT
+        vendor_id,
+        user_id,
+        business_name,
+        business_logo,
+        business_description,
+        business_address,
+        category,
+        delivery_method,
+        approval_status
+    FROM vendors
+    WHERE user_id = ?
+    LIMIT 1
 ");
 
-
-
-$check->bind_param(
-
-"i",
-
-$user_id
-
+$stmt->bind_param(
+    "i",
+    $user_id
 );
 
+$stmt->execute();
+
+$result = $stmt->get_result();
+$vendor = $result->fetch_assoc();
+
+$stmt->close();
 
 
-$check->execute();
+/*
+|--------------------------------------------------------------------------
+| DEFAULT VALUES
+|--------------------------------------------------------------------------
+*/
+$current_business_name =
+    $vendor['business_name'] ?? '';
+
+$current_business_description =
+    $vendor['business_description'] ?? '';
+
+$current_business_address =
+    $vendor['business_address'] ?? '';
+
+$current_category =
+    $vendor['category'] ?? '';
+
+$current_delivery_method =
+    $vendor['delivery_method'] ?? 'Both';
+
+$current_business_logo =
+    $vendor['business_logo'] ?? '';
+
+/*
+|--------------------------------------------------------------------------
+| FORM SUBMIT
+|--------------------------------------------------------------------------
+*/
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $business_name =
+        trim($_POST['business_name'] ?? '');
+
+    $business_description =
+        trim($_POST['business_description'] ?? '');
+
+    $business_address =
+        trim($_POST['business_address'] ?? '');
+
+    $category =
+        trim($_POST['category'] ?? '');
+
+    $delivery_method =
+        trim($_POST['delivery_method'] ?? 'Both');
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATION
+    |--------------------------------------------------------------------------
+    */
+    if ($business_name === '') {
+        $errors[] =
+            "Business name is required.";
+    }
 
-$result=$check->get_result();
+    if (mb_strlen($business_name) > 150) {
+        $errors[] =
+            "Business name must not exceed 150 characters.";
+    }
 
+    if ($category === '') {
+        $errors[] =
+            "Business category is required.";
+    }
 
+    $allowed_delivery_methods = [
+        'Pickup',
+        'Postage',
+        'Both'
+    ];
 
+    if (
+        !in_array(
+            $delivery_method,
+            $allowed_delivery_methods,
+            true
+        )
+    ) {
+        $errors[] =
+            "Invalid delivery method.";
 
-
-if($result->num_rows > 0){
-
-
-
-$update=$conn->prepare("
-
-UPDATE vendors
-
-SET
-
-business_name=?,
-
-business_description=?,
-
-business_address=?,
-
-delivery_method=?
-
-WHERE user_id=?
-
-");
-
-
-
-$update->bind_param(
-
-"ssssi",
-
-$business_name,
-
-$description,
-
-$address,
-
-$delivery,
-
-$user_id
-
-);
+        $delivery_method = 'Both';
+    }
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | IMAGE
+    |--------------------------------------------------------------------------
+    */
+    $business_logo =
+        $current_business_logo;
 
-$update->execute();
+    $new_logo_uploaded = false;
+
+    if (
+        isset($_FILES['business_logo']) &&
+        $_FILES['business_logo']['error']
+            !== UPLOAD_ERR_NO_FILE
+    ) {
+
+        if (
+            $_FILES['business_logo']['error']
+            !== UPLOAD_ERR_OK
+        ) {
+
+            $errors[] =
+                "Unable to upload business logo.";
+
+        } else {
+
+            $allowed_extensions = [
+                'jpg',
+                'jpeg',
+                'png',
+                'webp'
+            ];
+
+            $file_name =
+                $_FILES['business_logo']['name'];
+
+            $file_tmp =
+                $_FILES['business_logo']['tmp_name'];
+
+            $file_size =
+                $_FILES['business_logo']['size'];
+
+            $extension =
+                strtolower(
+                    pathinfo(
+                        $file_name,
+                        PATHINFO_EXTENSION
+                    )
+                );
 
 
+            if (
+                !in_array(
+                    $extension,
+                    $allowed_extensions,
+                    true
+                )
+            ) {
 
+                $errors[] =
+                    "Only JPG, JPEG, PNG and WEBP files are allowed.";
+
+            }
+
+
+            if ($file_size > 5 * 1024 * 1024) {
+
+                $errors[] =
+                    "Business logo must not exceed 5MB.";
+
+            }
+
+
+            if (empty($errors)) {
+
+                $business_logo =
+                    'vendor_' .
+                    $user_id .
+                    '_' .
+                    time() .
+                    '_' .
+                    bin2hex(
+                        random_bytes(4)
+                    ) .
+                    '.' .
+                    $extension;
+
+                $upload_directory =
+                    '../uploads/vendors/';
+
+
+                if (!is_dir($upload_directory)) {
+
+                    mkdir(
+                        $upload_directory,
+                        0755,
+                        true
+                    );
+
+                }
+
+
+                $upload_path =
+                    $upload_directory .
+                    $business_logo;
+
+
+                if (
+                    !move_uploaded_file(
+                        $file_tmp,
+                        $upload_path
+                    )
+                ) {
+
+                    $errors[] =
+                        "Unable to save business logo.";
+
+                    $business_logo =
+                        $current_business_logo;
+
+                } else {
+
+                    $new_logo_uploaded = true;
+
+                }
+            }
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SAVE PROFILE
+    |--------------------------------------------------------------------------
+    */
+    if (empty($errors)) {
+
+        if ($vendor) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE
+            |--------------------------------------------------------------------------
+            */
+            $stmt = $conn->prepare("
+                UPDATE vendors
+                SET
+                    business_name = ?,
+                    business_logo = ?,
+                    business_description = ?,
+                    business_address = ?,
+                    category = ?,
+                    delivery_method = ?
+                WHERE vendor_id = ?
+                AND user_id = ?
+            ");
+
+            $stmt->bind_param(
+                "ssssssii",
+                $business_name,
+                $business_logo,
+                $business_description,
+                $business_address,
+                $category,
+                $delivery_method,
+                $vendor['vendor_id'],
+                $user_id
+            );
+
+            if ($stmt->execute()) {
+
+                $stmt->close();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | DELETE OLD LOGO
+                |--------------------------------------------------------------------------
+                */
+                if (
+                    $new_logo_uploaded &&
+                    !empty($current_business_logo) &&
+                    $current_business_logo !== $business_logo
+                ) {
+
+                    $old_logo =
+                        '../uploads/vendors/' .
+                        $current_business_logo;
+
+                    if (
+                        file_exists($old_logo) &&
+                        is_file($old_logo)
+                    ) {
+
+                        unlink($old_logo);
+
+                    }
+                }
+
+
+                header(
+                    "Location: setup_profile.php?success=updated"
+                );
+
+                exit;
+
+            } else {
+
+                $errors[] =
+                    "Failed to update vendor profile.";
+
+                $stmt->close();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | REMOVE NEW LOGO
+                |--------------------------------------------------------------------------
+                */
+                if ($new_logo_uploaded) {
+
+                    $new_logo_path =
+                        '../uploads/vendors/' .
+                        $business_logo;
+
+                    if (
+                        file_exists($new_logo_path) &&
+                        is_file($new_logo_path)
+                    ) {
+
+                        unlink($new_logo_path);
+
+                    }
+                }
+            }
+
+        } else {
+
+            /*
+            |--------------------------------------------------------------------------
+            | CREATE NEW VENDOR PROFILE
+            |--------------------------------------------------------------------------
+            */
+            $approval_status = 'Pending';
+
+            $stmt = $conn->prepare("
+                INSERT INTO vendors
+                (
+                    user_id,
+                    business_name,
+                    business_logo,
+                    business_description,
+                    business_address,
+                    category,
+                    delivery_method,
+                    approval_status
+                )
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?
+                )
+            ");
+
+            $stmt->bind_param(
+                "isssssss",
+                $user_id,
+                $business_name,
+                $business_logo,
+                $business_description,
+                $business_address,
+                $category,
+                $delivery_method,
+                $approval_status
+            );
+
+
+            if ($stmt->execute()) {
+
+                $stmt->close();
+
+                header(
+                    "Location: setup_profile.php?success=created"
+                );
+
+                exit;
+
+            } else {
+
+                $errors[] =
+                    "Failed to create vendor profile.";
+
+                $stmt->close();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | REMOVE UPLOADED LOGO IF INSERT FAILED
+                |--------------------------------------------------------------------------
+                */
+                if ($new_logo_uploaded) {
+
+                    $new_logo_path =
+                        '../uploads/vendors/' .
+                        $business_logo;
+
+                    if (
+                        file_exists($new_logo_path) &&
+                        is_file($new_logo_path)
+                    ) {
+
+                        unlink($new_logo_path);
+
+                    }
+                }
+            }
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | KEEP FORM VALUES AFTER ERROR
+    |--------------------------------------------------------------------------
+    */
+    $current_business_name =
+        $business_name;
+
+    $current_business_description =
+        $business_description;
+
+    $current_business_address =
+        $business_address;
+
+    $current_category =
+        $category;
+
+    $current_delivery_method =
+        $delivery_method;
+
+    $current_business_logo =
+        $business_logo;
 }
-
-else{
-
-
-
-$insert=$conn->prepare("
-
-INSERT INTO vendors
-
-(
-
-user_id,
-
-business_name,
-
-business_description,
-
-business_address,
-
-delivery_method,
-
-approval_status
-
-)
-
-VALUES
-
-(?,?,?,?,?,'Pending')
-
-");
-
-
-
-$insert->bind_param(
-
-"issss",
-
-$user_id,
-
-$business_name,
-
-$description,
-
-$address,
-
-$delivery
-
-);
-
-
-
-$insert->execute();
-
-
-
-}
-
-
-
-header("Location: dashboard.php");
-
-exit();
-
-
-
-}
-
 
 ?>
-
-
-
 <!DOCTYPE html>
-
-<html>
+<html lang="en">
 
 <head>
 
-<title>
-Setup Vendor Profile
-</title>
+    <meta charset="UTF-8">
 
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-<link rel="stylesheet" href="css/vendor.css">
+    <title>
+        Setup Store | Seller | HochipoHub
+    </title>
 
+    <link
+        rel="stylesheet"
+        href="../css/style.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/vendor.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/responsive.css"
+    >
 
 </head>
 
-
 <body>
 
+<?php include '../includes/navbar.php'; ?>
+
+<div class="dashboard-layout">
+
+    <?php include '../includes/vendor_sidebar.php'; ?>
+
+    <main class="dashboard-content">
+
+        <div class="page-header">
+
+            <div>
+
+                <h1>
+                    <?= $vendor
+                        ? 'Store Profile'
+                        : 'Setup Your Store' ?>
+                </h1>
+
+                <p>
+                    Create and manage your HochipoHub vendor profile.
+                </p>
+
+            </div>
+
+        </div>
 
 
-<?php include "includes/navbar.php"; ?>
+        <?php if (isset($_GET['success'])): ?>
+
+            <div class="alert alert-success">
+
+                <?php if ($_GET['success'] === 'created'): ?>
+
+                    Your vendor profile has been created.
+                    It is now waiting for admin approval.
+
+                <?php elseif ($_GET['success'] === 'updated'): ?>
+
+                    Your vendor profile has been updated successfully.
+
+                <?php endif; ?>
+
+            </div>
+
+        <?php endif; ?>
 
 
+        <?php if (!empty($errors)): ?>
 
-<div class="vendor-container">
+            <div class="alert alert-danger">
 
+                <strong>
+                    Please fix the following:
+                </strong>
 
-<h1>
-Vendor Profile
-</h1>
+                <ul>
 
+                    <?php foreach ($errors as $error): ?>
 
+                        <li>
+                            <?= htmlspecialchars($error) ?>
+                        </li>
 
-<form method="POST">
+                    <?php endforeach; ?>
 
+                </ul>
 
+            </div>
 
-<label>
-Business Name
-</label>
-
-
-<input type="text"
-
-name="business_name"
-
-required>
-
+        <?php endif; ?>
 
 
-<label>
-Business Description
-</label>
+        <?php if ($vendor): ?>
+
+            <div class="alert alert-info">
+
+                Current approval status:
+
+                <strong>
+                    <?= htmlspecialchars(
+                        $vendor['approval_status']
+                    ) ?>
+                </strong>
+
+            </div>
+
+        <?php endif; ?>
 
 
-<textarea name="business_description"></textarea>
+        <div class="form-card">
+
+            <form
+                method="POST"
+                enctype="multipart/form-data"
+            >
+
+                <!-- BUSINESS NAME -->
+
+                <div class="form-group">
+
+                    <label for="business_name">
+                        Business Name
+                    </label>
+
+                    <input
+                        type="text"
+                        id="business_name"
+                        name="business_name"
+                        value="<?= htmlspecialchars(
+                            $current_business_name
+                        ) ?>"
+                        maxlength="150"
+                        required
+                    >
+
+                </div>
 
 
+                <!-- CATEGORY -->
+
+                <div class="form-group">
+
+                    <label for="category">
+                        Business Category
+                    </label>
+
+                    <input
+                        type="text"
+                        id="category"
+                        name="category"
+                        value="<?= htmlspecialchars(
+                            $current_category
+                        ) ?>"
+                        maxlength="100"
+                        placeholder="Example: Food, Fashion, Technology"
+                        required
+                    >
+
+                </div>
 
 
-<label>
-Business Address
-</label>
+                <!-- DESCRIPTION -->
+
+                <div class="form-group">
+
+                    <label for="business_description">
+                        Business Description
+                    </label>
+
+                    <textarea
+                        id="business_description"
+                        name="business_description"
+                        rows="6"
+                        placeholder="Tell customers about your business..."
+                    ><?= htmlspecialchars(
+                        $current_business_description
+                    ) ?></textarea>
+
+                </div>
 
 
-<textarea name="business_address"></textarea>
+                <!-- ADDRESS -->
+
+                <div class="form-group">
+
+                    <label for="business_address">
+                        Business Address
+                    </label>
+
+                    <textarea
+                        id="business_address"
+                        name="business_address"
+                        rows="5"
+                        placeholder="Enter your business address..."
+                    ><?= htmlspecialchars(
+                        $current_business_address
+                    ) ?></textarea>
+
+                </div>
 
 
+                <!-- DELIVERY -->
+
+                <div class="form-group">
+
+                    <label for="delivery_method">
+                        Delivery Method
+                    </label>
+
+                    <select
+                        id="delivery_method"
+                        name="delivery_method"
+                        required
+                    >
+
+                        <option
+                            value="Pickup"
+                            <?= $current_delivery_method === 'Pickup'
+                                ? 'selected'
+                                : '' ?>
+                        >
+                            Pickup Only
+                        </option>
+
+                        <option
+                            value="Postage"
+                            <?= $current_delivery_method === 'Postage'
+                                ? 'selected'
+                                : '' ?>
+                        >
+                            Postage Only
+                        </option>
+
+                        <option
+                            value="Both"
+                            <?= $current_delivery_method === 'Both'
+                                ? 'selected'
+                                : '' ?>
+                        >
+                            Pickup & Postage
+                        </option>
+
+                    </select>
+
+                </div>
 
 
-<label>
-Delivery Method
-</label>
+                <!-- CURRENT LOGO -->
+
+                <?php if (!empty($current_business_logo)): ?>
+
+                    <div class="form-group">
+
+                        <label>
+                            Current Business Logo
+                        </label>
+
+                        <div>
+
+                            <img
+                                src="../uploads/vendors/<?= htmlspecialchars($current_business_logo) ?>"
+                                alt="Business Logo"
+                                style="
+                                    width:150px;
+                                    height:150px;
+                                    object-fit:cover;
+                                    border-radius:15px;
+                                "
+                            >
+
+                        </div>
+
+                    </div>
+
+                <?php endif; ?>
 
 
-<select name="delivery_method">
+                <!-- LOGO -->
+
+                <div class="form-group">
+
+                    <label for="business_logo">
+
+                        <?= $vendor
+                            ? 'Change Business Logo'
+                            : 'Business Logo' ?>
+
+                    </label>
+
+                    <input
+                        type="file"
+                        id="business_logo"
+                        name="business_logo"
+                        accept=".jpg,.jpeg,.png,.webp"
+                    >
+
+                    <small>
+                        JPG, JPEG, PNG or WEBP. Maximum 5MB.
+                    </small>
+
+                </div>
 
 
-<option value="Pickup">
-Pickup
-</option>
+                <!-- BUTTON -->
 
+                <div class="form-actions">
 
-<option value="Postage">
-Postage
-</option>
+                    <a
+                        href="dashboard.php"
+                        class="btn btn-secondary"
+                    >
+                        Cancel
+                    </a>
 
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
 
-<option value="Both">
-Both
-</option>
+                        <?= $vendor
+                            ? 'Update Store'
+                            : 'Create Store' ?>
 
+                    </button>
 
-</select>
+                </div>
 
+            </form>
 
+        </div>
 
-
-<button name="save">
-
-Save Profile
-
-</button>
-
-
-
-</form>
-
+    </main>
 
 </div>
 
-
+<?php include '../includes/footer.php'; ?>
 
 </body>
-
 </html>
