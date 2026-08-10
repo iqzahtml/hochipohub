@@ -1,53 +1,67 @@
 <?php
+// =========================================================
+// HOCHIPOHUB - GLOBAL HEADER
+// File: includes/header.php
+// =========================================================
 
-/*
-|--------------------------------------------------------------------------
-| HochipoHub - Global Header
-|--------------------------------------------------------------------------
-*/
-
-if (!defined('BASE_URL')) {
-    require_once dirname(__DIR__) . '/config.php';
-}
-
-if (!function_exists('isLoggedIn')) {
-    require_once __DIR__ . '/session.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| PAGE SETTINGS
-|--------------------------------------------------------------------------
-*/
+// =========================================================
+// BASE PATH
+// =========================================================
+//
+// Root page:
+//     $basePath = '';
+//
+// Page dalam admin/seller/auth:
+//     $basePath = '../';
+//
+// Kalau page belum define $basePath,
+// kita default kepada root.
+//
 
-$pageTitle =
-    $pageTitle
-    ?? 'HochipoHub';
+if (!isset($basePath)) {
+    $basePath = '';
+}
 
-$pageDescription =
-    $pageDescription
-    ?? 'Discover local products and support local businesses.';
 
-$bodyClass =
-    $bodyClass
-    ?? '';
+// =========================================================
+// PAGE TITLE
+// =========================================================
+
+if (!isset($pageTitle)) {
+    $pageTitle = 'HochipoHub';
+}
+
+
+// =========================================================
+// USER DATA
+// =========================================================
+
+$isLoggedIn = isset($_SESSION['user_id']);
+
+$userName = $_SESSION['name'] ?? '';
+
+$userRole = $_SESSION['role'] ?? '';
+
+
+// =========================================================
+// CURRENT PAGE
+// =========================================================
+
+$currentPage = basename(
+    $_SERVER['PHP_SELF']
+);
 
 ?>
 
-
 <!DOCTYPE html>
-
-<html
-    lang="en"
->
+<html lang="en">
 
 <head>
-
-
-    <!-- =====================================================
-         BASIC META
-    ====================================================== -->
 
     <meta charset="UTF-8">
 
@@ -58,11 +72,7 @@ $bodyClass =
 
     <meta
         name="description"
-        content="<?php echo htmlspecialchars(
-            $pageDescription,
-            ENT_QUOTES,
-            'UTF-8'
-        ); ?>"
+        content="HochipoHub - Your trusted digital marketplace."
     >
 
     <meta
@@ -70,26 +80,14 @@ $bodyClass =
         content="#2563eb"
     >
 
-
-    <!-- =====================================================
-         TITLE
-    ====================================================== -->
-
     <title>
-
-        <?php echo htmlspecialchars(
-            $pageTitle,
-            ENT_QUOTES,
-            'UTF-8'
-        ); ?>
-
+        <?php echo htmlspecialchars($pageTitle); ?>
         | HochipoHub
-
     </title>
 
 
     <!-- =====================================================
-         GOOGLE FONT
+         FONTS
     ====================================================== -->
 
     <link
@@ -104,7 +102,7 @@ $bodyClass =
     >
 
     <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@500;600;700;800&display=swap"
         rel="stylesheet"
     >
 
@@ -116,9 +114,6 @@ $bodyClass =
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-        integrity="sha512-SnH5WK+bZxgPHs44uWixLJ8tW0Yp8qJk0j9JfF7qL9jX8j5m7K3m8sYQ2mJ6J7Y7dY7k2fF5J0kY7j3A8Q=="
-        crossorigin="anonymous"
-        referrerpolicy="no-referrer"
     >
 
 
@@ -128,137 +123,348 @@ $bodyClass =
 
     <link
         rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/style.css"
+        href="<?php echo $basePath; ?>css/style.css"
     >
 
     <link
         rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/responsive.css"
+        href="<?php echo $basePath; ?>css/responsive.css"
     >
 
 
     <!-- =====================================================
-         PAGE-SPECIFIC CSS
+         PAGE SPECIFIC CSS
     ====================================================== -->
 
-    <?php
+    <?php if (!empty($pageCss)): ?>
 
-    $pageCss = [
+        <?php foreach ((array) $pageCss as $cssFile): ?>
 
-        'cart.php'
-            => 'cart.css',
+            <link
+                rel="stylesheet"
+                href="<?php echo $basePath . 'css/' . htmlspecialchars($cssFile); ?>"
+            >
 
-        'checkout.php'
-            => 'checkout.css',
-
-        'dashboard.php'
-            => 'dashboard.css',
-
-        'product.php'
-            => 'product.css',
-
-        'product_details.php'
-            => 'product.css',
-
-        'vendor.php'
-            => 'vendor.css',
-
-        'wishlist.php'
-            => 'wishlist.css'
-
-    ];
-
-
-    if (
-        isset(
-            $pageCss[
-                basename(
-                    $_SERVER['PHP_SELF']
-                )
-            ]
-        )
-    ):
-
-    ?>
-
-        <link
-            rel="stylesheet"
-            href="<?php echo BASE_URL; ?>css/<?php echo $pageCss[
-                basename(
-                    $_SERVER['PHP_SELF']
-                )
-            ]; ?>"
-        >
+        <?php endforeach; ?>
 
     <?php endif; ?>
 
+
+    <!-- =====================================================
+         EXTRA HEAD
+    ====================================================== -->
+
+    <?php if (!empty($extraHead)): ?>
+
+        <?php echo $extraHead; ?>
+
+    <?php endif; ?>
 
 </head>
 
 
 <body
-    class="<?php echo htmlspecialchars(
-        $bodyClass,
-        ENT_QUOTES,
-        'UTF-8'
-    ); ?>"
+    class="<?php echo htmlspecialchars($bodyClass ?? ''); ?>"
 >
 
 
 <!-- =========================================================
-     PAGE LOADER
+     GLOBAL PAGE WRAPPER
 ========================================================= -->
 
-<div
-    class="page-loader"
-    id="pageLoader"
->
+<div class="site-wrapper">
 
-    <div class="loader-content">
 
-        <div class="loader-logo">
+    <!-- =====================================================
+         HEADER
+    ====================================================== -->
 
-            <i class="fa-solid fa-bolt"></i>
+    <header class="site-header">
+
+        <div class="header-container">
+
+
+            <!-- =================================================
+                 LOGO
+            ================================================== -->
+
+            <a
+                href="<?php echo $basePath; ?>index.php"
+                class="site-logo"
+            >
+
+                <div class="site-logo-icon">
+                    H
+                </div>
+
+                <div class="site-logo-text">
+
+                    <strong>
+                        HOCHIPO
+                    </strong>
+
+                    <span>
+                        HUB
+                    </span>
+
+                </div>
+
+            </a>
+
+
+            <!-- =================================================
+                 DESKTOP NAVIGATION
+            ================================================== -->
+
+            <nav class="main-navigation">
+
+                <a
+                    href="<?php echo $basePath; ?>index.php"
+                    class="<?php echo ($currentPage === 'index.php') ? 'active' : ''; ?>"
+                >
+                    Home
+                </a>
+
+
+                <a
+                    href="<?php echo $basePath; ?>catalog.php"
+                    class="<?php echo ($currentPage === 'catalog.php') ? 'active' : ''; ?>"
+                >
+                    Products
+                </a>
+
+
+                <a
+                    href="<?php echo $basePath; ?>category.php"
+                    class="<?php echo ($currentPage === 'category.php') ? 'active' : ''; ?>"
+                >
+                    Categories
+                </a>
+
+
+                <a
+                    href="<?php echo $basePath; ?>vendor.php"
+                    class="<?php echo ($currentPage === 'vendor.php') ? 'active' : ''; ?>"
+                >
+                    Vendors
+                </a>
+
+
+                <a
+                    href="<?php echo $basePath; ?>contact.php"
+                    class="<?php echo ($currentPage === 'contact.php') ? 'active' : ''; ?>"
+                >
+                    Contact
+                </a>
+
+            </nav>
+
+
+            <!-- =================================================
+                 HEADER ACTIONS
+            ================================================== -->
+
+            <div class="header-actions">
+
+
+                <!-- Search -->
+                <a
+                    href="<?php echo $basePath; ?>search.php"
+                    class="header-action"
+                    aria-label="Search"
+                    title="Search"
+                >
+
+                    <i class="fa-solid fa-magnifying-glass"></i>
+
+                </a>
+
+
+                <?php if ($isLoggedIn): ?>
+
+
+                    <!-- Wishlist -->
+                    <a
+                        href="<?php echo $basePath; ?>wishlist.php"
+                        class="header-action"
+                        aria-label="Wishlist"
+                        title="Wishlist"
+                    >
+
+                        <i class="fa-regular fa-heart"></i>
+
+                    </a>
+
+
+                    <!-- Cart -->
+                    <a
+                        href="<?php echo $basePath; ?>cart.php"
+                        class="header-action"
+                        aria-label="Cart"
+                        title="Cart"
+                    >
+
+                        <i class="fa-solid fa-cart-shopping"></i>
+
+                    </a>
+
+
+                    <!-- Profile -->
+                    <a
+                        href="<?php echo $basePath; ?>profile.php"
+                        class="header-user"
+                    >
+
+                        <div class="header-user-avatar">
+
+                            <i class="fa-solid fa-user"></i>
+
+                        </div>
+
+                        <span>
+                            <?php
+                            echo htmlspecialchars(
+                                $userName ?: 'Account'
+                            );
+                            ?>
+                        </span>
+
+                    </a>
+
+
+                <?php else: ?>
+
+
+                    <!-- Login -->
+                    <a
+                        href="<?php echo $basePath; ?>index.php"
+                        class="header-login"
+                    >
+                        Login
+                    </a>
+
+
+                    <!-- Register -->
+                    <a
+                        href="<?php echo $basePath; ?>index.php"
+                        class="header-register"
+                    >
+                        Register
+                    </a>
+
+
+                <?php endif; ?>
+
+
+                <!-- Mobile Menu Button -->
+                <button
+                    type="button"
+                    class="mobile-menu-toggle"
+                    id="mobileMenuToggle"
+                    aria-label="Open Menu"
+                >
+
+                    <i class="fa-solid fa-bars"></i>
+
+                </button>
+
+            </div>
 
         </div>
 
-        <div class="loader-spinner"></div>
 
-        <span>
-            Loading HochipoHub...
-        </span>
+        <!-- =====================================================
+             MOBILE NAVIGATION
+        ====================================================== -->
 
-    </div>
+        <div
+            class="mobile-navigation"
+            id="mobileNavigation"
+        >
 
-</div>
-
-
-<!-- =========================================================
-     NAVBAR
-========================================================= -->
-
-<?php
-
-$navbarPath =
-    __DIR__ . '/navbar.php';
-
-if (
-    file_exists(
-        $navbarPath
-    )
-) {
-
-    require $navbarPath;
-}
-
-?>
+            <a
+                href="<?php echo $basePath; ?>index.php"
+            >
+                <i class="fa-solid fa-house"></i>
+                Home
+            </a>
 
 
-<!-- =========================================================
-     MAIN CONTENT
-========================================================= -->
+            <a
+                href="<?php echo $basePath; ?>catalog.php"
+            >
+                <i class="fa-solid fa-store"></i>
+                Products
+            </a>
 
-<main
-    id="mainContent"
-    class="main-content"
->
+
+            <a
+                href="<?php echo $basePath; ?>category.php"
+            >
+                <i class="fa-solid fa-layer-group"></i>
+                Categories
+            </a>
+
+
+            <a
+                href="<?php echo $basePath; ?>vendor.php"
+            >
+                <i class="fa-solid fa-shop"></i>
+                Vendors
+            </a>
+
+
+            <a
+                href="<?php echo $basePath; ?>cart.php"
+            >
+                <i class="fa-solid fa-cart-shopping"></i>
+                Cart
+            </a>
+
+
+            <a
+                href="<?php echo $basePath; ?>wishlist.php"
+            >
+                <i class="fa-regular fa-heart"></i>
+                Wishlist
+            </a>
+
+
+            <a
+                href="<?php echo $basePath; ?>contact.php"
+            >
+                <i class="fa-solid fa-envelope"></i>
+                Contact
+            </a>
+
+
+            <?php if ($isLoggedIn): ?>
+
+                <a
+                    href="<?php echo $basePath; ?>profile.php"
+                >
+                    <i class="fa-solid fa-user"></i>
+                    My Profile
+                </a>
+
+
+                <a
+                    href="<?php echo $basePath; ?>auth/logout.php"
+                    class="mobile-logout"
+                >
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    Logout
+                </a>
+
+            <?php endif; ?>
+
+        </div>
+
+    </header>
+
+
+    <!-- =====================================================
+         MAIN CONTENT
+    ====================================================== -->
+
+    <main class="site-main">
