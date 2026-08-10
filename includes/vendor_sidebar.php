@@ -1,228 +1,219 @@
-<aside class="sidebar vendor-sidebar">
+<?php
+/**
+ * =========================================================
+ * HOCHIPOHUB - VENDOR SIDEBAR
+ * File: includes/vendor_sidebar.php
+ * =========================================================
+ */
 
-
-
-<div class="sidebar-title">
-
-
-<h2>
-
-Vendor Panel<?php
-
-/*
-|--------------------------------------------------------------------------
-| HochipoHub - Vendor Sidebar
-|--------------------------------------------------------------------------
-*/
-
-require_once __DIR__ . '/session.php';
-
-requireVendor();
-
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 /*
 |--------------------------------------------------------------------------
-| CURRENT PAGE
+| Get current vendor information
 |--------------------------------------------------------------------------
 */
+$vendorName = 'Vendor';
+$businessName = 'My Store';
+$vendorLogo = null;
 
-$currentPage =
-    basename(
-        $_SERVER['PHP_SELF'] ?? ''
-    );
+if (isset($_SESSION['user_id'])) {
 
+    $userId = (int) $_SESSION['user_id'];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Use existing database connection
+    |--------------------------------------------------------------------------
+    */
+    if (!isset($conn)) {
+
+        $dbFile = dirname(__DIR__) . '/database/db.php';
+
+        if (file_exists($dbFile)) {
+            require_once $dbFile;
+        }
+    }
+
+    if (isset($conn) && $conn instanceof mysqli) {
+
+        $sql = "
+            SELECT 
+                u.name,
+                u.profile_image,
+                v.business_name,
+                v.business_logo,
+                v.approval_status
+            FROM users u
+            LEFT JOIN vendors v
+                ON u.user_id = v.user_id
+            WHERE u.user_id = ?
+            LIMIT 1
+        ";
+
+        $stmt = mysqli_prepare($conn, $sql);
+
+        if ($stmt) {
+
+            mysqli_stmt_bind_param($stmt, "i", $userId);
+            mysqli_stmt_execute($stmt);
+
+            $result = mysqli_stmt_get_result($stmt);
+
+            if ($result && mysqli_num_rows($result) > 0) {
+
+                $vendor = mysqli_fetch_assoc($result);
+
+                if (!empty($vendor['name'])) {
+                    $vendorName = $vendor['name'];
+                }
+
+                if (!empty($vendor['business_name'])) {
+                    $businessName = $vendor['business_name'];
+                }
+
+                if (!empty($vendor['business_logo'])) {
+                    $vendorLogo = $vendor['business_logo'];
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Store vendor information in session
+                |--------------------------------------------------------------------------
+                */
+                $_SESSION['vendor_name'] = $vendorName;
+                $_SESSION['business_name'] = $businessName;
+
+                if (!empty($vendor['approval_status'])) {
+                    $_SESSION['vendor_approval_status'] = $vendor['approval_status'];
+                }
+            }
+
+            mysqli_stmt_close($stmt);
+        }
+    }
+}
 
 /*
 |--------------------------------------------------------------------------
-| ACTIVE LINK
+| Current page
 |--------------------------------------------------------------------------
 */
+$currentPage = basename($_SERVER['PHP_SELF']);
 
-function vendorSidebarActive(
-    string $page
-): string {
-
+/*
+|--------------------------------------------------------------------------
+| Sidebar link helper
+|--------------------------------------------------------------------------
+*/
+function vendorSidebarActive($page)
+{
     global $currentPage;
 
-    return $currentPage === $page
-        ? 'active'
-        : '';
+    return $currentPage === $page ? 'active' : '';
 }
-
 
 /*
 |--------------------------------------------------------------------------
-| VENDOR INFORMATION
+| Vendor logo
 |--------------------------------------------------------------------------
 */
+$logoPath = '';
 
-$vendor = null;
+if (!empty($vendorLogo)) {
 
-if (
-    function_exists('getCurrentVendor')
-) {
-
-    $vendor =
-        getCurrentVendor();
+    if (
+        strpos($vendorLogo, 'uploads/') === 0 ||
+        strpos($vendorLogo, 'uploads\\') === 0
+    ) {
+        $logoPath = '../' . str_replace('\\', '/', $vendorLogo);
+    } else {
+        $logoPath = '../uploads/vendors/' . basename($vendorLogo);
+    }
 }
-
-$businessName =
-    $vendor['business_name']
-    ?? 'My Store';
-
-$businessLogo =
-    $vendor['business_logo']
-    ?? '';
-
-$approvalStatus =
-    $vendor['approval_status']
-    ?? 'Pending';
-
 ?>
 
 <!-- =========================================================
      VENDOR SIDEBAR
 ========================================================= -->
 
-<aside
-    class="dashboard-sidebar vendor-sidebar"
-    id="vendorSidebar"
->
+<aside class="vendor-sidebar" id="vendorSidebar">
+
+    <!-- Sidebar Header -->
+    <div class="vendor-sidebar-header">
+
+        <div class="vendor-brand">
+
+            <div class="vendor-brand-icon">
+                <i class="fas fa-store"></i>
+            </div>
+
+            <div class="vendor-brand-text">
+                <h2>HOCHIPO<span>HUB</span></h2>
+                <small>Vendor Panel</small>
+            </div>
+
+        </div>
+
+        <button
+            type="button"
+            class="vendor-sidebar-close"
+            id="vendorSidebarClose"
+            aria-label="Close sidebar"
+        >
+            <i class="fas fa-times"></i>
+        </button>
+
+    </div>
 
 
     <!-- =====================================================
          VENDOR PROFILE
     ====================================================== -->
 
-    <div class="sidebar-profile vendor-profile">
+    <div class="vendor-profile">
 
-        <div class="sidebar-avatar vendor-avatar">
+        <div class="vendor-profile-image">
 
-            <?php if (
-                !empty($businessLogo)
-            ): ?>
+            <?php if (!empty($logoPath)): ?>
 
                 <img
-                    src="<?php echo BASE_URL; ?>image/vendors/<?php echo htmlspecialchars(
-                        $businessLogo,
-                        ENT_QUOTES,
-                        'UTF-8'
-                    ); ?>"
-                    alt="<?php echo htmlspecialchars(
-                        $businessName,
-                        ENT_QUOTES,
-                        'UTF-8'
-                    ); ?>"
+                    src="<?php echo htmlspecialchars($logoPath); ?>"
+                    alt="Business Logo"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                 >
+
+                <div
+                    class="vendor-default-avatar"
+                    style="display:none;"
+                >
+                    <i class="fas fa-store"></i>
+                </div>
 
             <?php else: ?>
 
-                <span>
-
-                    <?php
-
-                    echo strtoupper(
-                        substr(
-                            $businessName,
-                            0,
-                            1
-                        )
-                    );
-
-                    ?>
-
-                </span>
+                <div class="vendor-default-avatar">
+                    <i class="fas fa-store"></i>
+                </div>
 
             <?php endif; ?>
 
         </div>
 
 
-        <div class="sidebar-profile-info">
+        <div class="vendor-profile-info">
 
             <strong>
-
-                <?php
-
-                echo htmlspecialchars(
-                    $businessName,
-                    ENT_QUOTES,
-                    'UTF-8'
-                );
-
-                ?>
-
+                <?php echo htmlspecialchars($businessName); ?>
             </strong>
 
-
-            <small>
-
-                Vendor Account
-
-            </small>
+            <span>
+                <?php echo htmlspecialchars($vendorName); ?>
+            </span>
 
         </div>
-
-    </div>
-
-
-    <!-- =====================================================
-         APPROVAL STATUS
-    ====================================================== -->
-
-    <div
-        class="vendor-status-badge
-        <?php
-
-        echo strtolower(
-            $approvalStatus
-        );
-
-        ?>"
-    >
-
-        <?php
-
-        if (
-            $approvalStatus === 'Approved'
-        ) {
-
-            echo '<i class="fa-solid fa-circle-check"></i>';
-
-        } elseif (
-            $approvalStatus === 'Rejected'
-        ) {
-
-            echo '<i class="fa-solid fa-circle-xmark"></i>';
-
-        } elseif (
-            $approvalStatus === 'Suspended'
-        ) {
-
-            echo '<i class="fa-solid fa-ban"></i>';
-
-        } else {
-
-            echo '<i class="fa-solid fa-clock"></i>';
-
-        }
-
-        ?>
-
-
-        <span>
-
-            <?php
-
-            echo htmlspecialchars(
-                $approvalStatus,
-                ENT_QUOTES,
-                'UTF-8'
-            );
-
-            ?>
-
-        </span>
 
     </div>
 
@@ -231,458 +222,313 @@ $approvalStatus =
          NAVIGATION
     ====================================================== -->
 
-    <nav
-        class="sidebar-navigation"
-        aria-label="Vendor Navigation"
-    >
+    <nav class="vendor-navigation">
 
-
-        <div class="sidebar-section-title">
-
-            <span>
-                SELLER CENTER
-            </span>
-
+        <div class="vendor-nav-title">
+            <span>MAIN MENU</span>
         </div>
 
 
-        <!-- DASHBOARD -->
-
+        <!-- Dashboard -->
         <a
-            href="<?php echo BASE_URL; ?>seller/dashboard.php"
-            class="sidebar-link <?php echo vendorSidebarActive('dashboard.php'); ?>"
+            href="dashboard.php"
+            class="vendor-nav-link <?php echo vendorSidebarActive('dashboard.php'); ?>"
         >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-chart-line"></i>
-
+            <span class="vendor-nav-icon">
+                <i class="fas fa-chart-line"></i>
             </span>
 
-
-            <span class="sidebar-link-text">
+            <span class="vendor-nav-text">
                 Dashboard
             </span>
-
         </a>
 
 
-        <!-- PRODUCTS -->
-
+        <!-- Products -->
         <a
-            href="<?php echo BASE_URL; ?>seller/products.php"
-            class="sidebar-link <?php echo vendorSidebarActive('products.php'); ?>"
+            href="products.php"
+            class="vendor-nav-link <?php echo vendorSidebarActive('products.php'); ?>"
         >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-boxes-stacked"></i>
-
+            <span class="vendor-nav-icon">
+                <i class="fas fa-box"></i>
             </span>
 
-
-            <span class="sidebar-link-text">
+            <span class="vendor-nav-text">
                 My Products
             </span>
-
         </a>
 
 
-        <!-- ADD PRODUCT -->
-
+        <!-- Add Product -->
         <a
-            href="<?php echo BASE_URL; ?>seller/add_product.php"
-            class="sidebar-link <?php echo vendorSidebarActive('add_product.php'); ?>"
+            href="add_product.php"
+            class="vendor-nav-link <?php echo vendorSidebarActive('add_product.php'); ?>"
         >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-circle-plus"></i>
-
+            <span class="vendor-nav-icon">
+                <i class="fas fa-plus-circle"></i>
             </span>
 
-
-            <span class="sidebar-link-text">
+            <span class="vendor-nav-text">
                 Add Product
             </span>
-
         </a>
 
 
-        <!-- INVENTORY -->
-
+        <!-- Orders -->
         <a
-            href="<?php echo BASE_URL; ?>inventory.php"
-            class="sidebar-link <?php echo vendorSidebarActive('inventory.php'); ?>"
+            href="orders.php"
+            class="vendor-nav-link <?php echo vendorSidebarActive('orders.php'); ?>"
         >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-warehouse"></i>
-
+            <span class="vendor-nav-icon">
+                <i class="fas fa-shopping-bag"></i>
             </span>
 
-
-            <span class="sidebar-link-text">
-                Inventory
-            </span>
-
-        </a>
-
-
-        <div class="sidebar-section-title">
-
-            <span>
-                SALES
-            </span>
-
-        </div>
-
-
-        <!-- ORDERS -->
-
-        <a
-            href="<?php echo BASE_URL; ?>seller/orders.php"
-            class="sidebar-link <?php echo vendorSidebarActive('orders.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-receipt"></i>
-
-            </span>
-
-
-            <span class="sidebar-link-text">
+            <span class="vendor-nav-text">
                 Orders
             </span>
-
         </a>
 
 
-        <!-- SALES -->
-
+        <!-- Sales -->
         <a
-            href="<?php echo BASE_URL; ?>seller/sales.php"
-            class="sidebar-link <?php echo vendorSidebarActive('sales.php'); ?>"
+            href="sales.php"
+            class="vendor-nav-link <?php echo vendorSidebarActive('sales.php'); ?>"
         >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-chart-column"></i>
-
+            <span class="vendor-nav-icon">
+                <i class="fas fa-chart-bar"></i>
             </span>
 
-
-            <span class="sidebar-link-text">
+            <span class="vendor-nav-text">
                 Sales
             </span>
-
         </a>
 
 
-        <!-- COMMISSION -->
+        <!-- =================================================
+             MANAGEMENT
+        ================================================== -->
 
-        <a
-            href="<?php echo BASE_URL; ?>commission.php"
-            class="sidebar-link <?php echo vendorSidebarActive('commission.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-percent"></i>
-
-            </span>
-
-
-            <span class="sidebar-link-text">
-                Commission
-            </span>
-
-        </a>
-
-
-        <div class="sidebar-section-title">
-
-            <span>
-                STORE
-            </span>
-
+        <div class="vendor-nav-title">
+            <span>MANAGEMENT</span>
         </div>
 
 
-        <!-- STORE PROFILE -->
-
+        <!-- Inventory -->
         <a
-            href="<?php echo BASE_URL; ?>seller/setup_profile.php"
-            class="sidebar-link"
+            href="../inventory.php"
+            class="vendor-nav-link <?php echo vendorSidebarActive('inventory.php'); ?>"
         >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-store"></i>
-
+            <span class="vendor-nav-icon">
+                <i class="fas fa-warehouse"></i>
             </span>
 
+            <span class="vendor-nav-text">
+                Inventory
+            </span>
+        </a>
 
-            <span class="sidebar-link-text">
+
+        <!-- Commission -->
+        <a
+            href="../commission.php"
+            class="vendor-nav-link <?php echo vendorSidebarActive('commission.php'); ?>"
+        >
+            <span class="vendor-nav-icon">
+                <i class="fas fa-coins"></i>
+            </span>
+
+            <span class="vendor-nav-text">
+                Commission
+            </span>
+        </a>
+
+
+        <!-- Setup Profile -->
+        <a
+            href="setup_profile.php"
+            class="vendor-nav-link <?php echo vendorSidebarActive('setup_profile.php'); ?>"
+        >
+            <span class="vendor-nav-icon">
+                <i class="fas fa-store-alt"></i>
+            </span>
+
+            <span class="vendor-nav-text">
                 Store Profile
             </span>
-
         </a>
 
 
-        <!-- PUBLIC STORE -->
+        <!-- Divider -->
+        <div class="vendor-nav-divider"></div>
 
+
+        <!-- View Marketplace -->
         <a
-            href="<?php echo BASE_URL; ?>vendor.php"
-            class="sidebar-link"
+            href="../catalog.php"
+            class="vendor-nav-link"
         >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-eye"></i>
-
+            <span class="vendor-nav-icon">
+                <i class="fas fa-shopping-cart"></i>
             </span>
 
-
-            <span class="sidebar-link-text">
+            <span class="vendor-nav-text">
                 View Marketplace
             </span>
-
         </a>
 
 
-        <!-- PROFILE -->
-
+        <!-- Main Dashboard -->
         <a
-            href="<?php echo BASE_URL; ?>profile.php"
-            class="sidebar-link <?php echo vendorSidebarActive('profile.php'); ?>"
+            href="../dashboard.php"
+            class="vendor-nav-link"
         >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-user"></i>
-
+            <span class="vendor-nav-icon">
+                <i class="fas fa-home"></i>
             </span>
 
-
-            <span class="sidebar-link-text">
-                Account Profile
+            <span class="vendor-nav-text">
+                Customer Dashboard
             </span>
-
         </a>
 
     </nav>
 
 
     <!-- =====================================================
-         QUICK ACTION
+         SIDEBAR FOOTER
     ====================================================== -->
 
-    <div class="sidebar-promo vendor-promo">
-
-        <div class="sidebar-promo-icon">
-
-            <i class="fa-solid fa-plus"></i>
-
-        </div>
-
-
-        <div class="sidebar-promo-content">
-
-            <strong>
-                Grow Your Store
-            </strong>
-
-            <p>
-                Add products and reach more customers.
-            </p>
-
-
-            <a
-                href="<?php echo BASE_URL; ?>seller/add_product.php"
-            >
-
-                Add Product
-
-                <i class="fa-solid fa-arrow-right"></i>
-
-            </a>
-
-        </div>
-
-    </div>
-
-
-    <!-- =====================================================
-         LOGOUT
-    ====================================================== -->
-
-    <div class="sidebar-bottom">
+    <div class="vendor-sidebar-footer">
 
         <a
-            href="<?php echo BASE_URL; ?>auth/logout.php"
-            class="sidebar-link sidebar-logout"
+            href="../profile.php"
+            class="vendor-footer-link"
         >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-right-from-bracket"></i>
-
-            </span>
+            <i class="fas fa-user-circle"></i>
+            <span>My Profile</span>
+        </a>
 
 
-            <span class="sidebar-link-text">
-                Logout
-            </span>
-
+        <a
+            href="../auth/logout.php"
+            class="vendor-footer-link logout"
+            onclick="return confirm('Are you sure you want to logout?');"
+        >
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Logout</span>
         </a>
 
     </div>
 
 </aside>
 
-</h2>
 
+<!-- =========================================================
+     MOBILE OVERLAY
+========================================================= -->
 
-</div>
+<div
+    class="vendor-sidebar-overlay"
+    id="vendorSidebarOverlay"
+></div>
 
 
+<!-- =========================================================
+     SIDEBAR JAVASCRIPT
+========================================================= -->
 
+<script>
+document.addEventListener('DOMContentLoaded', function () {
 
+    const sidebar = document.getElementById('vendorSidebar');
+    const closeButton = document.getElementById('vendorSidebarClose');
+    const overlay = document.getElementById('vendorSidebarOverlay');
 
-<ul>
+    /*
+    |--------------------------------------------------------------------------
+    | Open sidebar
+    |--------------------------------------------------------------------------
+    */
+    const openSidebar = function () {
 
+        if (sidebar) {
+            sidebar.classList.add('open');
+        }
 
+        if (overlay) {
+            overlay.classList.add('show');
+        }
 
-<li>
+        document.body.classList.add('vendor-sidebar-open');
+    };
 
-<a href="<?= BASE_URL; ?>seller/dashboard.php">
 
+    /*
+    |--------------------------------------------------------------------------
+    | Close sidebar
+    |--------------------------------------------------------------------------
+    */
+    const closeSidebar = function () {
 
-<i class="fa-solid fa-store"></i>
+        if (sidebar) {
+            sidebar.classList.remove('open');
+        }
 
+        if (overlay) {
+            overlay.classList.remove('show');
+        }
 
-Dashboard
+        document.body.classList.remove('vendor-sidebar-open');
+    };
 
 
-</a>
+    /*
+    |--------------------------------------------------------------------------
+    | Close button
+    |--------------------------------------------------------------------------
+    */
+    if (closeButton) {
 
+        closeButton.addEventListener(
+            'click',
+            closeSidebar
+        );
 
-</li>
+    }
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | Overlay
+    |--------------------------------------------------------------------------
+    */
+    if (overlay) {
 
+        overlay.addEventListener(
+            'click',
+            closeSidebar
+        );
 
+    }
 
 
-<li>
+    /*
+    |--------------------------------------------------------------------------
+    | Existing toggle button
+    |--------------------------------------------------------------------------
+    */
+    const toggleButtons = document.querySelectorAll(
+        '[data-vendor-sidebar-toggle]'
+    );
 
-<a href="<?= BASE_URL; ?>seller/products.php">
+    toggleButtons.forEach(function (button) {
 
+        button.addEventListener(
+            'click',
+            openSidebar
+        );
 
-<i class="fa-solid fa-box"></i>
+    });
 
-
-Products
-
-
-</a>
-
-
-</li>
-
-
-
-
-
-
-<li>
-
-<a href="<?= BASE_URL; ?>seller/add_product.php">
-
-
-<i class="fa-solid fa-plus"></i>
-
-
-Add Product
-
-
-</a>
-
-
-</li>
-
-
-
-
-
-
-<li>
-
-<a href="<?= BASE_URL; ?>inventory.php">
-
-
-<i class="fa-solid fa-warehouse"></i>
-
-
-Inventory
-
-
-</a>
-
-
-</li>
-
-
-
-
-
-
-<li>
-
-<a href="<?= BASE_URL; ?>commission.php">
-
-
-<i class="fa-solid fa-money-bill"></i>
-
-
-Commission
-
-
-</a>
-
-
-</li>
-
-
-
-
-
-
-<li>
-
-<a href="<?= BASE_URL; ?>seller/orders.php">
-
-
-<i class="fa-solid fa-cart-shopping"></i>
-
-
-Orders
-
-
-</a>
-
-
-</li>
-
-
-
-
-
-</ul>
-
-
-
-</aside>
+});
+</script>
