@@ -1,54 +1,137 @@
 <?php
-
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB - SESSION & AUTHENTICATION
+| HOCHIPOHUB SESSION MANAGEMENT
 |--------------------------------------------------------------------------
 | File:
-| includes/session.php
+|     includes/session.php
 |
 | Purpose:
-| Central session management, authentication,
-| role checking, flash messages and OTP/reset state.
+| - Start secure PHP session
+| - Store login information
+| - Check authentication
+| - Check user roles
+| - Provide helper functions
 |--------------------------------------------------------------------------
 */
 
-require_once dirname(__DIR__) . '/config.php';
-
 
 /*
 |--------------------------------------------------------------------------
-| START SESSION
+| Start Session
 |--------------------------------------------------------------------------
 */
 
 if (session_status() === PHP_SESSION_NONE) {
 
-    session_name(SESSION_NAME);
+    /*
+    |--------------------------------------------------------------------------
+    | Session Cookie Settings
+    |--------------------------------------------------------------------------
+    */
+
+    $secure = (
+        isset($_SERVER['HTTPS']) &&
+        $_SERVER['HTTPS'] !== 'off'
+    );
+
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $secure,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
 
     session_start();
+
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN CHECK
+| Session Timeout
+|--------------------------------------------------------------------------
+|
+| Automatically log out inactive users after 2 hours.
+|
+*/
+
+$sessionTimeout = 7200;
+
+if (
+    isset($_SESSION['last_activity']) &&
+    (time() - $_SESSION['last_activity']) > $sessionTimeout
+) {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Destroy Expired Session
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION = [];
+
+    if (ini_get("session.use_cookies")) {
+
+        $params = session_get_cookie_params();
+
+        setcookie(
+            session_name(),
+            '',
+            time() - 42000,
+            $params["path"],
+            $params["domain"] ?? '',
+            $params["secure"],
+            $params["httponly"]
+        );
+
+    }
+
+    session_destroy();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Start New Session
+    |--------------------------------------------------------------------------
+    */
+
+    session_start();
+
+}
+
+$_SESSION['last_activity'] = time();
+
+
+/*
+|--------------------------------------------------------------------------
+| Authentication Functions
 |--------------------------------------------------------------------------
 */
 
-function isLoggedIn(): bool
+
+/**
+ * Check whether user is logged in.
+ *
+ * @return bool
+ */
+
+function isLoggedIn()
 {
-    return !empty($_SESSION['user_id']);
+    return (
+        isset($_SESSION['user_id']) &&
+        !empty($_SESSION['user_id'])
+    );
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| CURRENT USER ID
-|--------------------------------------------------------------------------
-*/
+/**
+ * Get current user ID.
+ *
+ * @return int|null
+ */
 
-function currentUserId(): ?int
+function getUserId()
 {
     if (!isLoggedIn()) {
         return null;
@@ -58,130 +141,424 @@ function currentUserId(): ?int
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| CURRENT USER NAME
-|--------------------------------------------------------------------------
-*/
+/**
+ * Get current user's name.
+ *
+ * @return string
+ */
 
-function currentUserName(): string
+function getUserName()
 {
-    return $_SESSION['name'] ?? '';
+    return $_SESSION['user_name'] ?? '';
+}
+
+
+/**
+ * Get current user's email.
+ *
+ * @return string
+ */
+
+function getUserEmail()
+{
+    return $_SESSION['user_email'] ?? '';
+}
+
+
+/**
+ * Get current user's role.
+ *
+ * @return string
+ */
+
+function getUserRole()
+{
+    return $_SESSION['user_role'] ?? '';
+}
+
+
+/**
+ * Get current user's status.
+ *
+ * @return string
+ */
+
+function getUserStatus()
+{
+    return $_SESSION['user_status'] ?? '';
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CURRENT USER EMAIL
+| Role Checking
 |--------------------------------------------------------------------------
 */
 
-function currentUserEmail(): string
+
+/**
+ * Check whether current user is admin.
+ *
+ * @return bool
+ */
+
+function isAdmin()
 {
-    return $_SESSION['email'] ?? '';
+    return (
+        isLoggedIn() &&
+        getUserRole() === 'admin'
+    );
+}
+
+
+/**
+ * Check whether current user is vendor.
+ *
+ * @return bool
+ */
+
+function isVendor()
+{
+    return (
+        isLoggedIn() &&
+        getUserRole() === 'vendor'
+    );
+}
+
+
+/**
+ * Check whether current user is customer.
+ *
+ * @return bool
+ */
+
+function isCustomer()
+{
+    return (
+        isLoggedIn() &&
+        getUserRole() === 'customer'
+    );
+}
+
+
+/**
+ * Check specific role.
+ *
+ * @param string $role
+ * @return bool
+ */
+
+function hasRole($role)
+{
+    return (
+        isLoggedIn() &&
+        getUserRole() === $role
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CURRENT USER PHONE
+| Authentication Protection
 |--------------------------------------------------------------------------
 */
 
-function currentUserPhone(): string
+
+/**
+ * Require login.
+ *
+ * Redirect user to index page if not logged in.
+ */
+
+function requireLogin()
 {
-    return $_SESSION['phone'] ?? '';
+    if (!isLoggedIn()) {
+
+        $_SESSION['login_required'] = true;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Save Requested Page
+        |--------------------------------------------------------------------------
+        */
+
+        $_SESSION['redirect_after_login'] =
+            $_SERVER['REQUEST_URI'] ?? 'index.php';
+
+        header("Location: index.php");
+
+        exit;
+
+    }
+}
+
+
+/**
+ * Require admin account.
+ */
+
+function requireAdmin()
+{
+    requireLogin();
+
+    if (!isAdmin()) {
+
+        header("Location: ../index.php");
+
+        exit;
+
+    }
+
+}
+
+
+/**
+ * Require vendor account.
+ */
+
+function requireVendor()
+{
+    requireLogin();
+
+    if (!isVendor()) {
+
+        header("Location: ../index.php");
+
+        exit;
+
+    }
+
+}
+
+
+/**
+ * Require customer account.
+ */
+
+function requireCustomer()
+{
+    requireLogin();
+
+    if (!isCustomer()) {
+
+        header("Location: index.php");
+
+        exit;
+
+    }
+
+}
+
+
+/**
+ * Require one of several roles.
+ *
+ * Example:
+ *
+ * requireRole(['admin', 'vendor']);
+ *
+ */
+
+function requireRole($roles)
+{
+    requireLogin();
+
+    if (!is_array($roles)) {
+        $roles = [$roles];
+    }
+
+    if (!in_array(getUserRole(), $roles, true)) {
+
+        header("Location: index.php");
+
+        exit;
+
+    }
+
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CURRENT USER ROLE
+| Login Session
 |--------------------------------------------------------------------------
 */
 
-function currentUserRole(): ?string
+
+/**
+ * Create login session.
+ *
+ * This function should be called after the password
+ * has already been verified in auth/login_process.php.
+ *
+ * @param array $user
+ */
+
+function createLoginSession($user)
 {
-    return $_SESSION['role'] ?? null;
-}
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validate User ID
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        !isset($user['user_id']) ||
+        empty($user['user_id'])
+    ) {
+
+        return false;
+
+    }
 
 
-/*
-|--------------------------------------------------------------------------
-| CURRENT USER PROFILE IMAGE
-|--------------------------------------------------------------------------
-*/
+    /*
+    |--------------------------------------------------------------------------
+    | Regenerate Session ID
+    |--------------------------------------------------------------------------
+    */
 
-function currentUserProfileImage(): string
-{
-    return $_SESSION['profile_image'] ?? '';
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| LOGIN USER
-|--------------------------------------------------------------------------
-|
-| Expected user array:
-|
-| user_id
-| name
-| email
-| phone
-| role
-| profile_image
-|
-|--------------------------------------------------------------------------
-*/
-
-function loginUser(array $user): void
-{
     session_regenerate_id(true);
 
-    $_SESSION['user_id'] =
-        (int) ($user['user_id'] ?? 0);
 
-    $_SESSION['name'] =
+    /*
+    |--------------------------------------------------------------------------
+    | Store User Information
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION['user_id'] =
+        (int) $user['user_id'];
+
+    $_SESSION['user_name'] =
         $user['name'] ?? '';
 
-    $_SESSION['email'] =
+    $_SESSION['user_email'] =
         $user['email'] ?? '';
 
-    $_SESSION['phone'] =
-        $user['phone'] ?? '';
-
-    $_SESSION['role'] =
+    $_SESSION['user_role'] =
         $user['role'] ?? 'customer';
 
-    $_SESSION['profile_image'] =
-        $user['profile_image'] ?? '';
+    $_SESSION['user_status'] =
+        $user['status'] ?? 'active';
 
-    $_SESSION['logged_in'] =
-        true;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Login Time
+    |--------------------------------------------------------------------------
+    */
 
     $_SESSION['login_time'] =
         time();
 
     $_SESSION['last_activity'] =
         time();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MFA
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION['mfa_enabled'] =
+        !empty($user['mfa_enabled']);
+
+    $_SESSION['mfa_verified'] =
+        false;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Login State
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION['logged_in'] = true;
+
+
+    return true;
+
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| LOGOUT USER
+| MFA Session
 |--------------------------------------------------------------------------
 */
 
-function logoutUser(): void
+
+/**
+ * Mark MFA as verified.
+ */
+
+function markMfaVerified()
 {
+    $_SESSION['mfa_verified'] = true;
+}
+
+
+/**
+ * Check MFA status.
+ *
+ * @return bool
+ */
+
+function isMfaVerified()
+{
+    return (
+        !empty($_SESSION['mfa_verified'])
+    );
+}
+
+
+/**
+ * Check whether MFA is required.
+ */
+
+function requiresMfa()
+{
+    return (
+        isLoggedIn() &&
+        !empty($_SESSION['mfa_enabled']) &&
+        !isMfaVerified()
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Logout
+|--------------------------------------------------------------------------
+*/
+
+
+/**
+ * Destroy current login session.
+ */
+
+function logoutUser()
+{
+
+    /*
+    |--------------------------------------------------------------------------
+    | Clear Session Data
+    |--------------------------------------------------------------------------
+    */
+
     $_SESSION = [];
 
 
-    if (
-        ini_get('session.use_cookies')
-    ) {
+    /*
+    |--------------------------------------------------------------------------
+    | Remove Session Cookie
+    |--------------------------------------------------------------------------
+    */
+
+    if (ini_get("session.use_cookies")) {
 
         $params =
             session_get_cookie_params();
@@ -190,411 +567,274 @@ function logoutUser(): void
             session_name(),
             '',
             time() - 42000,
-            $params['path'],
-            $params['domain'],
-            $params['secure'],
-            $params['httponly']
+            $params["path"],
+            $params["domain"] ?? '',
+            $params["secure"],
+            $params["httponly"]
         );
+
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Destroy Session
+    |--------------------------------------------------------------------------
+    */
 
     session_destroy();
+
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| REQUIRE LOGIN
+| Flash Messages
 |--------------------------------------------------------------------------
 */
 
-function requireLogin(): void
-{
-    if (!isLoggedIn()) {
 
-        setFlashMessage(
-            'warning',
-            'Please login to continue.'
-        );
-
-        redirect(
-            BASE_URL . 'index.php'
-        );
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRE GUEST
-|--------------------------------------------------------------------------
-*/
-
-function requireGuest(): void
-{
-    if (isLoggedIn()) {
-
-        redirect(
-            BASE_URL . 'dashboard.php'
-        );
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRE ROLE
-|--------------------------------------------------------------------------
-*/
-
-function requireRole(
-    string|array $roles
-): void {
-
-    requireLogin();
-
-    $allowedRoles =
-        is_array($roles)
-        ? $roles
-        : [$roles];
-
-    $currentRole =
-        currentUserRole();
-
-    if (
-        !in_array(
-            $currentRole,
-            $allowedRoles,
-            true
-        )
-    ) {
-
-        setFlashMessage(
-            'error',
-            'You do not have permission to access this page.'
-        );
-
-        redirect(
-            BASE_URL . 'dashboard.php'
-        );
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRE CUSTOMER
-|--------------------------------------------------------------------------
-*/
-
-function requireCustomer(): void
-{
-    requireRole('customer');
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRE VENDOR
-|--------------------------------------------------------------------------
-*/
-
-function requireVendor(): void
-{
-    requireRole('vendor');
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRE ADMIN
-|--------------------------------------------------------------------------
-*/
-
-function requireAdmin(): void
-{
-    requireRole('admin');
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| ROLE HELPERS
-|--------------------------------------------------------------------------
-*/
-
-function isCustomer(): bool
-{
-    return (
-        isLoggedIn()
-        &&
-        currentUserRole() === 'customer'
-    );
-}
-
-
-function isVendor(): bool
-{
-    return (
-        isLoggedIn()
-        &&
-        currentUserRole() === 'vendor'
-    );
-}
-
-
-function isAdmin(): bool
-{
-    return (
-        isLoggedIn()
-        &&
-        currentUserRole() === 'admin'
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| FLASH MESSAGE
-|--------------------------------------------------------------------------
-*/
+/**
+ * Set flash message.
+ *
+ * @param string $type
+ * @param string $message
+ */
 
 function setFlashMessage(
-    string $type,
-    string $message
-): void {
+    $type,
+    $message
+) {
 
-    $_SESSION['flash'] = [
-
-        'type' =>
-            $type,
-
-        'message' =>
-            $message
-
+    $_SESSION['flash_message'] = [
+        'type' => $type,
+        'message' => $message
     ];
+
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| GET FLASH MESSAGE
-|--------------------------------------------------------------------------
-*/
+/**
+ * Get flash message.
+ *
+ * Removes message after reading.
+ *
+ * @return array|null
+ */
 
-function getFlashMessage(): ?array
+function getFlashMessage()
 {
+
     if (
-        empty($_SESSION['flash'])
-    ) {
-
-        return null;
-    }
-
-    $flash =
-        $_SESSION['flash'];
-
-    unset(
-        $_SESSION['flash']
-    );
-
-    return $flash;
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| MFA / OTP VERIFIED
-|--------------------------------------------------------------------------
-*/
-
-function isMfaVerified(): bool
-{
-    return (
-        !empty(
-            $_SESSION['mfa_verified']
-        )
-    );
-}
-
-
-function markMfaVerified(): void
-{
-    $_SESSION['mfa_verified'] =
-        true;
-}
-
-
-function clearMfaVerification(): void
-{
-    unset(
-        $_SESSION['mfa_verified']
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| MFA PENDING USER
-|--------------------------------------------------------------------------
-*/
-
-function setMfaPendingUser(
-    int $userId
-): void {
-
-    $_SESSION[
-        'mfa_pending_user_id'
-    ] = $userId;
-}
-
-
-function getMfaPendingUser(): ?int
-{
-    if (
-        empty(
-            $_SESSION[
-                'mfa_pending_user_id'
-            ]
+        !isset(
+            $_SESSION['flash_message']
         )
     ) {
 
         return null;
+
     }
 
-    return (int) $_SESSION[
-        'mfa_pending_user_id'
-    ];
-}
+    $message =
+        $_SESSION['flash_message'];
 
-
-function clearMfaPendingUser(): void
-{
     unset(
-        $_SESSION[
-            'mfa_pending_user_id'
-        ]
+        $_SESSION['flash_message']
     );
+
+    return $message;
+
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| PASSWORD RESET USER
+| Redirect After Login
 |--------------------------------------------------------------------------
 */
 
-function setResetUser(
-    int $userId
-): void {
 
-    $_SESSION[
-        'reset_user_id'
-    ] = $userId;
-}
+/**
+ * Get stored redirect URL.
+ *
+ * @return string
+ */
 
-
-function getResetUser(): ?int
+function getLoginRedirect()
 {
+
     if (
-        empty(
-            $_SESSION[
-                'reset_user_id'
-            ]
+        isset(
+            $_SESSION['redirect_after_login']
         )
     ) {
 
-        return null;
+        $redirect =
+            $_SESSION['redirect_after_login'];
+
+        unset(
+            $_SESSION['redirect_after_login']
+        );
+
+        return $redirect;
+
     }
 
-    return (int) $_SESSION[
-        'reset_user_id'
-    ];
-}
+    /*
+    |--------------------------------------------------------------------------
+    | Default Redirect Based On Role
+    |--------------------------------------------------------------------------
+    */
 
+    if (isAdmin()) {
 
-function clearResetUser(): void
-{
-    unset(
-        $_SESSION[
-            'reset_user_id'
-        ]
-    );
+        return 'admin/dashboard.php';
+
+    }
+
+    if (isVendor()) {
+
+        return 'seller/dashboard.php';
+
+    }
+
+    return 'dashboard.php';
+
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| SESSION TIMEOUT
+| Redirect User Based On Role
 |--------------------------------------------------------------------------
 */
 
-function checkSessionTimeout(
-    int $timeout = 7200
-): void {
 
-    if (!isLoggedIn()) {
-        return;
-    }
+function redirectByRole()
+{
 
-
-    if (
-        empty(
-            $_SESSION['last_activity']
-        )
-    ) {
-
-        $_SESSION['last_activity'] =
-            time();
-
-        return;
-    }
-
-
-    if (
-        time()
-        -
-        (int) $_SESSION['last_activity']
-        >
-        $timeout
-    ) {
-
-        logoutUser();
+    if (isAdmin()) {
 
         header(
-            'Location: ' .
-            BASE_URL .
-            'index.php'
+            "Location: admin/dashboard.php"
         );
 
         exit;
+
     }
+
+    if (isVendor()) {
+
+        header(
+            "Location: seller/dashboard.php"
+        );
+
+        exit;
+
+    }
+
+    header(
+        "Location: dashboard.php"
+    );
+
+    exit;
+
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| UPDATE SESSION ACTIVITY
+| Safe Session Value
 |--------------------------------------------------------------------------
 */
 
-function updateSessionActivity(): void
+
+/**
+ * Get a session value safely.
+ *
+ * @param string $key
+ * @param mixed $default
+ * @return mixed
+ */
+
+function sessionValue(
+    $key,
+    $default = null
+) {
+
+    return $_SESSION[$key] ?? $default;
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CSRF TOKEN
+|--------------------------------------------------------------------------
+|
+| Used for forms that modify database information.
+|
+*/
+
+
+function generateCsrfToken()
 {
-    if (isLoggedIn()) {
 
-        $_SESSION['last_activity'] =
-            time();
+    if (
+        empty($_SESSION['csrf_token'])
+    ) {
+
+        $_SESSION['csrf_token'] =
+            bin2hex(
+                random_bytes(32)
+            );
+
     }
+
+    return $_SESSION['csrf_token'];
+
+}
+
+
+/**
+ * Validate CSRF token.
+ *
+ * @param string $token
+ * @return bool
+ */
+
+function validateCsrfToken($token)
+{
+
+    if (
+        empty($token) ||
+        empty($_SESSION['csrf_token'])
+    ) {
+
+        return false;
+
+    }
+
+    return hash_equals(
+        $_SESSION['csrf_token'],
+        $token
+    );
+
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| INITIAL SESSION ACTIVITY
+| Generate Token Automatically
 |--------------------------------------------------------------------------
 */
 
-if (isLoggedIn()) {
+if (
+    empty($_SESSION['csrf_token'])
+) {
 
-    updateSessionActivity();
+    generateCsrfToken();
+
 }
+
+?>

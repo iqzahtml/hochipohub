@@ -1,235 +1,133 @@
 <?php
-
 /*
-|--------------------------------------------------------------------------
-| HochipoHub - Login Modal
-|--------------------------------------------------------------------------
-*/
-
-if (!defined('BASE_URL')) {
-    require_once dirname(__DIR__) . '/config.php';
-}
-
+ * HOCHIPOHUB
+ * includes/login_modal.php
+ *
+ * Login modal
+ * Handles:
+ * - Email
+ * - Password
+ * - Remember me
+ * - Login form submission to auth/login_process.php
+ * - Link to forgot password
+ * - Link to register
+ */
 ?>
 
-<!-- =========================================================
-     LOGIN MODAL
-========================================================= -->
+<div class="login-modal-overlay" id="loginModal">
 
-<div
-    class="modal-overlay"
-    id="loginModal"
-    aria-hidden="true"
->
+    <div class="login-modal">
 
-    <div
-        class="modal-container login-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="loginModalTitle"
-    >
-
-
-        <!-- =================================================
-             CLOSE BUTTON
-        ================================================== -->
-
+        <!-- CLOSE BUTTON -->
         <button
             type="button"
-            class="modal-close"
-            data-modal-close="loginModal"
-            aria-label="Close login"
-        >
-
-            <i class="fa-solid fa-xmark"></i>
-
+            class="login-modal-close"
+            id="closeLoginModal"
+            aria-label="Close login modal">
+            &times;
         </button>
 
+        <!-- HEADER -->
+        <div class="login-modal-header">
 
-        <!-- =================================================
-             LOGIN HEADER
-        ================================================== -->
-
-        <div class="modal-header">
-
-            <div class="modal-icon">
-
-                <i class="fa-solid fa-right-to-bracket"></i>
-
+            <div class="login-modal-icon">
+                <i class="fas fa-user-circle"></i>
             </div>
 
+            <h2>Welcome Back!</h2>
 
-            <div>
-
-                <h2 id="loginModalTitle">
-                    Welcome Back!
-                </h2>
-
-                <p>
-                    Login to continue your HochipoHub journey.
-                </p>
-
-            </div>
+            <p>
+                Login to continue shopping on HochipoHub.
+            </p>
 
         </div>
 
 
-        <!-- =================================================
-             LOGIN FORM
-        ================================================== -->
-
+        <!-- LOGIN FORM -->
         <form
-            action="<?php echo BASE_URL; ?>auth/login_process.php"
+            action="auth/login_process.php"
             method="POST"
             id="loginForm"
-            class="auth-form"
-            novalidate
-        >
+            class="login-form"
+            novalidate>
 
-
-            <!-- CSRF -->
-
-            <?php if (
-                function_exists('csrfToken')
-            ): ?>
-
-                <input
-                    type="hidden"
-                    name="csrf_token"
-                    value="<?php echo htmlspecialchars(
-                        csrfToken(),
-                        ENT_QUOTES,
-                        'UTF-8'
-                    ); ?>"
-                >
-
-            <?php endif; ?>
-
-
-            <!-- =================================================
-                 EMAIL
-            ================================================== -->
-
+            <!-- EMAIL -->
             <div class="form-group">
 
-                <label
-                    for="loginEmail"
-                >
-
-                    <i class="fa-solid fa-envelope"></i>
-
+                <label for="loginEmail">
                     Email Address
-
                 </label>
-
 
                 <div class="input-wrapper">
 
-                    <i class="fa-regular fa-envelope input-icon"></i>
+                    <i class="fas fa-envelope"></i>
 
                     <input
                         type="email"
-                        id="loginEmail"
                         name="email"
+                        id="loginEmail"
                         placeholder="Enter your email"
                         autocomplete="email"
-                        required
-                    >
+                        required>
 
                 </div>
 
-
                 <small
                     class="form-error"
-                    id="loginEmailError"
-                ></small>
+                    id="loginEmailError">
+                </small>
 
             </div>
 
 
-            <!-- =================================================
-                 PASSWORD
-            ================================================== -->
-
+            <!-- PASSWORD -->
             <div class="form-group">
 
-                <div class="form-label-row">
-
-                    <label
-                        for="loginPassword"
-                    >
-
-                        <i class="fa-solid fa-lock"></i>
-
-                        Password
-
-                    </label>
-
-
-                    <a
-                        href="<?php echo BASE_URL; ?>auth/forgot_password.php"
-                        class="forgot-password-link"
-                    >
-                        Forgot password?
-                    </a>
-
-                </div>
-
+                <label for="loginPassword">
+                    Password
+                </label>
 
                 <div class="input-wrapper">
 
-                    <i class="fa-solid fa-lock input-icon"></i>
-
+                    <i class="fas fa-lock"></i>
 
                     <input
                         type="password"
-                        id="loginPassword"
                         name="password"
+                        id="loginPassword"
                         placeholder="Enter your password"
                         autocomplete="current-password"
-                        required
-                    >
-
+                        required>
 
                     <button
                         type="button"
                         class="password-toggle"
-                        data-password-toggle="loginPassword"
-                        aria-label="Show password"
-                    >
+                        id="toggleLoginPassword"
+                        aria-label="Show password">
 
-                        <i class="fa-regular fa-eye"></i>
+                        <i class="fas fa-eye"></i>
 
                     </button>
 
                 </div>
 
-
                 <small
                     class="form-error"
-                    id="loginPasswordError"
-                ></small>
+                    id="loginPasswordError">
+                </small>
 
             </div>
 
 
-            <!-- =================================================
-                 REMEMBER ME
-            ================================================== -->
+            <!-- OPTIONS -->
+            <div class="login-options">
 
-            <div class="form-options">
-
-                <label
-                    class="checkbox-label"
-                >
+                <label class="remember-me">
 
                     <input
                         type="checkbox"
                         name="remember"
-                        value="1"
-                    >
-
-                    <span class="custom-checkbox"></span>
+                        value="1">
 
                     <span>
                         Remember me
@@ -237,72 +135,454 @@ if (!defined('BASE_URL')) {
 
                 </label>
 
+
+                <a
+                    href="auth/forgot_password.php"
+                    class="forgot-password">
+
+                    Forgot Password?
+
+                </a>
+
             </div>
 
 
-            <!-- =================================================
-                 SUBMIT
-            ================================================== -->
-
+            <!-- LOGIN BUTTON -->
             <button
                 type="submit"
-                class="auth-submit-btn"
-                id="loginSubmitBtn"
-            >
+                class="login-submit-btn"
+                id="loginSubmitBtn">
 
-                <span class="btn-text">
+                <span class="login-btn-text">
                     Login
                 </span>
 
                 <span
-                    class="btn-loading"
-                    hidden
-                >
+                    class="login-btn-loading"
+                    style="display:none;">
 
-                    <i class="fa-solid fa-spinner fa-spin"></i>
-
-                    Signing in...
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Logging in...
 
                 </span>
 
             </button>
 
 
-            <!-- =================================================
-                 REGISTER LINK
-            ================================================== -->
-
-            <div class="auth-switch">
-
-                <span>
-                    Don't have an account?
-                </span>
-
-                <button
-                    type="button"
-                    class="auth-switch-btn"
-                    data-modal-open="registerModal"
-                    data-modal-close="loginModal"
-                >
-                    Create one
-                </button>
-
+            <!-- LOGIN MESSAGE -->
+            <div
+                id="loginMessage"
+                class="login-message"
+                style="display:none;">
             </div>
 
         </form>
 
 
-        <!-- =================================================
-             LOGIN STATUS
-        ================================================== -->
+        <!-- REGISTER -->
+        <div class="login-register">
 
-        <div
-            class="auth-message"
-            id="loginMessage"
-            role="alert"
-            aria-live="polite"
-        ></div>
+            <span>
+                Don't have an account?
+            </span>
+
+            <a
+                href="javascript:void(0)"
+                id="openRegisterFromLogin">
+
+                Create Account
+
+            </a>
+
+        </div>
+
+
+        <!-- SECURITY NOTICE -->
+        <div class="login-security">
+
+            <i class="fas fa-shield-alt"></i>
+
+            <span>
+                Your account information is protected.
+            </span>
+
+        </div>
 
     </div>
 
 </div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    /*
+     * LOGIN MODAL
+     */
+
+    const loginModal =
+        document.getElementById("loginModal");
+
+    const closeLoginModal =
+        document.getElementById("closeLoginModal");
+
+    const togglePassword =
+        document.getElementById("toggleLoginPassword");
+
+    const passwordInput =
+        document.getElementById("loginPassword");
+
+
+    /*
+     * OPEN LOGIN MODAL
+     */
+
+    window.openLoginModal = function () {
+
+        if (!loginModal) {
+            return;
+        }
+
+        loginModal.classList.add("active");
+
+        document.body.classList.add(
+            "modal-open"
+        );
+
+        setTimeout(function () {
+
+            const emailInput =
+                document.getElementById("loginEmail");
+
+            if (emailInput) {
+                emailInput.focus();
+            }
+
+        }, 200);
+
+    };
+
+
+    /*
+     * CLOSE LOGIN MODAL
+     */
+
+    window.closeLoginModal = function () {
+
+        if (!loginModal) {
+            return;
+        }
+
+        loginModal.classList.remove("active");
+
+        document.body.classList.remove(
+            "modal-open"
+        );
+
+    };
+
+
+    /*
+     * CLOSE BUTTON
+     */
+
+    if (closeLoginModal) {
+
+        closeLoginModal.addEventListener(
+            "click",
+            function () {
+
+                closeLoginModal();
+
+            }
+        );
+
+    }
+
+
+    /*
+     * CLICK OUTSIDE MODAL
+     */
+
+    if (loginModal) {
+
+        loginModal.addEventListener(
+            "click",
+            function (event) {
+
+                if (
+                    event.target === loginModal
+                ) {
+
+                    closeLoginModal();
+
+                }
+
+            }
+        );
+
+    }
+
+
+    /*
+     * ESCAPE KEY
+     */
+
+    document.addEventListener(
+        "keydown",
+        function (event) {
+
+            if (
+                event.key === "Escape" &&
+                loginModal &&
+                loginModal.classList.contains("active")
+            ) {
+
+                closeLoginModal();
+
+            }
+
+        }
+    );
+
+
+    /*
+     * PASSWORD TOGGLE
+     */
+
+    if (
+        togglePassword &&
+        passwordInput
+    ) {
+
+        togglePassword.addEventListener(
+            "click",
+            function () {
+
+                if (
+                    passwordInput.type ===
+                    "password"
+                ) {
+
+                    passwordInput.type =
+                        "text";
+
+                    togglePassword.innerHTML =
+                        '<i class="fas fa-eye-slash"></i>';
+
+                    togglePassword.setAttribute(
+                        "aria-label",
+                        "Hide password"
+                    );
+
+                } else {
+
+                    passwordInput.type =
+                        "password";
+
+                    togglePassword.innerHTML =
+                        '<i class="fas fa-eye"></i>';
+
+                    togglePassword.setAttribute(
+                        "aria-label",
+                        "Show password"
+                    );
+
+                }
+
+            }
+        );
+
+    }
+
+
+    /*
+     * REGISTER FROM LOGIN
+     */
+
+    const registerLink =
+        document.getElementById(
+            "openRegisterFromLogin"
+        );
+
+    if (registerLink) {
+
+        registerLink.addEventListener(
+            "click",
+            function () {
+
+                closeLoginModal();
+
+                if (
+                    typeof window.openRegisterModal ===
+                    "function"
+                ) {
+
+                    window.openRegisterModal();
+
+                }
+
+            }
+        );
+
+    }
+
+
+    /*
+     * LOGIN VALIDATION
+     */
+
+    const loginForm =
+        document.getElementById("loginForm");
+
+    if (loginForm) {
+
+        loginForm.addEventListener(
+            "submit",
+            function (event) {
+
+                const email =
+                    document.getElementById(
+                        "loginEmail"
+                    );
+
+                const password =
+                    document.getElementById(
+                        "loginPassword"
+                    );
+
+                const emailError =
+                    document.getElementById(
+                        "loginEmailError"
+                    );
+
+                const passwordError =
+                    document.getElementById(
+                        "loginPasswordError"
+                    );
+
+                let valid = true;
+
+
+                /*
+                 * CLEAR ERRORS
+                 */
+
+                emailError.textContent = "";
+                passwordError.textContent = "";
+
+                email.classList.remove(
+                    "input-error"
+                );
+
+                password.classList.remove(
+                    "input-error"
+                );
+
+
+                /*
+                 * EMAIL
+                 */
+
+                if (
+                    !email.value.trim()
+                ) {
+
+                    emailError.textContent =
+                        "Please enter your email.";
+
+                    email.classList.add(
+                        "input-error"
+                    );
+
+                    valid = false;
+
+                } else if (
+                    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                        .test(email.value.trim())
+                ) {
+
+                    emailError.textContent =
+                        "Please enter a valid email.";
+
+                    email.classList.add(
+                        "input-error"
+                    );
+
+                    valid = false;
+
+                }
+
+
+                /*
+                 * PASSWORD
+                 */
+
+                if (
+                    !password.value
+                ) {
+
+                    passwordError.textContent =
+                        "Please enter your password.";
+
+                    password.classList.add(
+                        "input-error"
+                    );
+
+                    valid = false;
+
+                }
+
+
+                /*
+                 * STOP SUBMISSION
+                 */
+
+                if (!valid) {
+
+                    event.preventDefault();
+
+                    return;
+
+                }
+
+
+                /*
+                 * LOADING STATE
+                 */
+
+                const submitButton =
+                    document.getElementById(
+                        "loginSubmitBtn"
+                    );
+
+                const buttonText =
+                    submitButton.querySelector(
+                        ".login-btn-text"
+                    );
+
+                const loadingText =
+                    submitButton.querySelector(
+                        ".login-btn-loading"
+                    );
+
+                if (buttonText) {
+                    buttonText.style.display =
+                        "none";
+                }
+
+                if (loadingText) {
+                    loadingText.style.display =
+                        "inline-flex";
+                }
+
+                submitButton.disabled =
+                    true;
+
+            }
+        );
+
+    }
+
+});
+</script>
