@@ -1,54 +1,328 @@
 <?php
 
-require_once "../config.php";
-require_once "../database/db.php";
-require_once "../includes/functions.php";
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - FORGOT PASSWORD
+|--------------------------------------------------------------------------
+| File:
+| auth/forgot_password.php
+|
+| Purpose:
+| Handle password reset request.
+|
+| Flow:
+| Forgot Password
+|      ↓
+| Enter Email
+|      ↓
+| Check User
+|      ↓
+| Generate OTP
+|      ↓
+| Store OTP temporarily
+|      ↓
+| Send OTP
+|      ↓
+| Verify OTP
+|      ↓
+| Reset Password
+|--------------------------------------------------------------------------
+*/
 
-$pageTitle = "Forgot Password";
 
-?>
+/*
+|--------------------------------------------------------------------------
+| LOAD CONFIGURATION
+|--------------------------------------------------------------------------
+*/
 
-<?php include "../includes/header.php"; ?>
+require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/includes/session.php';
+require_once dirname(__DIR__) . '/includes/functions.php';
 
-<section class="auth-page">
 
-    <div class="auth-box">
+/*
+|--------------------------------------------------------------------------
+| REQUIRE GUEST
+|--------------------------------------------------------------------------
+|
+| Logged-in users do not need password recovery.
+|
+*/
 
-        <h1>Forgot Password</h1>
+if (isLoggedIn()) {
 
-        <p>
-            Enter your registered email address to receive a reset code.
-        </p>
+    redirect(
+        BASE_URL . 'dashboard.php'
+    );
+}
 
-        <form action="send_otp.php" method="POST">
 
-            <div class="form-group">
+/*
+|--------------------------------------------------------------------------
+| HANDLE FORM SUBMISSION
+|--------------------------------------------------------------------------
+*/
 
-                <label for="email">
-                    Email
-                </label>
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+) {
 
-                <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    required
-                    autocomplete="email"
-                >
+    /*
+    |--------------------------------------------------------------------------
+    | GET EMAIL
+    |--------------------------------------------------------------------------
+    */
 
-            </div>
+    $email = trim(
+        $_POST['email']
+        ?? ''
+    );
 
-            <button
-                type="submit"
-                class="btn-primary"
-            >
-                Send OTP
-            </button>
 
-        </form>
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATE EMAIL
+    |--------------------------------------------------------------------------
+    */
 
-    </div>
+    if (
+        $email === ''
+        ||
+        !filter_var(
+            $email,
+            FILTER_VALIDATE_EMAIL
+        )
+    ) {
 
-</section>
+        $_SESSION['forgot_error'] =
+            'Please enter a valid email address.';
 
-<?php include "../includes/footer.php"; ?>
+        $_SESSION['forgot_email'] =
+            $email;
+
+        redirect(
+            BASE_URL . 'index.php?forgot=1'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DATABASE
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $db = getDB();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FIND USER
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt = $db->prepare("
+            SELECT
+                user_id,
+                name,
+                email,
+                status
+            FROM users
+            WHERE email = ?
+            LIMIT 1
+        ");
+
+        $stmt->execute([
+            $email
+        ]);
+
+        $user =
+            $stmt->fetch();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | USER NOT FOUND
+        |--------------------------------------------------------------------------
+        |
+        | We do not reveal whether an email exists.
+        | This prevents email/account enumeration.
+        |
+        */
+
+        if (!$user) {
+
+            $_SESSION['forgot_success'] =
+                'If an account exists with this email, '
+                . 'a verification code will be sent.';
+
+            redirect(
+                BASE_URL . 'index.php?forgot=1'
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK ACCOUNT STATUS
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            isset($user['status'])
+            &&
+            strtolower(
+                (string) $user['status']
+            ) !== 'active'
+        ) {
+
+            $_SESSION['forgot_error'] =
+                'This account is currently unavailable.';
+
+            redirect(
+                BASE_URL . 'index.php?forgot=1'
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | GENERATE OTP
+        |--------------------------------------------------------------------------
+        |
+        | 6-digit numeric OTP.
+        |
+        */
+
+        $otp = (string) random_int(
+            100000,
+            999999
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | OTP EXPIRY
+        |--------------------------------------------------------------------------
+        */
+
+        $otpExpiry =
+            time()
+            +
+            (
+                OTP_EXPIRY_MINUTES
+                *
+                60
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STORE RESET INFORMATION
+        |--------------------------------------------------------------------------
+        */
+
+        $_SESSION['reset_user_id'] =
+            (int) $user['user_id'];
+
+        $_SESSION['reset_email'] =
+            $user['email'];
+
+        $_SESSION['reset_name'] =
+            $user['name'];
+
+        $_SESSION['reset_otp'] =
+            password_hash(
+                $otp,
+                PASSWORD_DEFAULT
+            );
+
+        $_SESSION['reset_otp_expires'] =
+            $otpExpiry;
+
+        $_SESSION['reset_otp_attempts'] =
+            0;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CLEAR OLD RESET STATE
+        |--------------------------------------------------------------------------
+        */
+
+        unset(
+            $_SESSION['reset_verified']
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PREPARE OTP FOR EMAIL
+        |--------------------------------------------------------------------------
+        |
+        | send_otp.php will use these session values.
+        |
+        */
+
+        $_SESSION['otp_code_for_mail'] =
+            $otp;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | REDIRECT TO SEND OTP
+        |--------------------------------------------------------------------------
+        */
+
+        redirect(
+            BASE_URL . 'auth/send_otp.php'
+        );
+
+
+    } catch (
+        PDOException $e
+    ) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | DEVELOPMENT ERROR
+        |--------------------------------------------------------------------------
+        */
+
+        if (APP_DEBUG) {
+
+            $_SESSION['forgot_error'] =
+                'Database error: '
+                . $e->getMessage();
+
+        } else {
+
+            $_SESSION['forgot_error'] =
+                'Something went wrong. '
+                . 'Please try again later.';
+        }
+
+
+        redirect(
+            BASE_URL . 'index.php?forgot=1'
+        );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DIRECT ACCESS
+|--------------------------------------------------------------------------
+|
+| If user opens this PHP file directly without POST,
+| send them back to the forgot-password interface.
+|
+*/
+
+redirect(
+    BASE_URL . 'index.php?forgot=1'
+);

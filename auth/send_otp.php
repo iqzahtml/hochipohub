@@ -1,257 +1,630 @@
 <?php
 
-require_once "../config.php";
-require_once "../database/db.php";
-require_once "../includes/functions.php";
-require_once "../mail/send_mail.php";
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - SEND OTP
+|--------------------------------------------------------------------------
+| File:
+| auth/send_otp.php
+|
+| Purpose:
+| Sends OTP through PHPMailer.
+|
+| Supported OTP types:
+|
+| reset = Password Reset OTP
+| mfa   = Multi-Factor Authentication OTP
+|--------------------------------------------------------------------------
+*/
+
+require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/includes/session.php';
+require_once dirname(__DIR__) . '/includes/functions.php';
 
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+/*
+|--------------------------------------------------------------------------
+| PHPMailer
+|--------------------------------------------------------------------------
+*/
 
-    header("Location: forgot_password.php");
-    exit();
-
-}
-
-
-$email = trim($_POST['email'] ?? '');
+$autoloadPath =
+    dirname(__DIR__)
+    . '/vendor/autoload.php';
 
 
-if ($email === '') {
+if (!file_exists($autoloadPath)) {
 
-    setFlashMessage(
-        "error",
-        "Please enter your email."
+    setFlashMessageSafe(
+        'error',
+        'Mailer system is not available.'
     );
 
-    header("Location: forgot_password.php");
-    exit();
-
+    redirect(
+        BASE_URL . 'index.php'
+    );
 }
+
+
+require_once $autoloadPath;
+
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 
 /*
 |--------------------------------------------------------------------------
-| Find User
+| REQUEST TYPE
 |--------------------------------------------------------------------------
 */
 
-$stmt = $conn->prepare("
-
-    SELECT
-        user_id,
-        name,
-        email,
-        status
-
-    FROM users
-
-    WHERE email = ?
-
-    LIMIT 1
-
-");
-
-$stmt->bind_param(
-    "s",
-    $email
-);
-
-$stmt->execute();
-
-$result = $stmt->get_result();
-
-
-if ($result->num_rows === 0) {
-
-    setFlashMessage(
-        "error",
-        "No account is registered with this email."
+$type =
+    strtolower(
+        trim(
+            $_POST['type']
+            ?? $_GET['type']
+            ?? 'reset'
+        )
     );
 
-    header("Location: forgot_password.php");
-    exit();
 
-}
-
-
-$user = $result->fetch_assoc();
-
-
-if ($user['status'] === 'suspended') {
-
-    setFlashMessage(
-        "error",
-        "This account has been suspended."
-    );
-
-    header("Location: forgot_password.php");
-    exit();
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Generate 6 Digit Reset Code
-|--------------------------------------------------------------------------
-*/
-
-$resetCode = (string) random_int(
-    100000,
-    999999
-);
-
-
-$expiresAt = date(
-    'Y-m-d H:i:s',
-    time() + (PASSWORD_RESET_EXPIRY_MINUTES * 60)
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| Update Users Reset Fields
-|--------------------------------------------------------------------------
-*/
-
-$updateUser = $conn->prepare("
-
-    UPDATE users
-
-    SET
-        reset_code = ?,
-        reset_expiry = ?
-
-    WHERE user_id = ?
-
-");
-
-$updateUser->bind_param(
-    "ssi",
-    $resetCode,
-    $expiresAt,
-    $user['user_id']
-);
-
-$updateUser->execute();
-
-
-/*
-|--------------------------------------------------------------------------
-| Store Password Reset History
-|--------------------------------------------------------------------------
-*/
-
-$insertReset = $conn->prepare("
-
-    INSERT INTO password_resets
-
-    (
-        user_id,
-        reset_code,
-        expires_at
+if (
+    !in_array(
+        $type,
+        ['reset', 'mfa'],
+        true
     )
+) {
 
-    VALUES
-    (
-        ?,
-        ?,
-        ?
-    )
-
-");
-
-$insertReset->bind_param(
-    "iss",
-    $user['user_id'],
-    $resetCode,
-    $expiresAt
-);
-
-$insertReset->execute();
-
-
-/*
-|--------------------------------------------------------------------------
-| Email
-|--------------------------------------------------------------------------
-*/
-
-$message = "
-
-<div style='font-family:Arial,sans-serif;'>
-
-    <h2>HochipoHub Password Reset</h2>
-
-    <p>
-        Hello " .
-        htmlspecialchars($user['name']) .
-        ",
-    </p>
-
-    <p>
-        Your password reset OTP is:
-    </p>
-
-    <h1 style='letter-spacing:8px;'>
-        {$resetCode}
-    </h1>
-
-    <p>
-        This code expires in " .
-        PASSWORD_RESET_EXPIRY_MINUTES .
-        " minutes.
-    </p>
-
-    <p>
-        If you did not request this reset, you can ignore this email.
-    </p>
-
-</div>
-
-";
-
-
-$mailSent = sendMail(
-    $email,
-    "HochipoHub Password Reset OTP",
-    $message
-);
-
-
-if (!$mailSent) {
-
-    setFlashMessage(
-        "error",
-        "Unable to send OTP email. Please try again."
+    setFlashMessageSafe(
+        'error',
+        'Invalid OTP request.'
     );
 
-    header("Location: forgot_password.php");
-    exit();
-
+    redirect(
+        BASE_URL . 'index.php'
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Store Session
+| DATABASE
 |--------------------------------------------------------------------------
 */
 
-$_SESSION['reset_user_id'] =
-    $user['user_id'];
-
-$_SESSION['reset_email'] =
-    $user['email'];
+$pdo = getDB();
 
 
-setFlashMessage(
-    "success",
-    "OTP has been sent to your email."
-);
+/*
+|--------------------------------------------------------------------------
+| GET USER ID
+|--------------------------------------------------------------------------
+*/
+
+if ($type === 'reset') {
+
+    $userId =
+        getResetUser();
+
+} else {
+
+    $userId =
+        getMfaPendingUser();
+}
 
 
-header("Location: verify_otp.php");
+if ($userId === null) {
 
-exit();
+    setFlashMessageSafe(
+        'error',
+        'OTP session has expired. Please start the process again.'
+    );
+
+    redirect(
+        BASE_URL . 'index.php'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET USER
+|--------------------------------------------------------------------------
+*/
+
+$user =
+    getUserById(
+        $pdo,
+        $userId
+    );
+
+
+if (!$user) {
+
+    if ($type === 'reset') {
+
+        clearResetUser();
+
+    } else {
+
+        clearMfaPendingUser();
+    }
+
+
+    setFlashMessageSafe(
+        'error',
+        'User account could not be found.'
+    );
+
+    redirect(
+        BASE_URL . 'index.php'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GENERATE OTP
+|--------------------------------------------------------------------------
+*/
+
+$otp =
+    str_pad(
+        (string) random_int(
+            0,
+            999999
+        ),
+        6,
+        '0',
+        STR_PAD_LEFT
+    );
+
+
+$expiryMinutes =
+    OTP_EXPIRY_MINUTES;
+
+
+$expiryTimestamp =
+    time()
+    +
+    (
+        $expiryMinutes
+        *
+        60
+    );
+
+
+$expiryDate =
+    date(
+        'Y-m-d H:i:s',
+        $expiryTimestamp
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| STORE OTP
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    $pdo->beginTransaction();
+
+
+    if ($type === 'reset') {
+
+        /*
+        |--------------------------------------------------------------------------
+        | PASSWORD RESET
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $pdo->prepare("
+                INSERT INTO password_resets
+                (
+                    user_id,
+                    reset_code,
+                    expires_at
+                )
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?
+                )
+            ");
+
+
+        $stmt->execute([
+            $userId,
+            $otp,
+            $expiryDate
+        ]);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE CURRENT RESET CODE
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $pdo->prepare("
+                UPDATE users
+                SET
+                    reset_code = ?,
+                    reset_expiry = ?
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+
+
+        $stmt->execute([
+            $otp,
+            $expiryDate,
+            $userId
+        ]);
+
+    } else {
+
+        /*
+        |--------------------------------------------------------------------------
+        | MFA
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $pdo->prepare("
+                INSERT INTO mfa_codes
+                (
+                    user_id,
+                    code,
+                    expires_at
+                )
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?
+                )
+            ");
+
+
+        $stmt->execute([
+            $userId,
+            $otp,
+            $expiryDate
+        ]);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE CURRENT MFA CODE
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $pdo->prepare("
+                UPDATE users
+                SET
+                    mfa_code = ?,
+                    mfa_expiry = ?
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+
+
+        $stmt->execute([
+            $otp,
+            $expiryDate,
+            $userId
+        ]);
+    }
+
+
+    $pdo->commit();
+
+
+} catch (PDOException $e) {
+
+    if (
+        $pdo->inTransaction()
+    ) {
+
+        $pdo->rollBack();
+    }
+
+
+    if (APP_DEBUG) {
+
+        die(
+            'OTP database error: '
+            . e(
+                $e->getMessage()
+            )
+        );
+    }
+
+
+    setFlashMessageSafe(
+        'error',
+        'Unable to generate OTP.'
+    );
+
+    redirect(
+        BASE_URL . 'index.php'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| SEND EMAIL
+|--------------------------------------------------------------------------
+*/
+
+$mail =
+    new PHPMailer(true);
+
+
+try {
+
+    /*
+    |--------------------------------------------------------------------------
+    | SMTP
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    | Tukar settings ini ikut email SMTP kau.
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    $mail->isSMTP();
+
+    $mail->Host =
+        'smtp.gmail.com';
+
+    $mail->SMTPAuth =
+        true;
+
+    $mail->Username =
+        'YOUR_EMAIL@gmail.com';
+
+    $mail->Password =
+        'YOUR_APP_PASSWORD';
+
+    $mail->SMTPSecure =
+        PHPMailer::ENCRYPTION_STARTTLS;
+
+    $mail->Port =
+        587;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SENDER
+    |--------------------------------------------------------------------------
+    */
+
+    $mail->setFrom(
+        'YOUR_EMAIL@gmail.com',
+        APP_NAME
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RECIPIENT
+    |--------------------------------------------------------------------------
+    */
+
+    $mail->addAddress(
+        $user['email'],
+        $user['name']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | EMAIL CONTENT
+    |--------------------------------------------------------------------------
+    */
+
+    if ($type === 'reset') {
+
+        $subject =
+            'HochipoHub - Password Reset Code';
+
+        $title =
+            'Password Reset';
+
+        $description =
+            'Use the verification code below to reset your HochipoHub password.';
+
+    } else {
+
+        $subject =
+            'HochipoHub - Login Verification Code';
+
+        $title =
+            'Login Verification';
+
+        $description =
+            'Use the verification code below to complete your login.';
+    }
+
+
+    $mail->isHTML(true);
+
+    $mail->Subject =
+        $subject;
+
+
+    $mail->Body = '
+        <div style="
+            font-family:Arial,sans-serif;
+            background:#f1f5f9;
+            padding:40px;
+        ">
+
+            <div style="
+                max-width:560px;
+                margin:auto;
+                background:#ffffff;
+                border-radius:18px;
+                padding:35px;
+            ">
+
+                <h1 style="
+                    color:#2563eb;
+                    margin-bottom:5px;
+                ">
+                    HochipoHub
+                </h1>
+
+                <h2>
+                    ' . e($title) . '
+                </h2>
+
+                <p>
+                    Hi ' . e($user['name']) . ',
+                </p>
+
+                <p>
+                    ' . e($description) . '
+                </p>
+
+                <div style="
+                    margin:30px 0;
+                    padding:20px;
+                    background:#eff6ff;
+                    border-radius:12px;
+                    text-align:center;
+                ">
+
+                    <div style="
+                        font-size:13px;
+                        color:#64748b;
+                        margin-bottom:8px;
+                    ">
+                        YOUR OTP CODE
+                    </div>
+
+                    <strong style="
+                        font-size:32px;
+                        letter-spacing:8px;
+                        color:#1d4ed8;
+                    ">
+                        ' . e($otp) . '
+                    </strong>
+
+                </div>
+
+                <p>
+                    This code will expire in
+                    <strong>
+                        ' . e($expiryMinutes) . ' minutes
+                    </strong>.
+                </p>
+
+                <p style="
+                    color:#64748b;
+                    font-size:13px;
+                ">
+                    If you did not request this code,
+                    please ignore this email.
+                </p>
+
+                <hr>
+
+                <p style="
+                    color:#94a3b8;
+                    font-size:12px;
+                ">
+                    © ' . date('Y') . ' HochipoHub
+                </p>
+
+            </div>
+
+        </div>
+    ';
+
+
+    $mail->AltBody =
+        $title
+        . "\n\n"
+        . 'Your OTP code is: '
+        . $otp
+        . "\n\n"
+        . 'This code expires in '
+        . $expiryMinutes
+        . ' minutes.';
+
+
+    $mail->send();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SUCCESS
+    |--------------------------------------------------------------------------
+    */
+
+    setFlashMessageSafe(
+        'success',
+        'A verification code has been sent to your email.'
+    );
+
+
+    if ($type === 'reset') {
+
+        redirect(
+            BASE_URL
+            . 'auth/verify_otp.php?type=reset'
+        );
+
+    } else {
+
+        redirect(
+            BASE_URL
+            . 'auth/verify_otp.php?type=mfa'
+        );
+    }
+
+
+} catch (
+    Exception $e
+) {
+
+    /*
+    |--------------------------------------------------------------------------
+    | EMAIL FAILED
+    |--------------------------------------------------------------------------
+    */
+
+    if (APP_DEBUG) {
+
+        setFlashMessageSafe(
+            'error',
+            'Unable to send email: '
+            . $mail->ErrorInfo
+        );
+
+    } else {
+
+        setFlashMessageSafe(
+            'error',
+            'Unable to send verification email. Please try again.'
+        );
+    }
+
+
+    redirect(
+        BASE_URL . 'index.php'
+    );
+}

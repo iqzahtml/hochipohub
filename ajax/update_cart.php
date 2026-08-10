@@ -1,158 +1,545 @@
 <?php
 
-require_once "../config.php";
-require_once "../database/db.php";
-require_once "../includes/session.php";
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - AJAX UPDATE CART
+|--------------------------------------------------------------------------
+| File:
+| ajax/update_cart.php
+|
+| Purpose:
+| Update the quantity of an item in the customer's shopping cart.
+|--------------------------------------------------------------------------
+*/
 
 
-if (!isLoggedIn()) {
+/*
+|--------------------------------------------------------------------------
+| LOAD REQUIRED FILES
+|--------------------------------------------------------------------------
+*/
 
-    header("Location: " . BASE_URL . "index.php");
-    exit();
-
-}
-
-
-$customerID =
-    (int) currentUserID();
-
-
-$cartID =
-    (int) ($_POST['cart_id'] ?? 0);
+require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/includes/session.php';
+require_once dirname(__DIR__) . '/includes/functions.php';
+require_once dirname(__DIR__) . '/database/db.php';
 
 
-$quantity =
-    (int) ($_POST['quantity'] ?? 1);
+/*
+|--------------------------------------------------------------------------
+| JSON RESPONSE
+|--------------------------------------------------------------------------
+*/
+
+header(
+    'Content-Type: application/json; charset=UTF-8'
+);
 
 
-if ($cartID <= 0) {
+/*
+|--------------------------------------------------------------------------
+| ONLY POST REQUEST
+|--------------------------------------------------------------------------
+*/
 
-    header("Location: " . BASE_URL . "cart.php");
-    exit();
+if (
+    $_SERVER['REQUEST_METHOD']
+    !== 'POST'
+) {
 
-}
+    http_response_code(405);
 
+    echo json_encode([
 
-if ($quantity < 1) {
+        'success' => false,
 
-    $quantity = 1;
+        'message' =>
+            'Invalid request method.'
 
+    ]);
+
+    exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Check Stock
+| LOGIN CHECK
 |--------------------------------------------------------------------------
 */
 
-$check = $conn->prepare("
+if (
+    !isLoggedIn()
+) {
 
-    SELECT
-        products.stock_quantity
+    http_response_code(401);
 
-    FROM cart
+    echo json_encode([
 
-    INNER JOIN products
+        'success' => false,
 
-        ON cart.product_id =
-           products.product_id
+        'message' =>
+            'Please login to continue.'
 
-    WHERE cart.cart_id = ?
+    ]);
 
-    AND cart.customer_id = ?
-
-    LIMIT 1
-
-");
-
-$check->bind_param(
-    "ii",
-    $cartID,
-    $customerID
-);
-
-$check->execute();
-
-$result =
-    $check->get_result();
-
-
-if ($result->num_rows === 0) {
-
-    header("Location: " . BASE_URL . "cart.php");
-    exit();
-
+    exit;
 }
 
 
-$product =
-    $result->fetch_assoc();
+/*
+|--------------------------------------------------------------------------
+| CUSTOMER CHECK
+|--------------------------------------------------------------------------
+*/
 
+if (
+    !isCustomer()
+) {
 
-$stock =
-    (int)$product['stock_quantity'];
+    http_response_code(403);
 
+    echo json_encode([
 
-if ($quantity > $stock) {
+        'success' => false,
 
-    $quantity = $stock;
+        'message' =>
+            'Only customers can update the shopping cart.'
 
+    ]);
+
+    exit;
 }
 
 
-if ($quantity <= 0) {
+/*
+|--------------------------------------------------------------------------
+| CURRENT CUSTOMER
+|--------------------------------------------------------------------------
+*/
 
-    $delete = $conn->prepare("
+$customerId =
+    currentUserId();
 
-        DELETE FROM cart
 
-        WHERE cart_id = ?
+if (
+    $customerId === null
+) {
 
-        AND customer_id = ?
+    http_response_code(401);
 
-    ");
+    echo json_encode([
 
-    $delete->bind_param(
-        "ii",
-        $cartID,
-        $customerID
+        'success' => false,
+
+        'message' =>
+            'Unable to identify the current customer.'
+
+    ]);
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CART ID
+|--------------------------------------------------------------------------
+*/
+
+$cartId =
+    filter_input(
+        INPUT_POST,
+        'cart_id',
+        FILTER_VALIDATE_INT
     );
 
-    $delete->execute();
+
+/*
+|--------------------------------------------------------------------------
+| QUANTITY
+|--------------------------------------------------------------------------
+*/
+
+$quantity =
+    filter_input(
+        INPUT_POST,
+        'quantity',
+        FILTER_VALIDATE_INT
+    );
 
 
-} else {
+/*
+|--------------------------------------------------------------------------
+| VALIDATE CART ID
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $cartId === false
+    ||
+    $cartId === null
+    ||
+    $cartId <= 0
+) {
+
+    http_response_code(400);
+
+    echo json_encode([
+
+        'success' => false,
+
+        'message' =>
+            'Invalid cart item.'
+
+    ]);
+
+    exit;
+}
 
 
-    $update = $conn->prepare("
+/*
+|--------------------------------------------------------------------------
+| VALIDATE QUANTITY
+|--------------------------------------------------------------------------
+*/
 
-        UPDATE cart
+if (
+    $quantity === false
+    ||
+    $quantity === null
+    ||
+    $quantity < 1
+) {
 
-        SET quantity = ?
+    http_response_code(400);
 
-        WHERE cart_id = ?
+    echo json_encode([
 
-        AND customer_id = ?
+        'success' => false,
 
-    ");
+        'message' =>
+            'Quantity must be at least 1.'
 
-    $update->bind_param(
-        "iii",
+    ]);
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE CART
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    /*
+    |--------------------------------------------------------------------------
+    | GET CART ITEM + PRODUCT STOCK
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt =
+        $db->prepare("
+            SELECT
+
+                c.cart_id,
+                c.customer_id,
+                c.product_id,
+                c.quantity AS current_quantity,
+
+                p.product_name,
+                p.price,
+                p.stock_quantity,
+                p.status
+
+            FROM cart c
+
+            INNER JOIN products p
+                ON c.product_id = p.product_id
+
+            WHERE c.cart_id = ?
+
+            AND c.customer_id = ?
+
+            LIMIT 1
+        ");
+
+
+    $stmt->execute([
+
+        $cartId,
+
+        $customerId
+
+    ]);
+
+
+    $cartItem =
+        $stmt->fetch();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CART ITEM NOT FOUND
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        !$cartItem
+    ) {
+
+        http_response_code(404);
+
+        echo json_encode([
+
+            'success' => false,
+
+            'message' =>
+                'Cart item not found.'
+
+        ]);
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CHECK PRODUCT STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $cartItem['status']
+        !== 'Available'
+    ) {
+
+        http_response_code(400);
+
+        echo json_encode([
+
+            'success' => false,
+
+            'message' =>
+                'This product is no longer available.'
+
+        ]);
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CHECK STOCK
+    |--------------------------------------------------------------------------
+    */
+
+    $stockQuantity =
+        (int)
+        $cartItem['stock_quantity'];
+
+
+    if (
+        $stockQuantity <= 0
+    ) {
+
+        http_response_code(400);
+
+        echo json_encode([
+
+            'success' => false,
+
+            'message' =>
+                'This product is out of stock.'
+
+        ]);
+
+        exit;
+    }
+
+
+    if (
+        $quantity > $stockQuantity
+    ) {
+
+        http_response_code(400);
+
+        echo json_encode([
+
+            'success' => false,
+
+            'message' =>
+                'Only '
+                . $stockQuantity
+                . ' item(s) available in stock.',
+
+            'available_stock' =>
+                $stockQuantity
+
+        ]);
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE QUANTITY
+    |--------------------------------------------------------------------------
+    */
+
+    $updateStmt =
+        $db->prepare("
+            UPDATE cart
+
+            SET quantity = ?
+
+            WHERE cart_id = ?
+
+            AND customer_id = ?
+        ");
+
+
+    $updateStmt->execute([
+
         $quantity,
-        $cartID,
-        $customerID
-    );
 
-    $update->execute();
+        $cartId,
 
+        $customerId
+
+    ]);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATED ITEM TOTAL
+    |--------------------------------------------------------------------------
+    */
+
+    $price =
+        (float)
+        $cartItem['price'];
+
+
+    $itemTotal =
+        $price * $quantity;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATED CART COUNT
+    |--------------------------------------------------------------------------
+    */
+
+    $cartCount =
+        getCartCount(
+            $db,
+            $customerId
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATED CART TOTAL
+    |--------------------------------------------------------------------------
+    */
+
+    $cartTotal =
+        getCartTotal(
+            $db,
+            $customerId
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SUCCESS
+    |--------------------------------------------------------------------------
+    */
+
+    echo json_encode([
+
+        'success' => true,
+
+        'message' =>
+            'Cart updated successfully.',
+
+        'cart_id' =>
+            $cartId,
+
+        'product_id' =>
+            (int)
+            $cartItem['product_id'],
+
+        'quantity' =>
+            $quantity,
+
+        'price' =>
+            $price,
+
+        'item_total' =>
+            $itemTotal,
+
+        'formatted_item_total' =>
+            formatMoney(
+                $itemTotal
+            ),
+
+        'cart_count' =>
+            $cartCount,
+
+        'cart_total' =>
+            $cartTotal,
+
+        'formatted_cart_total' =>
+            formatMoney(
+                $cartTotal
+            ),
+
+        'available_stock' =>
+            $stockQuantity
+
+    ]);
+
+    exit;
+
+
+} catch (
+    PDOException $e
+) {
+
+    http_response_code(500);
+
+
+    if (
+        APP_DEBUG
+    ) {
+
+        echo json_encode([
+
+            'success' => false,
+
+            'message' =>
+                $e->getMessage()
+
+        ]);
+
+    } else {
+
+        echo json_encode([
+
+            'success' => false,
+
+            'message' =>
+                'Unable to update cart.'
+
+        ]);
+    }
+
+    exit;
 }
-
-
-header(
-    "Location: " .
-    BASE_URL .
-    "cart.php"
-);
-
-exit();
