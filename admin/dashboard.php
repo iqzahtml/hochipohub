@@ -2,16 +2,15 @@
 
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB - DASHBOARD
-|--------------------------------------------------------------------------
-| Customer / Vendor / Admin Dashboard
+| HOCHIPOHUB
+| ADMIN DASHBOARD
 |--------------------------------------------------------------------------
 */
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/database/db.php';
-require_once __DIR__ . '/includes/session.php';
-require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -25,16 +24,23 @@ if (session_status() === PHP_SESSION_NONE) {
 */
 
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ' . site_url('index.php?login=required'));
+
+    header(
+        'Location: ' .
+        site_url('index.php?login=required')
+    );
+
     exit;
 }
 
-$userId = (int) $_SESSION['user_id'];
+
+$userId =
+    (int) $_SESSION['user_id'];
 
 
 /*
 |--------------------------------------------------------------------------
-| GET CURRENT USER
+| CURRENT USER
 |--------------------------------------------------------------------------
 */
 
@@ -53,784 +59,570 @@ $stmt = $conn->prepare("
     LIMIT 1
 ");
 
-$stmt->bind_param("i", $userId);
+$stmt->bind_param(
+    "i",
+    $userId
+);
+
 $stmt->execute();
 
-$userResult = $stmt->get_result();
-$user = $userResult->fetch_assoc();
+$result =
+    $stmt->get_result();
+
+$user =
+    $result->fetch_assoc();
 
 $stmt->close();
 
-
-/*
-|--------------------------------------------------------------------------
-| USER NOT FOUND
-|--------------------------------------------------------------------------
-*/
 
 if (!$user) {
 
     session_destroy();
 
-    header('Location: ' . site_url('index.php'));
+    header(
+        'Location: ' .
+        site_url('index.php')
+    );
+
     exit;
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| ACCOUNT STATUS
-|--------------------------------------------------------------------------
-*/
+if ($user['role'] !== 'admin') {
+
+    header(
+        'Location: ' .
+        site_url('dashboard.php')
+    );
+
+    exit;
+}
+
 
 if ($user['status'] !== 'active') {
 
     session_destroy();
 
-    header('Location: ' . site_url('index.php?account=inactive'));
+    header(
+        'Location: ' .
+        site_url(
+            'index.php?account=inactive'
+        )
+    );
+
     exit;
 }
 
 
-$role = $user['role'];
-
-
 /*
 |--------------------------------------------------------------------------
-| DEFAULT DATA
+| DEFAULT STATS
 |--------------------------------------------------------------------------
 */
 
 $stats = [
 
-    // Customer
-    'orders' => 0,
-    'cart' => 0,
-    'wishlist' => 0,
-    'reviews' => 0,
-
-    // Vendor
-    'products' => 0,
-    'stock' => 0,
-    'sales' => 0,
-    'commission' => 0,
-
-    // Admin
     'users' => 0,
+
+    'customers' => 0,
+
     'vendors' => 0,
+
     'pending_vendors' => 0,
-    'pending_orders' => 0
+
+    'products' => 0,
+
+    'orders' => 0,
+
+    'pending_orders' => 0,
+
+    'sales' => 0,
+
+    'commission' => 0
+
 ];
 
 
 $recentOrders = [];
+
 $recentProducts = [];
-$recentCommissions = [];
 
-$vendor = null;
-$vendorId = 0;
+$recentVendors = [];
+
+$recentUsers = [];
 
 
 /*
 |--------------------------------------------------------------------------
-| CUSTOMER DASHBOARD
+| USERS
 |--------------------------------------------------------------------------
 */
 
-if ($role === 'customer') {
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM users
+");
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | TOTAL ORDERS
-    |--------------------------------------------------------------------------
-    */
+if ($result) {
 
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) AS total
-        FROM orders
-        WHERE customer_id = ?
-    ");
+    $stats['users'] =
+        (int)
+        (
+            $result
+                ->fetch_assoc()['total']
+            ?? 0
+        );
 
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-
-    $result = $stmt->get_result();
-
-    $stats['orders'] = (int) (
-        $result->fetch_assoc()['total'] ?? 0
-    );
-
-    $stmt->close();
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CART ITEMS
-    |--------------------------------------------------------------------------
-    */
-
-    $stmt = $conn->prepare("
-        SELECT COALESCE(SUM(quantity), 0) AS total
-        FROM cart
-        WHERE customer_id = ?
-    ");
-
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-
-    $result = $stmt->get_result();
-
-    $stats['cart'] = (int) (
-        $result->fetch_assoc()['total'] ?? 0
-    );
-
-    $stmt->close();
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | WISHLIST
-    |--------------------------------------------------------------------------
-    */
-
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) AS total
-        FROM wishlist
-        WHERE user_id = ?
-    ");
-
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-
-    $result = $stmt->get_result();
-
-    $stats['wishlist'] = (int) (
-        $result->fetch_assoc()['total'] ?? 0
-    );
-
-    $stmt->close();
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | REVIEWS
-    |--------------------------------------------------------------------------
-    */
-
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) AS total
-        FROM reviews
-        WHERE customer_id = ?
-    ");
-
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-
-    $result = $stmt->get_result();
-
-    $stats['reviews'] = (int) (
-        $result->fetch_assoc()['total'] ?? 0
-    );
-
-    $stmt->close();
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | RECENT CUSTOMER ORDERS
-    |--------------------------------------------------------------------------
-    */
-
-    $stmt = $conn->prepare("
-        SELECT
-            o.order_id,
-            o.order_date,
-            o.total_amount,
-            o.delivery_method,
-            o.order_status
-        FROM orders o
-        WHERE o.customer_id = ?
-        ORDER BY o.order_date DESC
-        LIMIT 6
-    ");
-
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-
-    $result = $stmt->get_result();
-
-    while ($row = $result->fetch_assoc()) {
-        $recentOrders[] = $row;
-    }
-
-    $stmt->close();
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VENDOR DASHBOARD
+| CUSTOMERS
 |--------------------------------------------------------------------------
 */
 
-elseif ($role === 'vendor') {
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM users
+    WHERE role = 'customer'
+");
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | GET VENDOR INFORMATION
-    |--------------------------------------------------------------------------
-    */
+if ($result) {
 
-    $stmt = $conn->prepare("
-        SELECT
-            vendor_id,
-            business_name,
-            business_logo,
-            approval_status,
-            delivery_method
-        FROM vendors
-        WHERE user_id = ?
-        LIMIT 1
-    ");
-
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-
-    $result = $stmt->get_result();
-
-    $vendor = $result->fetch_assoc();
-
-    $stmt->close();
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | VENDOR EXISTS
-    |--------------------------------------------------------------------------
-    */
-
-    if ($vendor) {
-
-        $vendorId = (int) $vendor['vendor_id'];
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | TOTAL PRODUCTS
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $conn->prepare("
-            SELECT COUNT(*) AS total
-            FROM products
-            WHERE vendor_id = ?
-        ");
-
-        $stmt->bind_param("i", $vendorId);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        $stats['products'] = (int) (
-            $result->fetch_assoc()['total'] ?? 0
+    $stats['customers'] =
+        (int)
+        (
+            $result
+                ->fetch_assoc()['total']
+            ?? 0
         );
 
-        $stmt->close();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | TOTAL STOCK
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $conn->prepare("
-            SELECT
-                COALESCE(SUM(stock_quantity), 0) AS total
-            FROM products
-            WHERE vendor_id = ?
-            AND status != 'Hidden'
-        ");
-
-        $stmt->bind_param("i", $vendorId);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        $stats['stock'] = (int) (
-            $result->fetch_assoc()['total'] ?? 0
-        );
-
-        $stmt->close();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | TOTAL SALES
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $conn->prepare("
-            SELECT
-                COALESCE(
-                    SUM(
-                        CASE
-                            WHEN vendor_status != 'Cancelled'
-                            THEN subtotal
-                            ELSE 0
-                        END
-                    ),
-                    0
-                ) AS total
-            FROM vendor_orders
-            WHERE vendor_id = ?
-        ");
-
-        $stmt->bind_param("i", $vendorId);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        $stats['sales'] = (float) (
-            $result->fetch_assoc()['total'] ?? 0
-        );
-
-        $stmt->close();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | TOTAL COMMISSION
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $conn->prepare("
-            SELECT
-                COALESCE(
-                    SUM(commission_amount),
-                    0
-                ) AS total
-            FROM commission
-            WHERE vendor_id = ?
-        ");
-
-        $stmt->bind_param("i", $vendorId);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        $stats['commission'] = (float) (
-            $result->fetch_assoc()['total'] ?? 0
-        );
-
-        $stmt->close();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | VENDOR ORDER COUNT
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $conn->prepare("
-            SELECT COUNT(*) AS total
-            FROM vendor_orders
-            WHERE vendor_id = ?
-        ");
-
-        $stmt->bind_param("i", $vendorId);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        $stats['orders'] = (int) (
-            $result->fetch_assoc()['total'] ?? 0
-        );
-
-        $stmt->close();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | RECENT VENDOR ORDERS
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $conn->prepare("
-            SELECT
-                vo.vendor_order_id,
-                vo.order_id,
-                vo.subtotal,
-                vo.delivery_fee,
-                vo.vendor_status,
-                vo.tracking_number,
-                vo.created_at,
-
-                u.name AS customer_name
-
-            FROM vendor_orders vo
-
-            INNER JOIN orders o
-                ON vo.order_id = o.order_id
-
-            INNER JOIN users u
-                ON o.customer_id = u.user_id
-
-            WHERE vo.vendor_id = ?
-
-            ORDER BY vo.created_at DESC
-
-            LIMIT 6
-        ");
-
-        $stmt->bind_param("i", $vendorId);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        while ($row = $result->fetch_assoc()) {
-            $recentOrders[] = $row;
-        }
-
-        $stmt->close();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | RECENT PRODUCTS
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $conn->prepare("
-            SELECT
-                p.product_id,
-                p.product_name,
-                p.price,
-                p.stock_quantity,
-                p.image,
-                p.status,
-
-                c.category_name
-
-            FROM products p
-
-            LEFT JOIN categories c
-                ON p.category_id = c.category_id
-
-            WHERE p.vendor_id = ?
-
-            ORDER BY p.created_at DESC
-
-            LIMIT 6
-        ");
-
-        $stmt->bind_param("i", $vendorId);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        while ($row = $result->fetch_assoc()) {
-            $recentProducts[] = $row;
-        }
-
-        $stmt->close();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | RECENT COMMISSION
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $conn->prepare("
-            SELECT
-                commission_id,
-                order_id,
-                commission_rate,
-                commission_amount,
-                status,
-                created_at
-
-            FROM commission
-
-            WHERE vendor_id = ?
-
-            ORDER BY created_at DESC
-
-            LIMIT 5
-        ");
-
-        $stmt->bind_param("i", $vendorId);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        while ($row = $result->fetch_assoc()) {
-            $recentCommissions[] = $row;
-        }
-
-        $stmt->close();
-    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| ADMIN DASHBOARD
+| APPROVED VENDORS
 |--------------------------------------------------------------------------
 */
 
-elseif ($role === 'admin') {
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM vendors
+    WHERE approval_status = 'Approved'
+");
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | TOTAL USERS
-    |--------------------------------------------------------------------------
-    */
+if ($result) {
 
-    $result = $conn->query("
-        SELECT COUNT(*) AS total
-        FROM users
-    ");
-
-    if ($result) {
-
-        $stats['users'] = (int) (
-            $result->fetch_assoc()['total'] ?? 0
+    $stats['vendors'] =
+        (int)
+        (
+            $result
+                ->fetch_assoc()['total']
+            ?? 0
         );
-    }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | APPROVED VENDORS
-    |--------------------------------------------------------------------------
-    */
-
-    $result = $conn->query("
-        SELECT COUNT(*) AS total
-        FROM vendors
-        WHERE approval_status = 'Approved'
-    ");
-
-    if ($result) {
-
-        $stats['vendors'] = (int) (
-            $result->fetch_assoc()['total'] ?? 0
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | PENDING VENDOR APPLICATIONS
-    |--------------------------------------------------------------------------
-    */
-
-    $result = $conn->query("
-        SELECT COUNT(*) AS total
-        FROM vendor_applications
-        WHERE status = 'Pending'
-    ");
-
-    if ($result) {
-
-        $stats['pending_vendors'] = (int) (
-            $result->fetch_assoc()['total'] ?? 0
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | PENDING ORDERS
-    |--------------------------------------------------------------------------
-    */
-
-    $result = $conn->query("
-        SELECT COUNT(*) AS total
-        FROM orders
-        WHERE order_status = 'Pending'
-    ");
-
-    if ($result) {
-
-        $stats['pending_orders'] = (int) (
-            $result->fetch_assoc()['total'] ?? 0
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | TOTAL PRODUCTS
-    |--------------------------------------------------------------------------
-    */
-
-    $result = $conn->query("
-        SELECT COUNT(*) AS total
-        FROM products
-    ");
-
-    if ($result) {
-
-        $stats['products'] = (int) (
-            $result->fetch_assoc()['total'] ?? 0
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | TOTAL SALES
-    |--------------------------------------------------------------------------
-    */
-
-    $result = $conn->query("
-        SELECT
-            COALESCE(
-                SUM(
-                    CASE
-                        WHEN order_status != 'Cancelled'
-                        THEN total_amount
-                        ELSE 0
-                    END
-                ),
-                0
-            ) AS total
-        FROM orders
-    ");
-
-    if ($result) {
-
-        $stats['sales'] = (float) (
-            $result->fetch_assoc()['total'] ?? 0
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | RECENT ORDERS
-    |--------------------------------------------------------------------------
-    */
-
-    $result = $conn->query("
-        SELECT
-            o.order_id,
-            o.order_date,
-            o.total_amount,
-            o.order_status,
-
-            u.name AS customer_name
-
-        FROM orders o
-
-        INNER JOIN users u
-            ON o.customer_id = u.user_id
-
-        ORDER BY o.order_date DESC
-
-        LIMIT 8
-    ");
-
-    if ($result) {
-
-        while ($row = $result->fetch_assoc()) {
-            $recentOrders[] = $row;
-        }
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | RECENT PRODUCTS
-    |--------------------------------------------------------------------------
-    */
-
-    $result = $conn->query("
-        SELECT
-            p.product_id,
-            p.product_name,
-            p.price,
-            p.stock_quantity,
-            p.status,
-
-            v.business_name
-
-        FROM products p
-
-        INNER JOIN vendors v
-            ON p.vendor_id = v.vendor_id
-
-        ORDER BY p.created_at DESC
-
-        LIMIT 6
-    ");
-
-    if ($result) {
-
-        while ($row = $result->fetch_assoc()) {
-            $recentProducts[] = $row;
-        }
-    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| HELPER FUNCTIONS
+| PENDING VENDORS
 |--------------------------------------------------------------------------
 */
 
-function dashboard_money($amount)
-{
-    return 'RM ' . number_format(
-        (float) $amount,
-        2
-    );
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM vendor_applications
+    WHERE status = 'Pending'
+");
+
+
+if ($result) {
+
+    $stats['pending_vendors'] =
+        (int)
+        (
+            $result
+                ->fetch_assoc()['total']
+            ?? 0
+        );
+
 }
 
 
-function dashboard_date($date)
-{
+/*
+|--------------------------------------------------------------------------
+| PRODUCTS
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM products
+");
+
+
+if ($result) {
+
+    $stats['products'] =
+        (int)
+        (
+            $result
+                ->fetch_assoc()['total']
+            ?? 0
+        );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ORDERS
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM orders
+");
+
+
+if ($result) {
+
+    $stats['orders'] =
+        (int)
+        (
+            $result
+                ->fetch_assoc()['total']
+            ?? 0
+        );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PENDING ORDERS
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM orders
+    WHERE order_status = 'Pending'
+");
+
+
+if ($result) {
+
+    $stats['pending_orders'] =
+        (int)
+        (
+            $result
+                ->fetch_assoc()['total']
+            ?? 0
+        );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL SALES
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT
+        COALESCE(
+            SUM(
+                CASE
+                    WHEN order_status != 'Cancelled'
+                    THEN total_amount
+                    ELSE 0
+                END
+            ),
+            0
+        ) AS total
+    FROM orders
+");
+
+
+if ($result) {
+
+    $stats['sales'] =
+        (float)
+        (
+            $result
+                ->fetch_assoc()['total']
+            ?? 0
+        );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL COMMISSION
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT
+        COALESCE(
+            SUM(
+                CASE
+                    WHEN status != 'Cancelled'
+                    THEN commission_amount
+                    ELSE 0
+                END
+            ),
+            0
+        ) AS total
+    FROM commission
+");
+
+
+if ($result) {
+
+    $stats['commission'] =
+        (float)
+        (
+            $result
+                ->fetch_assoc()['total']
+            ?? 0
+        );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| RECENT ORDERS
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT
+
+        o.order_id,
+        o.order_date,
+        o.total_amount,
+        o.order_status,
+
+        u.name AS customer_name
+
+    FROM orders o
+
+    INNER JOIN users u
+        ON o.customer_id = u.user_id
+
+    ORDER BY
+        o.order_date DESC
+
+    LIMIT 8
+");
+
+
+if ($result) {
+
+    while (
+        $row =
+        $result->fetch_assoc()
+    ) {
+
+        $recentOrders[] =
+            $row;
+
+    }
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| RECENT PRODUCTS
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT
+
+        p.product_id,
+        p.product_name,
+        p.price,
+        p.stock_quantity,
+        p.status,
+        p.image,
+
+        v.business_name
+
+    FROM products p
+
+    INNER JOIN vendors v
+        ON p.vendor_id = v.vendor_id
+
+    ORDER BY
+        p.created_at DESC
+
+    LIMIT 6
+");
+
+
+if ($result) {
+
+    while (
+        $row =
+        $result->fetch_assoc()
+    ) {
+
+        $recentProducts[] =
+            $row;
+
+    }
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| RECENT VENDORS
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT
+
+        v.vendor_id,
+        v.business_name,
+        v.approval_status,
+        v.created_at,
+
+        u.name AS owner_name
+
+    FROM vendors v
+
+    LEFT JOIN users u
+        ON v.user_id = u.user_id
+
+    ORDER BY
+        v.created_at DESC
+
+    LIMIT 6
+");
+
+
+if ($result) {
+
+    while (
+        $row =
+        $result->fetch_assoc()
+    ) {
+
+        $recentVendors[] =
+            $row;
+
+    }
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| RECENT USERS
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT
+
+        user_id,
+        name,
+        email,
+        role,
+        status,
+        created_at
+
+    FROM users
+
+    ORDER BY
+        created_at DESC
+
+    LIMIT 6
+");
+
+
+if ($result) {
+
+    while (
+        $row =
+        $result->fetch_assoc()
+    ) {
+
+        $recentUsers[] =
+            $row;
+
+    }
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| FORMAT HELPERS
+|--------------------------------------------------------------------------
+*/
+
+function admin_dashboard_money(
+    $amount
+) {
+
+    return 'RM ' .
+        number_format(
+            (float) $amount,
+            2
+        );
+
+}
+
+
+function admin_dashboard_date(
+    $date
+) {
+
     if (!$date) {
-        return '-';
-    }
-
-    $timestamp = strtotime($date);
-
-    if (!$timestamp) {
         return '-';
     }
 
     return date(
         'd M Y, h:i A',
-        $timestamp
+        strtotime($date)
     );
+
 }
 
 
-function dashboard_status_class($status)
-{
-    $status = strtolower(
-        trim(
+function admin_dashboard_status(
+    $status
+) {
+
+    return 'status-' .
+        strtolower(
             str_replace(
                 ' ',
                 '-',
-                (string) $status
+                $status
             )
-        )
-    );
+        );
 
-    return 'status-' . $status;
 }
 
 ?>
-
 
 <!DOCTYPE html>
 
@@ -846,33 +638,879 @@ function dashboard_status_class($status)
     >
 
     <title>
-        Dashboard |
-        <?php echo htmlspecialchars(SITE_NAME); ?>
+        Admin Dashboard |
+        <?php
+        echo htmlspecialchars(
+            SITE_NAME
+        );
+        ?>
     </title>
 
 
-    <!-- Main CSS -->
+    <link
+        rel="stylesheet"
+        href="<?php
+        echo site_url(
+            'css/style.css'
+        );
+        ?>"
+    >
 
     <link
         rel="stylesheet"
-        href="<?php echo site_url('css/style.css'); ?>"
+        href="<?php
+        echo site_url(
+            'css/admin.css'
+        );
+        ?>"
     >
-
-
-    <!-- Dashboard CSS -->
 
     <link
         rel="stylesheet"
-        href="<?php echo site_url('css/dashboard.css'); ?>"
+        href="<?php
+        echo site_url(
+            'css/responsive.css'
+        );
+        ?>"
     >
 
 
-    <!-- Responsive CSS -->
+    <style>
 
-    <link
-        rel="stylesheet"
-        href="<?php echo site_url('css/responsive.css'); ?>"
-    >
+        .admin-dashboard {
+
+            min-height: 100vh;
+
+            padding:
+                40px 0 80px;
+
+            background:
+
+                radial-gradient(
+                    circle at 10% 0%,
+                    rgba(
+                        37,
+                        99,
+                        235,
+                        .18
+                    ),
+                    transparent 28%
+                ),
+
+                radial-gradient(
+                    circle at 90% 10%,
+                    rgba(
+                        14,
+                        165,
+                        233,
+                        .13
+                    ),
+                    transparent 25%
+                ),
+
+                linear-gradient(
+                    145deg,
+                    #020617,
+                    #061a35 55%,
+                    #020617
+                );
+
+            color: #f8fafc;
+
+        }
+
+
+        .admin-dashboard-container {
+
+            width: 90%;
+
+            max-width: 1400px;
+
+            margin: auto;
+
+        }
+
+
+        .admin-hero {
+
+            display: flex;
+
+            justify-content:
+                space-between;
+
+            align-items: center;
+
+            gap: 20px;
+
+            padding: 30px;
+
+            margin-bottom: 20px;
+
+            border:
+                1px solid
+                rgba(
+                    56,
+                    189,
+                    248,
+                    .16
+                );
+
+            border-radius: 23px;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    rgba(
+                        15,
+                        23,
+                        42,
+                        .95
+                    ),
+                    rgba(
+                        8,
+                        47,
+                        73,
+                        .72
+                    )
+                );
+
+        }
+
+
+        .admin-hero small {
+
+            color: #38bdf8;
+
+            font-size: 8px;
+
+            font-weight: 950;
+
+            letter-spacing: 1.8px;
+
+        }
+
+
+        .admin-hero h1 {
+
+            margin:
+                8px 0 0;
+
+            font-size: 36px;
+
+            font-weight: 950;
+
+        }
+
+
+        .admin-hero h1 span {
+
+            color: #38bdf8;
+
+        }
+
+
+        .admin-hero p {
+
+            margin:
+                9px 0 0;
+
+            color: #64748b;
+
+            font-size: 10px;
+
+            line-height: 1.6;
+
+        }
+
+
+        .admin-role {
+
+            padding:
+                16px 23px;
+
+            border:
+                1px solid
+                rgba(
+                    56,
+                    189,
+                    248,
+                    .16
+                );
+
+            border-radius: 15px;
+
+            background:
+                rgba(
+                    2,
+                    6,
+                    23,
+                    .45
+                );
+
+            text-align: center;
+
+        }
+
+
+        .admin-role span {
+
+            display: block;
+
+            color: #475569;
+
+            font-size: 7px;
+
+            font-weight: 900;
+
+            letter-spacing: 1px;
+
+        }
+
+
+        .admin-role strong {
+
+            display: block;
+
+            margin-top: 5px;
+
+            color: #7dd3fc;
+
+            font-size: 15px;
+
+            text-transform:
+                uppercase;
+
+        }
+
+
+        .admin-stats {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, 1fr);
+
+            gap: 13px;
+
+            margin-bottom: 20px;
+
+        }
+
+
+        .admin-stat {
+
+            padding: 19px;
+
+            border:
+                1px solid
+                rgba(
+                    148,
+                    163,
+                    184,
+                    .09
+                );
+
+            border-radius: 17px;
+
+            background:
+                rgba(
+                    15,
+                    23,
+                    42,
+                    .78
+                );
+
+            transition: .2s ease;
+
+        }
+
+
+        .admin-stat:hover {
+
+            transform:
+                translateY(-3px);
+
+            border-color:
+                rgba(
+                    56,
+                    189,
+                    248,
+                    .25
+                );
+
+        }
+
+
+        .admin-stat-label {
+
+            color: #64748b;
+
+            font-size: 8px;
+
+            font-weight: 900;
+
+            letter-spacing: 1px;
+
+            text-transform:
+                uppercase;
+
+        }
+
+
+        .admin-stat-value {
+
+            display: block;
+
+            margin-top: 7px;
+
+            color: #f8fafc;
+
+            font-size: 24px;
+
+            font-weight: 950;
+
+        }
+
+
+        .admin-stat-sub {
+
+            display: block;
+
+            margin-top: 4px;
+
+            color: #475569;
+
+            font-size: 8px;
+
+        }
+
+
+        .admin-grid {
+
+            display: grid;
+
+            grid-template-columns:
+                1.45fr 1fr;
+
+            gap: 18px;
+
+        }
+
+
+        .admin-card {
+
+            overflow: hidden;
+
+            border:
+                1px solid
+                rgba(
+                    148,
+                    163,
+                    184,
+                    .08
+                );
+
+            border-radius: 18px;
+
+            background:
+                rgba(
+                    15,
+                    23,
+                    42,
+                    .78
+                );
+
+        }
+
+
+        .admin-card-header {
+
+            display: flex;
+
+            justify-content:
+                space-between;
+
+            align-items: center;
+
+            padding:
+                17px 19px;
+
+            border-bottom:
+                1px solid
+                rgba(
+                    148,
+                    163,
+                    184,
+                    .06
+                );
+
+        }
+
+
+        .admin-card-header h2 {
+
+            margin: 0;
+
+            color: #e2e8f0;
+
+            font-size: 13px;
+
+            font-weight: 900;
+
+        }
+
+
+        .admin-card-header span {
+
+            color: #475569;
+
+            font-size: 8px;
+
+        }
+
+
+        .admin-link {
+
+            color: #38bdf8;
+
+            font-size: 8px;
+
+            font-weight: 900;
+
+            text-decoration: none;
+
+        }
+
+
+        .admin-order {
+
+            display: flex;
+
+            justify-content:
+                space-between;
+
+            gap: 15px;
+
+            padding:
+                14px 19px;
+
+            border-bottom:
+                1px solid
+                rgba(
+                    148,
+                    163,
+                    184,
+                    .05
+                );
+
+        }
+
+
+        .admin-order:last-child {
+
+            border-bottom: 0;
+
+        }
+
+
+        .admin-order-id {
+
+            color: #cbd5e1;
+
+            font-size: 10px;
+
+            font-weight: 850;
+
+        }
+
+
+        .admin-order-meta {
+
+            display: block;
+
+            margin-top: 4px;
+
+            color: #475569;
+
+            font-size: 8px;
+
+        }
+
+
+        .admin-order-right {
+
+            text-align: right;
+
+        }
+
+
+        .admin-order-amount {
+
+            color: #f8fafc;
+
+            font-size: 10px;
+
+            font-weight: 900;
+
+        }
+
+
+        .admin-status {
+
+            display: inline-flex;
+
+            margin-top: 5px;
+
+            padding:
+                4px 7px;
+
+            border-radius: 99px;
+
+            font-size: 7px;
+
+            font-weight: 900;
+
+        }
+
+
+        .status-pending {
+
+            background:
+                rgba(
+                    250,
+                    204,
+                    21,
+                    .08
+                );
+
+            color: #fde047;
+
+        }
+
+
+        .status-processing {
+
+            background:
+                rgba(
+                    56,
+                    189,
+                    248,
+                    .08
+                );
+
+            color: #7dd3fc;
+
+        }
+
+
+        .status-completed,
+        .status-paid,
+        .status-approved {
+
+            background:
+                rgba(
+                    34,
+                    197,
+                    94,
+                    .08
+                );
+
+            color: #86efac;
+
+        }
+
+
+        .status-cancelled,
+        .status-rejected {
+
+            background:
+                rgba(
+                    239,
+                    68,
+                    68,
+                    .08
+                );
+
+            color: #fca5a5;
+
+        }
+
+
+        .admin-product {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 10px;
+
+            padding:
+                12px 19px;
+
+            border-bottom:
+                1px solid
+                rgba(
+                    148,
+                    163,
+                    184,
+                    .05
+                );
+
+        }
+
+
+        .admin-product:last-child {
+
+            border-bottom: 0;
+
+        }
+
+
+        .admin-product-image {
+
+            width: 42px;
+
+            height: 42px;
+
+            flex-shrink: 0;
+
+            overflow: hidden;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            border-radius: 11px;
+
+            background:
+                #020617;
+
+            color: #334155;
+
+        }
+
+
+        .admin-product-image img {
+
+            width: 100%;
+
+            height: 100%;
+
+            object-fit: cover;
+
+        }
+
+
+        .admin-product-info {
+
+            flex: 1;
+
+            min-width: 0;
+
+        }
+
+
+        .admin-product-name {
+
+            display: block;
+
+            overflow: hidden;
+
+            color: #cbd5e1;
+
+            font-size: 9px;
+
+            font-weight: 850;
+
+            text-overflow: ellipsis;
+
+            white-space: nowrap;
+
+        }
+
+
+        .admin-product-vendor {
+
+            display: block;
+
+            margin-top: 3px;
+
+            color: #475569;
+
+            font-size: 7px;
+
+        }
+
+
+        .admin-product-price {
+
+            color: #7dd3fc;
+
+            font-size: 9px;
+
+            font-weight: 900;
+
+        }
+
+
+        .admin-actions {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(2, 1fr);
+
+            gap: 8px;
+
+            padding: 16px;
+
+        }
+
+
+        .admin-action {
+
+            padding: 13px;
+
+            border:
+                1px solid
+                rgba(
+                    148,
+                    163,
+                    184,
+                    .08
+                );
+
+            border-radius: 11px;
+
+            background:
+                rgba(
+                    2,
+                    6,
+                    23,
+                    .35
+                );
+
+            color: #94a3b8;
+
+            font-size: 8px;
+
+            font-weight: 850;
+
+            text-decoration: none;
+
+            transition: .2s ease;
+
+        }
+
+
+        .admin-action:hover {
+
+            border-color:
+                rgba(
+                    56,
+                    189,
+                    248,
+                    .25
+                );
+
+            color: #7dd3fc;
+
+            transform:
+                translateY(-2px);
+
+        }
+
+
+        .admin-action strong {
+
+            display: block;
+
+            margin-bottom: 4px;
+
+            color: #38bdf8;
+
+            font-size: 17px;
+
+        }
+
+
+        .admin-empty {
+
+            padding: 40px 20px;
+
+            color: #475569;
+
+            font-size: 9px;
+
+            text-align: center;
+
+        }
+
+
+        @media (
+            max-width: 1050px
+        ) {
+
+            .admin-stats {
+
+                grid-template-columns:
+                    repeat(2, 1fr);
+
+            }
+
+            .admin-grid {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
+        }
+
+
+        @media (
+            max-width: 600px
+        ) {
+
+            .admin-hero {
+
+                flex-direction:
+                    column;
+
+                align-items:
+                    flex-start;
+
+            }
+
+            .admin-role {
+
+                width: 100%;
+
+                box-sizing:
+                    border-box;
+
+            }
+
+            .admin-stats {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
+            .admin-actions {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
+        }
+
+    </style>
 
 </head>
 
@@ -882,100 +1520,176 @@ function dashboard_status_class($status)
 
 <?php
 
-require_once __DIR__ . '/includes/navbar.php';
+require_once __DIR__ .
+    '/../includes/navbar.php';
 
 ?>
 
 
-<main class="dashboard-page">
+<main class="admin-dashboard">
 
 
-    <div class="dashboard-container">
+    <div
+        class="admin-dashboard-container"
+    >
 
 
-        <!-- ==================================================
-             HERO
-        ================================================== -->
+        <!-- HERO -->
 
-        <section class="dashboard-hero">
+        <section class="admin-hero">
 
+            <div>
 
-            <div class="dashboard-hero-content">
-
-
-                <div class="dashboard-eyebrow">
-
-                    <?php
-                    echo strtoupper(
-                        htmlspecialchars($role)
-                    );
-                    ?>
-
-                    DASHBOARD
-
-                </div>
-
+                <small>
+                    ADMIN CONTROL CENTER
+                </small>
 
                 <h1>
 
-                    Hey,
-
+                    Welcome,
                     <span>
-
                         <?php
                         echo htmlspecialchars(
                             $user['name']
                         );
                         ?>
-
-                    </span>.
+                    </span>
 
                 </h1>
 
-
                 <p>
-
-                    <?php if ($role === 'customer'): ?>
-
-                        Manage your orders, wishlist,
-                        shopping cart and reviews from
-                        one place.
-
-                    <?php elseif ($role === 'vendor'): ?>
-
-                        Monitor your products, orders,
-                        sales and commission from your
-                        vendor workspace.
-
-                    <?php else: ?>
-
-                        Keep an eye on users, vendors,
-                        products and orders across
-                        HochipoHub.
-
-                    <?php endif; ?>
-
+                    Manage the HochipoHub
+                    marketplace from one
+                    central dashboard.
                 </p>
-
 
             </div>
 
 
-            <div class="dashboard-role">
+            <div class="admin-role">
 
-                <small>
+                <span>
                     ACCOUNT ROLE
-                </small>
+                </span>
 
                 <strong>
+                    Administrator
+                </strong>
 
+            </div>
+
+        </section>
+
+
+        <!-- STATS -->
+
+        <section class="admin-stats">
+
+
+            <div class="admin-stat">
+
+                <span
+                    class="admin-stat-label"
+                >
+                    Users
+                </span>
+
+                <strong
+                    class="admin-stat-value"
+                >
                     <?php
-                    echo htmlspecialchars(
-                        $role
+                    echo number_format(
+                        $stats['users']
                     );
                     ?>
-
                 </strong>
+
+                <span
+                    class="admin-stat-sub"
+                >
+                    All registered users
+                </span>
+
+            </div>
+
+
+            <div class="admin-stat">
+
+                <span
+                    class="admin-stat-label"
+                >
+                    Vendors
+                </span>
+
+                <strong
+                    class="admin-stat-value"
+                >
+                    <?php
+                    echo number_format(
+                        $stats['vendors']
+                    );
+                    ?>
+                </strong>
+
+                <span
+                    class="admin-stat-sub"
+                >
+                    Approved vendors
+                </span>
+
+            </div>
+
+
+            <div class="admin-stat">
+
+                <span
+                    class="admin-stat-label"
+                >
+                    Products
+                </span>
+
+                <strong
+                    class="admin-stat-value"
+                >
+                    <?php
+                    echo number_format(
+                        $stats['products']
+                    );
+                    ?>
+                </strong>
+
+                <span
+                    class="admin-stat-sub"
+                >
+                    Marketplace products
+                </span>
+
+            </div>
+
+
+            <div class="admin-stat">
+
+                <span
+                    class="admin-stat-label"
+                >
+                    Sales
+                </span>
+
+                <strong
+                    class="admin-stat-value"
+                >
+                    <?php
+                    echo admin_dashboard_money(
+                        $stats['sales']
+                    );
+                    ?>
+                </strong>
+
+                <span
+                    class="admin-stat-sub"
+                >
+                    Non-cancelled orders
+                </span>
 
             </div>
 
@@ -983,474 +1697,120 @@ require_once __DIR__ . '/includes/navbar.php';
         </section>
 
 
+        <!-- SECONDARY STATS -->
 
-        <!-- ==================================================
-             VENDOR APPROVAL NOTICE
-        ================================================== -->
-
-        <?php if (
-            $role === 'vendor' &&
-            $vendor &&
-            $vendor['approval_status'] !== 'Approved'
-        ): ?>
+        <section
+            class="admin-actions"
+            style="
+                margin-bottom:20px;
+                padding:0;
+            "
+        >
 
 
-            <div class="vendor-notice">
+            <a
+                href="<?php
+                echo site_url(
+                    'admin/vendors.php'
+                );
+                ?>"
+                class="admin-action"
+            >
 
                 <strong>
-
-                    Vendor Account:
-
                     <?php
-                    echo htmlspecialchars(
-                        $vendor['approval_status']
+                    echo number_format(
+                        $stats['pending_vendors']
                     );
                     ?>
-
                 </strong>
 
+                Pending Vendor Applications
 
-                <p>
+            </a>
 
-                    Your vendor account is currently
 
+            <a
+                href="<?php
+                echo site_url(
+                    'admin/orders.php'
+                );
+                ?>"
+                class="admin-action"
+            >
+
+                <strong>
                     <?php
-                    echo strtolower(
-                        htmlspecialchars(
-                            $vendor['approval_status']
-                        )
+                    echo number_format(
+                        $stats['pending_orders']
                     );
-                    ?>.
+                    ?>
+                </strong>
 
-                    Some vendor features may remain
-                    unavailable until your application
-                    is approved.
+                Pending Orders
 
-                </p>
+            </a>
 
-            </div>
 
+            <a
+                href="<?php
+                echo site_url(
+                    'admin/commission.php'
+                );
+                ?>"
+                class="admin-action"
+            >
 
-        <?php endif; ?>
+                <strong>
+                    <?php
+                    echo admin_dashboard_money(
+                        $stats['commission']
+                    );
+                    ?>
+                </strong>
 
+                Total Commission
 
+            </a>
 
-        <!-- ==================================================
-             CUSTOMER STATS
-        ================================================== -->
 
-        <?php if ($role === 'customer'): ?>
+            <a
+                href="<?php
+                echo site_url(
+                    'admin/users.php'
+                );
+                ?>"
+                class="admin-action"
+            >
 
+                <strong>
+                    <?php
+                    echo number_format(
+                        $stats['customers']
+                    );
+                    ?>
+                </strong>
 
-            <section class="dashboard-stats">
+                Customers
 
+            </a>
 
-                <!-- Orders -->
 
-                <div class="dashboard-stat">
+        </section>
 
-                    <div class="dashboard-stat-icon">
-                        #
-                    </div>
 
-                    <span class="dashboard-stat-label">
-                        Orders
-                    </span>
+        <!-- MAIN GRID -->
 
-                    <strong class="dashboard-stat-value">
+        <div class="admin-grid">
 
-                        <?php
-                        echo number_format(
-                            $stats['orders']
-                        );
-                        ?>
 
-                    </strong>
+            <!-- RECENT ORDERS -->
 
-                    <span class="dashboard-stat-sub">
-                        Your purchases
-                    </span>
+            <section class="admin-card">
 
-                </div>
-
-
-                <!-- Cart -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        🛒
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Cart Items
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo number_format(
-                            $stats['cart']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Ready for checkout
-                    </span>
-
-                </div>
-
-
-                <!-- Wishlist -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        ♡
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Wishlist
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo number_format(
-                            $stats['wishlist']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Saved products
-                    </span>
-
-                </div>
-
-
-                <!-- Reviews -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        ★
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Reviews
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo number_format(
-                            $stats['reviews']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Your reviews
-                    </span>
-
-                </div>
-
-
-            </section>
-
-
-        <?php endif; ?>
-
-
-
-        <!-- ==================================================
-             VENDOR STATS
-        ================================================== -->
-
-        <?php if ($role === 'vendor'): ?>
-
-
-            <section class="dashboard-stats">
-
-
-                <!-- Products -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        ◈
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Products
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo number_format(
-                            $stats['products']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Products in your store
-                    </span>
-
-                </div>
-
-
-                <!-- Orders -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        #
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Orders
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo number_format(
-                            $stats['orders']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Vendor orders
-                    </span>
-
-                </div>
-
-
-                <!-- Sales -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        RM
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Sales
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo dashboard_money(
-                            $stats['sales']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Total vendor sales
-                    </span>
-
-                </div>
-
-
-                <!-- Commission -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        %
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Commission
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo dashboard_money(
-                            $stats['commission']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Recorded commission
-                    </span>
-
-                </div>
-
-
-            </section>
-
-
-        <?php endif; ?>
-
-
-
-        <!-- ==================================================
-             ADMIN STATS
-        ================================================== -->
-
-        <?php if ($role === 'admin'): ?>
-
-
-            <section class="dashboard-stats">
-
-
-                <!-- Users -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        ◉
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Users
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo number_format(
-                            $stats['users']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Registered accounts
-                    </span>
-
-                </div>
-
-
-                <!-- Vendors -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        ◇
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Vendors
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo number_format(
-                            $stats['vendors']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Approved vendors
-                    </span>
-
-                </div>
-
-
-                <!-- Pending Vendors -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        !
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Pending Vendors
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo number_format(
-                            $stats['pending_vendors']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Applications to review
-                    </span>
-
-                </div>
-
-
-                <!-- Pending Orders -->
-
-                <div class="dashboard-stat">
-
-                    <div class="dashboard-stat-icon">
-                        #
-                    </div>
-
-                    <span class="dashboard-stat-label">
-                        Pending Orders
-                    </span>
-
-                    <strong class="dashboard-stat-value">
-
-                        <?php
-                        echo number_format(
-                            $stats['pending_orders']
-                        );
-                        ?>
-
-                    </strong>
-
-                    <span class="dashboard-stat-sub">
-                        Orders awaiting action
-                    </span>
-
-                </div>
-
-
-            </section>
-
-
-        <?php endif; ?>
-
-
-
-        <!-- ==================================================
-             MAIN GRID
-        ================================================== -->
-
-        <div class="dashboard-grid">
-
-
-
-            <!-- ==================================================
-                 RECENT ORDERS
-            ================================================== -->
-
-            <section class="dashboard-card">
-
-
-                <div class="dashboard-card-header">
-
+                <div
+                    class="admin-card-header"
+                >
 
                     <div>
 
@@ -1459,932 +1819,604 @@ require_once __DIR__ . '/includes/navbar.php';
                         </h2>
 
                         <span>
-                            Latest activity
+                            Latest marketplace
+                            transactions
                         </span>
 
                     </div>
 
 
-                    <?php if ($role === 'customer'): ?>
-
-                        <a
-                            href="<?php echo site_url('order.php'); ?>"
-                            class="dashboard-view-link"
-                        >
-                            VIEW ALL →
-                        </a>
-
-
-                    <?php elseif ($role === 'vendor'): ?>
-
-                        <a
-                            href="<?php echo site_url('seller/orders.php'); ?>"
-                            class="dashboard-view-link"
-                        >
-                            VIEW ALL →
-                        </a>
-
-
-                    <?php else: ?>
-
-                        <a
-                            href="<?php echo site_url('admin/orders.php'); ?>"
-                            class="dashboard-view-link"
-                        >
-                            MANAGE →
-                        </a>
-
-                    <?php endif; ?>
-
+                    <a
+                        href="<?php
+                        echo site_url(
+                            'admin/orders.php'
+                        );
+                        ?>"
+                        class="admin-link"
+                    >
+                        VIEW ALL →
+                    </a>
 
                 </div>
 
 
-
-                <div class="dashboard-list">
-
-
-                    <?php if (empty($recentOrders)): ?>
-
-
-                        <div class="dashboard-empty">
-
-                            <div class="dashboard-empty-icon">
-                                #
-                            </div>
-
-                            <h3>
-                                No orders yet
-                            </h3>
-
-                            <p>
-                                Order activity will appear
-                                here when there is something
-                                to display.
-                            </p>
-
-                        </div>
-
-
-                    <?php else: ?>
-
-
-                        <?php foreach (
-                            $recentOrders as $order
-                        ): ?>
-
-
-                            <div class="dashboard-list-item">
-
-
-                                <div class="dashboard-item-left">
-
-
-                                    <span
-                                        class="dashboard-item-title"
-                                    >
-
-                                        Order #
-
-                                        <?php
-                                        echo (int)
-                                            $order['order_id'];
-                                        ?>
-
-
-                                        <?php if (
-                                            isset(
-                                                $order['customer_name']
-                                            )
-                                        ): ?>
-
-                                            ·
-
-                                            <?php
-                                            echo htmlspecialchars(
-                                                $order['customer_name']
-                                            );
-                                            ?>
-
-                                        <?php endif; ?>
-
-                                    </span>
-
-
-                                    <span
-                                        class="dashboard-item-meta"
-                                    >
-
-                                        <?php
-                                        echo dashboard_date(
-                                            $order['order_date']
-                                            ??
-                                            $order['created_at']
-                                            ??
-                                            null
-                                        );
-                                        ?>
-
-                                    </span>
-
-
-                                    <?php
-
-                                    $orderStatus =
-                                        $order['order_status']
-                                        ??
-                                        $order['vendor_status']
-                                        ??
-                                        'Pending';
-
-                                    ?>
-
-
-                                    <span
-                                        class="
-                                            dashboard-status
-                                            <?php
-                                            echo dashboard_status_class(
-                                                $orderStatus
-                                            );
-                                            ?>
-                                        "
-                                    >
-
-                                        <?php
-                                        echo htmlspecialchars(
-                                            $orderStatus
-                                        );
-                                        ?>
-
-                                    </span>
-
-
-                                </div>
-
-
-                                <div class="dashboard-item-right">
-
-
-                                    <span
-                                        class="dashboard-item-amount"
-                                    >
-
-                                        <?php
-
-                                        if ($role === 'vendor') {
-
-                                            echo dashboard_money(
-                                                $order['subtotal'] ?? 0
-                                            );
-
-                                        } else {
-
-                                            echo dashboard_money(
-                                                $order['total_amount'] ?? 0
-                                            );
-
-                                        }
-
-                                        ?>
-
-                                    </span>
-
-
-                                </div>
-
-
-                            </div>
-
-
-                        <?php endforeach; ?>
-
-
-                    <?php endif; ?>
-
-
-                </div>
-
-
-            </section>
-
-
-
-            <!-- ==================================================
-                 QUICK ACTIONS
-            ================================================== -->
-
-            <section class="dashboard-card">
-
-
-                <div class="dashboard-card-header">
-
-
-                    <div>
-
-                        <h2>
-                            Quick Actions
-                        </h2>
-
-                        <span>
-                            Jump right in
-                        </span>
-
+                <?php if (
+                    empty($recentOrders)
+                ): ?>
+
+                    <div
+                        class="admin-empty"
+                    >
+                        No orders yet.
                     </div>
 
-
-                </div>
-
+                <?php else: ?>
 
 
-                <div class="dashboard-actions">
+                    <?php foreach (
+                        $recentOrders
+                        as $order
+                    ): ?>
 
 
-                    <?php if ($role === 'customer'): ?>
-
-
-                        <a
-                            href="<?php echo site_url('catalog.php'); ?>"
-                            class="dashboard-action"
+                        <div
+                            class="admin-order"
                         >
 
-                            <span class="dashboard-action-icon">
-                                ◈
-                            </span>
+                            <div>
 
-                            Shop Products
-
-                        </a>
-
-
-                        <a
-                            href="<?php echo site_url('cart.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                🛒
-                            </span>
-
-                            My Cart
-
-                        </a>
-
-
-                        <a
-                            href="<?php echo site_url('wishlist.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                ♡
-                            </span>
-
-                            Wishlist
-
-                        </a>
-
-
-                        <a
-                            href="<?php echo site_url('profile.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                ◉
-                            </span>
-
-                            My Profile
-
-                        </a>
-
-
-                    <?php elseif ($role === 'vendor'): ?>
-
-
-                        <a
-                            href="<?php echo site_url('seller/add_product.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                +
-                            </span>
-
-                            Add Product
-
-                        </a>
-
-
-                        <a
-                            href="<?php echo site_url('seller/products.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                ◈
-                            </span>
-
-                            My Products
-
-                        </a>
-
-
-                        <a
-                            href="<?php echo site_url('seller/orders.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                #
-                            </span>
-
-                            Orders
-
-                        </a>
-
-
-                        <a
-                            href="<?php echo site_url('commission.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                %
-                            </span>
-
-                            Commission
-
-                        </a>
-
-
-                    <?php else: ?>
-
-
-                        <a
-                            href="<?php echo site_url('admin/users.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                ◉
-                            </span>
-
-                            Users
-
-                        </a>
-
-
-                        <a
-                            href="<?php echo site_url('admin/vendors.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                ◇
-                            </span>
-
-                            Vendors
-
-                        </a>
-
-
-                        <a
-                            href="<?php echo site_url('admin/products.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                ◈
-                            </span>
-
-                            Products
-
-                        </a>
-
-
-                        <a
-                            href="<?php echo site_url('admin/orders.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-                                #
-                            </span>
-
-                            Orders
-
-                        </a>
-
-
-                    <?php endif; ?>
-
-
-                </div>
-
-
-            </section>
-
-
-
-            <!-- ==================================================
-                 RECENT PRODUCTS
-            ================================================== -->
-
-            <?php if (
-                $role === 'vendor' ||
-                $role === 'admin'
-            ): ?>
-
-
-                <section class="dashboard-card">
-
-
-                    <div class="dashboard-card-header">
-
-
-                        <div>
-
-                            <h2>
-                                Recent Products
-                            </h2>
-
-                            <span>
-                                Latest catalogue activity
-                            </span>
-
-                        </div>
-
-
-                        <?php if ($role === 'vendor'): ?>
-
-                            <a
-                                href="<?php echo site_url('seller/products.php'); ?>"
-                                class="dashboard-view-link"
-                            >
-                                PRODUCTS →
-                            </a>
-
-                        <?php else: ?>
-
-                            <a
-                                href="<?php echo site_url('admin/products.php'); ?>"
-                                class="dashboard-view-link"
-                            >
-                                MANAGE →
-                            </a>
-
-                        <?php endif; ?>
-
-
-                    </div>
-
-
-
-                    <?php if (empty($recentProducts)): ?>
-
-
-                        <div class="dashboard-empty">
-
-                            <div class="dashboard-empty-icon">
-                                ◈
-                            </div>
-
-                            <h3>
-                                No products yet
-                            </h3>
-
-                            <p>
-                                Product activity will appear
-                                here once products are added.
-                            </p>
-
-                        </div>
-
-
-                    <?php else: ?>
-
-
-                        <?php foreach (
-                            $recentProducts as $product
-                        ): ?>
-
-
-                            <div class="dashboard-product">
-
-
-                                <div
-                                    class="dashboard-product-image"
+                                <span
+                                    class="admin-order-id"
                                 >
 
+                                    Order #
 
                                     <?php
-
-                                    $productImage =
-                                        $product['image'] ?? '';
-
+                                    echo (int)
+                                        $order[
+                                            'order_id'
+                                        ];
                                     ?>
 
-
-                                    <?php if (
-                                        $productImage !== ''
-                                    ): ?>
-
-
-                                        <img
-                                            src="<?php
-                                            echo htmlspecialchars(
-                                                site_url(
-                                                    'image/product/' .
-                                                    $productImage
-                                                )
-                                            );
-                                            ?>"
-                                            alt="<?php
-                                            echo htmlspecialchars(
-                                                $product['product_name']
-                                            );
-                                            ?>"
-                                            onerror="
-                                                this.style.display='none';
-                                                this.nextElementSibling.style.display='flex';
-                                            "
-                                        >
-
-
-                                    <?php endif; ?>
-
-
-                                    <span
-                                        class="
-                                            dashboard-product-placeholder
-                                        "
-                                        style="<?php
-                                        echo $productImage !== ''
-                                            ? 'display:none;'
-                                            : '';
-                                        ?>"
-                                    >
-                                        ◈
-                                    </span>
-
-
-                                </div>
-
-
-
-                                <div class="dashboard-product-info">
-
-
-                                    <span
-                                        class="dashboard-product-name"
-                                    >
-
-                                        <?php
-                                        echo htmlspecialchars(
-                                            $product['product_name']
-                                        );
-                                        ?>
-
-                                    </span>
-
-
-                                    <span
-                                        class="dashboard-product-meta"
-                                    >
-
-                                        <?php if (
-                                            $role === 'vendor'
-                                        ): ?>
-
-                                            Stock:
-
-                                            <?php
-                                            echo number_format(
-                                                (int)
-                                                $product[
-                                                    'stock_quantity'
-                                                ]
-                                            );
-                                            ?>
-
-                                        <?php else: ?>
-
-                                            <?php
-                                            echo htmlspecialchars(
-                                                $product[
-                                                    'business_name'
-                                                ]
-                                            );
-                                            ?>
-
-                                        <?php endif; ?>
-
-                                    </span>
-
-
-                                </div>
-
+                                </span>
 
 
                                 <span
-                                    class="dashboard-product-price"
+                                    class="admin-order-meta"
                                 >
 
                                     <?php
-                                    echo dashboard_money(
-                                        $product['price']
+                                    echo htmlspecialchars(
+                                        $order[
+                                            'customer_name'
+                                        ]
+                                    );
+                                    ?>
+
+                                    ·
+
+                                    <?php
+                                    echo admin_dashboard_date(
+                                        $order[
+                                            'order_date'
+                                        ]
+                                    );
+                                    ?>
+
+                                </span>
+
+                            </div>
+
+
+                            <div
+                                class="admin-order-right"
+                            >
+
+                                <span
+                                    class="admin-order-amount"
+                                >
+
+                                    <?php
+                                    echo admin_dashboard_money(
+                                        $order[
+                                            'total_amount'
+                                        ]
                                     );
                                     ?>
 
                                 </span>
 
 
+                                <span
+                                    class="
+                                        admin-status
+                                        <?php
+                                        echo admin_dashboard_status(
+                                            $order[
+                                                'order_status'
+                                            ]
+                                        );
+                                        ?>
+                                    "
+                                >
+
+                                    <?php
+                                    echo htmlspecialchars(
+                                        $order[
+                                            'order_status'
+                                        ]
+                                    );
+                                    ?>
+
+                                </span>
+
                             </div>
-
-
-                        <?php endforeach; ?>
-
-
-                    <?php endif; ?>
-
-
-                </section>
-
-
-            <?php endif; ?>
-
-
-
-            <!-- ==================================================
-                 CUSTOMER ACCOUNT OVERVIEW
-            ================================================== -->
-
-            <?php if ($role === 'customer'): ?>
-
-
-                <section class="dashboard-card">
-
-
-                    <div class="dashboard-card-header">
-
-
-                        <div>
-
-                            <h2>
-                                Account Overview
-                            </h2>
-
-                            <span>
-                                Your HochipoHub profile
-                            </span>
 
                         </div>
 
 
-                        <a
-                            href="<?php echo site_url('profile.php'); ?>"
-                            class="dashboard-view-link"
-                        >
-                            EDIT →
-                        </a>
+                    <?php endforeach; ?>
 
+
+                <?php endif; ?>
+
+
+            </section>
+
+
+            <!-- QUICK ACTIONS -->
+
+            <section class="admin-card">
+
+                <div
+                    class="admin-card-header"
+                >
+
+                    <div>
+
+                        <h2>
+                            Admin Tools
+                        </h2>
+
+                        <span>
+                            Manage marketplace
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="admin-actions"
+                >
+
+
+                    <a
+                        href="<?php
+                        echo site_url(
+                            'admin/users.php'
+                        );
+                        ?>"
+                        class="admin-action"
+                    >
+
+                        <strong>
+                            U
+                        </strong>
+
+                        Users
+
+                    </a>
+
+
+                    <a
+                        href="<?php
+                        echo site_url(
+                            'admin/vendors.php'
+                        );
+                        ?>"
+                        class="admin-action"
+                    >
+
+                        <strong>
+                            V
+                        </strong>
+
+                        Vendors
+
+                    </a>
+
+
+                    <a
+                        href="<?php
+                        echo site_url(
+                            'admin/products.php'
+                        );
+                        ?>"
+                        class="admin-action"
+                    >
+
+                        <strong>
+                            P
+                        </strong>
+
+                        Products
+
+                    </a>
+
+
+                    <a
+                        href="<?php
+                        echo site_url(
+                            'admin/orders.php'
+                        );
+                        ?>"
+                        class="admin-action"
+                    >
+
+                        <strong>
+                            O
+                        </strong>
+
+                        Orders
+
+                    </a>
+
+
+                    <a
+                        href="<?php
+                        echo site_url(
+                            'admin/commission.php'
+                        );
+                        ?>"
+                        class="admin-action"
+                    >
+
+                        <strong>
+                            %
+                        </strong>
+
+                        Commission
+
+                    </a>
+
+
+                    <a
+                        href="<?php
+                        echo site_url(
+                            'dashboard.php'
+                        );
+                        ?>"
+                        class="admin-action"
+                    >
+
+                        <strong>
+                            ↗
+                        </strong>
+
+                        Main Dashboard
+
+                    </a>
+
+
+                </div>
+
+            </section>
+
+
+            <!-- PRODUCTS -->
+
+            <section class="admin-card">
+
+                <div
+                    class="admin-card-header"
+                >
+
+                    <div>
+
+                        <h2>
+                            Recent Products
+                        </h2>
+
+                        <span>
+                            Latest catalogue
+                            additions
+                        </span>
 
                     </div>
 
 
+                    <a
+                        href="<?php
+                        echo site_url(
+                            'admin/products.php'
+                        );
+                        ?>"
+                        class="admin-link"
+                    >
+                        MANAGE →
+                    </a>
 
-                    <div class="dashboard-account-content">
+                </div>
 
 
-                        <div class="dashboard-profile-row">
+                <?php if (
+                    empty($recentProducts)
+                ): ?>
+
+                    <div
+                        class="admin-empty"
+                    >
+                        No products yet.
+                    </div>
+
+                <?php else: ?>
 
 
-                            <div class="dashboard-profile-image">
+                    <?php foreach (
+                        $recentProducts
+                        as $product
+                    ): ?>
 
 
-                                <?php
+                        <div
+                            class="admin-product"
+                        >
 
-                                $profileImage =
-                                    $user['profile_image'] ?? '';
 
-                                ?>
-
+                            <div
+                                class="
+                                    admin-product-image
+                                "
+                            >
 
                                 <?php if (
-                                    $profileImage !== ''
+                                    !empty(
+                                        $product[
+                                            'image'
+                                        ]
+                                    )
                                 ): ?>
-
 
                                     <img
                                         src="<?php
                                         echo htmlspecialchars(
                                             site_url(
-                                                'image/' .
-                                                $profileImage
+                                                'image/product/' .
+                                                $product[
+                                                    'image'
+                                                ]
                                             )
                                         );
                                         ?>"
-                                        alt="Profile"
+                                        alt=""
                                     >
-
 
                                 <?php else: ?>
 
-
-                                    <?php
-                                    echo strtoupper(
-                                        substr(
-                                            $user['name'],
-                                            0,
-                                            1
-                                        )
-                                    );
-                                    ?>
-
+                                    P
 
                                 <?php endif; ?>
 
+                            </div>
+
+
+                            <div
+                                class="
+                                    admin-product-info
+                                "
+                            >
+
+                                <span
+                                    class="
+                                        admin-product-name
+                                    "
+                                >
+
+                                    <?php
+                                    echo htmlspecialchars(
+                                        $product[
+                                            'product_name'
+                                        ]
+                                    );
+                                    ?>
+
+                                </span>
+
+
+                                <span
+                                    class="
+                                        admin-product-vendor
+                                    "
+                                >
+
+                                    <?php
+                                    echo htmlspecialchars(
+                                        $product[
+                                            'business_name'
+                                        ]
+                                    );
+                                    ?>
+
+                                    · Stock:
+
+                                    <?php
+                                    echo number_format(
+                                        (int)
+                                        $product[
+                                            'stock_quantity'
+                                        ]
+                                    );
+                                    ?>
+
+                                </span>
 
                             </div>
 
 
+                            <span
+                                class="
+                                    admin-product-price
+                                "
+                            >
+
+                                <?php
+                                echo admin_dashboard_money(
+                                    $product[
+                                        'price'
+                                    ]
+                                );
+                                ?>
+
+                            </span>
+
+
+                        </div>
+
+
+                    <?php endforeach; ?>
+
+
+                <?php endif; ?>
+
+
+            </section>
+
+
+            <!-- RECENT VENDORS -->
+
+            <section class="admin-card">
+
+                <div
+                    class="admin-card-header"
+                >
+
+                    <div>
+
+                        <h2>
+                            Recent Vendors
+                        </h2>
+
+                        <span>
+                            Vendor activity
+                        </span>
+
+                    </div>
+
+
+                    <a
+                        href="<?php
+                        echo site_url(
+                            'admin/vendors.php'
+                        );
+                        ?>"
+                        class="admin-link"
+                    >
+                        MANAGE →
+                    </a>
+
+                </div>
+
+
+                <?php if (
+                    empty($recentVendors)
+                ): ?>
+
+                    <div
+                        class="admin-empty"
+                    >
+                        No vendors yet.
+                    </div>
+
+                <?php else: ?>
+
+
+                    <?php foreach (
+                        $recentVendors
+                        as $vendor
+                    ): ?>
+
+
+                        <div
+                            class="admin-order"
+                        >
 
                             <div>
 
-
-                                <strong class="dashboard-profile-name">
-
-                                    <?php
-                                    echo htmlspecialchars(
-                                        $user['name']
-                                    );
-                                    ?>
-
-                                </strong>
-
-
-                                <span class="dashboard-profile-email">
+                                <span
+                                    class="admin-order-id"
+                                >
 
                                     <?php
                                     echo htmlspecialchars(
-                                        $user['email']
+                                        $vendor[
+                                            'business_name'
+                                        ]
                                     );
                                     ?>
 
                                 </span>
 
 
+                                <span
+                                    class="admin-order-meta"
+                                >
+
+                                    Owner:
+                                    <?php
+                                    echo htmlspecialchars(
+                                        $vendor[
+                                            'owner_name'
+                                        ] ??
+                                        'Unknown'
+                                    );
+                                    ?>
+
+                                </span>
+
                             </div>
 
 
-                        </div>
+                            <div
+                                class="admin-order-right"
+                            >
 
-
-
-                        <div class="dashboard-profile-details">
-
-
-                            <div class="dashboard-profile-detail">
-
-
-                                <span>
-                                    Phone
-                                </span>
-
-
-                                <strong>
+                                <span
+                                    class="
+                                        admin-status
+                                        <?php
+                                        echo admin_dashboard_status(
+                                            $vendor[
+                                                'approval_status'
+                                            ]
+                                        );
+                                        ?>
+                                    "
+                                >
 
                                     <?php
                                     echo htmlspecialchars(
-                                        $user['phone']
-                                        ?: 'Not provided'
+                                        $vendor[
+                                            'approval_status'
+                                        ]
                                     );
                                     ?>
 
-                                </strong>
-
-
-                            </div>
-
-
-
-                            <div class="dashboard-profile-detail">
-
-
-                                <span>
-                                    Member Since
                                 </span>
 
-
-                                <strong>
-
-                                    <?php
-                                    echo dashboard_date(
-                                        $user['created_at']
-                                    );
-                                    ?>
-
-                                </strong>
-
-
                             </div>
 
-
                         </div>
 
 
-                    </div>
+                    <?php endforeach; ?>
 
 
-                </section>
+                <?php endif; ?>
 
 
-            <?php endif; ?>
-
-
-
-            <!-- ==================================================
-                 ADMIN ATTENTION
-            ================================================== -->
-
-            <?php if ($role === 'admin'): ?>
-
-
-                <section class="dashboard-card">
-
-
-                    <div class="dashboard-card-header">
-
-
-                        <div>
-
-                            <h2>
-                                Admin Attention
-                            </h2>
-
-                            <span>
-                                Items requiring review
-                            </span>
-
-                        </div>
-
-
-                    </div>
-
-
-
-                    <div class="dashboard-actions">
-
-
-                        <a
-                            href="<?php echo site_url('admin/vendors.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-
-                                <?php
-                                echo number_format(
-                                    $stats['pending_vendors']
-                                );
-                                ?>
-
-                            </span>
-
-                            Vendor Applications
-
-                        </a>
-
-
-
-                        <a
-                            href="<?php echo site_url('admin/orders.php'); ?>"
-                            class="dashboard-action"
-                        >
-
-                            <span class="dashboard-action-icon">
-
-                                <?php
-                                echo number_format(
-                                    $stats['pending_orders']
-                                );
-                                ?>
-
-                            </span>
-
-                            Pending Orders
-
-                        </a>
-
-
-                    </div>
-
-
-                </section>
-
-
-            <?php endif; ?>
+            </section>
 
 
         </div>
@@ -2396,10 +2428,10 @@ require_once __DIR__ . '/includes/navbar.php';
 </main>
 
 
-
 <?php
 
-require_once __DIR__ . '/includes/footer.php';
+require_once __DIR__ .
+    '/../includes/footer.php';
 
 ?>
 
