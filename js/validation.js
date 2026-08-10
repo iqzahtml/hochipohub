@@ -1,922 +1,396 @@
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB - FORM VALIDATION
+| HOCHIPOHUB - VALIDATION.JS
 |--------------------------------------------------------------------------
 | Handles:
-| - Login validation
-| - Register validation
-| - Password confirmation
+| - Required fields
 | - Email validation
 | - Phone validation
-| - Password strength
-| - Vendor registration validation
-| - Real-time validation
-| - Form submission protection
+| - Password validation
+| - Password confirmation
+| - Register form
+| - Login form
+| - Checkout form
+| - Product form
 |--------------------------------------------------------------------------
 */
 
-"use strict";
-
-
-/* ==============================================================
-   DOM READY
-============================================================== */
-
 document.addEventListener("DOMContentLoaded", function () {
 
-    initLoginValidation();
-    initRegisterValidation();
-    initPasswordStrength();
-    initRealtimeValidation();
-    initPasswordToggle();
+    /*
+    |--------------------------------------------------------------------------
+    | FORM VALIDATION
+    |--------------------------------------------------------------------------
+    */
 
-});
+    const forms = document.querySelectorAll("form");
 
+    forms.forEach(function (form) {
 
-/* ==============================================================
-   VALIDATION CONFIG
-============================================================== */
+        form.addEventListener("submit", function (event) {
 
-const ValidationConfig = {
+            /*
+            | Skip forms that explicitly disable validation
+            */
 
-    minPasswordLength: 8,
+            if (
+                form.dataset.validate === "false" ||
+                form.classList.contains("no-validation")
+            ) {
+                return;
+            }
 
-    maxPasswordLength: 72,
+            let valid = true;
 
-    minNameLength: 2,
+            clearFormErrors(form);
 
-    maxNameLength: 100,
 
-    phoneMinLength: 9,
+            /*
+            |--------------------------------------------------------------------------
+            | REQUIRED INPUTS
+            |--------------------------------------------------------------------------
+            */
 
-    phoneMaxLength: 15
+            const requiredFields =
+                form.querySelectorAll(
+                    "[required]"
+                );
 
-};
+            requiredFields.forEach(function (field) {
 
+                if (
+                    field.disabled ||
+                    field.type === "hidden"
+                ) {
+                    return;
+                }
 
-/* ==============================================================
-   REGEX
-============================================================== */
+                const value =
+                    getFieldValue(field);
 
-const ValidationRegex = {
+                if (value === "") {
 
-    email:
-        /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
+                    showFieldError(
+                        field,
+                        "This field is required."
+                    );
 
-    phone:
-        /^[0-9+\-\s()]{9,20}$/,
+                    valid = false;
 
-    name:
-        /^[A-Za-zÀ-ÿ\s.'-]{2,100}$/,
+                }
 
-    passwordUppercase:
-        /[A-Z]/,
+            });
 
-    passwordLowercase:
-        /[a-z]/,
 
-    passwordNumber:
-        /[0-9]/,
+            /*
+            |--------------------------------------------------------------------------
+            | EMAIL
+            |--------------------------------------------------------------------------
+            */
 
-    passwordSpecial:
-        /[^A-Za-z0-9]/
+            const emailFields =
+                form.querySelectorAll(
+                    'input[type="email"]'
+                );
 
-};
+            emailFields.forEach(function (field) {
 
+                if (
+                    field.value.trim() === "" ||
+                    field.disabled
+                ) {
+                    return;
+                }
 
-/* ==============================================================
-   HELPER - GET ELEMENT
-============================================================== */
+                if (!isValidEmail(field.value)) {
 
-function getElement(selector, parent = document) {
+                    showFieldError(
+                        field,
+                        "Please enter a valid email address."
+                    );
 
-    if (!selector) {
-        return null;
-    }
+                    valid = false;
 
-    return parent.querySelector(selector);
+                }
 
-}
+            });
 
 
-/* ==============================================================
-   HELPER - GET VALUE
-============================================================== */
+            /*
+            |--------------------------------------------------------------------------
+            | PHONE
+            |--------------------------------------------------------------------------
+            */
 
-function getValue(element) {
+            const phoneFields =
+                form.querySelectorAll(
+                    'input[type="tel"], input[name="phone"]'
+                );
 
-    if (!element) {
-        return "";
-    }
+            phoneFields.forEach(function (field) {
 
-    return element.value.trim();
+                if (
+                    field.value.trim() === "" ||
+                    field.disabled
+                ) {
+                    return;
+                }
 
-}
+                if (!isValidPhone(field.value)) {
 
+                    showFieldError(
+                        field,
+                        "Please enter a valid phone number."
+                    );
 
-/* ==============================================================
-   HELPER - SHOW ERROR
-============================================================== */
+                    valid = false;
 
-function showValidationError(input, message) {
+                }
 
-    if (!input) {
-        return false;
-    }
+            });
 
-    clearValidationError(input);
 
-    input.classList.add("is-invalid");
+            /*
+            |--------------------------------------------------------------------------
+            | PASSWORD
+            |--------------------------------------------------------------------------
+            */
 
-    input.setAttribute("aria-invalid", "true");
+            const passwordFields =
+                form.querySelectorAll(
+                    'input[type="password"][data-password]'
+                );
 
-    let errorElement =
-        input.parentElement.querySelector(
-            ".validation-error"
-        );
+            passwordFields.forEach(function (field) {
 
-    if (!errorElement) {
+                if (
+                    field.value === "" ||
+                    field.disabled
+                ) {
+                    return;
+                }
 
-        errorElement =
-            document.createElement("small");
+                if (!isValidPassword(field.value)) {
 
-        errorElement.className =
-            "validation-error";
+                    showFieldError(
+                        field,
+                        "Password must contain at least 8 characters."
+                    );
 
-        input.parentElement.appendChild(
-            errorElement
-        );
+                    valid = false;
 
-    }
+                }
 
-    errorElement.textContent = message;
+            });
 
-    return false;
 
-}
+            /*
+            |--------------------------------------------------------------------------
+            | CONFIRM PASSWORD
+            |--------------------------------------------------------------------------
+            */
 
+            const confirmPassword =
+                form.querySelector(
+                    'input[name="confirm_password"], ' +
+                    'input[name="password_confirmation"], ' +
+                    'input[id="confirmPassword"]'
+                );
 
-/* ==============================================================
-   HELPER - SHOW SUCCESS
-============================================================== */
+            const password =
+                form.querySelector(
+                    'input[name="password"]'
+                );
 
-function showValidationSuccess(input) {
+            if (
+                confirmPassword &&
+                password &&
+                confirmPassword.value !== ""
+            ) {
 
-    if (!input) {
-        return true;
-    }
+                if (
+                    confirmPassword.value !==
+                    password.value
+                ) {
 
-    clearValidationError(input);
+                    showFieldError(
+                        confirmPassword,
+                        "Passwords do not match."
+                    );
 
-    input.classList.add("is-valid");
+                    valid = false;
 
-    input.setAttribute("aria-invalid", "false");
+                }
 
-    return true;
+            }
 
-}
 
+            /*
+            |--------------------------------------------------------------------------
+            | CHECKBOX REQUIRED
+            |--------------------------------------------------------------------------
+            */
 
-/* ==============================================================
-   HELPER - CLEAR ERROR
-============================================================== */
+            const requiredCheckboxes =
+                form.querySelectorAll(
+                    'input[type="checkbox"][required]'
+                );
 
-function clearValidationError(input) {
+            requiredCheckboxes.forEach(function (checkbox) {
 
-    if (!input) {
-        return;
-    }
+                if (!checkbox.checked) {
 
-    input.classList.remove("is-invalid");
+                    showFieldError(
+                        checkbox,
+                        "Please accept this option."
+                    );
 
-    input.classList.remove("is-valid");
+                    valid = false;
 
-    input.removeAttribute("aria-invalid");
+                }
 
-    const errorElement =
-        input.parentElement.querySelector(
-            ".validation-error"
-        );
+            });
 
-    if (errorElement) {
-        errorElement.remove();
-    }
 
-}
+            /*
+            |--------------------------------------------------------------------------
+            | NUMBER MIN/MAX
+            |--------------------------------------------------------------------------
+            */
 
+            const numberFields =
+                form.querySelectorAll(
+                    'input[type="number"]'
+                );
 
-/* ==============================================================
-   REQUIRED FIELD
-============================================================== */
+            numberFields.forEach(function (field) {
 
-function validateRequired(input, fieldName = "This field") {
+                if (
+                    field.value === "" ||
+                    field.disabled
+                ) {
+                    return;
+                }
 
-    if (!input) {
-        return true;
-    }
+                const value =
+                    parseFloat(field.value);
 
-    const value = getValue(input);
+                const min =
+                    field.getAttribute("min");
 
-    if (value === "") {
+                const max =
+                    field.getAttribute("max");
 
-        return showValidationError(
-            input,
-            `${fieldName} is required.`
-        );
 
-    }
+                if (
+                    min !== null &&
+                    value < parseFloat(min)
+                ) {
 
-    return showValidationSuccess(input);
+                    showFieldError(
+                        field,
+                        "Value cannot be lower than " +
+                        min +
+                        "."
+                    );
 
-}
+                    valid = false;
 
+                }
 
-/* ==============================================================
-   NAME VALIDATION
-============================================================== */
 
-function validateName(input) {
+                if (
+                    max !== null &&
+                    value > parseFloat(max)
+                ) {
 
-    if (!input) {
-        return true;
-    }
+                    showFieldError(
+                        field,
+                        "Value cannot be higher than " +
+                        max +
+                        "."
+                    );
 
-    const value = getValue(input);
+                    valid = false;
 
-    if (value === "") {
+                }
 
-        return showValidationError(
-            input,
-            "Name is required."
-        );
+            });
 
-    }
 
-    if (
-        value.length <
-        ValidationConfig.minNameLength
-    ) {
+            /*
+            |--------------------------------------------------------------------------
+            | PREVENT SUBMIT
+            |--------------------------------------------------------------------------
+            */
 
-        return showValidationError(
-            input,
-            "Name is too short."
-        );
+            if (!valid) {
 
-    }
+                event.preventDefault();
 
-    if (
-        value.length >
-        ValidationConfig.maxNameLength
-    ) {
+                const firstError =
+                    form.querySelector(
+                        ".validation-error"
+                    );
 
-        return showValidationError(
-            input,
-            "Name is too long."
-        );
+                if (firstError) {
 
-    }
+                    const target =
+                        firstError.closest(
+                            ".form-group, .input-group, .field"
+                        ) ||
+                        firstError;
 
-    if (!ValidationRegex.name.test(value)) {
+                    target.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center"
+                    });
 
-        return showValidationError(
-            input,
-            "Please enter a valid name."
-        );
+                }
 
-    }
+            }
 
-    return showValidationSuccess(input);
+        });
 
-}
+    });
 
 
-/* ==============================================================
-   EMAIL VALIDATION
-============================================================== */
+    /*
+    |--------------------------------------------------------------------------
+    | LIVE VALIDATION
+    |--------------------------------------------------------------------------
+    */
 
-function validateEmail(input) {
+    document.addEventListener(
+        "input",
+        function (event) {
 
-    if (!input) {
-        return true;
-    }
+            const field =
+                event.target;
 
-    const value = getValue(input);
+            if (
+                !field.matches(
+                    "input, textarea, select"
+                )
+            ) {
+                return;
+            }
 
-    if (value === "") {
+            removeFieldError(field);
 
-        return showValidationError(
-            input,
-            "Email address is required."
-        );
-
-    }
-
-    if (!ValidationRegex.email.test(value)) {
-
-        return showValidationError(
-            input,
-            "Please enter a valid email address."
-        );
-
-    }
-
-    return showValidationSuccess(input);
-
-}
-
-
-/* ==============================================================
-   PHONE VALIDATION
-============================================================== */
-
-function validatePhone(input) {
-
-    if (!input) {
-        return true;
-    }
-
-    const value = getValue(input);
-
-    if (value === "") {
-
-        return showValidationError(
-            input,
-            "Phone number is required."
-        );
-
-    }
-
-    if (!ValidationRegex.phone.test(value)) {
-
-        return showValidationError(
-            input,
-            "Please enter a valid phone number."
-        );
-
-    }
-
-    const digitsOnly =
-        value.replace(/\D/g, "");
-
-    if (
-        digitsOnly.length <
-        ValidationConfig.phoneMinLength
-    ) {
-
-        return showValidationError(
-            input,
-            "Phone number is too short."
-        );
-
-    }
-
-    if (
-        digitsOnly.length >
-        ValidationConfig.phoneMaxLength
-    ) {
-
-        return showValidationError(
-            input,
-            "Phone number is too long."
-        );
-
-    }
-
-    return showValidationSuccess(input);
-
-}
-
-
-/* ==============================================================
-   PASSWORD VALIDATION
-============================================================== */
-
-function validatePassword(input) {
-
-    if (!input) {
-        return true;
-    }
-
-    const value = input.value;
-
-    if (value === "") {
-
-        return showValidationError(
-            input,
-            "Password is required."
-        );
-
-    }
-
-    if (
-        value.length <
-        ValidationConfig.minPasswordLength
-    ) {
-
-        return showValidationError(
-            input,
-            `Password must contain at least ${ValidationConfig.minPasswordLength} characters.`
-        );
-
-    }
-
-    if (
-        value.length >
-        ValidationConfig.maxPasswordLength
-    ) {
-
-        return showValidationError(
-            input,
-            "Password is too long."
-        );
-
-    }
-
-    if (!ValidationRegex.passwordUppercase.test(value)) {
-
-        return showValidationError(
-            input,
-            "Password must contain at least one uppercase letter."
-        );
-
-    }
-
-    if (!ValidationRegex.passwordLowercase.test(value)) {
-
-        return showValidationError(
-            input,
-            "Password must contain at least one lowercase letter."
-        );
-
-    }
-
-    if (!ValidationRegex.passwordNumber.test(value)) {
-
-        return showValidationError(
-            input,
-            "Password must contain at least one number."
-        );
-
-    }
-
-    if (!ValidationRegex.passwordSpecial.test(value)) {
-
-        return showValidationError(
-            input,
-            "Password must contain at least one special character."
-        );
-
-    }
-
-    return showValidationSuccess(input);
-
-}
-
-
-/* ==============================================================
-   CONFIRM PASSWORD
-============================================================== */
-
-function validateConfirmPassword(
-    passwordInput,
-    confirmInput
-) {
-
-    if (!passwordInput || !confirmInput) {
-        return true;
-    }
-
-    const password =
-        passwordInput.value;
-
-    const confirmation =
-        confirmInput.value;
-
-    if (confirmation === "") {
-
-        return showValidationError(
-            confirmInput,
-            "Please confirm your password."
-        );
-
-    }
-
-    if (password !== confirmation) {
-
-        return showValidationError(
-            confirmInput,
-            "Passwords do not match."
-        );
-
-    }
-
-    return showValidationSuccess(
-        confirmInput
+        }
     );
 
-}
 
-
-/* ==============================================================
-   LOGIN VALIDATION
-============================================================== */
-
-function initLoginValidation() {
-
-    const loginForms =
-        document.querySelectorAll(
-            "#loginForm, .login-form"
-        );
-
-    loginForms.forEach(function (form) {
-
-        form.addEventListener(
-            "submit",
-            function (event) {
-
-                let valid = true;
-
-                const email =
-                    form.querySelector(
-                        'input[name="email"], #loginEmail'
-                    );
-
-                const password =
-                    form.querySelector(
-                        'input[name="password"], #loginPassword'
-                    );
-
-                if (email) {
-
-                    if (!validateEmail(email)) {
-                        valid = false;
-                    }
-
-                }
-
-                if (password) {
-
-                    if (
-                        !validateRequired(
-                            password,
-                            "Password"
-                        )
-                    ) {
-
-                        valid = false;
-
-                    }
-
-                }
-
-                if (!valid) {
-
-                    event.preventDefault();
-
-                    focusFirstInvalidField(form);
-
-                }
-
-            }
-        );
-
-    });
-
-}
-
-
-/* ==============================================================
-   REGISTER VALIDATION
-============================================================== */
-
-function initRegisterValidation() {
-
-    const registerForms =
-        document.querySelectorAll(
-            "#registerForm, .register-form"
-        );
-
-    registerForms.forEach(function (form) {
-
-        form.addEventListener(
-            "submit",
-            function (event) {
-
-                let valid = true;
-
-                const name =
-                    form.querySelector(
-                        'input[name="name"], #registerName'
-                    );
-
-                const email =
-                    form.querySelector(
-                        'input[name="email"], #registerEmail'
-                    );
-
-                const phone =
-                    form.querySelector(
-                        'input[name="phone"], #registerPhone'
-                    );
-
-                const password =
-                    form.querySelector(
-                        'input[name="password"], #registerPassword'
-                    );
-
-                const confirmPassword =
-                    form.querySelector(
-                        'input[name="confirm_password"], input[name="password_confirmation"], #confirmPassword, #registerConfirmPassword'
-                    );
-
-                if (name) {
-
-                    if (!validateName(name)) {
-                        valid = false;
-                    }
-
-                }
-
-                if (email) {
-
-                    if (!validateEmail(email)) {
-                        valid = false;
-                    }
-
-                }
-
-                if (phone) {
-
-                    if (!validatePhone(phone)) {
-                        valid = false;
-                    }
-
-                }
-
-                if (password) {
-
-                    if (!validatePassword(password)) {
-                        valid = false;
-                    }
-
-                }
-
-                if (
-                    password &&
-                    confirmPassword
-                ) {
-
-                    if (
-                        !validateConfirmPassword(
-                            password,
-                            confirmPassword
-                        )
-                    ) {
-
-                        valid = false;
-
-                    }
-
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | VENDOR REGISTRATION
-                |--------------------------------------------------------------------------
-                */
-
-                const role =
-                    form.querySelector(
-                        'input[name="role"]:checked, select[name="role"]'
-                    );
-
-                if (
-                    role &&
-                    role.value.toLowerCase() === "vendor"
-                ) {
-
-                    const businessName =
-                        form.querySelector(
-                            'input[name="business_name"], #businessName'
-                        );
-
-                    const businessAddress =
-                        form.querySelector(
-                            'textarea[name="business_address"], #businessAddress'
-                        );
-
-                    if (businessName) {
-
-                        if (
-                            !validateRequired(
-                                businessName,
-                                "Business name"
-                            )
-                        ) {
-
-                            valid = false;
-
-                        }
-
-                    }
-
-                    if (businessAddress) {
-
-                        if (
-                            !validateRequired(
-                                businessAddress,
-                                "Business address"
-                            )
-                        ) {
-
-                            valid = false;
-
-                        }
-
-                    }
-
-                }
-
-                if (!valid) {
-
-                    event.preventDefault();
-
-                    focusFirstInvalidField(form);
-
-                }
-
-            }
-        );
-
-    });
-
-}
-
-
-/* ==============================================================
-   PASSWORD STRENGTH
-============================================================== */
-
-function calculatePasswordStrength(password) {
-
-    let score = 0;
-
-    if (!password) {
-        return 0;
-    }
-
-    if (password.length >= 8) {
-        score++;
-    }
-
-    if (password.length >= 12) {
-        score++;
-    }
-
-    if (ValidationRegex.passwordUppercase.test(password)) {
-        score++;
-    }
-
-    if (ValidationRegex.passwordLowercase.test(password)) {
-        score++;
-    }
-
-    if (ValidationRegex.passwordNumber.test(password)) {
-        score++;
-    }
-
-    if (ValidationRegex.passwordSpecial.test(password)) {
-        score++;
-    }
-
-    return Math.min(score, 6);
-
-}
-
-
-/* ==============================================================
-   PASSWORD STRENGTH LABEL
-============================================================== */
-
-function getPasswordStrengthLabel(score) {
-
-    if (score <= 1) {
-        return "Very Weak";
-    }
-
-    if (score === 2) {
-        return "Weak";
-    }
-
-    if (score === 3) {
-        return "Fair";
-    }
-
-    if (score === 4) {
-        return "Good";
-    }
-
-    if (score === 5) {
-        return "Strong";
-    }
-
-    return "Very Strong";
-
-}
-
-
-/* ==============================================================
-   PASSWORD STRENGTH UI
-============================================================== */
-
-function updatePasswordStrength(input) {
-
-    if (!input) {
-        return;
-    }
-
-    const password =
-        input.value;
-
-    let strengthContainer =
-        input.parentElement.parentElement.querySelector(
-            ".password-strength"
-        );
-
-    if (!strengthContainer) {
-
-        strengthContainer =
-            document.createElement("div");
-
-        strengthContainer.className =
-            "password-strength";
-
-        strengthContainer.innerHTML = `
-            <div class="password-strength-bar">
-                <span></span>
-            </div>
-            <div class="password-strength-text">
-                <span>Password strength</span>
-            </div>
-        `;
-
-        input.parentElement.parentElement.appendChild(
-            strengthContainer
-        );
-
-    }
-
-    const score =
-        calculatePasswordStrength(password);
-
-    const bar =
-        strengthContainer.querySelector(
-            ".password-strength-bar span"
-        );
-
-    const text =
-        strengthContainer.querySelector(
-            ".password-strength-text span"
-        );
-
-    if (!password) {
-
-        bar.style.width = "0%";
-
-        text.textContent =
-            "Password strength";
-
-        strengthContainer.className =
-            "password-strength";
-
-        return;
-
-    }
-
-    const percentage =
-        Math.round((score / 6) * 100);
-
-    bar.style.width =
-        `${percentage}%`;
-
-    text.textContent =
-        getPasswordStrengthLabel(score);
-
-    strengthContainer.className =
-        `password-strength strength-${score}`;
-
-}
-
-
-/* ==============================================================
-   INIT PASSWORD STRENGTH
-============================================================== */
-
-function initPasswordStrength() {
+    /*
+    |--------------------------------------------------------------------------
+    | PASSWORD STRENGTH
+    |--------------------------------------------------------------------------
+    */
 
     const passwordInputs =
         document.querySelectorAll(
-            'input[type="password"][name="password"], #registerPassword'
+            'input[type="password"]'
         );
 
     passwordInputs.forEach(function (input) {
@@ -925,360 +399,331 @@ function initPasswordStrength() {
             "input",
             function () {
 
-                updatePasswordStrength(input);
+                updatePasswordStrength(
+                    this
+                );
 
             }
         );
 
     });
+
+});
+
+
+/*
+|--------------------------------------------------------------------------
+| GET FIELD VALUE
+|--------------------------------------------------------------------------
+*/
+
+function getFieldValue(field) {
+
+    if (field.type === "checkbox") {
+
+        return field.checked
+            ? "checked"
+            : "";
+
+    }
+
+    return field.value.trim();
 
 }
 
 
-/* ==============================================================
-   REALTIME VALIDATION
-============================================================== */
+/*
+|--------------------------------------------------------------------------
+| EMAIL VALIDATION
+|--------------------------------------------------------------------------
+*/
 
-function initRealtimeValidation() {
+function isValidEmail(email) {
 
-    const emailInputs =
-        document.querySelectorAll(
-            'input[type="email"], input[name="email"]'
-        );
+    const pattern =
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    emailInputs.forEach(function (input) {
-
-        input.addEventListener(
-            "blur",
-            function () {
-
-                validateEmail(input);
-
-            }
-        );
-
-    });
-
-
-    const phoneInputs =
-        document.querySelectorAll(
-            'input[name="phone"], input[type="tel"]'
-        );
-
-    phoneInputs.forEach(function (input) {
-
-        input.addEventListener(
-            "blur",
-            function () {
-
-                validatePhone(input);
-
-            }
-        );
-
-    });
-
-
-    const nameInputs =
-        document.querySelectorAll(
-            'input[name="name"], #registerName'
-        );
-
-    nameInputs.forEach(function (input) {
-
-        input.addEventListener(
-            "blur",
-            function () {
-
-                validateName(input);
-
-            }
-        );
-
-    });
-
-
-    const passwordInputs =
-        document.querySelectorAll(
-            'input[name="password"], #registerPassword'
-        );
-
-    passwordInputs.forEach(function (input) {
-
-        input.addEventListener(
-            "blur",
-            function () {
-
-                validatePassword(input);
-
-            }
-        );
-
-    });
-
-
-    const confirmInputs =
-        document.querySelectorAll(
-            'input[name="confirm_password"], input[name="password_confirmation"], #confirmPassword, #registerConfirmPassword'
-        );
-
-    confirmInputs.forEach(function (input) {
-
-        input.addEventListener(
-            "blur",
-            function () {
-
-                const form =
-                    input.closest("form");
-
-                if (!form) {
-                    return;
-                }
-
-                const password =
-                    form.querySelector(
-                        'input[name="password"], #registerPassword'
-                    );
-
-                if (password) {
-
-                    validateConfirmPassword(
-                        password,
-                        input
-                    );
-
-                }
-
-            }
-        );
-
-    });
+    return pattern.test(
+        String(email).trim()
+    );
 
 }
 
 
-/* ==============================================================
-   PASSWORD SHOW / HIDE
-============================================================== */
+/*
+|--------------------------------------------------------------------------
+| PHONE VALIDATION
+|--------------------------------------------------------------------------
+*/
 
-function initPasswordToggle() {
+function isValidPhone(phone) {
 
-    const toggleButtons =
-        document.querySelectorAll(
-            "[data-password-toggle], .password-toggle"
-        );
+    const cleaned =
+        String(phone)
+            .replace(/[\s\-().+]/g, "");
 
-    toggleButtons.forEach(function (button) {
-
-        button.addEventListener(
-            "click",
-            function () {
-
-                let targetSelector =
-                    button.getAttribute(
-                        "data-target"
-                    );
-
-                let input = null;
-
-                if (targetSelector) {
-
-                    input =
-                        document.querySelector(
-                            targetSelector
-                        );
-
-                }
-
-                if (!input) {
-
-                    input =
-                        button.parentElement.querySelector(
-                            'input[type="password"], input[type="text"]'
-                        );
-
-                }
-
-                if (!input) {
-                    return;
-                }
-
-                if (
-                    input.type === "password"
-                ) {
-
-                    input.type = "text";
-
-                    button.classList.add(
-                        "active"
-                    );
-
-                    button.setAttribute(
-                        "aria-label",
-                        "Hide password"
-                    );
-
-                    if (button.querySelector("i")) {
-
-                        button.querySelector("i").className =
-                            "fa-solid fa-eye-slash";
-
-                    }
-
-                } else {
-
-                    input.type = "password";
-
-                    button.classList.remove(
-                        "active"
-                    );
-
-                    button.setAttribute(
-                        "aria-label",
-                        "Show password"
-                    );
-
-                    if (button.querySelector("i")) {
-
-                        button.querySelector("i").className =
-                            "fa-solid fa-eye";
-
-                    }
-
-                }
-
-            }
-        );
-
-    });
+    return /^[0-9]{8,15}$/.test(
+        cleaned
+    );
 
 }
 
 
-/* ==============================================================
-   FOCUS FIRST INVALID FIELD
-============================================================== */
+/*
+|--------------------------------------------------------------------------
+| PASSWORD VALIDATION
+|--------------------------------------------------------------------------
+*/
 
-function focusFirstInvalidField(form) {
+function isValidPassword(password) {
 
-    if (!form) {
+    return password.length >= 8;
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| SHOW FIELD ERROR
+|--------------------------------------------------------------------------
+*/
+
+function showFieldError(field, message) {
+
+    removeFieldError(field);
+
+    field.classList.add(
+        "validation-invalid"
+    );
+
+    field.setAttribute(
+        "aria-invalid",
+        "true"
+    );
+
+
+    const wrapper =
+        field.closest(
+            ".form-group, .input-group, .field, .form-field"
+        ) ||
+        field.parentElement;
+
+
+    if (!wrapper) {
         return;
     }
 
-    const invalid =
-        form.querySelector(
-            ".is-invalid"
+
+    const error =
+        document.createElement("small");
+
+    error.className =
+        "validation-error";
+
+    error.textContent =
+        message;
+
+
+    wrapper.appendChild(error);
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| REMOVE FIELD ERROR
+|--------------------------------------------------------------------------
+*/
+
+function removeFieldError(field) {
+
+    field.classList.remove(
+        "validation-invalid"
+    );
+
+    field.removeAttribute(
+        "aria-invalid"
+    );
+
+
+    const wrapper =
+        field.closest(
+            ".form-group, .input-group, .field, .form-field"
+        ) ||
+        field.parentElement;
+
+
+    if (!wrapper) {
+        return;
+    }
+
+
+    const error =
+        wrapper.querySelector(
+            ".validation-error"
         );
 
-    if (invalid) {
 
-        invalid.focus();
-
-        invalid.scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-        });
-
+    if (error) {
+        error.remove();
     }
 
 }
 
 
-/* ==============================================================
-   PREVENT DOUBLE SUBMISSION
-============================================================== */
+/*
+|--------------------------------------------------------------------------
+| CLEAR FORM ERRORS
+|--------------------------------------------------------------------------
+*/
 
-function preventDoubleSubmission(form) {
+function clearFormErrors(form) {
 
-    if (!form) {
-        return;
-    }
+    form.querySelectorAll(
+        ".validation-error"
+    ).forEach(function (error) {
 
-    if (
-        form.dataset.submitting === "true"
-    ) {
-        return;
-    }
+        error.remove();
 
-    form.dataset.submitting = "true";
+    });
 
-    const submitButtons =
-        form.querySelectorAll(
-            'button[type="submit"], input[type="submit"]'
+
+    form.querySelectorAll(
+        ".validation-invalid"
+    ).forEach(function (field) {
+
+        field.classList.remove(
+            "validation-invalid"
         );
 
-    submitButtons.forEach(function (button) {
-
-        button.disabled = true;
-
-        button.classList.add(
-            "is-loading"
+        field.removeAttribute(
+            "aria-invalid"
         );
-
-        if (
-            button.tagName.toLowerCase() ===
-            "button"
-        ) {
-
-            button.dataset.originalText =
-                button.innerHTML;
-
-            button.innerHTML = `
-                <i class="fa-solid fa-spinner fa-spin"></i>
-                Processing...
-            `;
-
-        }
 
     });
 
 }
 
 
-/* ==============================================================
-   RESET DOUBLE SUBMISSION
-============================================================== */
+/*
+|--------------------------------------------------------------------------
+| PASSWORD STRENGTH
+|--------------------------------------------------------------------------
+*/
 
-function resetDoubleSubmission(form) {
+function updatePasswordStrength(input) {
 
-    if (!form) {
+    const password =
+        input.value;
+
+    const wrapper =
+        input.closest(
+            ".form-group, .input-group, .field, .form-field"
+        ) ||
+        input.parentElement;
+
+
+    if (!wrapper) {
         return;
     }
 
-    form.dataset.submitting = "false";
 
-    const submitButtons =
-        form.querySelectorAll(
-            'button[type="submit"], input[type="submit"]'
+    let strength =
+        wrapper.querySelector(
+            ".password-strength"
         );
 
-    submitButtons.forEach(function (button) {
 
-        button.disabled = false;
+    if (!strength) {
 
-        button.classList.remove(
-            "is-loading"
+        strength =
+            document.createElement("div");
+
+        strength.className =
+            "password-strength";
+
+        input.insertAdjacentElement(
+            "afterend",
+            strength
         );
 
-        if (
-            button.dataset.originalText
-        ) {
+    }
 
-            button.innerHTML =
-                button.dataset.originalText;
 
-            delete button.dataset.originalText;
+    if (password === "") {
 
-        }
+        strength.innerHTML = "";
 
-    });
+        strength.className =
+            "password-strength";
+
+        return;
+
+    }
+
+
+    let score = 0;
+
+
+    if (password.length >= 8) {
+        score++;
+    }
+
+    if (/[A-Z]/.test(password)) {
+        score++;
+    }
+
+    if (/[a-z]/.test(password)) {
+        score++;
+    }
+
+    if (/[0-9]/.test(password)) {
+        score++;
+    }
+
+    if (/[^A-Za-z0-9]/.test(password)) {
+        score++;
+    }
+
+
+    let text = "";
+    let level = "";
+
+
+    if (score <= 2) {
+
+        text = "Weak";
+        level = "weak";
+
+    } else if (score <= 4) {
+
+        text = "Medium";
+        level = "medium";
+
+    } else {
+
+        text = "Strong";
+        level = "strong";
+
+    }
+
+
+    strength.className =
+        "password-strength " +
+        level;
+
+    strength.textContent =
+        "Password strength: " +
+        text;
 
 }
 
 
-/* ==============================================================
-   FORM SUBMISSION PROTECTION
-============================================================== */
+/*
+|--------------------------------------------------------------------------
+| PREVENT MULTIPLE SUBMISSIONS
+|--------------------------------------------------------------------------
+*/
 
 document.addEventListener(
     "submit",
@@ -1287,302 +732,45 @@ document.addEventListener(
         const form =
             event.target;
 
-        if (!form || form.tagName !== "FORM") {
-            return;
-        }
-
         if (
-            form.dataset.validationSkip ===
-            "true"
+            !(form instanceof HTMLFormElement)
         ) {
             return;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Don't lock the form if browser validation fails
-        |--------------------------------------------------------------------------
-        */
-
-        if (!form.checkValidity()) {
-            return;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Prevent accidental double click
-        |--------------------------------------------------------------------------
-        */
-
         if (
-            form.dataset.submitting === "true"
+            form.dataset.preventDoubleSubmit ===
+            "false"
         ) {
-
-            event.preventDefault();
-
             return;
-
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Only lock after validation has passed
-        |--------------------------------------------------------------------------
-        */
 
         setTimeout(function () {
 
-            if (!event.defaultPrevented) {
-
-                preventDoubleSubmission(
-                    form
+            const submitButtons =
+                form.querySelectorAll(
+                    'button[type="submit"], input[type="submit"]'
                 );
 
-            }
+            submitButtons.forEach(function (button) {
 
-        }, 0);
+                button.disabled = true;
 
-    },
-    true
-);
-
-
-/* ==============================================================
-   CLEAR VALIDATION WHEN USER TYPES
-============================================================== */
-
-document.addEventListener(
-    "input",
-    function (event) {
-
-        const input =
-            event.target;
-
-        if (!input.matches("input, textarea, select")) {
-            return;
-        }
-
-        if (
-            input.classList.contains(
-                "is-invalid"
-            )
-        ) {
-
-            clearValidationError(
-                input
-            );
-
-        }
-
-    }
-);
-
-
-/* ==============================================================
-   OTP VALIDATION
-============================================================== */
-
-function validateOTP(input) {
-
-    if (!input) {
-        return false;
-    }
-
-    const value =
-        getValue(input);
-
-    if (value === "") {
-
-        return showValidationError(
-            input,
-            "Verification code is required."
-        );
-
-    }
-
-    if (!/^[0-9]{4,8}$/.test(value)) {
-
-        return showValidationError(
-            input,
-            "Please enter a valid verification code."
-        );
-
-    }
-
-    return showValidationSuccess(
-        input
-    );
-
-}
-
-
-/* ==============================================================
-   INIT OTP VALIDATION
-============================================================== */
-
-function initOTPValidation() {
-
-    const otpInputs =
-        document.querySelectorAll(
-            'input[name="otp"], input[name="mfa_code"], input[name="verification_code"], #otpCode'
-        );
-
-    otpInputs.forEach(function (input) {
-
-        input.addEventListener(
-            "input",
-            function () {
-
-                input.value =
-                    input.value.replace(
-                        /\D/g,
-                        ""
-                    );
+                button.dataset.originalText =
+                    button.textContent;
 
                 if (
-                    input.value.length >= 4
+                    button.tagName === "BUTTON"
                 ) {
 
-                    validateOTP(
-                        input
-                    );
+                    button.textContent =
+                        "Processing...";
 
                 }
 
-            }
-        );
+            });
 
-    });
-
-}
-
-
-/* ==============================================================
-   FORGOT PASSWORD VALIDATION
-============================================================== */
-
-function initForgotPasswordValidation() {
-
-    const forms =
-        document.querySelectorAll(
-            "#forgotPasswordForm, .forgot-password-form"
-        );
-
-    forms.forEach(function (form) {
-
-        form.addEventListener(
-            "submit",
-            function (event) {
-
-                const email =
-                    form.querySelector(
-                        'input[name="email"], #forgotEmail'
-                    );
-
-                const phone =
-                    form.querySelector(
-                        'input[name="phone"], #forgotPhone'
-                    );
-
-                let valid = false;
-
-                if (email && getValue(email)) {
-
-                    valid =
-                        validateEmail(email);
-
-                } else if (
-                    phone &&
-                    getValue(phone)
-                ) {
-
-                    valid =
-                        validatePhone(phone);
-
-                } else {
-
-                    if (email) {
-
-                        showValidationError(
-                            email,
-                            "Enter your email or phone number."
-                        );
-
-                    } else if (phone) {
-
-                        showValidationError(
-                            phone,
-                            "Enter your email or phone number."
-                        );
-
-                    }
-
-                    valid = false;
-
-                }
-
-                if (!valid) {
-
-                    event.preventDefault();
-
-                    focusFirstInvalidField(
-                        form
-                    );
-
-                }
-
-            }
-        );
-
-    });
-
-}
-
-
-/* ==============================================================
-   INIT EVERYTHING
-============================================================== */
-
-document.addEventListener(
-    "DOMContentLoaded",
-    function () {
-
-        initOTPValidation();
-
-        initForgotPasswordValidation();
+        }, 50);
 
     }
 );
-
-
-/* ==============================================================
-   GLOBAL EXPORTS
-============================================================== */
-
-window.HochipoValidation = {
-
-    validateRequired,
-
-    validateName,
-
-    validateEmail,
-
-    validatePhone,
-
-    validatePassword,
-
-    validateConfirmPassword,
-
-    validateOTP,
-
-    calculatePasswordStrength,
-
-    clearValidationError,
-
-    showValidationError,
-
-    showValidationSuccess,
-
-    resetDoubleSubmission
-
-};
