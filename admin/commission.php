@@ -1,45 +1,30 @@
 <?php
 
-/*
-|--------------------------------------------------------------------------
-| HOCHIPOHUB
-| ADMIN - COMMISSION MANAGEMENT
-|--------------------------------------------------------------------------
-*/
-
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../database/db.php';
-require_once __DIR__ . '/../includes/session.php';
-require_once __DIR__ . '/../includes/functions.php';
+require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/database/db.php';
+require_once dirname(__DIR__) . '/includes/session.php';
+require_once dirname(__DIR__) . '/includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
 /*
 |--------------------------------------------------------------------------
-| ADMIN CHECK
+| ADMIN ACCESS CHECK
 |--------------------------------------------------------------------------
 */
 
 if (!isset($_SESSION['user_id'])) {
-
-    header(
-        'Location: ' .
-        site_url('index.php?login=required')
-    );
-
+    header('Location: ' . site_url('index.php?login=required'));
     exit;
 }
 
-
 $userId = (int) $_SESSION['user_id'];
-
 
 /*
 |--------------------------------------------------------------------------
-| GET CURRENT USER
+| GET CURRENT ADMIN
 |--------------------------------------------------------------------------
 */
 
@@ -55,57 +40,32 @@ $stmt = $conn->prepare("
     LIMIT 1
 ");
 
-$stmt->bind_param(
-    "i",
-    $userId
-);
-
+$stmt->bind_param("i", $userId);
 $stmt->execute();
 
 $result = $stmt->get_result();
-
-$currentUser =
-    $result->fetch_assoc();
+$admin = $result->fetch_assoc();
 
 $stmt->close();
 
-
-if (!$currentUser) {
-
+if (!$admin) {
     session_destroy();
 
-    header(
-        'Location: ' .
-        site_url('index.php')
-    );
-
+    header('Location: ' . site_url('index.php'));
     exit;
 }
 
-
-if ($currentUser['role'] !== 'admin') {
-
-    header(
-        'Location: ' .
-        site_url('dashboard.php')
-    );
-
+if ($admin['role'] !== 'admin') {
+    header('Location: ' . site_url('dashboard.php'));
     exit;
 }
 
-
-if ($currentUser['status'] !== 'active') {
-
+if ($admin['status'] !== 'active') {
     session_destroy();
 
-    header(
-        'Location: ' .
-        site_url('index.php?account=inactive')
-    );
-
+    header('Location: ' . site_url('index.php?account=inactive'));
     exit;
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -113,44 +73,31 @@ if ($currentUser['status'] !== 'active') {
 |--------------------------------------------------------------------------
 */
 
-$statusFilter =
-    $_GET['status'] ?? 'all';
-
-$vendorFilter =
-    isset($_GET['vendor_id'])
-        ? (int) $_GET['vendor_id']
-        : 0;
-
-$search =
-    trim(
-        $_GET['search'] ?? ''
-    );
-
+$statusFilter = $_GET['status'] ?? 'all';
 
 $allowedStatuses = [
     'all',
     'Pending',
     'Paid',
+    'Completed',
     'Cancelled'
 ];
 
-
-if (
-    !in_array(
-        $statusFilter,
-        $allowedStatuses,
-        true
-    )
-) {
-
+if (!in_array($statusFilter, $allowedStatuses, true)) {
     $statusFilter = 'all';
-
 }
-
 
 /*
 |--------------------------------------------------------------------------
-| SUMMARY
+| SEARCH
+|--------------------------------------------------------------------------
+*/
+
+$search = trim($_GET['search'] ?? '');
+
+/*
+|--------------------------------------------------------------------------
+| COMMISSION SUMMARY
 |--------------------------------------------------------------------------
 */
 
@@ -158,171 +105,78 @@ $summary = [
     'total' => 0,
     'pending' => 0,
     'paid' => 0,
+    'completed' => 0,
     'cancelled' => 0
 ];
 
-
-$result = $conn->query("
-    SELECT
-        COUNT(*) AS total,
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN status = 'Pending'
-                    THEN 1
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS pending,
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN status = 'Paid'
-                    THEN 1
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS paid,
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN status = 'Cancelled'
-                    THEN 1
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS cancelled
-    FROM commission
-");
-
-
-if ($result) {
-
-    $row =
-        $result->fetch_assoc();
-
-    $summary['total'] =
-        (int) ($row['total'] ?? 0);
-
-    $summary['pending'] =
-        (int) ($row['pending'] ?? 0);
-
-    $summary['paid'] =
-        (int) ($row['paid'] ?? 0);
-
-    $summary['cancelled'] =
-        (int) ($row['cancelled'] ?? 0);
-
-}
-
-
 /*
 |--------------------------------------------------------------------------
-| COMMISSION AMOUNT SUMMARY
+| TOTAL COMMISSION
 |--------------------------------------------------------------------------
 */
 
-$amountSummary = [
-    'total' => 0,
-    'pending' => 0,
-    'paid' => 0
-];
-
-
 $result = $conn->query("
     SELECT
-
-        COALESCE(
-            SUM(commission_amount),
-            0
-        ) AS total,
-
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN status = 'Pending'
-                    THEN commission_amount
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS pending,
-
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN status = 'Paid'
-                    THEN commission_amount
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS paid
-
+        COALESCE(SUM(commission_amount), 0) AS total
     FROM commission
+    WHERE status != 'Cancelled'
 ");
 
-
 if ($result) {
+    $row = $result->fetch_assoc();
 
-    $row =
-        $result->fetch_assoc();
-
-    $amountSummary['total'] =
-        (float) ($row['total'] ?? 0);
-
-    $amountSummary['pending'] =
-        (float) ($row['pending'] ?? 0);
-
-    $amountSummary['paid'] =
-        (float) ($row['paid'] ?? 0);
-
+    $summary['total'] = (float) ($row['total'] ?? 0);
 }
-
 
 /*
 |--------------------------------------------------------------------------
-| GET VENDORS
+| STATUS COUNTS
 |--------------------------------------------------------------------------
 */
 
-$vendors = [];
-
 $result = $conn->query("
     SELECT
-        vendor_id,
-        business_name
-    FROM vendors
-    ORDER BY business_name ASC
+        status,
+        COUNT(*) AS total
+    FROM commission
+    GROUP BY status
 ");
-
 
 if ($result) {
 
-    while (
-        $row =
-        $result->fetch_assoc()
-    ) {
+    while ($row = $result->fetch_assoc()) {
 
-        $vendors[] = $row;
+        $status = $row['status'];
+        $count = (int) $row['total'];
 
+        if ($status === 'Pending') {
+            $summary['pending'] = $count;
+        }
+
+        if ($status === 'Paid') {
+            $summary['paid'] = $count;
+        }
+
+        if ($status === 'Completed') {
+            $summary['completed'] = $count;
+        }
+
+        if ($status === 'Cancelled') {
+            $summary['cancelled'] = $count;
+        }
     }
-
 }
-
 
 /*
 |--------------------------------------------------------------------------
-| BUILD COMMISSION QUERY
+| COMMISSION LIST
 |--------------------------------------------------------------------------
 */
+
+$commissionRows = [];
 
 $sql = "
     SELECT
-
         c.commission_id,
         c.order_id,
         c.vendor_id,
@@ -337,20 +191,17 @@ $sql = "
 
     FROM commission c
 
-    INNER JOIN vendors v
+    LEFT JOIN vendors v
         ON c.vendor_id = v.vendor_id
 
     LEFT JOIN users u
         ON v.user_id = u.user_id
 
-    WHERE 1 = 1
+    WHERE 1 = ?
 ";
 
-
-$params = [];
-
-$types = "";
-
+$types = "i";
+$params = [1];
 
 /*
 |--------------------------------------------------------------------------
@@ -364,37 +215,13 @@ if ($statusFilter !== 'all') {
         AND c.status = ?
     ";
 
-    $params[] =
-        $statusFilter;
-
     $types .= "s";
-
+    $params[] = $statusFilter;
 }
-
 
 /*
 |--------------------------------------------------------------------------
-| VENDOR FILTER
-|--------------------------------------------------------------------------
-*/
-
-if ($vendorFilter > 0) {
-
-    $sql .= "
-        AND c.vendor_id = ?
-    ";
-
-    $params[] =
-        $vendorFilter;
-
-    $types .= "i";
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| SEARCH
+| SEARCH FILTER
 |--------------------------------------------------------------------------
 */
 
@@ -402,106 +229,64 @@ if ($search !== '') {
 
     $sql .= "
         AND (
-            v.business_name LIKE ?
-            OR u.name LIKE ?
+            CAST(c.commission_id AS CHAR) LIKE ?
             OR CAST(c.order_id AS CHAR) LIKE ?
+            OR v.business_name LIKE ?
+            OR u.name LIKE ?
         )
     ";
 
-    $searchValue =
-        '%' . $search . '%';
+    $searchValue = '%' . $search . '%';
 
-    $params[] =
-        $searchValue;
+    $types .= "ssss";
 
-    $params[] =
-        $searchValue;
-
-    $params[] =
-        $searchValue;
-
-    $types .= "sss";
-
+    $params[] = $searchValue;
+    $params[] = $searchValue;
+    $params[] = $searchValue;
+    $params[] = $searchValue;
 }
-
 
 $sql .= "
     ORDER BY c.created_at DESC
+    LIMIT 100
 ";
 
+$stmt = $conn->prepare($sql);
 
-/*
-|--------------------------------------------------------------------------
-| PREPARE
-|--------------------------------------------------------------------------
-*/
-
-$stmt =
-    $conn->prepare($sql);
-
-
-if (!empty($params)) {
+if ($stmt) {
 
     $stmt->bind_param(
         $types,
         ...$params
     );
 
+    $stmt->execute();
+
+    $result = $stmt->get_result();
+
+    while ($row = $result->fetch_assoc()) {
+        $commissionRows[] = $row;
+    }
+
+    $stmt->close();
 }
-
-
-$stmt->execute();
-
-$result =
-    $stmt->get_result();
-
-
-$commissions = [];
-
-
-while (
-    $row =
-    $result->fetch_assoc()
-) {
-
-    $commissions[] =
-        $row;
-
-}
-
-
-$stmt->close();
-
 
 /*
 |--------------------------------------------------------------------------
-| FORMAT MONEY
+| HELPER
 |--------------------------------------------------------------------------
 */
 
-function admin_commission_money(
-    $amount
-) {
-
-    return 'RM ' .
-        number_format(
-            (float) $amount,
-            2
-        );
-
+function commission_money($amount)
+{
+    return 'RM ' . number_format(
+        (float) $amount,
+        2
+    );
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| FORMAT DATE
-|--------------------------------------------------------------------------
-*/
-
-function admin_commission_date(
-    $date
-) {
-
+function commission_date($date)
+{
     if (!$date) {
         return '-';
     }
@@ -510,21 +295,11 @@ function admin_commission_date(
         'd M Y, h:i A',
         strtotime($date)
     );
-
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| STATUS CLASS
-|--------------------------------------------------------------------------
-*/
-
-function admin_commission_status_class(
-    $status
-) {
-
-    return 'status-' .
+function commission_status_class($status)
+{
+    return 'commission-status-' .
         strtolower(
             str_replace(
                 ' ',
@@ -532,7 +307,6 @@ function admin_commission_status_class(
                 $status
             )
         );
-
 }
 
 ?>
@@ -552,783 +326,502 @@ function admin_commission_status_class(
 
     <title>
         Commission |
-        <?php
-        echo htmlspecialchars(
-            SITE_NAME
-        );
-        ?>
+        <?php echo htmlspecialchars(SITE_NAME); ?>
     </title>
 
-
     <link
         rel="stylesheet"
-        href="<?php
-        echo site_url(
-            'css/style.css'
-        );
-        ?>"
+        href="<?php echo site_url('css/style.css'); ?>"
     >
 
     <link
         rel="stylesheet"
-        href="<?php
-        echo site_url(
-            'css/admin.css'
-        );
-        ?>"
+        href="<?php echo site_url('css/admin.css'); ?>"
     >
 
     <link
         rel="stylesheet"
-        href="<?php
-        echo site_url(
-            'css/responsive.css'
-        );
-        ?>"
+        href="<?php echo site_url('css/responsive.css'); ?>"
     >
-
 
     <style>
 
         .admin-page {
-
             min-height: 100vh;
-
-            padding:
-                35px 0 80px;
-
+            padding: 35px 0 80px;
             background:
+                radial-gradient(
+                    circle at 10% 0%,
+                    rgba(37, 99, 235, .16),
+                    transparent 28%
+                ),
+                radial-gradient(
+                    circle at 90% 10%,
+                    rgba(14, 165, 233, .12),
+                    transparent 25%
+                ),
                 linear-gradient(
                     145deg,
                     #020617,
-                    #061a35,
+                    #061a35 55%,
                     #020617
                 );
-
             color: #f8fafc;
-
         }
-
 
         .admin-container {
-
             width: 90%;
-
-            max-width: 1400px;
-
+            max-width: 1450px;
             margin: auto;
-
         }
-
 
         .admin-header {
-
             display: flex;
-
-            justify-content:
-                space-between;
-
+            justify-content: space-between;
             align-items: center;
-
             gap: 20px;
-
             margin-bottom: 25px;
-
         }
-
 
         .admin-header h1 {
-
             margin: 0;
-
-            color: #f8fafc;
-
-            font-size: 30px;
-
+            font-size: 32px;
             font-weight: 950;
-
+            letter-spacing: -1px;
         }
-
 
         .admin-header p {
-
             margin: 7px 0 0;
-
             color: #64748b;
-
             font-size: 11px;
-
         }
 
-
-        .admin-back {
-
-            display: inline-flex;
-
-            align-items: center;
-
-            padding:
-                10px 15px;
-
-            border:
-                1px solid
-                rgba(
-                    56,
-                    189,
-                    248,
-                    .18
-                );
-
-            border-radius: 10px;
-
+        .admin-header-badge {
+            padding: 10px 15px;
+            border: 1px solid rgba(56,189,248,.16);
+            border-radius: 12px;
+            background: rgba(14,165,233,.06);
             color: #7dd3fc;
-
-            text-decoration: none;
-
-            font-size: 10px;
-
+            font-size: 9px;
             font-weight: 900;
-
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
-
 
         .commission-summary {
-
             display: grid;
-
-            grid-template-columns:
-                repeat(4, 1fr);
-
+            grid-template-columns: repeat(4, 1fr);
             gap: 14px;
-
-            margin-bottom: 20px;
-
+            margin-bottom: 22px;
         }
-
 
         .commission-stat {
-
-            padding: 19px;
-
-            border:
-                1px solid
-                rgba(
-                    148,
-                    163,
-                    184,
-                    .09
-                );
-
-            border-radius: 17px;
-
-            background:
-                rgba(
-                    15,
-                    23,
-                    42,
-                    .82
-                );
-
+            padding: 20px;
+            border: 1px solid rgba(148,163,184,.09);
+            border-radius: 18px;
+            background: rgba(15,23,42,.78);
         }
-
 
         .commission-stat-label {
-
             display: block;
-
+            margin-bottom: 8px;
             color: #64748b;
-
             font-size: 8px;
-
             font-weight: 900;
-
+            text-transform: uppercase;
             letter-spacing: 1px;
-
-            text-transform:
-                uppercase;
-
         }
-
 
         .commission-stat-value {
-
             display: block;
-
-            margin-top: 8px;
-
             color: #f8fafc;
-
             font-size: 23px;
-
             font-weight: 950;
-
         }
 
-
-        .commission-stat-sub {
-
-            display: block;
-
-            margin-top: 4px;
-
-            color: #475569;
-
-            font-size: 8px;
-
+        .commission-stat-value.blue {
+            color: #7dd3fc;
         }
 
+        .commission-stat-value.yellow {
+            color: #fde047;
+        }
+
+        .commission-stat-value.green {
+            color: #86efac;
+        }
 
         .commission-filter {
-
             display: flex;
-
-            flex-wrap: wrap;
-
-            gap: 9px;
-
-            padding: 15px;
-
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
             margin-bottom: 18px;
-
-            border:
-                1px solid
-                rgba(
-                    148,
-                    163,
-                    184,
-                    .08
-                );
-
-            border-radius: 15px;
-
-            background:
-                rgba(
-                    15,
-                    23,
-                    42,
-                    .72
-                );
-
+            padding: 16px;
+            border: 1px solid rgba(148,163,184,.08);
+            border-radius: 17px;
+            background: rgba(15,23,42,.75);
         }
 
-
-        .commission-filter input,
-        .commission-filter select {
-
-            min-height: 38px;
-
-            padding:
-                0 12px;
-
-            border:
-                1px solid
-                rgba(
-                    148,
-                    163,
-                    184,
-                    .12
-                );
-
-            border-radius: 9px;
-
-            outline: none;
-
-            background:
-                #020617;
-
-            color: #cbd5e1;
-
-            font-size: 10px;
-
-        }
-
-
-        .commission-filter input {
-
+        .commission-search {
+            display: flex;
             flex: 1;
-
-            min-width: 190px;
-
+            gap: 8px;
         }
 
-
-        .commission-filter button {
-
+        .commission-search input,
+        .commission-filter select {
             min-height: 38px;
-
-            padding:
-                0 17px;
-
-            border: 0;
-
-            border-radius: 9px;
-
-            background:
-                #0284c7;
-
-            color: white;
-
-            cursor: pointer;
-
+            box-sizing: border-box;
+            border: 1px solid rgba(148,163,184,.12);
+            border-radius: 10px;
+            outline: none;
+            background: rgba(2,6,23,.65);
+            color: #cbd5e1;
             font-size: 10px;
+        }
 
+        .commission-search input {
+            width: 100%;
+            padding: 0 13px;
+        }
+
+        .commission-filter select {
+            padding: 0 12px;
+        }
+
+        .commission-search input:focus,
+        .commission-filter select:focus {
+            border-color: rgba(56,189,248,.45);
+        }
+
+        .commission-btn {
+            min-height: 38px;
+            padding: 0 15px;
+            border: 0;
+            border-radius: 10px;
+            background: #0284c7;
+            color: white;
+            font-size: 9px;
             font-weight: 900;
-
+            cursor: pointer;
         }
 
+        .commission-btn:hover {
+            background: #0369a1;
+        }
 
-        .commission-table-card {
+        .commission-reset {
+            display: inline-flex;
+            align-items: center;
+            min-height: 38px;
+            padding: 0 13px;
+            border: 1px solid rgba(148,163,184,.1);
+            border-radius: 10px;
+            color: #64748b;
+            font-size: 9px;
+            font-weight: 900;
+            text-decoration: none;
+        }
 
+        .commission-reset:hover {
+            color: #7dd3fc;
+            border-color: rgba(56,189,248,.25);
+        }
+
+        .commission-card {
             overflow: hidden;
-
-            border:
-                1px solid
-                rgba(
-                    148,
-                    163,
-                    184,
-                    .08
-                );
-
-            border-radius: 18px;
-
-            background:
-                rgba(
-                    15,
-                    23,
-                    42,
-                    .78
-                );
-
+            border: 1px solid rgba(148,163,184,.09);
+            border-radius: 20px;
+            background: rgba(15,23,42,.78);
         }
 
+        .commission-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 20px;
+            border-bottom: 1px solid rgba(148,163,184,.07);
+        }
+
+        .commission-card-header h2 {
+            margin: 0;
+            color: #e2e8f0;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .commission-card-header span {
+            color: #475569;
+            font-size: 9px;
+        }
 
         .commission-table-wrapper {
-
+            width: 100%;
             overflow-x: auto;
-
         }
-
 
         .commission-table {
-
             width: 100%;
-
-            border-collapse:
-                collapse;
-
-            min-width: 900px;
-
+            min-width: 850px;
+            border-collapse: collapse;
         }
-
 
         .commission-table th {
-
-            padding:
-                14px 16px;
-
-            background:
-                rgba(
-                    2,
-                    6,
-                    23,
-                    .55
-                );
-
+            padding: 13px 16px;
+            background: rgba(2,6,23,.28);
             color: #475569;
-
             font-size: 8px;
-
             font-weight: 900;
-
-            letter-spacing: 1px;
-
+            letter-spacing: .8px;
             text-align: left;
-
-            text-transform:
-                uppercase;
-
+            text-transform: uppercase;
         }
-
 
         .commission-table td {
-
-            padding:
-                15px 16px;
-
-            border-top:
-                1px solid
-                rgba(
-                    148,
-                    163,
-                    184,
-                    .055
-                );
-
+            padding: 15px 16px;
+            border-top: 1px solid rgba(148,163,184,.055);
             color: #94a3b8;
-
             font-size: 10px;
-
         }
-
 
         .commission-table tr:hover td {
-
-            background:
-                rgba(
-                    14,
-                    165,
-                    233,
-                    .025
-                );
-
+            background: rgba(14,165,233,.025);
         }
-
 
         .commission-id {
-
             color: #7dd3fc;
-
             font-weight: 900;
-
         }
-
 
         .commission-vendor {
-
-            color: #e2e8f0;
-
+            color: #cbd5e1;
             font-weight: 850;
-
         }
-
 
         .commission-owner {
-
             display: block;
-
             margin-top: 3px;
-
             color: #475569;
-
             font-size: 8px;
-
         }
-
 
         .commission-amount {
-
-            color: #f8fafc;
-
+            color: #86efac;
             font-weight: 950;
-
         }
-
 
         .commission-status {
-
             display: inline-flex;
-
-            padding:
-                5px 9px;
-
+            align-items: center;
+            gap: 5px;
+            padding: 5px 8px;
             border-radius: 99px;
-
             font-size: 8px;
-
             font-weight: 900;
-
         }
 
+        .commission-status::before {
+            content: "";
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+        }
 
-        .status-pending {
-
-            background:
-                rgba(
-                    250,
-                    204,
-                    21,
-                    .08
-                );
-
+        .commission-status-pending {
+            background: rgba(250,204,21,.08);
             color: #fde047;
-
         }
 
+        .commission-status-pending::before {
+            background: #facc15;
+        }
 
-        .status-paid {
-
-            background:
-                rgba(
-                    34,
-                    197,
-                    94,
-                    .08
-                );
-
+        .commission-status-paid,
+        .commission-status-completed {
+            background: rgba(34,197,94,.08);
             color: #86efac;
-
         }
 
+        .commission-status-paid::before,
+        .commission-status-completed::before {
+            background: #22c55e;
+        }
 
-        .status-cancelled {
-
-            background:
-                rgba(
-                    239,
-                    68,
-                    68,
-                    .08
-                );
-
+        .commission-status-cancelled {
+            background: rgba(239,68,68,.08);
             color: #fca5a5;
-
         }
 
+        .commission-status-cancelled::before {
+            background: #ef4444;
+        }
 
         .commission-empty {
-
-            padding: 60px 20px;
-
+            padding: 55px 20px;
             text-align: center;
-
         }
-
 
         .commission-empty-icon {
-
-            font-size: 30px;
-
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 52px;
+            height: 52px;
+            margin: 0 auto 12px;
+            border-radius: 16px;
+            background: rgba(14,165,233,.08);
             color: #38bdf8;
-
+            font-size: 20px;
+            font-weight: 950;
         }
-
 
         .commission-empty h3 {
-
-            margin: 12px 0 5px;
-
+            margin: 0;
             color: #cbd5e1;
-
-            font-size: 14px;
-
+            font-size: 13px;
         }
-
 
         .commission-empty p {
-
-            margin: 0;
-
+            margin: 6px auto 0;
+            max-width: 350px;
             color: #475569;
-
             font-size: 9px;
-
         }
 
-
-        @media (
-            max-width: 850px
-        ) {
+        @media (max-width: 900px) {
 
             .commission-summary {
-
-                grid-template-columns:
-                    repeat(2, 1fr);
-
+                grid-template-columns: repeat(2, 1fr);
             }
 
+            .commission-filter {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .commission-search {
+                width: 100%;
+            }
         }
 
-
-        @media (
-            max-width: 550px
-        ) {
+        @media (max-width: 550px) {
 
             .admin-header {
-
-                align-items:
-                    flex-start;
-
-                flex-direction:
-                    column;
-
+                flex-direction: column;
+                align-items: flex-start;
             }
 
             .commission-summary {
-
-                grid-template-columns:
-                    1fr;
-
+                grid-template-columns: 1fr;
             }
 
+            .commission-search {
+                flex-direction: column;
+            }
         }
 
     </style>
 
 </head>
 
-
 <body>
 
-
-<?php
-
-require_once __DIR__ .
-    '/../includes/navbar.php';
-
-?>
-
+<?php require_once dirname(__DIR__) . '/includes/navbar.php'; ?>
 
 <main class="admin-page">
 
-
     <div class="admin-container">
-
 
         <div class="admin-header">
 
             <div>
 
-                <h1>
-                    Commission
-                </h1>
+                <h1>Commission</h1>
 
                 <p>
-                    Monitor vendor commissions
-                    across HochipoHub.
+                    Monitor commission generated from HochipoHub vendor transactions.
                 </p>
 
             </div>
 
-
-            <a
-                href="<?php
-                echo site_url(
-                    'dashboard.php'
-                );
-                ?>"
-                class="admin-back"
-            >
-                ← Dashboard
-            </a>
+            <div class="admin-header-badge">
+                Admin Control
+            </div>
 
         </div>
 
 
         <!-- SUMMARY -->
 
-        <section
-            class="commission-summary"
-        >
-
+        <section class="commission-summary">
 
             <div class="commission-stat">
 
-                <span
-                    class="commission-stat-label"
-                >
-                    Total Records
+                <span class="commission-stat-label">
+                    Total Commission
                 </span>
 
-                <strong
-                    class="commission-stat-value"
-                >
+                <strong class="commission-stat-value blue">
                     <?php
-                    echo number_format(
+                    echo commission_money(
                         $summary['total']
                     );
                     ?>
                 </strong>
 
-                <span
-                    class="commission-stat-sub"
-                >
-                    All commission records
-                </span>
-
             </div>
 
 
             <div class="commission-stat">
 
-                <span
-                    class="commission-stat-label"
-                >
-                    Total Commission
-                </span>
-
-                <strong
-                    class="commission-stat-value"
-                >
-                    <?php
-                    echo admin_commission_money(
-                        $amountSummary['total']
-                    );
-                    ?>
-                </strong>
-
-                <span
-                    class="commission-stat-sub"
-                >
-                    Recorded commission
-                </span>
-
-            </div>
-
-
-            <div class="commission-stat">
-
-                <span
-                    class="commission-stat-label"
-                >
+                <span class="commission-stat-label">
                     Pending
                 </span>
 
-                <strong
-                    class="commission-stat-value"
-                >
+                <strong class="commission-stat-value yellow">
                     <?php
-                    echo admin_commission_money(
-                        $amountSummary['pending']
+                    echo number_format(
+                        $summary['pending']
                     );
                     ?>
                 </strong>
-
-                <span
-                    class="commission-stat-sub"
-                >
-                    Awaiting payment
-                </span>
 
             </div>
 
 
             <div class="commission-stat">
 
-                <span
-                    class="commission-stat-label"
-                >
+                <span class="commission-stat-label">
                     Paid
                 </span>
 
-                <strong
-                    class="commission-stat-value"
-                >
+                <strong class="commission-stat-value green">
                     <?php
-                    echo admin_commission_money(
-                        $amountSummary['paid']
+                    echo number_format(
+                        $summary['paid']
                     );
                     ?>
                 </strong>
 
-                <span
-                    class="commission-stat-sub"
-                >
-                    Paid commissions
-                </span>
-
             </div>
 
+
+            <div class="commission-stat">
+
+                <span class="commission-stat-label">
+                    Cancelled
+                </span>
+
+                <strong class="commission-stat-value">
+                    <?php
+                    echo number_format(
+                        $summary['cancelled']
+                    );
+                    ?>
+                </strong>
+
+            </div>
 
         </section>
 
@@ -1340,25 +833,39 @@ require_once __DIR__ .
             class="commission-filter"
         >
 
+            <div class="commission-search">
 
-            <input
-                type="search"
-                name="search"
-                value="<?php
-                echo htmlspecialchars(
-                    $search
-                );
-                ?>"
-                placeholder="Search vendor, owner or order..."
-            >
+                <input
+                    type="text"
+                    name="search"
+                    placeholder="Search commission, order, vendor..."
+                    value="<?php
+                    echo htmlspecialchars($search);
+                    ?>"
+                >
+
+                <button
+                    type="submit"
+                    class="commission-btn"
+                >
+                    SEARCH
+                </button>
+
+            </div>
 
 
             <select
                 name="status"
+                onchange="this.form.submit()"
             >
 
                 <option
                     value="all"
+                    <?php
+                    echo $statusFilter === 'all'
+                        ? 'selected'
+                        : '';
+                    ?>
                 >
                     All Status
                 </option>
@@ -1386,6 +893,17 @@ require_once __DIR__ .
                 </option>
 
                 <option
+                    value="Completed"
+                    <?php
+                    echo $statusFilter === 'Completed'
+                        ? 'selected'
+                        : '';
+                    ?>
+                >
+                    Completed
+                </option>
+
+                <option
                     value="Cancelled"
                     <?php
                     echo $statusFilter === 'Cancelled'
@@ -1399,109 +917,71 @@ require_once __DIR__ .
             </select>
 
 
-            <select
-                name="vendor_id"
+            <a
+                href="<?php
+                echo site_url('admin/commission.php');
+                ?>"
+                class="commission-reset"
             >
-
-                <option value="0">
-                    All Vendors
-                </option>
-
-
-                <?php foreach (
-                    $vendors
-                    as $vendorOption
-                ): ?>
-
-                    <option
-                        value="<?php
-                        echo (int)
-                            $vendorOption[
-                                'vendor_id'
-                            ];
-                        ?>"
-                        <?php
-                        echo
-                            $vendorFilter ===
-                            (int)
-                            $vendorOption[
-                                'vendor_id'
-                            ]
-                                ? 'selected'
-                                : '';
-                        ?>
-                    >
-
-                        <?php
-                        echo htmlspecialchars(
-                            $vendorOption[
-                                'business_name'
-                            ]
-                        );
-                        ?>
-
-                    </option>
-
-                <?php endforeach; ?>
-
-            </select>
-
-
-            <button
-                type="submit"
-            >
-                FILTER
-            </button>
-
+                RESET
+            </a>
 
         </form>
 
 
         <!-- TABLE -->
 
-        <section
-            class="commission-table-card"
-        >
+        <section class="commission-card">
+
+            <div class="commission-card-header">
+
+                <div>
+
+                    <h2>
+                        Commission Records
+                    </h2>
+
+                    <span>
+                        Showing latest commission activity
+                    </span>
+
+                </div>
+
+                <span>
+                    <?php
+                    echo number_format(
+                        count($commissionRows)
+                    );
+                    ?>
+                    records
+                </span>
+
+            </div>
 
 
-            <?php if (
-                empty($commissions)
-            ): ?>
+            <?php if (empty($commissionRows)): ?>
 
+                <div class="commission-empty">
 
-                <div
-                    class="commission-empty"
-                >
-
-                    <div
-                        class="commission-empty-icon"
-                    >
+                    <div class="commission-empty-icon">
                         %
                     </div>
 
                     <h3>
-                        No commission records
+                        No commission records found
                     </h3>
 
                     <p>
-                        No commission data
-                        matches your current
-                        filter.
+                        Commission records will appear here when vendor transactions generate commission.
                     </p>
 
                 </div>
 
-
             <?php else: ?>
 
+                <div class="commission-table-wrapper">
 
-                <div
-                    class="commission-table-wrapper"
-                >
-
-                    <table
-                        class="commission-table"
-                    >
+                    <table class="commission-table">
 
                         <thead>
 
@@ -1542,174 +1022,149 @@ require_once __DIR__ .
 
                         <tbody>
 
+                        <?php foreach (
+                            $commissionRows
+                            as $row
+                        ): ?>
 
-                            <?php foreach (
-                                $commissions
-                                as $commission
-                            ): ?>
+                            <tr>
 
+                                <td>
 
-                                <tr>
-
-
-                                    <td>
-
-                                        <span
-                                            class="commission-id"
-                                        >
-
-                                            #
-                                            <?php
-                                            echo (int)
-                                                $commission[
-                                                    'commission_id'
-                                                ];
-                                            ?>
-
-                                        </span>
-
-                                    </td>
-
-
-                                    <td>
-
+                                    <span class="commission-id">
                                         #
-
                                         <?php
                                         echo (int)
-                                            $commission[
-                                                'order_id'
+                                            $row[
+                                                'commission_id'
                                             ];
                                         ?>
+                                    </span>
 
-                                    </td>
+                                </td>
 
 
-                                    <td>
+                                <td>
 
-                                        <span
-                                            class="commission-vendor"
-                                        >
+                                    #
+                                    <?php
+                                    echo (int)
+                                        $row['order_id'];
+                                    ?>
+
+                                </td>
+
+
+                                <td>
+
+                                    <span class="commission-vendor">
+
+                                        <?php
+                                        echo htmlspecialchars(
+                                            $row[
+                                                'business_name'
+                                            ]
+                                            ?: 'Unknown Vendor'
+                                        );
+                                        ?>
+
+                                    </span>
+
+                                    <?php if (
+                                        !empty(
+                                            $row[
+                                                'vendor_owner'
+                                            ]
+                                        )
+                                    ): ?>
+
+                                        <span class="commission-owner">
 
                                             <?php
                                             echo htmlspecialchars(
-                                                $commission[
-                                                    'business_name'
-                                                ]
-                                            );
-                                            ?>
-
-                                        </span>
-
-
-                                        <?php if (
-                                            !empty(
-                                                $commission[
+                                                $row[
                                                     'vendor_owner'
                                                 ]
-                                            )
-                                        ): ?>
-
-                                            <span
-                                                class="commission-owner"
-                                            >
-
-                                                Owner:
-                                                <?php
-                                                echo htmlspecialchars(
-                                                    $commission[
-                                                        'vendor_owner'
-                                                    ]
-                                                );
-                                                ?>
-
-                                            </span>
-
-                                        <?php endif; ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?php
-                                        echo number_format(
-                                            (float)
-                                            $commission[
-                                                'commission_rate'
-                                            ],
-                                            2
-                                        );
-                                        ?>%
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <span
-                                            class="commission-amount"
-                                        >
-
-                                            <?php
-                                            echo admin_commission_money(
-                                                $commission[
-                                                    'commission_amount'
-                                                ]
                                             );
                                             ?>
 
                                         </span>
 
-                                    </td>
+                                    <?php endif; ?>
+
+                                </td>
 
 
-                                    <td>
+                                <td>
 
-                                        <span
-                                            class="
-                                                commission-status
-                                                <?php
-                                                echo admin_commission_status_class(
-                                                    $commission[
-                                                        'status'
-                                                    ]
-                                                );
-                                                ?>
-                                            "
-                                        >
+                                    <?php
+                                    echo number_format(
+                                        (float)
+                                        $row[
+                                            'commission_rate'
+                                        ],
+                                        2
+                                    );
+                                    ?>
+                                    %
 
-                                            <?php
-                                            echo htmlspecialchars(
-                                                $commission[
-                                                    'status'
-                                                ]
-                                            );
-                                            ?>
-
-                                        </span>
-
-                                    </td>
+                                </td>
 
 
-                                    <td>
+                                <td>
+
+                                    <span class="commission-amount">
 
                                         <?php
-                                        echo admin_commission_date(
-                                            $commission[
-                                                'created_at'
+                                        echo commission_money(
+                                            $row[
+                                                'commission_amount'
                                             ]
                                         );
                                         ?>
 
-                                    </td>
+                                    </span>
+
+                                </td>
 
 
-                                </tr>
+                                <td>
+
+                                    <span
+                                        class="
+                                            commission-status
+                                            <?php
+                                            echo commission_status_class(
+                                                $row['status']
+                                            );
+                                            ?>
+                                        "
+                                    >
+
+                                        <?php
+                                        echo htmlspecialchars(
+                                            $row['status']
+                                        );
+                                        ?>
+
+                                    </span>
+
+                                </td>
 
 
-                            <?php endforeach; ?>
+                                <td>
 
+                                    <?php
+                                    echo commission_date(
+                                        $row['created_at']
+                                    );
+                                    ?>
+
+                                </td>
+
+                            </tr>
+
+                        <?php endforeach; ?>
 
                         </tbody>
 
@@ -1717,25 +1172,16 @@ require_once __DIR__ .
 
                 </div>
 
-
             <?php endif; ?>
 
-
         </section>
-
 
     </div>
 
 </main>
 
 
-<?php
-
-require_once __DIR__ .
-    '/../includes/footer.php';
-
-?>
-
+<?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>
 
 </body>
 
