@@ -1,53 +1,103 @@
 <?php
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB - MAIN NAVBAR
+| HOCHIPOHUB - GLOBAL NAVBAR
 |--------------------------------------------------------------------------
 | File:
 | includes/navbar.php
+|
+| Required variables from header.php:
+| - $currentPage
+| - $isLoggedIn
+| - $userName
+| - $userRole
+| - $userId
+| - $cartCount
+| - $wishlistCount
 |--------------------------------------------------------------------------
 */
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+/*
+|--------------------------------------------------------------------------
+| BASE URL
+|--------------------------------------------------------------------------
+*/
 
-$isLoggedIn = isset($_SESSION['user_id']);
-
-$userName = $_SESSION['user_name']
-    ?? $_SESSION['name']
-    ?? 'User';
-
-$userRole = $_SESSION['user_role']
-    ?? $_SESSION['role']
-    ?? '';
-
-$userId = $_SESSION['user_id'] ?? null;
-
-$cartCount = $cartCount ?? 0;
-$wishlistCount = $wishlistCount ?? 0;
-
-$baseUrl = defined('BASE_URL')
-    ? BASE_URL
+$navBaseUrl = defined('BASE_URL')
+    ? rtrim(BASE_URL, '/') . '/'
     : '/hochipohub/';
 
-$currentPage = basename(
-    $_SERVER['PHP_SELF'] ?? 'index.php'
-);
+/*
+|--------------------------------------------------------------------------
+| HELPER
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('navUrl')) {
+
+    function navUrl($path = '')
+    {
+        global $navBaseUrl;
+
+        return $navBaseUrl . ltrim($path, '/');
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| USER INITIAL
+|--------------------------------------------------------------------------
+*/
+
+$userInitial = 'U';
+
+if (!empty($userName)) {
+    $userInitial = strtoupper(
+        substr(
+            trim($userName),
+            0,
+            1
+        )
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| CURRENT PAGE CHECK
+|--------------------------------------------------------------------------
+*/
+
+function navActive($pages)
+{
+    global $currentPage;
+
+    if (!is_array($pages)) {
+        $pages = [$pages];
+    }
+
+    return in_array($currentPage, $pages, true)
+        ? 'active'
+        : '';
+}
 
 ?>
+
+<!-- =========================================================
+     HOCHIPOHUB NAVBAR
+     ========================================================= -->
 
 <header class="site-header">
 
     <div class="navbar-container">
 
         <!-- =====================================================
-             LOGO
-        ====================================================== -->
+             BRAND
+             ===================================================== -->
 
         <a
-            href="<?= $baseUrl ?>index.php"
+            href="<?= htmlspecialchars(navUrl('index.php'), ENT_QUOTES, 'UTF-8') ?>"
             class="brand"
+            aria-label="HochipoHub Home"
         >
 
             <span class="brand-mark">
@@ -63,42 +113,30 @@ $currentPage = basename(
 
         <!-- =====================================================
              DESKTOP NAVIGATION
-        ====================================================== -->
+             ===================================================== -->
 
-        <nav class="main-nav">
+        <nav
+            class="main-nav"
+            aria-label="Main Navigation"
+        >
 
             <a
-                href="<?= $baseUrl ?>index.php"
-                class="<?= $currentPage === 'index.php'
-                    ? 'active'
-                    : '' ?>"
+                href="<?= htmlspecialchars(navUrl('index.php'), ENT_QUOTES, 'UTF-8') ?>"
+                class="<?= navActive(['index.php']) ?>"
             >
                 Home
             </a>
 
             <a
-                href="<?= $baseUrl ?>catalog.php"
-                class="<?= $currentPage === 'catalog.php'
-                    ? 'active'
-                    : '' ?>"
+                href="<?= htmlspecialchars(navUrl('catalog.php'), ENT_QUOTES, 'UTF-8') ?>"
+                class="<?= navActive(['catalog.php', 'product.php', 'product_details.php', 'category.php']) ?>"
             >
-                Shop
+                Catalog
             </a>
 
             <a
-                href="<?= $baseUrl ?>category.php"
-                class="<?= $currentPage === 'category.php'
-                    ? 'active'
-                    : '' ?>"
-            >
-                Categories
-            </a>
-
-            <a
-                href="<?= $baseUrl ?>vendor.php"
-                class="<?= $currentPage === 'vendor.php'
-                    ? 'active'
-                    : '' ?>"
+                href="<?= htmlspecialchars(navUrl('vendor.php'), ENT_QUOTES, 'UTF-8') ?>"
+                class="<?= navActive(['vendor.php']) ?>"
             >
                 Vendors
             </a>
@@ -108,31 +146,29 @@ $currentPage = basename(
 
         <!-- =====================================================
              SEARCH
-        ====================================================== -->
+             ===================================================== -->
 
         <form
-            action="<?= $baseUrl ?>search.php"
-            method="GET"
             class="navbar-search"
+            action="<?= htmlspecialchars(navUrl('search.php'), ENT_QUOTES, 'UTF-8') ?>"
+            method="GET"
         >
 
             <span class="search-icon">
-                🔎
+                🔍
             </span>
 
             <input
                 type="search"
                 name="q"
-                placeholder="Search products, vendors..."
-                value="<?= htmlspecialchars(
-                    $_GET['q'] ?? '',
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
+                placeholder="Search products..."
+                value="<?= htmlspecialchars($_GET['q'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                 autocomplete="off"
             >
 
-            <button type="submit">
+            <button
+                type="submit"
+            >
                 Search
             </button>
 
@@ -140,67 +176,69 @@ $currentPage = basename(
 
 
         <!-- =====================================================
-             ACTIONS
-        ====================================================== -->
+             RIGHT ACTIONS
+             ===================================================== -->
 
         <div class="navbar-actions">
 
 
-            <!-- Wishlist -->
-
-            <a
-                href="<?= $baseUrl ?>wishlist.php"
-                class="nav-icon-btn"
-                aria-label="Wishlist"
-                title="Wishlist"
-            >
-
-                <span>
-                    ♡
-                </span>
-
-                <?php if ($wishlistCount > 0): ?>
-
-                    <small class="nav-badge">
-                        <?= $wishlistCount > 99
-                            ? '99+'
-                            : $wishlistCount ?>
-                    </small>
-
-                <?php endif; ?>
-
-            </a>
-
-
-            <!-- Cart -->
-
-            <a
-                href="<?= $baseUrl ?>cart.php"
-                class="nav-icon-btn"
-                aria-label="Cart"
-                title="Shopping Cart"
-            >
-
-                <span>
-                    🛒
-                </span>
-
-                <?php if ($cartCount > 0): ?>
-
-                    <small class="nav-badge">
-                        <?= $cartCount > 99
-                            ? '99+'
-                            : $cartCount ?>
-                    </small>
-
-                <?php endif; ?>
-
-            </a>
-
-
             <?php if ($isLoggedIn): ?>
 
-                <!-- USER -->
+                <!-- =================================================
+                     CART
+                     ================================================= -->
+
+                <?php if ($userRole === 'customer'): ?>
+
+                    <a
+                        href="<?= htmlspecialchars(navUrl('cart.php'), ENT_QUOTES, 'UTF-8') ?>"
+                        class="nav-icon-btn"
+                        aria-label="Shopping Cart"
+                        title="Shopping Cart"
+                    >
+
+                        🛒
+
+                        <?php if ($cartCount > 0): ?>
+
+                            <span class="nav-badge">
+                                <?= $cartCount > 99 ? '99+' : $cartCount ?>
+                            </span>
+
+                        <?php endif; ?>
+
+                    </a>
+
+
+                    <!-- =============================================
+                         WISHLIST
+                         ============================================= -->
+
+                    <a
+                        href="<?= htmlspecialchars(navUrl('wishlist.php'), ENT_QUOTES, 'UTF-8') ?>"
+                        class="nav-icon-btn"
+                        aria-label="Wishlist"
+                        title="Wishlist"
+                    >
+
+                        ♡
+
+                        <?php if ($wishlistCount > 0): ?>
+
+                            <span class="nav-badge">
+                                <?= $wishlistCount > 99 ? '99+' : $wishlistCount ?>
+                            </span>
+
+                        <?php endif; ?>
+
+                    </a>
+
+                <?php endif; ?>
+
+
+                <!-- =================================================
+                     USER MENU
+                     ================================================= -->
 
                 <div class="user-menu">
 
@@ -208,34 +246,32 @@ $currentPage = basename(
                         type="button"
                         class="user-menu-button"
                         id="userMenuButton"
+                        aria-expanded="false"
+                        aria-haspopup="true"
                     >
 
                         <span class="user-avatar">
-                            <?= strtoupper(
-                                substr(
-                                    trim($userName),
-                                    0,
-                                    1
-                                )
-                            ) ?>
+                            <?= htmlspecialchars($userInitial, ENT_QUOTES, 'UTF-8') ?>
                         </span>
 
                         <span class="user-menu-name">
-
                             <?= htmlspecialchars(
-                                $userName,
+                                $userName ?: 'Account',
                                 ENT_QUOTES,
                                 'UTF-8'
                             ) ?>
-
                         </span>
 
                         <span class="user-chevron">
-                            ▾
+                            ▼
                         </span>
 
                     </button>
 
+
+                    <!-- =============================================
+                         DROPDOWN
+                         ============================================= -->
 
                     <div
                         class="user-dropdown"
@@ -245,22 +281,14 @@ $currentPage = basename(
                         <div class="dropdown-user-info">
 
                             <span class="dropdown-avatar">
-
-                                <?= strtoupper(
-                                    substr(
-                                        trim($userName),
-                                        0,
-                                        1
-                                    )
-                                ) ?>
-
+                                <?= htmlspecialchars($userInitial, ENT_QUOTES, 'UTF-8') ?>
                             </span>
 
                             <div>
 
                                 <strong>
                                     <?= htmlspecialchars(
-                                        $userName,
+                                        $userName ?: 'User',
                                         ENT_QUOTES,
                                         'UTF-8'
                                     ) ?>
@@ -268,9 +296,7 @@ $currentPage = basename(
 
                                 <small>
                                     <?= htmlspecialchars(
-                                        ucfirst(
-                                            $userRole ?: 'customer'
-                                        ),
+                                        ucfirst($userRole ?: 'customer'),
                                         ENT_QUOTES,
                                         'UTF-8'
                                     ) ?>
@@ -284,57 +310,80 @@ $currentPage = basename(
                         <div class="dropdown-divider"></div>
 
 
+                        <!-- Profile -->
+
                         <a
-                            href="<?= $baseUrl ?>profile.php"
+                            href="<?= htmlspecialchars(navUrl('profile.php'), ENT_QUOTES, 'UTF-8') ?>"
                             class="dropdown-link"
                         >
+
                             <span>👤</span>
-                            My Profile
+
+                            Profile
+
                         </a>
 
+
+                        <!-- Customer -->
 
                         <?php if ($userRole === 'customer'): ?>
 
                             <a
-                                href="<?= $baseUrl ?>order.php"
+                                href="<?= htmlspecialchars(navUrl('order.php'), ENT_QUOTES, 'UTF-8') ?>"
                                 class="dropdown-link"
                             >
-                                <span>📦</span>
-                                My Orders
-                            </a>
 
-                            <a
-                                href="<?= $baseUrl ?>wishlist.php"
-                                class="dropdown-link"
-                            >
-                                <span>♡</span>
-                                Wishlist
+                                <span>📦</span>
+
+                                My Orders
+
                             </a>
 
                         <?php endif; ?>
 
+
+                        <!-- Vendor -->
 
                         <?php if ($userRole === 'vendor'): ?>
 
                             <a
-                                href="<?= $baseUrl ?>seller/dashboard.php"
+                                href="<?= htmlspecialchars(navUrl('seller/dashboard.php'), ENT_QUOTES, 'UTF-8') ?>"
                                 class="dropdown-link"
                             >
-                                <span>📊</span>
-                                Seller Center
+
+                                <span>🏪</span>
+
+                                Vendor Dashboard
+
+                            </a>
+
+                            <a
+                                href="<?= htmlspecialchars(navUrl('seller/products.php'), ENT_QUOTES, 'UTF-8') ?>"
+                                class="dropdown-link"
+                            >
+
+                                <span>🛍️</span>
+
+                                My Products
+
                             </a>
 
                         <?php endif; ?>
 
 
+                        <!-- Admin -->
+
                         <?php if ($userRole === 'admin'): ?>
 
                             <a
-                                href="<?= $baseUrl ?>admin/dashboard.php"
+                                href="<?= htmlspecialchars(navUrl('admin/dashboard.php'), ENT_QUOTES, 'UTF-8') ?>"
                                 class="dropdown-link"
                             >
+
                                 <span>⚙️</span>
-                                Admin Panel
+
+                                Admin Dashboard
+
                             </a>
 
                         <?php endif; ?>
@@ -343,12 +392,17 @@ $currentPage = basename(
                         <div class="dropdown-divider"></div>
 
 
+                        <!-- Logout -->
+
                         <a
-                            href="<?= $baseUrl ?>auth/logout.php"
+                            href="<?= htmlspecialchars(navUrl('auth/logout.php'), ENT_QUOTES, 'UTF-8') ?>"
                             class="dropdown-link dropdown-danger"
                         >
+
                             <span>↪</span>
+
                             Logout
+
                         </a>
 
                     </div>
@@ -358,38 +412,42 @@ $currentPage = basename(
 
             <?php else: ?>
 
-                <!-- AUTH BUTTONS -->
+
+                <!-- =================================================
+                     GUEST AUTH BUTTONS
+                     ================================================= -->
 
                 <div class="auth-buttons">
 
-                    <button
-                        type="button"
+                    <a
+                        href="<?= htmlspecialchars(navUrl('auth/login.php'), ENT_QUOTES, 'UTF-8') ?>"
                         class="btn-login"
-                        data-modal-open="loginModal"
                     >
                         Login
-                    </button>
+                    </a>
 
-                    <button
-                        type="button"
+                    <a
+                        href="<?= htmlspecialchars(navUrl('auth/register.php'), ENT_QUOTES, 'UTF-8') ?>"
                         class="btn-register"
-                        data-modal-open="registerModal"
                     >
                         Register
-                    </button>
+                    </a>
 
                 </div>
 
             <?php endif; ?>
 
 
-            <!-- MOBILE MENU -->
+            <!-- =================================================
+                 MOBILE TOGGLE
+                 ================================================= -->
 
             <button
                 type="button"
                 class="mobile-menu-toggle"
                 id="mobileMenuToggle"
-                aria-label="Open menu"
+                aria-label="Open navigation menu"
+                aria-expanded="false"
             >
 
                 <span></span>
@@ -403,9 +461,9 @@ $currentPage = basename(
     </div>
 
 
-    <!-- =====================================================
-         MOBILE NAVIGATION
-    ====================================================== -->
+    <!-- =========================================================
+         MOBILE MENU
+         ========================================================= -->
 
     <div
         class="mobile-menu"
@@ -414,77 +472,143 @@ $currentPage = basename(
 
         <div class="mobile-menu-inner">
 
+
+            <!-- Mobile Search -->
+
             <form
-                action="<?= $baseUrl ?>search.php"
-                method="GET"
                 class="mobile-search"
+                action="<?= htmlspecialchars(navUrl('search.php'), ENT_QUOTES, 'UTF-8') ?>"
+                method="GET"
             >
 
                 <input
                     type="search"
                     name="q"
-                    placeholder="Search..."
+                    placeholder="Search products..."
+                    value="<?= htmlspecialchars($_GET['q'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                 >
 
                 <button type="submit">
-                    🔎
+                    🔍
                 </button>
 
             </form>
 
 
-            <a href="<?= $baseUrl ?>index.php">
-                Home
+            <!-- Mobile Navigation -->
+
+            <a
+                href="<?= htmlspecialchars(navUrl('index.php'), ENT_QUOTES, 'UTF-8') ?>"
+                class="<?= navActive(['index.php']) ?>"
+            >
+                🏠 Home
             </a>
 
-            <a href="<?= $baseUrl ?>catalog.php">
-                Shop
+            <a
+                href="<?= htmlspecialchars(navUrl('catalog.php'), ENT_QUOTES, 'UTF-8') ?>"
+                class="<?= navActive(['catalog.php', 'product.php', 'product_details.php', 'category.php']) ?>"
+            >
+                🛍️ Catalog
             </a>
 
-            <a href="<?= $baseUrl ?>category.php">
-                Categories
-            </a>
-
-            <a href="<?= $baseUrl ?>vendor.php">
-                Vendors
-            </a>
-
-            <a href="<?= $baseUrl ?>wishlist.php">
-                Wishlist
-            </a>
-
-            <a href="<?= $baseUrl ?>cart.php">
-                Cart
+            <a
+                href="<?= htmlspecialchars(navUrl('vendor.php'), ENT_QUOTES, 'UTF-8') ?>"
+                class="<?= navActive(['vendor.php']) ?>"
+            >
+                🏪 Vendors
             </a>
 
 
-            <?php if (!$isLoggedIn): ?>
+            <?php if ($isLoggedIn): ?>
 
-                <button
-                    type="button"
-                    class="mobile-login-button"
-                    data-modal-open="loginModal"
+
+                <?php if ($userRole === 'customer'): ?>
+
+                    <a
+                        href="<?= htmlspecialchars(navUrl('cart.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    >
+                        🛒 Cart
+                        <?php if ($cartCount > 0): ?>
+                            (<?= $cartCount ?>)
+                        <?php endif; ?>
+                    </a>
+
+                    <a
+                        href="<?= htmlspecialchars(navUrl('wishlist.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    >
+                        ♡ Wishlist
+                        <?php if ($wishlistCount > 0): ?>
+                            (<?= $wishlistCount ?>)
+                        <?php endif; ?>
+                    </a>
+
+                    <a
+                        href="<?= htmlspecialchars(navUrl('order.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    >
+                        📦 My Orders
+                    </a>
+
+                <?php endif; ?>
+
+
+                <?php if ($userRole === 'vendor'): ?>
+
+                    <a
+                        href="<?= htmlspecialchars(navUrl('seller/dashboard.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    >
+                        🏪 Vendor Dashboard
+                    </a>
+
+                    <a
+                        href="<?= htmlspecialchars(navUrl('seller/products.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    >
+                        🛍️ My Products
+                    </a>
+
+                <?php endif; ?>
+
+
+                <?php if ($userRole === 'admin'): ?>
+
+                    <a
+                        href="<?= htmlspecialchars(navUrl('admin/dashboard.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    >
+                        ⚙️ Admin Dashboard
+                    </a>
+
+                <?php endif; ?>
+
+
+                <a
+                    href="<?= htmlspecialchars(navUrl('profile.php'), ENT_QUOTES, 'UTF-8') ?>"
                 >
-                    Login
-                </button>
+                    👤 Profile
+                </a>
 
-                <button
-                    type="button"
-                    class="mobile-register-button"
-                    data-modal-open="registerModal"
+                <a
+                    href="<?= htmlspecialchars(navUrl('auth/logout.php'), ENT_QUOTES, 'UTF-8') ?>"
                 >
-                    Create Account
-                </button>
+                    ↪ Logout
+                </a>
+
 
             <?php else: ?>
 
-                <a href="<?= $baseUrl ?>profile.php">
-                    My Profile
+
+                <a
+                    href="<?= htmlspecialchars(navUrl('auth/login.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    class="mobile-login-button"
+                >
+                    Login
                 </a>
 
-                <a href="<?= $baseUrl ?>auth/logout.php">
-                    Logout
+                <a
+                    href="<?= htmlspecialchars(navUrl('auth/register.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    class="mobile-register-button"
+                >
+                    Register
                 </a>
+
 
             <?php endif; ?>
 
@@ -497,94 +621,120 @@ $currentPage = basename(
 
 <!-- =========================================================
      NAVBAR JAVASCRIPT
-========================================================== -->
+     ========================================================= -->
 
 <script>
 
 document.addEventListener('DOMContentLoaded', function () {
 
-    /*
-    |--------------------------------------------------------------------------
-    | USER DROPDOWN
-    |--------------------------------------------------------------------------
-    */
+    /* =====================================================
+       USER DROPDOWN
+       ===================================================== */
 
-    const userButton =
-        document.getElementById('userMenuButton');
-
-    const userDropdown =
-        document.getElementById('userDropdown');
-
+    const userButton = document.getElementById('userMenuButton');
+    const userDropdown = document.getElementById('userDropdown');
 
     if (userButton && userDropdown) {
 
-        userButton.addEventListener(
-            'click',
-            function (event) {
+        userButton.addEventListener('click', function (event) {
 
-                event.stopPropagation();
+            event.stopPropagation();
 
-                userDropdown.classList.toggle(
-                    'show'
+            const isOpen =
+                userDropdown.classList.contains('show');
+
+            userDropdown.classList.toggle('show');
+
+            userButton.setAttribute(
+                'aria-expanded',
+                !isOpen
+            );
+
+        });
+
+
+        document.addEventListener('click', function (event) {
+
+            if (
+                !userDropdown.contains(event.target) &&
+                !userButton.contains(event.target)
+            ) {
+
+                userDropdown.classList.remove('show');
+
+                userButton.setAttribute(
+                    'aria-expanded',
+                    'false'
                 );
 
             }
-        );
 
-
-        document.addEventListener(
-            'click',
-            function () {
-
-                userDropdown.classList.remove(
-                    'show'
-                );
-
-            }
-        );
+        });
 
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | MOBILE MENU
-    |--------------------------------------------------------------------------
-    */
+    /* =====================================================
+       MOBILE MENU
+       ===================================================== */
 
     const mobileToggle =
-        document.getElementById(
-            'mobileMenuToggle'
-        );
+        document.getElementById('mobileMenuToggle');
 
     const mobileMenu =
-        document.getElementById(
-            'mobileMenu'
-        );
+        document.getElementById('mobileMenu');
 
 
     if (mobileToggle && mobileMenu) {
 
-        mobileToggle.addEventListener(
-            'click',
-            function () {
+        mobileToggle.addEventListener('click', function () {
 
-                mobileToggle.classList.toggle(
-                    'active'
-                );
+            const isOpen =
+                mobileMenu.classList.contains('show');
 
-                mobileMenu.classList.toggle(
-                    'show'
-                );
+            mobileMenu.classList.toggle('show');
 
-                document.body.classList.toggle(
-                    'menu-open'
-                );
+            mobileToggle.classList.toggle('active');
 
-            }
-        );
+            mobileToggle.setAttribute(
+                'aria-expanded',
+                !isOpen
+            );
+
+        });
 
     }
+
+
+    /* =====================================================
+       CLOSE MOBILE MENU WHEN LINK CLICKED
+       ===================================================== */
+
+    const mobileLinks =
+        document.querySelectorAll(
+            '.mobile-menu-inner > a'
+        );
+
+    mobileLinks.forEach(function (link) {
+
+        link.addEventListener('click', function () {
+
+            if (mobileMenu) {
+                mobileMenu.classList.remove('show');
+            }
+
+            if (mobileToggle) {
+                mobileToggle.classList.remove('active');
+
+                mobileToggle.setAttribute(
+                    'aria-expanded',
+                    'false'
+                );
+            }
+
+        });
+
+    });
 
 });
 
