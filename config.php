@@ -4,16 +4,20 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - GLOBAL CONFIGURATION
 |--------------------------------------------------------------------------
+| File:
+| config.php
+|
+| Purpose:
+| Central configuration for the whole HochipoHub system.
+|
+|--------------------------------------------------------------------------
 */
+
 
 /*
 |--------------------------------------------------------------------------
 | ERROR REPORTING
 |--------------------------------------------------------------------------
-|
-| Development mode.
-| Tukar kepada false bila deploy ke production.
-|
 */
 
 define('APP_DEBUG', true);
@@ -62,6 +66,16 @@ define(
 |--------------------------------------------------------------------------
 | DATABASE CONFIGURATION
 |--------------------------------------------------------------------------
+|
+| Database:
+| hochipohub
+|
+| DO NOT create another PDO connection in other files.
+| Use:
+|
+| $db = getDB();
+|
+|--------------------------------------------------------------------------
 */
 
 define(
@@ -92,34 +106,79 @@ define(
 
 /*
 |--------------------------------------------------------------------------
-| FILE / UPLOAD PATHS
+| ROOT PATH
 |--------------------------------------------------------------------------
 */
 
 define(
     'ROOT_PATH',
-    dirname(__FILE__) . DIRECTORY_SEPARATOR
-);
-
-define(
-    'UPLOAD_PATH',
-    ROOT_PATH . 'uploads' . DIRECTORY_SEPARATOR
-);
-
-define(
-    'PRODUCT_UPLOAD_PATH',
-    UPLOAD_PATH . 'products' . DIRECTORY_SEPARATOR
-);
-
-define(
-    'VENDOR_UPLOAD_PATH',
-    UPLOAD_PATH . 'vendors' . DIRECTORY_SEPARATOR
+    __DIR__ . DIRECTORY_SEPARATOR
 );
 
 
 /*
 |--------------------------------------------------------------------------
-| IMAGE URLS
+| UPLOAD PATHS
+|--------------------------------------------------------------------------
+|
+| Structure:
+|
+| uploads/
+| ├── products/
+| └── vendors/
+|
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'UPLOAD_PATH',
+    ROOT_PATH
+    . 'uploads'
+    . DIRECTORY_SEPARATOR
+);
+
+define(
+    'PRODUCT_UPLOAD_PATH',
+    UPLOAD_PATH
+    . 'products'
+    . DIRECTORY_SEPARATOR
+);
+
+define(
+    'VENDOR_UPLOAD_PATH',
+    UPLOAD_PATH
+    . 'vendors'
+    . DIRECTORY_SEPARATOR
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| UPLOAD URL
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'UPLOAD_URL',
+    BASE_URL . 'uploads/'
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| IMAGE PATHS
+|--------------------------------------------------------------------------
+|
+| Structure:
+|
+| image/
+| ├── banner.jpg
+| ├── logo.jpg
+| ├── product/
+| │   └── default-product.jpg
+| └── vendors/
+|     └── default-vendor.jpg
+|
 |--------------------------------------------------------------------------
 */
 
@@ -138,15 +197,10 @@ define(
     IMAGE_URL . 'vendors/'
 );
 
-define(
-    'UPLOAD_URL',
-    BASE_URL . 'uploads/'
-);
-
 
 /*
 |--------------------------------------------------------------------------
-| SECURITY
+| SECURITY / SESSION
 |--------------------------------------------------------------------------
 */
 
@@ -158,7 +212,7 @@ define(
 
 /*
 |--------------------------------------------------------------------------
-| PASSWORD RESET / MFA
+| PASSWORD RESET / OTP
 |--------------------------------------------------------------------------
 */
 
@@ -172,10 +226,6 @@ define(
 |--------------------------------------------------------------------------
 | MARKETPLACE SETTINGS
 |--------------------------------------------------------------------------
-|
-| Commission rate boleh diubah kemudian.
-| Database commission table memang menyokong rate ini.
-|
 */
 
 define(
@@ -218,12 +268,15 @@ date_default_timezone_set(
 |--------------------------------------------------------------------------
 */
 
-function baseUrl(string $path = ''): string
-{
-    return BASE_URL . ltrim(
-        $path,
-        '/\\'
-    );
+function baseUrl(
+    string $path = ''
+): string {
+
+    return BASE_URL
+        . ltrim(
+            $path,
+            '/\\'
+        );
 }
 
 
@@ -233,18 +286,21 @@ function baseUrl(string $path = ''): string
 |--------------------------------------------------------------------------
 */
 
-function assetUrl(string $path): string
-{
-    return BASE_URL . ltrim(
-        $path,
-        '/\\'
-    );
+function assetUrl(
+    string $path
+): string {
+
+    return BASE_URL
+        . ltrim(
+            $path,
+            '/\\'
+        );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| HELPER - PRODUCT IMAGE
+| HELPER - PRODUCT IMAGE URL
 |--------------------------------------------------------------------------
 */
 
@@ -252,41 +308,90 @@ function productImageUrl(
     ?string $image
 ): string {
 
-    if (
-        empty($image)
-    ) {
-
-        return BASE_URL
-            . 'image/product/default-product.jpg';
-    }
-
     /*
     |--------------------------------------------------------------------------
-    | If database already stores a full path
+    | Default image
     |--------------------------------------------------------------------------
     */
 
     if (
-        str_contains(
+        empty($image)
+    ) {
+
+        return PRODUCT_IMAGE_URL
+            . 'default-product.jpg';
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize Windows path
+    |--------------------------------------------------------------------------
+    */
+
+    $image = str_replace(
+        '\\',
+        '/',
+        $image
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Already a full URL
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        filter_var(
             $image,
-            '/'
-        )
-        ||
-        str_contains(
-            $image,
-            '\\'
+            FILTER_VALIDATE_URL
         )
     ) {
 
-        return BASE_URL . ltrim(
-            str_replace(
-                '\\',
-                '/',
-                $image
-            ),
-            '/'
-        );
+        return $image;
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Remove leading slash
+    |--------------------------------------------------------------------------
+    */
+
+    $image = ltrim(
+        $image,
+        '/'
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Already contains image/ or uploads/
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        str_starts_with(
+            $image,
+            'image/'
+        )
+        ||
+        str_starts_with(
+            $image,
+            'uploads/'
+        )
+    ) {
+
+        return BASE_URL . $image;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Filename only
+    |--------------------------------------------------------------------------
+    */
 
     return PRODUCT_IMAGE_URL
         . rawurlencode($image);
@@ -295,7 +400,7 @@ function productImageUrl(
 
 /*
 |--------------------------------------------------------------------------
-| HELPER - VENDOR IMAGE
+| HELPER - VENDOR IMAGE URL
 |--------------------------------------------------------------------------
 */
 
@@ -303,35 +408,90 @@ function vendorImageUrl(
     ?string $image
 ): string {
 
+    /*
+    |--------------------------------------------------------------------------
+    | Default image
+    |--------------------------------------------------------------------------
+    */
+
     if (
         empty($image)
     ) {
 
-        return BASE_URL
-            . 'image/vendors/default-vendor.jpg';
+        return VENDOR_IMAGE_URL
+            . 'default-vendor.jpg';
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize Windows path
+    |--------------------------------------------------------------------------
+    */
+
+    $image = str_replace(
+        '\\',
+        '/',
+        $image
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Already a full URL
+    |--------------------------------------------------------------------------
+    */
+
     if (
-        str_contains(
+        filter_var(
             $image,
-            '/'
-        )
-        ||
-        str_contains(
-            $image,
-            '\\'
+            FILTER_VALIDATE_URL
         )
     ) {
 
-        return BASE_URL . ltrim(
-            str_replace(
-                '\\',
-                '/',
-                $image
-            ),
-            '/'
-        );
+        return $image;
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Remove leading slash
+    |--------------------------------------------------------------------------
+    */
+
+    $image = ltrim(
+        $image,
+        '/'
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Already contains image/ or uploads/
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        str_starts_with(
+            $image,
+            'image/'
+        )
+        ||
+        str_starts_with(
+            $image,
+            'uploads/'
+        )
+    ) {
+
+        return BASE_URL . $image;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Filename only
+    |--------------------------------------------------------------------------
+    */
 
     return VENDOR_IMAGE_URL
         . rawurlencode($image);
@@ -433,13 +593,27 @@ foreach (
 | PDO DATABASE CONNECTION
 |--------------------------------------------------------------------------
 |
-| One centralized connection.
+| Centralized PDO connection.
 |
+| Every PHP file should use:
+|
+| $db = getDB();
+|
+| Do NOT create another PDO connection.
+|
+|--------------------------------------------------------------------------
 */
 
 function getDB(): PDO
 {
     static $pdo = null;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reuse existing connection
+    |--------------------------------------------------------------------------
+    */
 
     if (
         $pdo instanceof PDO
@@ -449,6 +623,12 @@ function getDB(): PDO
     }
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | PDO DSN
+    |--------------------------------------------------------------------------
+    */
+
     $dsn =
         'mysql:host='
         . DB_HOST
@@ -457,6 +637,12 @@ function getDB(): PDO
         . ';charset='
         . DB_CHARSET;
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | PDO OPTIONS
+    |--------------------------------------------------------------------------
+    */
 
     $options = [
 
@@ -475,6 +661,12 @@ function getDB(): PDO
     ];
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | CREATE CONNECTION
+    |--------------------------------------------------------------------------
+    */
+
     try {
 
         $pdo = new PDO(
@@ -490,17 +682,29 @@ function getDB(): PDO
         PDOException $e
     ) {
 
-        if (APP_DEBUG) {
+        /*
+        |--------------------------------------------------------------------------
+        | DEVELOPMENT ERROR
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            APP_DEBUG
+        ) {
 
             die(
                 '<div style="
-                    font-family:Arial;
+                    font-family:Arial,sans-serif;
                     padding:30px;
                     background:#0f172a;
                     color:#fff;
                     min-height:100vh;
                 ">
-                    <h2 style="color:#60a5fa;">
+
+                    <h2 style="
+                        color:#60a5fa;
+                        margin-bottom:10px;
+                    ">
                         HochipoHub Database Error
                     </h2>
 
@@ -513,25 +717,54 @@ function getDB(): PDO
                         padding:20px;
                         border-radius:12px;
                         overflow:auto;
+                        white-space:pre-wrap;
                     ">'
-                    . e($e->getMessage())
+                    . e(
+                        $e->getMessage()
+                    )
                     . '</pre>
 
                     <p>
-                        Check:
+                        Please check:
                     </p>
 
                     <ul>
-                        <li>Laragon / MySQL is running</li>
-                        <li>Database name is <strong>hochipohub</strong></li>
-                        <li>MySQL username is correct</li>
-                        <li>MySQL password is correct</li>
+
+                        <li>
+                            Laragon / MySQL is running
+                        </li>
+
+                        <li>
+                            Database name is
+                            <strong>
+                                hochipohub
+                            </strong>
+                        </li>
+
+                        <li>
+                            MySQL username is correct
+                        </li>
+
+                        <li>
+                            MySQL password is correct
+                        </li>
+
                     </ul>
+
                 </div>'
             );
         }
 
-        http_response_code(500);
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCTION ERROR
+        |--------------------------------------------------------------------------
+        */
+
+        http_response_code(
+            500
+        );
 
         exit(
             'Database connection failed.'
