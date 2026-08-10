@@ -2,7 +2,14 @@
 
 /*
 |--------------------------------------------------------------------------
-| HochipoHub - Session & Authentication
+| HOCHIPOHUB - SESSION & AUTHENTICATION
+|--------------------------------------------------------------------------
+| File:
+| includes/session.php
+|
+| Purpose:
+| Central session management, authentication,
+| role checking, flash messages and OTP/reset state.
 |--------------------------------------------------------------------------
 */
 
@@ -11,20 +18,13 @@ require_once dirname(__DIR__) . '/config.php';
 
 /*
 |--------------------------------------------------------------------------
-| SESSION
+| START SESSION
 |--------------------------------------------------------------------------
-|
-| config.php already starts the session.
-| This check prevents session_start() from
-| being called twice.
-|
 */
 
 if (session_status() === PHP_SESSION_NONE) {
 
-    session_name(
-        SESSION_NAME
-    );
+    session_name(SESSION_NAME);
 
     session_start();
 }
@@ -38,13 +38,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 function isLoggedIn(): bool
 {
-    return isset(
-        $_SESSION['user_id']
-    )
-    &&
-    !empty(
-        $_SESSION['user_id']
-    );
+    return !empty($_SESSION['user_id']);
 }
 
 
@@ -72,8 +66,7 @@ function currentUserId(): ?int
 
 function currentUserName(): string
 {
-    return $_SESSION['user_name']
-        ?? '';
+    return $_SESSION['name'] ?? '';
 }
 
 
@@ -85,8 +78,19 @@ function currentUserName(): string
 
 function currentUserEmail(): string
 {
-    return $_SESSION['user_email']
-        ?? '';
+    return $_SESSION['email'] ?? '';
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CURRENT USER PHONE
+|--------------------------------------------------------------------------
+*/
+
+function currentUserPhone(): string
+{
+    return $_SESSION['phone'] ?? '';
 }
 
 
@@ -98,8 +102,19 @@ function currentUserEmail(): string
 
 function currentUserRole(): ?string
 {
-    return $_SESSION['user_role']
-        ?? null;
+    return $_SESSION['role'] ?? null;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CURRENT USER PROFILE IMAGE
+|--------------------------------------------------------------------------
+*/
+
+function currentUserProfileImage(): string
+{
+    return $_SESSION['profile_image'] ?? '';
 }
 
 
@@ -108,44 +123,47 @@ function currentUserRole(): ?string
 | LOGIN USER
 |--------------------------------------------------------------------------
 |
-| Called after successful authentication.
+| Expected user array:
 |
+| user_id
+| name
+| email
+| phone
+| role
+| profile_image
+|
+|--------------------------------------------------------------------------
 */
 
-function loginUser(
-    array $user
-): void {
-
-    session_regenerate_id(
-        true
-    );
-
+function loginUser(array $user): void
+{
+    session_regenerate_id(true);
 
     $_SESSION['user_id'] =
-        (int) $user['user_id'];
+        (int) ($user['user_id'] ?? 0);
 
+    $_SESSION['name'] =
+        $user['name'] ?? '';
 
-    $_SESSION['user_name'] =
-        $user['name'];
+    $_SESSION['email'] =
+        $user['email'] ?? '';
 
+    $_SESSION['phone'] =
+        $user['phone'] ?? '';
 
-    $_SESSION['user_email'] =
-        $user['email'];
+    $_SESSION['role'] =
+        $user['role'] ?? 'customer';
 
-
-    $_SESSION['user_role'] =
-        $user['role'];
-
-
-    $_SESSION['user_status'] =
-        $user['status'];
-
+    $_SESSION['profile_image'] =
+        $user['profile_image'] ?? '';
 
     $_SESSION['logged_in'] =
         true;
 
-
     $_SESSION['login_time'] =
+        time();
+
+    $_SESSION['last_activity'] =
         time();
 }
 
@@ -162,14 +180,11 @@ function logoutUser(): void
 
 
     if (
-        ini_get(
-            'session.use_cookies'
-        )
+        ini_get('session.use_cookies')
     ) {
 
         $params =
             session_get_cookie_params();
-
 
         setcookie(
             session_name(),
@@ -197,19 +212,14 @@ function requireLogin(): void
 {
     if (!isLoggedIn()) {
 
-        setFlashMessageSafe(
+        setFlashMessage(
             'warning',
             'Please login to continue.'
         );
 
-
-        header(
-            'Location: ' .
-            BASE_URL .
-            'index.php'
+        redirect(
+            BASE_URL . 'index.php'
         );
-
-        exit;
     }
 }
 
@@ -224,13 +234,9 @@ function requireGuest(): void
 {
     if (isLoggedIn()) {
 
-        header(
-            'Location: ' .
-            BASE_URL .
-            'dashboard.php'
+        redirect(
+            BASE_URL . 'dashboard.php'
         );
-
-        exit;
     }
 }
 
@@ -247,16 +253,13 @@ function requireRole(
 
     requireLogin();
 
-
     $allowedRoles =
         is_array($roles)
         ? $roles
         : [$roles];
 
-
     $currentRole =
         currentUserRole();
-
 
     if (
         !in_array(
@@ -266,19 +269,14 @@ function requireRole(
         )
     ) {
 
-        setFlashMessageSafe(
+        setFlashMessage(
             'error',
             'You do not have permission to access this page.'
         );
 
-
-        header(
-            'Location: ' .
-            BASE_URL .
-            'dashboard.php'
+        redirect(
+            BASE_URL . 'dashboard.php'
         );
-
-        exit;
     }
 }
 
@@ -291,9 +289,7 @@ function requireRole(
 
 function requireCustomer(): void
 {
-    requireRole(
-        'customer'
-    );
+    requireRole('customer');
 }
 
 
@@ -305,9 +301,7 @@ function requireCustomer(): void
 
 function requireVendor(): void
 {
-    requireRole(
-        'vendor'
-    );
+    requireRole('vendor');
 }
 
 
@@ -319,23 +313,53 @@ function requireVendor(): void
 
 function requireAdmin(): void
 {
-    requireRole(
-        'admin'
+    requireRole('admin');
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ROLE HELPERS
+|--------------------------------------------------------------------------
+*/
+
+function isCustomer(): bool
+{
+    return (
+        isLoggedIn()
+        &&
+        currentUserRole() === 'customer'
+    );
+}
+
+
+function isVendor(): bool
+{
+    return (
+        isLoggedIn()
+        &&
+        currentUserRole() === 'vendor'
+    );
+}
+
+
+function isAdmin(): bool
+{
+    return (
+        isLoggedIn()
+        &&
+        currentUserRole() === 'admin'
     );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| SAFE FLASH MESSAGE
+| FLASH MESSAGE
 |--------------------------------------------------------------------------
-|
-| functions.php may not be loaded yet when
-| session.php is used by itself.
-|
 */
 
-function setFlashMessageSafe(
+function setFlashMessage(
     string $type,
     string $message
 ): void {
@@ -354,17 +378,43 @@ function setFlashMessageSafe(
 
 /*
 |--------------------------------------------------------------------------
-| MFA
+| GET FLASH MESSAGE
+|--------------------------------------------------------------------------
+*/
+
+function getFlashMessage(): ?array
+{
+    if (
+        empty($_SESSION['flash'])
+    ) {
+
+        return null;
+    }
+
+    $flash =
+        $_SESSION['flash'];
+
+    unset(
+        $_SESSION['flash']
+    );
+
+    return $flash;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| MFA / OTP VERIFIED
 |--------------------------------------------------------------------------
 */
 
 function isMfaVerified(): bool
 {
-    return isset(
-        $_SESSION['mfa_verified']
-    )
-    &&
-    $_SESSION['mfa_verified'] === true;
+    return (
+        !empty(
+            $_SESSION['mfa_verified']
+        )
+    );
 }
 
 
@@ -393,8 +443,9 @@ function setMfaPendingUser(
     int $userId
 ): void {
 
-    $_SESSION['mfa_pending_user_id'] =
-        $userId;
+    $_SESSION[
+        'mfa_pending_user_id'
+    ] = $userId;
 }
 
 
@@ -411,11 +462,9 @@ function getMfaPendingUser(): ?int
         return null;
     }
 
-
-    return (int)
-        $_SESSION[
-            'mfa_pending_user_id'
-        ];
+    return (int) $_SESSION[
+        'mfa_pending_user_id'
+    ];
 }
 
 
@@ -458,11 +507,9 @@ function getResetUser(): ?int
         return null;
     }
 
-
-    return (int)
-        $_SESSION[
-            'reset_user_id'
-        ];
+    return (int) $_SESSION[
+        'reset_user_id'
+    ];
 }
 
 
@@ -486,21 +533,18 @@ function checkSessionTimeout(
     int $timeout = 7200
 ): void {
 
-    if (
-        !isLoggedIn()
-    ) {
-
+    if (!isLoggedIn()) {
         return;
     }
 
 
     if (
-        !isset(
-            $_SESSION['login_time']
+        empty(
+            $_SESSION['last_activity']
         )
     ) {
 
-        $_SESSION['login_time'] =
+        $_SESSION['last_activity'] =
             time();
 
         return;
@@ -510,13 +554,12 @@ function checkSessionTimeout(
     if (
         time()
         -
-        $_SESSION['login_time']
+        (int) $_SESSION['last_activity']
         >
         $timeout
     ) {
 
         logoutUser();
-
 
         header(
             'Location: ' .
@@ -537,72 +580,11 @@ function checkSessionTimeout(
 
 function updateSessionActivity(): void
 {
-    if (
-        isLoggedIn()
-    ) {
+    if (isLoggedIn()) {
 
-        $_SESSION[
-            'last_activity'
-        ] = time();
+        $_SESSION['last_activity'] =
+            time();
     }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CHECK ACCOUNT STATUS
-|--------------------------------------------------------------------------
-*/
-
-function isAccountActive(): bool
-{
-    return (
-        isset(
-            $_SESSION['user_status']
-        )
-        &&
-        $_SESSION['user_status']
-            === 'active'
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| ROLE CHECK HELPERS
-|--------------------------------------------------------------------------
-*/
-
-function isCustomer(): bool
-{
-    return (
-        isLoggedIn()
-        &&
-        currentUserRole()
-            === 'customer'
-    );
-}
-
-
-function isVendor(): bool
-{
-    return (
-        isLoggedIn()
-        &&
-        currentUserRole()
-            === 'vendor'
-    );
-}
-
-
-function isAdmin(): bool
-{
-    return (
-        isLoggedIn()
-        &&
-        currentUserRole()
-            === 'admin'
-    );
 }
 
 
@@ -615,5 +597,4 @@ function isAdmin(): bool
 if (isLoggedIn()) {
 
     updateSessionActivity();
-
 }
