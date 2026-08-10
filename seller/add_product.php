@@ -1,132 +1,119 @@
 <?php
+/**
+ * =========================================================
+ * HOCHIPOHUB
+ * SELLER - ADD PRODUCT
+ * File: seller/add_product.php
+ * =========================================================
+ */
 
-require_once "../config.php";
-require_once "../database/db.php";
-require_once "../includes/session.php";
-require_once "../includes/functions.php";
-
-
-$pageTitle = "Add Product";
-
-
-if (!isLoggedIn()) {
-
-    header("Location: " . BASE_URL . "index.php");
-    exit();
-
-}
-
-
-if (currentUserRole() !== 'vendor') {
-
-    header("Location: " . BASE_URL . "index.php");
-    exit();
-
-}
-
-
-$userID =
-    (int) currentUserID();
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/functions.php';
 
 
 /*
 |--------------------------------------------------------------------------
-| Get Vendor
+| Security - Vendor Only
 |--------------------------------------------------------------------------
 */
 
-$vendorQuery = $conn->prepare("
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-    SELECT
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../index.php");
+    exit;
+}
 
-        vendor_id,
-        approval_status
-
-    FROM vendors
-
-    WHERE user_id = ?
-
-    LIMIT 1
-
-");
-
-
-$vendorQuery->bind_param(
-    "i",
-    $userID
-);
-
-
-$vendorQuery->execute();
-
-
-$vendorResult =
-    $vendorQuery->get_result();
-
-
-if ($vendorResult->num_rows === 0) {
-
-    header(
-        "Location: setup_profile.php"
-    );
-
-    exit();
-
+if (
+    !isset($_SESSION['role']) ||
+    $_SESSION['role'] !== 'vendor'
+) {
+    header("Location: ../dashboard.php");
+    exit;
 }
 
 
-$vendor =
-    $vendorResult->fetch_assoc();
+$userId = (int) $_SESSION['user_id'];
 
-
-$vendorID =
-    (int)$vendor['vendor_id'];
+$errors = [];
+$success = "";
 
 
 /*
 |--------------------------------------------------------------------------
-| Only Approved Vendor Can Add Products
+| Get Vendor Information
+|--------------------------------------------------------------------------
+*/
+
+$vendorStmt = $conn->prepare("
+    SELECT
+        vendor_id,
+        business_name,
+        approval_status
+    FROM vendors
+    WHERE user_id = ?
+    LIMIT 1
+");
+
+$vendorStmt->bind_param("i", $userId);
+$vendorStmt->execute();
+
+$vendorResult = $vendorStmt->get_result();
+
+$vendor = $vendorResult->fetch_assoc();
+
+$vendorStmt->close();
+
+
+if (!$vendor) {
+    $errors[] = "Vendor profile was not found.";
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Check Vendor Approval
 |--------------------------------------------------------------------------
 */
 
 if (
-    $vendor['approval_status']
-    !== 'Approved'
+    $vendor &&
+    $vendor['approval_status'] !== 'Approved'
 ) {
 
-    setFlashMessage(
-        "error",
-        "Your vendor account must be approved before adding products."
-    );
-
-    header(
-        "Location: dashboard.php"
-    );
-
-    exit();
+    $errors[] =
+        "Your vendor account must be approved before you can add products.";
 
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Categories
+| Get Categories
 |--------------------------------------------------------------------------
 */
 
-$categories =
-    $conn->query("
+$categories = [];
 
-        SELECT
+$categoryQuery = $conn->query("
+    SELECT
+        category_id,
+        category_name
+    FROM categories
+    ORDER BY category_name ASC
+");
 
-            category_id,
-            category_name
+if ($categoryQuery) {
 
-        FROM categories
+    while ($row = $categoryQuery->fetch_assoc()) {
+        $categories[] = $row;
+    }
 
-        ORDER BY category_name ASC
-
-    ");
+}
 
 
 /*
@@ -136,72 +123,19 @@ $categories =
 */
 
 if (
-    $_SERVER['REQUEST_METHOD']
-    === 'POST'
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    empty($errors)
 ) {
 
+    $productName = trim($_POST['product_name'] ?? '');
 
-    $productName =
-        trim(
-            $_POST['product_name']
-            ?? ''
-        );
+    $description = trim($_POST['description'] ?? '');
 
+    $price = trim($_POST['price'] ?? '');
 
-    $description =
-        trim(
-            $_POST['description']
-            ?? ''
-        );
+    $stockQuantity = trim($_POST['stock_quantity'] ?? '');
 
-
-    $price =
-        (float)(
-            $_POST['price']
-            ?? 0
-        );
-
-
-    $stock =
-        (int)(
-            $_POST['stock_quantity']
-            ?? 0
-        );
-
-
-    $categoryID =
-        (int)(
-            $_POST['category_id']
-            ?? 0
-        );
-
-
-    $status =
-        $_POST['status']
-        ?? 'Available';
-
-
-    $allowedStatus = [
-
-        'Available',
-        'Out of Stock',
-        'Hidden'
-
-    ];
-
-
-    if (
-        !in_array(
-            $status,
-            $allowedStatus,
-            true
-        )
-    ) {
-
-        $status =
-            'Available';
-
-    }
+    $categoryId = (int) ($_POST['category_id'] ?? 0);
 
 
     /*
@@ -210,106 +144,285 @@ if (
     |--------------------------------------------------------------------------
     */
 
+    if ($productName === '') {
+
+        $errors[] = "Product name is required.";
+
+    }
+
+    if (strlen($productName) > 150) {
+
+        $errors[] =
+            "Product name cannot exceed 150 characters.";
+
+    }
+
+
+    if ($categoryId <= 0) {
+
+        $errors[] =
+            "Please select a product category.";
+
+    }
+
+
+    if ($price === '' || !is_numeric($price)) {
+
+        $errors[] =
+            "Please enter a valid product price.";
+
+    } elseif ((float) $price < 0) {
+
+        $errors[] =
+            "Product price cannot be negative.";
+
+    }
+
+
     if (
-        $productName === ''
-        ||
-        $categoryID <= 0
-        ||
-        $price < 0
-        ||
-        $stock < 0
+        $stockQuantity === '' ||
+        !is_numeric($stockQuantity) ||
+        (int) $stockQuantity < 0
     ) {
 
-        setFlashMessage(
-            "error",
-            "Please fill in all required fields correctly."
+        $errors[] =
+            "Please enter a valid stock quantity.";
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Check Category
+    |--------------------------------------------------------------------------
+    */
+
+    if ($categoryId > 0) {
+
+        $categoryCheck = $conn->prepare("
+            SELECT category_id
+            FROM categories
+            WHERE category_id = ?
+            LIMIT 1
+        ");
+
+        $categoryCheck->bind_param(
+            "i",
+            $categoryId
         );
 
-    } else {
+        $categoryCheck->execute();
+
+        $categoryExists =
+            $categoryCheck->get_result()->num_rows > 0;
+
+        $categoryCheck->close();
+
+
+        if (!$categoryExists) {
+
+            $errors[] =
+                "Selected category does not exist.";
+
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Product Image
+    |--------------------------------------------------------------------------
+    */
+
+    $imageName = null;
+
+    if (
+        isset($_FILES['product_image']) &&
+        $_FILES['product_image']['error'] !== UPLOAD_ERR_NO_FILE
+    ) {
+
+        $file = $_FILES['product_image'];
+
+
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+
+            $errors[] =
+                "There was a problem uploading the product image.";
+
+        } else {
+
+            $allowedTypes = [
+                'image/jpeg',
+                'image/png',
+                'image/webp'
+            ];
+
+            $maxSize = 5 * 1024 * 1024;
+
+
+            if (!in_array($file['type'], $allowedTypes, true)) {
+
+                $errors[] =
+                    "Only JPG, PNG and WEBP images are allowed.";
+
+            }
+
+
+            if ($file['size'] > $maxSize) {
+
+                $errors[] =
+                    "Product image must not exceed 5MB.";
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | More Reliable MIME Check
+            |--------------------------------------------------------------------------
+            */
+
+            if (empty($errors)) {
+
+                $finfo =
+                    new finfo(FILEINFO_MIME_TYPE);
+
+                $realMime =
+                    $finfo->file($file['tmp_name']);
+
+
+                if (
+                    !in_array(
+                        $realMime,
+                        $allowedTypes,
+                        true
+                    )
+                ) {
+
+                    $errors[] =
+                        "Invalid image file.";
+
+                }
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Generate Safe Filename
+            |--------------------------------------------------------------------------
+            */
+
+            if (empty($errors)) {
+
+                $extension =
+                    strtolower(
+                        pathinfo(
+                            $file['name'],
+                            PATHINFO_EXTENSION
+                        )
+                    );
+
+                $imageName =
+                    'product_' .
+                    $vendor['vendor_id'] .
+                    '_' .
+                    uniqid('', true) .
+                    '.' .
+                    $extension;
+
+            }
+
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Insert Product
+    |--------------------------------------------------------------------------
+    */
+
+    if (empty($errors)) {
+
+        $priceValue =
+            number_format(
+                (float) $price,
+                2,
+                '.',
+                ''
+            );
+
+        $stockValue =
+            (int) $stockQuantity;
 
 
         /*
         |--------------------------------------------------------------------------
-        | Image Upload
+        | Product Status
         |--------------------------------------------------------------------------
         */
 
-        $imageName = null;
+        $productStatus =
+            $stockValue > 0
+            ? 'Available'
+            : 'Out of Stock';
 
 
-        if (
-            isset($_FILES['image'])
-            &&
-            $_FILES['image']['error']
-            === UPLOAD_ERR_OK
-        ) {
+        /*
+        |--------------------------------------------------------------------------
+        | Upload Directory
+        |--------------------------------------------------------------------------
+        */
+
+        $uploadDirectory =
+            dirname(__DIR__) .
+            '/uploads/products/';
 
 
-            $extension =
-                strtolower(
-                    pathinfo(
-                        $_FILES['image']['name'],
-                        PATHINFO_EXTENSION
-                    )
-                );
+        if (!is_dir($uploadDirectory)) {
+
+            mkdir(
+                $uploadDirectory,
+                0755,
+                true
+            );
+
+        }
 
 
-            $allowedExtensions = [
+        /*
+        |--------------------------------------------------------------------------
+        | Move Image
+        |--------------------------------------------------------------------------
+        */
 
-                'jpg',
-                'jpeg',
-                'png',
-                'webp'
+        $imageUploaded = false;
 
-            ];
+        if ($imageName !== null) {
+
+            $targetPath =
+                $uploadDirectory .
+                $imageName;
 
 
             if (
-                in_array(
-                    $extension,
-                    $allowedExtensions,
-                    true
+                !move_uploaded_file(
+                    $_FILES['product_image']['tmp_name'],
+                    $targetPath
                 )
             ) {
 
+                $errors[] =
+                    "Failed to save product image.";
 
-                $imageName =
-                    uniqid(
-                        'product_',
-                        true
-                    )
-                    . '.'
-                    . $extension;
+                $imageName = null;
 
+            } else {
 
-                $uploadDirectory =
-                    dirname(__DIR__)
-                    . '/uploads/products/';
-
-
-                if (
-                    !is_dir(
-                        $uploadDirectory
-                    )
-                ) {
-
-                    mkdir(
-                        $uploadDirectory,
-                        0777,
-                        true
-                    );
-
-                }
-
-
-                move_uploaded_file(
-
-                    $_FILES['image']['tmp_name'],
-
-                    $uploadDirectory
-                    . $imageName
-
-                );
+                $imageUploaded = true;
 
             }
 
@@ -318,132 +431,152 @@ if (
 
         /*
         |--------------------------------------------------------------------------
-        | Automatically Mark Out Of Stock
+        | Database Transaction
         |--------------------------------------------------------------------------
         */
 
-        if ($stock <= 0) {
+        if (empty($errors)) {
 
-            $status =
-                'Out of Stock';
+            $conn->begin_transaction();
 
-        }
+            try {
 
+                /*
+                --------------------------------------------------------------
+                | Insert Product
+                --------------------------------------------------------------
+                */
 
-        /*
-        |--------------------------------------------------------------------------
-        | Insert Product
-        |--------------------------------------------------------------------------
-        */
-
-        $insert = $conn->prepare("
-
-            INSERT INTO products
-
-            (
-                vendor_id,
-                category_id,
-                product_name,
-                description,
-                price,
-                stock_quantity,
-                image,
-                status
-            )
-
-            VALUES
-
-            (
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?
-            )
-
-        ");
+                $productStmt = $conn->prepare("
+                    INSERT INTO products (
+                        vendor_id,
+                        category_id,
+                        product_name,
+                        description,
+                        price,
+                        stock_quantity,
+                        image,
+                        status
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
 
 
-        $insert->bind_param(
-
-            "iissdiss",
-
-            $vendorID,
-            $categoryID,
-            $productName,
-            $description,
-            $price,
-            $stock,
-            $imageName,
-            $status
-
-        );
+                $productStmt->bind_param(
+                    "iissdiss",
+                    $vendor['vendor_id'],
+                    $categoryId,
+                    $productName,
+                    $description,
+                    $priceValue,
+                    $stockValue,
+                    $imageName,
+                    $productStatus
+                );
 
 
-        if ($insert->execute()) {
+                if (!$productStmt->execute()) {
+
+                    throw new Exception(
+                        "Failed to create product."
+                    );
+
+                }
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Create Inventory Record
-            |--------------------------------------------------------------------------
-            */
-
-            $productID =
-                $insert->insert_id;
+                $productId =
+                    $conn->insert_id;
 
 
-            $inventory = $conn->prepare("
-
-                INSERT INTO inventory
-
-                (
-                    product_id,
-                    quantity
-                )
-
-                VALUES
-                (
-                    ?,
-                    ?
-                )
-
-            ");
+                $productStmt->close();
 
 
-            $inventory->bind_param(
-                "ii",
-                $productID,
-                $stock
-            );
+                /*
+                --------------------------------------------------------------
+                | Insert Inventory
+                --------------------------------------------------------------
+                */
+
+                $inventoryStmt = $conn->prepare("
+                    INSERT INTO inventory (
+                        product_id,
+                        quantity
+                    )
+                    VALUES (?, ?)
+                ");
 
 
-            $inventory->execute();
+                $inventoryStmt->bind_param(
+                    "ii",
+                    $productId,
+                    $stockValue
+                );
 
 
-            setFlashMessage(
-                "success",
-                "Product added successfully."
-            );
+                if (!$inventoryStmt->execute()) {
+
+                    throw new Exception(
+                        "Failed to create inventory record."
+                    );
+
+                }
 
 
-            header(
-                "Location: products.php"
-            );
-
-            exit();
+                $inventoryStmt->close();
 
 
-        } else {
+                /*
+                --------------------------------------------------------------
+                | Commit
+                --------------------------------------------------------------
+                */
+
+                $conn->commit();
 
 
-            setFlashMessage(
-                "error",
-                "Unable to add product."
-            );
+                $success =
+                    "Product added successfully.";
+
+
+                /*
+                --------------------------------------------------------------
+                | Clear Form
+                --------------------------------------------------------------
+                */
+
+                $productName = '';
+                $description = '';
+                $price = '';
+                $stockQuantity = '';
+                $categoryId = 0;
+
+
+            } catch (Exception $e) {
+
+                $conn->rollback();
+
+
+                /*
+                --------------------------------------------------------------
+                | Remove uploaded image if DB failed
+                --------------------------------------------------------------
+                */
+
+                if (
+                    $imageName !== null &&
+                    isset($targetPath) &&
+                    file_exists($targetPath)
+                ) {
+
+                    unlink($targetPath);
+
+                }
+
+
+                $errors[] =
+                    "Unable to add product. Please try again.";
+
+            }
 
         }
 
@@ -451,26 +584,182 @@ if (
 
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Page Variables
+|--------------------------------------------------------------------------
+*/
+
+$pageTitle = "Add Product - HochipoHub";
+
+?>
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        <?php echo htmlspecialchars($pageTitle); ?>
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="../css/style.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/dashboard.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/vendor.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/responsive.css"
+    >
+
+</head>
+
+
+<body>
+
+
+<?php
+
+if (file_exists(
+    dirname(__DIR__) .
+    '/includes/vendor_sidebar.php'
+)) {
+
+    include dirname(__DIR__) .
+        '/includes/vendor_sidebar.php';
+
+}
+
 ?>
 
-<?php include "../includes/header.php"; ?>
 
-<section class="product-form-page">
+<main class="dashboard-main">
 
-    <div class="page-title">
 
-        <h1>
-            Add Product
-        </h1>
+    <!-- =====================================================
+         HEADER
+    ====================================================== -->
 
-        <p>
-            Create a new product listing.
-        </p>
+    <div class="dashboard-header">
+
+        <div>
+
+            <span
+                style="
+                    color:#2563eb;
+                    font-weight:700;
+                "
+            >
+                SELLER PANEL
+            </span>
+
+            <h1>
+                Add New Product
+            </h1>
+
+            <p>
+                Add your product to HochipoHub marketplace.
+            </p>
+
+        </div>
+
+
+        <a
+            href="products.php"
+            class="btn"
+        >
+            ← My Products
+        </a>
 
     </div>
 
 
-    <div class="form-box">
+    <!-- =====================================================
+         ALERTS
+    ====================================================== -->
+
+    <?php if (!empty($errors)): ?>
+
+        <div
+            style="
+                margin:20px 0;
+                padding:16px 20px;
+                border-radius:12px;
+                background:#fee2e2;
+                color:#991b1b;
+            "
+        >
+
+            <?php foreach ($errors as $error): ?>
+
+                <div>
+                    •
+                    <?php
+                    echo htmlspecialchars($error);
+                    ?>
+                </div>
+
+            <?php endforeach; ?>
+
+        </div>
+
+    <?php endif; ?>
+
+
+    <?php if ($success !== ''): ?>
+
+        <div
+            style="
+                margin:20px 0;
+                padding:16px 20px;
+                border-radius:12px;
+                background:#dcfce7;
+                color:#166534;
+            "
+        >
+
+            <?php
+            echo htmlspecialchars($success);
+            ?>
+
+        </div>
+
+    <?php endif; ?>
+
+
+    <!-- =====================================================
+         FORM
+    ====================================================== -->
+
+    <section
+        style="
+            max-width:900px;
+            margin:30px auto;
+            background:#ffffff;
+            padding:30px;
+            border-radius:20px;
+            box-shadow:0 8px 30px rgba(15,23,42,.08);
+        "
+    >
 
         <form
             method="POST"
@@ -478,9 +767,22 @@ if (
         >
 
 
-            <div class="form-group">
+            <!-- PRODUCT NAME -->
 
-                <label for="product_name">
+            <div
+                style="
+                    margin-bottom:22px;
+                "
+            >
+
+                <label
+                    for="product_name"
+                    style="
+                        display:block;
+                        font-weight:700;
+                        margin-bottom:8px;
+                    "
+                >
                     Product Name
                 </label>
 
@@ -490,14 +792,38 @@ if (
                     name="product_name"
                     maxlength="150"
                     required
+                    value="<?php
+                        echo htmlspecialchars(
+                            $productName ?? ''
+                        );
+                    ?>"
+                    style="
+                        width:100%;
+                        padding:14px;
+                        border:1px solid #cbd5e1;
+                        border-radius:10px;
+                    "
                 >
 
             </div>
 
 
-            <div class="form-group">
+            <!-- CATEGORY -->
 
-                <label for="category_id">
+            <div
+                style="
+                    margin-bottom:22px;
+                "
+            >
+
+                <label
+                    for="category_id"
+                    style="
+                        display:block;
+                        font-weight:700;
+                        margin-bottom:8px;
+                    "
+                >
                     Category
                 </label>
 
@@ -505,37 +831,72 @@ if (
                     id="category_id"
                     name="category_id"
                     required
+                    style="
+                        width:100%;
+                        padding:14px;
+                        border:1px solid #cbd5e1;
+                        border-radius:10px;
+                    "
                 >
 
                     <option value="">
                         Select Category
                     </option>
 
-                    <?php while (
-                        $category =
-                        $categories->fetch_assoc()
+                    <?php foreach (
+                        $categories
+                        as $category
                     ): ?>
 
                         <option
-                            value="<?= $category['category_id']; ?>"
+                            value="<?php
+                                echo (int)
+                                    $category['category_id'];
+                            ?>"
+                            <?php
+                            echo (
+                                (int)
+                                ($categoryId ?? 0)
+                                ===
+                                (int)
+                                $category['category_id']
+                            )
+                            ? 'selected'
+                            : '';
+                            ?>
                         >
 
-                            <?= htmlspecialchars(
+                            <?php
+                            echo htmlspecialchars(
                                 $category['category_name']
-                            ); ?>
+                            );
+                            ?>
 
                         </option>
 
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
 
                 </select>
 
             </div>
 
 
-            <div class="form-group">
+            <!-- DESCRIPTION -->
 
-                <label for="description">
+            <div
+                style="
+                    margin-bottom:22px;
+                "
+            >
+
+                <label
+                    for="description"
+                    style="
+                        display:block;
+                        font-weight:700;
+                        margin-bottom:8px;
+                    "
+                >
                     Description
                 </label>
 
@@ -543,102 +904,192 @@ if (
                     id="description"
                     name="description"
                     rows="6"
-                ></textarea>
+                    style="
+                        width:100%;
+                        padding:14px;
+                        border:1px solid #cbd5e1;
+                        border-radius:10px;
+                        resize:vertical;
+                    "
+                ><?php
+                    echo htmlspecialchars(
+                        $description ?? ''
+                    );
+                ?></textarea>
 
             </div>
 
 
-            <div class="form-group">
+            <!-- PRICE + STOCK -->
 
-                <label for="price">
-                    Price (RM)
-                </label>
+            <div
+                style="
+                    display:grid;
+                    grid-template-columns:1fr 1fr;
+                    gap:20px;
+                    margin-bottom:22px;
+                "
+            >
 
-                <input
-                    type="number"
-                    id="price"
-                    name="price"
-                    step="0.01"
-                    min="0"
-                    required
+
+                <div>
+
+                    <label
+                        for="price"
+                        style="
+                            display:block;
+                            font-weight:700;
+                            margin-bottom:8px;
+                        "
+                    >
+                        Price (RM)
+                    </label>
+
+                    <input
+                        type="number"
+                        id="price"
+                        name="price"
+                        min="0"
+                        step="0.01"
+                        required
+                        value="<?php
+                            echo htmlspecialchars(
+                                $price ?? ''
+                            );
+                        ?>"
+                        style="
+                            width:100%;
+                            padding:14px;
+                            border:1px solid #cbd5e1;
+                            border-radius:10px;
+                        "
+                    >
+
+                </div>
+
+
+                <div>
+
+                    <label
+                        for="stock_quantity"
+                        style="
+                            display:block;
+                            font-weight:700;
+                            margin-bottom:8px;
+                        "
+                    >
+                        Stock Quantity
+                    </label>
+
+                    <input
+                        type="number"
+                        id="stock_quantity"
+                        name="stock_quantity"
+                        min="0"
+                        step="1"
+                        required
+                        value="<?php
+                            echo htmlspecialchars(
+                                $stockQuantity ?? ''
+                            );
+                        ?>"
+                        style="
+                            width:100%;
+                            padding:14px;
+                            border:1px solid #cbd5e1;
+                            border-radius:10px;
+                        "
+                    >
+
+                </div>
+
+            </div>
+
+
+            <!-- IMAGE -->
+
+            <div
+                style="
+                    margin-bottom:25px;
+                "
+            >
+
+                <label
+                    for="product_image"
+                    style="
+                        display:block;
+                        font-weight:700;
+                        margin-bottom:8px;
+                    "
                 >
-
-            </div>
-
-
-            <div class="form-group">
-
-                <label for="stock_quantity">
-                    Stock Quantity
-                </label>
-
-                <input
-                    type="number"
-                    id="stock_quantity"
-                    name="stock_quantity"
-                    min="0"
-                    required
-                >
-
-            </div>
-
-
-            <div class="form-group">
-
-                <label for="image">
                     Product Image
                 </label>
 
                 <input
                     type="file"
-                    id="image"
-                    name="image"
+                    id="product_image"
+                    name="product_image"
                     accept=".jpg,.jpeg,.png,.webp"
                 >
 
-            </div>
-
-
-            <div class="form-group">
-
-                <label for="status">
-                    Status
-                </label>
-
-                <select
-                    id="status"
-                    name="status"
+                <small
+                    style="
+                        display:block;
+                        margin-top:8px;
+                        color:#64748b;
+                    "
                 >
-
-                    <option value="Available">
-                        Available
-                    </option>
-
-                    <option value="Out of Stock">
-                        Out of Stock
-                    </option>
-
-                    <option value="Hidden">
-                        Hidden
-                    </option>
-
-                </select>
+                    JPG, PNG or WEBP. Maximum 5MB.
+                </small>
 
             </div>
 
 
-            <button
-                type="submit"
-                class="btn-primary"
+            <!-- BUTTONS -->
+
+            <div
+                style="
+                    display:flex;
+                    gap:12px;
+                    justify-content:flex-end;
+                "
             >
-                Add Product
-            </button>
+
+                <a
+                    href="products.php"
+                    class="btn"
+                    style="
+                        text-decoration:none;
+                    "
+                >
+                    Cancel
+                </a>
+
+
+                <button
+                    type="submit"
+                    class="btn"
+                    style="
+                        border:none;
+                        cursor:pointer;
+                        background:#2563eb;
+                        color:#ffffff;
+                    "
+                >
+                    Add Product
+                </button>
+
+            </div>
 
 
         </form>
 
-    </div>
+    </section>
 
-</section>
 
-<?php include "../includes/footer.php"; ?>
+</main>
+
+
+</body>
+
+</html>
