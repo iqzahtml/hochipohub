@@ -5,6 +5,10 @@
 |--------------------------------------------------------------------------
 */
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $baseUrl = defined('BASE_URL')
     ? BASE_URL
     : '/hochipohub/';
@@ -24,16 +28,18 @@ $baseUrl = defined('BASE_URL')
         aria-labelledby="loginModalTitle"
     >
 
+        <!-- CLOSE BUTTON -->
         <button
             type="button"
             class="modal-close"
             data-modal-close="loginModal"
-            aria-label="Close"
+            aria-label="Close login"
         >
             ×
         </button>
 
 
+        <!-- HEADER -->
         <div class="auth-modal-header">
 
             <div class="auth-modal-icon">
@@ -55,36 +61,62 @@ $baseUrl = defined('BASE_URL')
         </div>
 
 
+        <!-- SUCCESS MESSAGE -->
         <?php if (
-            isset($_SESSION['error']) &&
-            !empty($_SESSION['error'])
+            isset($_SESSION['login_success']) &&
+            !empty($_SESSION['login_success'])
         ): ?>
 
-            <div class="auth-alert auth-alert-error">
+            <div class="auth-alert auth-alert-success">
 
                 <?= htmlspecialchars(
-                    $_SESSION['error'],
+                    $_SESSION['login_success'],
                     ENT_QUOTES,
                     'UTF-8'
                 ) ?>
 
             </div>
 
-            <?php unset($_SESSION['error']); ?>
+            <?php unset($_SESSION['login_success']); ?>
 
         <?php endif; ?>
 
 
+        <!-- ERROR MESSAGE -->
+        <?php if (
+            isset($_SESSION['login_error']) &&
+            !empty($_SESSION['login_error'])
+        ): ?>
+
+            <div class="auth-alert auth-alert-error">
+
+                <?= htmlspecialchars(
+                    $_SESSION['login_error'],
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>
+
+            </div>
+
+            <?php unset($_SESSION['login_error']); ?>
+
+        <?php endif; ?>
+
+
+        <!-- LOGIN FORM -->
         <form
-            action="<?= $baseUrl ?>auth/login_process.php"
+            action="<?= htmlspecialchars(
+                $baseUrl . 'auth/login_process.php',
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>"
             method="POST"
             class="auth-form"
             id="loginForm"
         >
 
-            <?php if (
-                function_exists('csrfToken')
-            ): ?>
+            <!-- CSRF -->
+            <?php if (function_exists('csrfToken')): ?>
 
                 <input
                     type="hidden"
@@ -96,9 +128,7 @@ $baseUrl = defined('BASE_URL')
                     ) ?>"
                 >
 
-            <?php elseif (
-                isset($_SESSION['csrf_token'])
-            ): ?>
+            <?php elseif (isset($_SESSION['csrf_token'])): ?>
 
                 <input
                     type="hidden"
@@ -113,6 +143,7 @@ $baseUrl = defined('BASE_URL')
             <?php endif; ?>
 
 
+            <!-- EMAIL -->
             <div class="form-group">
 
                 <label for="loginEmail">
@@ -125,12 +156,18 @@ $baseUrl = defined('BASE_URL')
                     name="email"
                     placeholder="you@example.com"
                     autocomplete="email"
+                    value="<?= htmlspecialchars(
+                        $_SESSION['login_email'] ?? '',
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>"
                     required
                 >
 
             </div>
 
 
+            <!-- PASSWORD -->
             <div class="form-group">
 
                 <div class="form-label-row">
@@ -140,7 +177,11 @@ $baseUrl = defined('BASE_URL')
                     </label>
 
                     <a
-                        href="<?= $baseUrl ?>auth/forgot_password.php"
+                        href="<?= htmlspecialchars(
+                            $baseUrl . 'auth/forgot_password.php',
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>"
                         class="form-link"
                     >
                         Forgot password?
@@ -174,6 +215,23 @@ $baseUrl = defined('BASE_URL')
             </div>
 
 
+            <!-- REMEMBER ME -->
+            <label class="checkbox-row">
+
+                <input
+                    type="checkbox"
+                    name="remember"
+                    value="1"
+                >
+
+                <span>
+                    Remember me
+                </span>
+
+            </label>
+
+
+            <!-- SUBMIT -->
             <button
                 type="submit"
                 class="auth-submit"
@@ -190,6 +248,7 @@ $baseUrl = defined('BASE_URL')
             </button>
 
 
+            <!-- DIVIDER -->
             <div class="auth-divider">
 
                 <span>
@@ -199,6 +258,7 @@ $baseUrl = defined('BASE_URL')
             </div>
 
 
+            <!-- REGISTER -->
             <p class="auth-switch">
 
                 Don't have an account?
