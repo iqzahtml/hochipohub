@@ -2,137 +2,52 @@
 
 /*
 |--------------------------------------------------------------------------
-| HochipoHub - Header
-|--------------------------------------------------------------------------
-| This file:
-| - Loads configuration
-| - Loads session
-| - Loads global functions
-| - Sets HTML document structure
-| - Loads CSS
+| HochipoHub - Global Header
 |--------------------------------------------------------------------------
 */
+
+if (!defined('BASE_URL')) {
+    require_once dirname(__DIR__) . '/config.php';
+}
+
+if (!function_exists('isLoggedIn')) {
+    require_once __DIR__ . '/session.php';
+}
 
 
 /*
 |--------------------------------------------------------------------------
-| Load Required Files
+| PAGE SETTINGS
 |--------------------------------------------------------------------------
-|
-| dirname(__DIR__) points to:
-| C:\laragon\www\hochipohub
-|
-| Therefore these paths remain correct even when this file is included
-| from different PHP pages.
-|
 */
 
-require_once dirname(__DIR__) . '/config.php';
-
-require_once dirname(__DIR__) . '/database/db.php';
-
-require_once DIR . '/session.php';
-
-require_once DIR . '/functions.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| Page Variables
-|--------------------------------------------------------------------------
-|
-| Individual pages can define:
-|
-| $pageTitle = "Products";
-|
-| before including header.php.
-|
-*/
-
-$pageTitle = $pageTitle ?? SITE_NAME;
+$pageTitle =
+    $pageTitle
+    ?? 'HochipoHub';
 
 $pageDescription =
     $pageDescription
-    ?? 'HochipoHub - Discover, Shop & Support Local Vendors';
+    ?? 'Discover local products and support local businesses.';
 
-
-/*
-|--------------------------------------------------------------------------
-| Current Page
-|--------------------------------------------------------------------------
-*/
-
-$currentPage = basename(
-    $_SERVER['PHP_SELF'] ?? 'index.php'
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| Flash Message
-|--------------------------------------------------------------------------
-*/
-
-$flashMessage = getFlashMessage();
-
-
-/*
-|--------------------------------------------------------------------------
-| User Information
-|--------------------------------------------------------------------------
-*/
-
-$isLoggedIn = isLoggedIn();
-
-$currentUserId =
-    currentUserId();
-
-$currentUserName =
-    currentUserName();
-
-$currentUserRole =
-    currentUserRole();
-
-
-/*
-|--------------------------------------------------------------------------
-| Cart / Wishlist Count
-|--------------------------------------------------------------------------
-*/
-
-$cartCount = 0;
-
-$wishlistCount = 0;
-
-if ($isLoggedIn) {
-
-    if ($currentUserRole === 'customer') {
-
-        $cartCount =
-            getCartCount(
-                $currentUserId
-            );
-
-        $wishlistCount =
-            getWishlistCount(
-                $currentUserId
-            );
-    }
-}
+$bodyClass =
+    $bodyClass
+    ?? '';
 
 ?>
+
+
 <!DOCTYPE html>
 
 <html
     lang="en"
-    data-theme="blue"
 >
 
 <head>
 
-    <!-- =========================================================
+
+    <!-- =====================================================
          BASIC META
-    ========================================================== -->
+    ====================================================== -->
 
     <meta charset="UTF-8">
 
@@ -152,45 +67,34 @@ if ($isLoggedIn) {
 
     <meta
         name="theme-color"
-        content="#1557D6"
+        content="#2563eb"
     >
 
 
-    <!-- =========================================================
-         SECURITY / REFERRER
-    ========================================================== -->
-
-    <meta
-        name="referrer"
-        content="strict-origin-when-cross-origin"
-    >
-
-
-    <!-- =========================================================
-         PAGE TITLE
-    ========================================================== -->
+    <!-- =====================================================
+         TITLE
+    ====================================================== -->
 
     <title>
+
         <?php echo htmlspecialchars(
             $pageTitle,
             ENT_QUOTES,
             'UTF-8'
         ); ?>
 
-        <?php if ($pageTitle !== SITE_NAME): ?>
+        | HochipoHub
 
-            | <?php echo SITE_NAME; ?>
-
-        <?php endif; ?>
     </title>
 
 
-    <!-- =========================================================
-         GOOGLE FONTS
-    ========================================================== -->
+    <!-- =====================================================
+         GOOGLE FONT
+    ====================================================== -->
 
     <link
-        rel="preconnect"href="https://fonts.googleapis.com"
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
     >
 
     <link
@@ -205,19 +109,22 @@ if ($isLoggedIn) {
     >
 
 
-    <!-- =========================================================
-         ICONS
-    ========================================================== -->
+    <!-- =====================================================
+         FONT AWESOME
+    ====================================================== -->
 
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        integrity="sha512-SnH5WK+bZxgPHs44uWixLJ8tW0Yp8qJk0j9JfF7qL9jX8j5m7K3m8sYQ2mJ6J7Y7dY7k2fF5J0kY7j3A8Q=="
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"
     >
 
 
-    <!-- =========================================================
-         MAIN CSS
-    ========================================================== -->
+    <!-- =====================================================
+         GLOBAL CSS
+    ====================================================== -->
 
     <link
         rel="stylesheet"
@@ -229,272 +136,129 @@ if ($isLoggedIn) {
         href="<?php echo BASE_URL; ?>css/responsive.css"
     >
 
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/modal.css"
-    >
 
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/login.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/product.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/dashboard.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/cart.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/checkout.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/vendor.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/admin.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="<?php echo BASE_URL; ?>css/wishlist.css"
-    >
-
-
-    <!-- =========================================================
+    <!-- =====================================================
          PAGE-SPECIFIC CSS
-    ========================================================== -->
+    ====================================================== -->
 
-    <?php if (
-        isset($additionalCSS)
-        &&
-        is_array($additionalCSS)
-    ): ?>
+    <?php
 
-        <?php foreach (
-            $additionalCSS
-            as $cssFile
-        ): ?>
+    $pageCss = [
 
-            <link
-                rel="stylesheet"
-                href="<?php echo BASE_URL; ?>css/<?php echo htmlspecialchars(
-                    $cssFile,
-                    ENT_QUOTES,
-                    'UTF-8'
-                ); ?>"
-            >
+        'cart.php'
+            => 'cart.css',
 
-        <?php endforeach; ?>
+        'checkout.php'
+            => 'checkout.css',
+
+        'dashboard.php'
+            => 'dashboard.css',
+
+        'product.php'
+            => 'product.css',
+
+        'product_details.php'
+            => 'product.css',
+
+        'vendor.php'
+            => 'vendor.css',
+
+        'wishlist.php'
+            => 'wishlist.css'
+
+    ];
+
+
+    if (
+        isset(
+            $pageCss[
+                basename(
+                    $_SERVER['PHP_SELF']
+                )
+            ]
+        )
+    ):
+
+    ?>
+
+        <link
+            rel="stylesheet"
+            href="<?php echo BASE_URL; ?>css/<?php echo $pageCss[
+                basename(
+                    $_SERVER['PHP_SELF']
+                )
+            ]; ?>"
+        >
 
     <?php endif; ?>
 
-
-    <!-- =========================================================
-         FAVICON
-    ========================================================== -->
-
-    <?php
-    $logoPath =
-        BASE_URL . 'image/logo.jpg';
-    ?>
-
-    <link
-        rel="icon"
-        type="image/jpeg"
-        href="<?php echo $logoPath; ?>"
-    >
 
 </head>
 
 
 <body
-    class="hochipo-body page-<?php echo htmlspecialchars(
-        pathinfo(
-            $currentPage,
-            PATHINFO_FILENAME
-        ),
+    class="<?php echo htmlspecialchars(
+        $bodyClass,
         ENT_QUOTES,
         'UTF-8'
     ); ?>"
 >
 
 
-<!-- =============================================================
+<!-- =========================================================
      PAGE LOADER
-============================================================== -->
+========================================================= -->
 
 <div
-    id="pageLoader"
     class="page-loader"
-    aria-hidden="true"
+    id="pageLoader"
 >
 
     <div class="loader-content">
 
         <div class="loader-logo">
 
-            <img
-                src="<?php echo BASE_URL; ?>image/logo.jpg"
-                alt="<?php echo SITE_NAME; ?> Logo"
-            >
+            <i class="fa-solid fa-bolt"></i>
 
         </div>
 
         <div class="loader-spinner"></div>
 
-        <p>
+        <span>
             Loading HochipoHub...
-        </p>
+        </span>
 
     </div>
 
 </div>
 
 
-<!-- =============================================================
-     ACCESSIBILITY - SKIP LINK
-============================================================== -->
+<!-- =========================================================
+     NAVBAR
+========================================================= -->
 
-<a
-    href="#main-content"
-    class="skip-link"
+<?php
+
+$navbarPath =
+    __DIR__ . '/navbar.php';
+
+if (
+    file_exists(
+        $navbarPath
+    )
+) {
+
+    require $navbarPath;
+}
+
+?>
+
+
+<!-- =========================================================
+     MAIN CONTENT
+========================================================= -->
+
+<main
+    id="mainContent"
+    class="main-content"
 >
-    Skip to content
-</a>
-
-
-<!-- =============================================================
-     FLASH MESSAGE
-============================================================== -->
-
-<?php if ($flashMessage): ?>
-
-    <div
-        class="global-flashflash-<?php echo htmlspecialchars(
-            $flashMessage['type'],
-            ENT_QUOTES,
-            'UTF-8'
-        ); ?>"
-        role="alert"
-    >
-
-        <div class="flash-inner">
-
-            <div class="flash-icon">
-
-                <?php if (
-                    $flashMessage['type']
-                    === 'success'
-                ): ?>
-
-                    <i class="fa-solid fa-circle-check"></i>
-
-                <?php elseif (
-                    $flashMessage['type']
-                    === 'error'
-                ): ?>
-
-                    <i class="fa-solid fa-circle-xmark"></i>
-
-                <?php elseif (
-                    $flashMessage['type']
-                    === 'warning'
-                ): ?>
-
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-
-                <?php else: ?>
-
-                    <i class="fa-solid fa-circle-info"></i>
-
-                <?php endif; ?>
-
-            </div>
-
-
-            <div class="flash-message">
-
-                <?php echo htmlspecialchars(
-                    $flashMessage['message'],
-                    ENT_QUOTES,
-                    'UTF-8'
-                ); ?>
-
-            </div>
-
-
-            <button
-                type="button"
-                class="flash-close"
-                aria-label="Close message"
-                onclick="this.closest('.global-flash').remove();"
-            >
-
-                <i class="fa-solid fa-xmark"></i>
-
-            </button>
-
-        </div>
-
-    </div>
-
-<?php endif; ?>
-
-
-<!-- =============================================================
-     MAIN WEBSITE WRAPPER
-============================================================== -->
-
-<div
-    id="websiteWrapper"
-    class="website-wrapper"
->
-
-
-    <!-- =========================================================
-         NAVBAR
-    ========================================================== -->
-
-    <?php
-
-    /*
-    |--------------------------------------------------------------------------
-    | Navbar
-    |--------------------------------------------------------------------------
-    */
-
-    $navbarPath =
-        DIR . '/navbar.php';
-
-    if (file_exists($navbarPath)) {
-
-        include $navbarPath;
-
-    }
-
-    ?>
-
-
-    <!-- =========================================================
-         MAIN CONTENT
-    ========================================================== -->
-
-    <main
-        id="main-content"
-        class="main-content"
-    >

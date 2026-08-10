@@ -1,285 +1,716 @@
 <?php
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/database/db.php';
 
-session_start();
-
-require_once "../database/db.php";
-
-
-if(!isset($_SESSION['user_id'])){
-
-    header("Location: ../auth/login.php");
-    exit();
-
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ' . site_url('index.php'));
+    exit;
 }
 
+$userId = (int) $_SESSION['user_id'];
 
+/*
+|--------------------------------------------------------------------------
+| Remove item
+|--------------------------------------------------------------------------
+*/
+if (isset($_GET['remove'])) {
 
-$user_id=$_SESSION['user_id'];
+    $cartId = (int) $_GET['remove'];
 
+    $stmt = $conn->prepare("
+        DELETE FROM cart
+        WHERE cart_id = ?
+        AND customer_id = ?
+    ");
 
+    $stmt->bind_param("ii", $cartId, $userId);
+    $stmt->execute();
+    $stmt->close();
 
-$cart_stmt=$conn->prepare("
+    header('Location: cart.php');
+    exit;
+}
 
+/*
+|--------------------------------------------------------------------------
+| Update quantity
+|--------------------------------------------------------------------------
+*/
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_cart'])) {
 
-SELECT
+    if (!empty($_POST['quantity']) && is_array($_POST['quantity'])) {
 
+        foreach ($_POST['quantity'] as $cartId => $quantity) {
 
-cart.cart_id,
+            $cartId = (int) $cartId;
+            $quantity = (int) $quantity;
 
+            if ($quantity < 1) {
+                $quantity = 1;
+            }
 
-cart.quantity,
+            $stmt = $conn->prepare("
+                UPDATE cart c
+                INNER JOIN products p
+                    ON c.product_id = p.product_id
+                SET c.quantity = LEAST(?, p.stock_quantity)
+                WHERE c.cart_id = ?
+                AND c.customer_id = ?
+                AND p.status = 'Available'
+            ");
 
+            $stmt->bind_param(
+                "iii",
+                $quantity,
+                $cartId,
+                $userId
+            );
 
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
 
-products.product_id,
+    header('Location: cart.php');
+    exit;
+}
 
-products.product_name,
+/*
+|--------------------------------------------------------------------------
+| Get cart items
+|--------------------------------------------------------------------------
+*/
+$cartItems = [];
 
-products.price,
+$stmt = $conn->prepare("
+    SELECT
+        c.cart_id,
+        c.quantity,
 
-products.image,
+        p.product_id,
+        p.product_name,
+        p.price,
+        p.stock_quantity,
+        p.image,
+        p.status,
 
-products.stock_quantity,
+        v.vendor_id,
+        v.business_name,
 
+        cat.category_name
 
+    FROM cart c
 
-vendors.business_name
+    INNER JOIN products p
+        ON c.product_id = p.product_id
 
+    INNER JOIN vendors v
+        ON p.vendor_id = v.vendor_id
 
+    INNER JOIN categories cat
+        ON p.category_id = cat.category_id
 
-FROM cart
+    WHERE c.customer_id = ?
 
-
-
-JOIN products
-
-ON cart.product_id = products.product_id
-
-
-
-JOIN vendors
-
-ON products.vendor_id = vendors.vendor_id
-
-
-
-WHERE cart.customer_id = ?
-
-
-
-ORDER BY cart.cart_id DESC
-
-
-
+    ORDER BY c.created_at DESC
 ");
 
+$stmt->bind_param("i", $userId);
+$stmt->execute();
 
+$result = $stmt->get_result();
 
-$cart_stmt->bind_param(
+while ($row = $result->fetch_assoc()) {
+    $cartItems[] = $row;
+}
 
-"i",
+$stmt->close();
 
-$user_id
+/*
+|--------------------------------------------------------------------------
+| Calculate totals
+|--------------------------------------------------------------------------
+*/
+$subtotal = 0;
+$totalItems = 0;
 
-);
+foreach ($cartItems as $item) {
 
+    $itemSubtotal =
+        (float)$item['price'] *
+        (int)$item['quantity'];
 
+    $subtotal += $itemSubtotal;
 
-$cart_stmt->execute();
+    $totalItems += (int)$item['quantity'];
+}
 
+$deliveryFee = 0;
+$grandTotal = $subtotal + $deliveryFee;
 
+function cartImage($image)
+{
+    if (!empty($image)) {
+        return site_url(
+            'image/product/' . ltrim($image, '/')
+        );
+    }
 
-$cart_items=$cart_stmt->get_result();
-
-
-
-$total=0;
-
-
+    return DEFAULT_PRODUCT_IMAGE;
+}
 ?>
 
-
-
 <!DOCTYPE html>
-
-<html>
-
+<html lang="en">
 
 <head>
 
-<title>
-Shopping Cart
-</title>
+    <meta charset="UTF-8">
 
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-<link rel="stylesheet" href="../assets/css/cart.css">
+    <title>
+        Shopping Cart | <?php echo SITE_NAME; ?>
+    </title>
 
+    <link
+        rel="stylesheet"
+        href="<?php echo site_url('css/style.css'); ?>"
+    >
+
+    <link
+        rel="stylesheet"
+        href="<?php echo site_url('css/cart.css'); ?>"
+    >
+
+    <link
+        rel="stylesheet"
+        href="<?php echo site_url('css/responsive.css'); ?>"
+    >
 
 </head>
 
-
 <body>
 
+<div class="cart-page">
 
+    <!-- =====================================================
+         HEADER
+    ====================================================== -->
 
-<?php include "../includes/navbar.php"; ?>
+    <div class="cart-header">
 
+        <div>
 
+            <span class="cart-eyebrow">
+                YOUR SHOPPING BAG
+            </span>
 
-<div class="cart-container">
+            <h1>
+                My Cart
+                <span>
+                    (<?php echo $totalItems; ?>)
+                </span>
+            </h1>
 
+            <p>
+                Review your picks before checking out.
+            </p>
 
+        </div>
 
-<h1>
-My Cart
-</h1>
+        <a
+            href="<?php echo site_url('catalog.php'); ?>"
+            class="continue-shopping"
+        >
+            ← Continue Shopping
+        </a>
 
+    </div>
 
 
+    <?php if (empty($cartItems)): ?>
 
-<?php if($cart_items->num_rows==0){ ?>
+        <!-- =================================================
+             EMPTY CART
+        ================================================== -->
 
+        <div class="empty-cart">
 
-<p>
-Your cart is empty.
-</p>
+            <div class="empty-cart-icon">
+                🛒
+            </div>
 
+            <h2>
+                Your cart is empty.
+            </h2>
 
-<?php } ?>
+            <p>
+                Nothing here yet. Go find something worth
+                spending your money on.
+            </p>
 
+            <a
+                href="<?php echo site_url('catalog.php'); ?>"
+                class="cart-primary-btn"
+            >
+                Explore Products →
+            </a>
 
+        </div>
 
+    <?php else: ?>
 
-<?php while($row=$cart_items->fetch_assoc()){ 
+        <!-- =================================================
+             CART CONTENT
+        ================================================== -->
 
+        <form
+            method="POST"
+            action="cart.php"
+        >
 
+            <div class="cart-layout">
 
-$subtotal=$row['price']*$row['quantity'];
+                <!-- =========================================
+                     ITEMS
+                ========================================== -->
 
-$total += $subtotal;
+                <div class="cart-items-section">
 
+                    <div class="cart-section-heading">
 
+                        <div>
 
-?>
+                            <h2>
+                                Your Items
+                            </h2>
 
+                            <p>
+                                Products from local vendors
+                            </p>
 
+                        </div>
 
-<div class="cart-item">
+                        <span>
+                            <?php echo count($cartItems); ?>
+                            products
+                        </span>
+
+                    </div>
+
+
+                    <?php foreach ($cartItems as $item): ?>
+
+                        <?php
+
+                        $itemTotal =
+                            (float)$item['price'] *
+                            (int)$item['quantity'];
+
+                        $stock =
+                            (int)$item['stock_quantity'];
+
+                        ?>
 
+                        <div class="cart-item">
 
+                            <!-- IMAGE -->
 
-<img src="../assets/uploads/products/<?= $row['image']; ?>">
+                            <a
+                                href="<?php
+                                    echo site_url(
+                                        'product_details.php?id=' .
+                                        (int)$item['product_id']
+                                    );
+                                ?>"
+                                class="cart-product-image"
+                            >
 
+                                <img
+                                    src="<?php
+                                        echo htmlspecialchars(
+                                            cartImage(
+                                                $item['image']
+                                            )
+                                        );
+                                    ?>"
+                                    alt="<?php
+                                        echo htmlspecialchars(
+                                            $item['product_name']
+                                        );
+                                    ?>"
+                                    onerror="
+                                        this.src='<?php
+                                            echo DEFAULT_PRODUCT_IMAGE;
+                                        ?>';
+                                    "
+                                >
+
+                            </a>
+
+
+                            <!-- INFO -->
+
+                            <div class="cart-product-info">
+
+                                <span class="cart-category">
+
+                                    <?php
+                                    echo htmlspecialchars(
+                                        $item['category_name']
+                                    );
+                                    ?>
+
+                                </span>
 
+                                <a
+                                    href="<?php
+                                        echo site_url(
+                                            'product_details.php?id=' .
+                                            (int)$item['product_id']
+                                        );
+                                    ?>"
+                                    class="cart-product-name"
+                                >
 
-<div>
+                                    <?php
+                                    echo htmlspecialchars(
+                                        $item['product_name']
+                                    );
+                                    ?>
 
+                                </a>
 
-<h3>
+                                <p class="cart-vendor">
 
-<?= htmlspecialchars($row['product_name']); ?>
+                                    Sold by
+                                    <strong>
+                                        <?php
+                                        echo htmlspecialchars(
+                                            $item['business_name']
+                                        );
+                                        ?>
+                                    </strong>
 
-</h3>
+                                </p>
 
+                                <div class="cart-unit-price">
 
+                                    RM
+                                    <?php
+                                    echo number_format(
+                                        (float)$item['price'],
+                                        2
+                                    );
+                                    ?>
 
-<p>
+                                    each
 
-Vendor:
+                                </div>
 
-<?= htmlspecialchars($row['business_name']); ?>
+                            </div>
 
-</p>
 
+                            <!-- QUANTITY -->
 
+                            <div class="cart-quantity">
 
-<p>
+                                <label>
+                                    Quantity
+                                </label>
 
-RM <?= number_format($row['price'],2); ?>
+                                <div class="quantity-control">
 
-</p>
+                                    <button
+                                        type="button"
+                                        class="quantity-minus"
+                                    >
+                                        −
+                                    </button>
 
+                                    <input
+                                        type="number"
+                                        name="quantity[
+                                            <?php
+                                            echo (int)$item['cart_id'];
+                                            ?>
+                                        ]"
+                                        value="<?php
+                                            echo (int)$item['quantity'];
+                                        ?>"
+                                        min="1"
+                                        max="<?php
+                                            echo max(1, $stock);
+                                        ?>"
+                                    >
 
+                                    <button
+                                        type="button"
+                                        class="quantity-plus"
+                                    >
+                                        +
+                                    </button>
 
-<input type="number"
+                                </div>
 
-class="cart-qty"
+                                <small>
 
-data-id="<?= $row['cart_id']; ?>"
+                                    <?php if ($stock > 0): ?>
 
-value="<?= $row['quantity']; ?>"
+                                        <?php echo $stock; ?>
+                                        left in stock
 
-min="1">
+                                    <?php else: ?>
 
+                                        Out of stock
 
+                                    <?php endif; ?>
 
-<p>
+                                </small>
 
-Subtotal:
+                            </div>
 
-RM <?= number_format($subtotal,2); ?>
 
-</p>
+                            <!-- TOTAL -->
 
+                            <div class="cart-item-total">
 
+                                <span>
+                                    Total
+                                </span>
 
+                                <strong>
 
-<button class="remove-cart"
+                                    RM
+                                    <?php
+                                    echo number_format(
+                                        $itemTotal,
+                                        2
+                                    );
+                                    ?>
 
-data-id="<?= $row['cart_id']; ?>">
+                                </strong>
 
-Remove
+                                <a
+                                    href="cart.php?remove=<?php
+                                        echo (int)$item['cart_id'];
+                                    ?>"
+                                    class="remove-item"
+                                    onclick="
+                                        return confirm(
+                                            'Remove this item from your cart?'
+                                        );
+                                    "
+                                >
+                                    Remove
+                                </a>
 
-</button>
+                            </div>
 
+                        </div>
 
+                    <?php endforeach; ?>
+
+
+                    <div class="cart-update-row">
+
+                        <button
+                            type="submit"
+                            name="update_cart"
+                            class="update-cart-btn"
+                        >
+                            ↻ Update Cart
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =========================================
+                     SUMMARY
+                ========================================== -->
+
+                <aside class="cart-summary">
+
+                    <div class="summary-glow"></div>
+
+                    <div class="summary-content">
+
+                        <span class="summary-eyebrow">
+                            ORDER SUMMARY
+                        </span>
+
+                        <h2>
+                            Almost there.
+                        </h2>
+
+
+                        <div class="summary-line">
+
+                            <span>
+                                Items
+                            </span>
+
+                            <strong>
+                                <?php echo $totalItems; ?>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="summary-line">
+
+                            <span>
+                                Subtotal
+                            </span>
+
+                            <strong>
+
+                                RM
+                                <?php
+                                echo number_format(
+                                    $subtotal,
+                                    2
+                                );
+                                ?>
+
+                            </strong>
+
+                        </div>
+
+
+                        <div class="summary-line">
+
+                            <span>
+                                Delivery
+                            </span>
+
+                            <strong>
+
+                                <?php if ($deliveryFee > 0): ?>
+
+                                    RM
+                                    <?php
+                                    echo number_format(
+                                        $deliveryFee,
+                                        2
+                                    );
+                                    ?>
+
+                                <?php else: ?>
+
+                                    FREE
+
+                                <?php endif; ?>
+
+                            </strong>
+
+                        </div>
+
+
+                        <div class="summary-divider"></div>
+
+
+                        <div class="summary-total">
+
+                            <span>
+                                Total
+                            </span>
+
+                            <strong>
+
+                                RM
+                                <?php
+                                echo number_format(
+                                    $grandTotal,
+                                    2
+                                );
+                                ?>
+
+                            </strong>
+
+                        </div>
+
+
+                        <a
+                            href="<?php
+                                echo site_url('checkout.php');
+                            ?>"
+                            class="checkout-btn"
+                        >
+                            Proceed to Checkout
+                            <span>→</span>
+                        </a>
+
+
+                        <div class="secure-note">
+
+                            🔒 Secure checkout
+
+                        </div>
+
+                    </div>
+
+                </aside>
+
+            </div>
+
+        </form>
+
+    <?php endif; ?>
 
 </div>
 
 
-</div>
+<script>
+
+document.querySelectorAll('.quantity-control')
+.forEach(function(control) {
+
+    const minus =
+        control.querySelector('.quantity-minus');
+
+    const plus =
+        control.querySelector('.quantity-plus');
+
+    const input =
+        control.querySelector('input');
+
+    minus.addEventListener('click', function() {
+
+        let value =
+            parseInt(input.value) || 1;
+
+        if (value > 1) {
+            input.value = value - 1;
+        }
+
+    });
 
 
+    plus.addEventListener('click', function() {
 
-<?php } ?>
+        let value =
+            parseInt(input.value) || 1;
 
+        let max =
+            parseInt(input.max) || 999;
 
+        if (value < max) {
+            input.value = value + 1;
+        }
 
+    });
 
-<div class="cart-summary">
+});
 
-
-<h2>
-
-Total:
-
-RM <?= number_format($total,2); ?>
-
-</h2>
-
-
-
-<a href="checkout.php">
-
-Proceed Checkout
-
-</a>
-
-
-</div>
-
-
-
-
-</div>
-
-
-
-
-<script src="../assets/js/script.js"></script>
-
+</script>
 
 </body>
-
-
 </html>

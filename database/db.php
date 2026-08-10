@@ -2,7 +2,26 @@
 
 /*
 |--------------------------------------------------------------------------
-| HochipoHub Database Connection
+| HOCHIPOHUB - DATABASE CONNECTION
+|--------------------------------------------------------------------------
+| File:
+| database/db.php
+|
+| Purpose:
+| Central database connection file.
+|
+| Usage:
+| require_once __DIR__ . '/database/db.php';
+|
+| Then:
+| $db = getDB();
+|--------------------------------------------------------------------------
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| LOAD GLOBAL CONFIG
 |--------------------------------------------------------------------------
 */
 
@@ -11,50 +30,17 @@ require_once dirname(__DIR__) . '/config.php';
 
 /*
 |--------------------------------------------------------------------------
-| PDO Database Connection
+| DATABASE INSTANCE
+|--------------------------------------------------------------------------
+|
+| getDB() is already defined in config.php.
+| It creates one PDO connection and reuses it.
+|
+| Example:
+|
+| $db = getDB();
+|
 |--------------------------------------------------------------------------
 */
 
-try {
-
-    $dsn = "mysql:host=" . DB_HOST .
-           ";dbname=" . DB_NAME .
-           ";charset=utf8mb4";
-
-    $options = [
-
-        PDO::ATTR_ERRMODE =>
-            PDO::ERRMODE_EXCEPTION,
-
-        PDO::ATTR_DEFAULT_FETCH_MODE =>
-            PDO::FETCH_ASSOC,
-
-        PDO::ATTR_EMULATE_PREPARES =>
-            false
-
-    ];
-
-    $pdo = new PDO(
-        $dsn,
-        DB_USER,
-        DB_PASS,
-        $options
-    );
-
-
-} catch (PDOException $e) {
-
-    if (DEVELOPMENT_MODE === true) {
-
-        die(
-            "Database Connection Failed: " .
-            htmlspecialchars($e->getMessage())
-        );
-
-    } else {
-
-        die(
-            "Unable to connect to the database. Please try again later."
-        );
-    }
-}
+$db = getDB();

@@ -1,109 +1,106 @@
 <?php
 
-session_start();
-
+require_once "../config.php";
 require_once "../database/db.php";
+require_once "../includes/session.php";
 
 
-header("Content-Type: application/json");
+if (!isLoggedIn()) {
 
-
-
-if(!isset($_SESSION['user_id'])){
-
-echo json_encode([
-"status"=>"error"
-]);
-
-exit();
+    header("Location: " . BASE_URL . "index.php");
+    exit();
 
 }
 
 
-
-$user_id=$_SESSION['user_id'];
-
-$product_id=$_POST['product_id'];
+$userID =
+    (int) currentUserID();
 
 
-
-$check=$conn->prepare("
-
-SELECT wishlist_id
-
-FROM wishlist
-
-WHERE user_id=?
-
-AND product_id=?
-
-");
+$productID =
+    (int) ($_POST['product_id'] ?? 0);
 
 
-$check->bind_param(
+if ($productID <= 0) {
 
-"ii",
-
-$user_id,
-
-$product_id
-
-);
-
-
-
-$check->execute();
-
-
-
-if($check->get_result()->num_rows>0){
-
-
-echo json_encode([
-
-"status"=>"exists"
-
-]);
-
-
-exit();
-
+    header("Location: " . BASE_URL . "catalog.php");
+    exit();
 
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Check Product
+|--------------------------------------------------------------------------
+*/
 
-$stmt=$conn->prepare("
+$product = $conn->prepare("
 
-INSERT INTO wishlist
+    SELECT product_id
 
-(user_id,product_id)
+    FROM products
 
-VALUES(?,?)
+    WHERE product_id = ?
+
+    LIMIT 1
 
 ");
 
-
-$stmt->bind_param(
-
-"ii",
-
-$user_id,
-
-$product_id
-
+$product->bind_param(
+    "i",
+    $productID
 );
 
+$product->execute();
 
 
-$stmt->execute();
+if (
+    $product->get_result()->num_rows === 0
+) {
+
+    header("Location: " . BASE_URL . "catalog.php");
+    exit();
+
+}
 
 
+/*
+|--------------------------------------------------------------------------
+| Insert Wishlist
+|--------------------------------------------------------------------------
+*/
 
-echo json_encode([
+$insert = $conn->prepare("
 
-"status"=>"success"
+    INSERT IGNORE INTO wishlist
 
-]);
+    (
+        user_id,
+        product_id
+    )
 
-?>
+    VALUES
+    (
+        ?,
+        ?
+    )
+
+");
+
+$insert->bind_param(
+    "ii",
+    $userID,
+    $productID
+);
+
+$insert->execute();
+
+
+header(
+    "Location: " .
+    BASE_URL .
+    "wishlist.php"
+);
+
+exit();

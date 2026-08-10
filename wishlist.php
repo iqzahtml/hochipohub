@@ -1,228 +1,741 @@
 <?php
 
-session_start();
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/database/db.php';
 
-require_once "../database/db.php";
-
-
-if(!isset($_SESSION['user_id'])){
-
-header("Location: ../auth/login.php");
-
-exit();
-
+if (session_status() === PHP_SESSION_NONE) {
+    session_name(SESSION_NAME);
+    session_start();
 }
 
+$db = getDB();
 
+/*
+|--------------------------------------------------------------------------
+| AUTHENTICATION
+|--------------------------------------------------------------------------
+*/
 
-$user_id=$_SESSION['user_id'];
+if (empty($_SESSION['user_id'])) {
+    redirect(BASE_URL . 'index.php');
+}
 
+$userId = (int) $_SESSION['user_id'];
 
+$successMessage = '';
+$errorMessage = '';
 
-$stmt=$conn->prepare("
+/*
+|--------------------------------------------------------------------------
+| REMOVE WISHLIST ITEM
+|--------------------------------------------------------------------------
+*/
 
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    &&
+    isset($_POST['remove_wishlist'])
+) {
 
-SELECT
+    $productId = (int) (
+        $_POST['product_id'] ?? 0
+    );
 
+    if ($productId <= 0) {
 
-wishlist.wishlist_id,
+        $errorMessage =
+            'Invalid product.';
 
+    } else {
 
-products.product_id,
+        try {
 
+            $removeStmt = $db->prepare("
+                DELETE FROM wishlist
+                WHERE user_id = :user_id
+                AND product_id = :product_id
+            ");
 
-products.product_name,
+            $removeStmt->execute([
+                ':user_id' => $userId,
+                ':product_id' => $productId
+            ]);
 
+            if ($removeStmt->rowCount() > 0) {
 
-products.price,
+                $successMessage =
+                    'Product removed from your wishlist.';
 
+            } else {
 
-products.image,
+                $errorMessage =
+                    'Product was not found in your wishlist.';
+            }
 
+        } catch (Throwable $e) {
 
-vendors.business_name
+            $errorMessage =
+                APP_DEBUG
+                    ? $e->getMessage()
+                    : 'Unable to remove wishlist item.';
+        }
+    }
+}
 
+/*
+|--------------------------------------------------------------------------
+| GET WISHLIST
+|--------------------------------------------------------------------------
+*/
 
+$wishlistItems = [];
 
-FROM wishlist
+$wishlistStmt = $db->prepare("
+    SELECT
+        w.wishlist_id,
+        w.product_id,
+        w.created_at AS wishlist_date,
 
+        p.product_name,
+        p.description,
+        p.price,
+        p.stock_quantity,
+        p.image,
+        p.status,
 
+        c.category_name,
 
-JOIN products
+        v.vendor_id,
+        v.business_name
 
+    FROM wishlist w
 
-ON wishlist.product_id=products.product_id
+    INNER JOIN products p
+        ON p.product_id = w.product_id
 
+    INNER JOIN categories c
+        ON c.category_id = p.category_id
 
+    INNER JOIN vendors v
+        ON v.vendor_id = p.vendor_id
 
-JOIN vendors
+    WHERE w.user_id = :user_id
 
-
-ON products.vendor_id=vendors.vendor_id
-
-
-
-WHERE wishlist.user_id=?
-
-
-
-ORDER BY wishlist_id DESC
-
-
-
+    ORDER BY w.created_at DESC
 ");
 
+$wishlistStmt->execute([
+    ':user_id' => $userId
+]);
 
+$wishlistItems =
+    $wishlistStmt->fetchAll();
 
-$stmt->bind_param(
-
-"i",
-
-$user_id
-
-);
-
-
-
-$stmt->execute();
-
-
-
-$result=$stmt->get_result();
-
-
+$totalWishlist =
+    count($wishlistItems);
 
 ?>
-
-
 <!DOCTYPE html>
 
-<html>
-
+<html lang="en">
 
 <head>
 
-<title>
-Wishlist
-</title>
+    <meta charset="UTF-8">
 
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-<link rel="stylesheet" href="../assets/css/wishlist.css">
+    <title>
+        Wishlist | <?= e(APP_NAME) ?>
+    </title>
 
+    <link
+        rel="stylesheet"
+        href="<?= BASE_URL ?>css/style.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="<?= BASE_URL ?>css/wishlist.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="<?= BASE_URL ?>css/responsive.css"
+    >
+
+    <style>
+
+        .wishlist-page {
+            min-height: 100vh;
+            padding: 45px 5%;
+            background:
+                radial-gradient(
+                    circle at 8% 8%,
+                    rgba(37,99,235,.14),
+                    transparent 30%
+                ),
+                radial-gradient(
+                    circle at 92% 18%,
+                    rgba(14,165,233,.10),
+                    transparent 28%
+                ),
+                #f8fbff;
+        }
+
+        .wishlist-container {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .wishlist-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .wishlist-kicker {
+            display: block;
+            margin-bottom: 8px;
+            color: #2563eb;
+            font-size: 11px;
+            font-weight: 950;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .wishlist-header h1 {
+            margin: 0 0 7px;
+            color: #0f172a;
+            font-size: clamp(32px, 5vw, 48px);
+            font-weight: 950;
+        }
+
+        .wishlist-header p {
+            margin: 0;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .wishlist-count {
+            padding: 10px 15px;
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-size: 11px;
+            font-weight: 950;
+            white-space: nowrap;
+        }
+
+        .alert {
+            margin-bottom: 20px;
+            padding: 14px 17px;
+            border-radius: 14px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .alert.success {
+            border: 1px solid #bbf7d0;
+            background: #f0fdf4;
+            color: #166534;
+        }
+
+        .alert.error {
+            border: 1px solid #fecaca;
+            background: #fef2f2;
+            color: #991b1b;
+        }
+
+        .wishlist-grid {
+            display: grid;
+            grid-template-columns:
+                repeat(3, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .wishlist-card {
+            overflow: hidden;
+            border: 1px solid #dbeafe;
+            border-radius: 22px;
+            background: white;
+            box-shadow:
+                0 15px 40px rgba(15,23,42,.06);
+            transition: .2s ease;
+        }
+
+        .wishlist-card:hover {
+            transform: translateY(-5px);
+            box-shadow:
+                0 22px 50px rgba(37,99,235,.13);
+        }
+
+        .wishlist-image-wrap {
+            position: relative;
+            height: 230px;
+            background: #eff6ff;
+        }
+
+        .wishlist-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .wishlist-heart {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: rgba(255,255,255,.95);
+            color: #ef4444;
+            font-size: 17px;
+            box-shadow:
+                0 5px 15px rgba(15,23,42,.1);
+        }
+
+        .wishlist-category {
+            position: absolute;
+            left: 12px;
+            bottom: 12px;
+            padding: 6px 9px;
+            border-radius: 999px;
+            background: rgba(15,23,42,.78);
+            color: white;
+            font-size: 9px;
+            font-weight: 900;
+        }
+
+        .wishlist-content {
+            padding: 18px;
+        }
+
+        .wishlist-content h2 {
+            margin: 0 0 6px;
+            color: #0f172a;
+            font-size: 15px;
+            font-weight: 950;
+        }
+
+        .wishlist-vendor {
+            margin-bottom: 10px;
+            color: #64748b;
+            font-size: 10px;
+        }
+
+        .wishlist-vendor a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 900;
+        }
+
+        .wishlist-description {
+            display: -webkit-box;
+            height: 37px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            color: #94a3b8;
+            font-size: 10px;
+            line-height: 1.7;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+
+        .wishlist-price-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .wishlist-price {
+            color: #1d4ed8;
+            font-size: 19px;
+            font-weight: 950;
+        }
+
+        .stock-status {
+            font-size: 9px;
+            font-weight: 900;
+        }
+
+        .stock-status.available {
+            color: #16a34a;
+        }
+
+        .stock-status.out {
+            color: #dc2626;
+        }
+
+        .wishlist-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .wishlist-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 11px;
+            border: none;
+            border-radius: 11px;
+            text-decoration: none;
+            font-size: 10px;
+            font-weight: 950;
+            cursor: pointer;
+        }
+
+        .view-btn {
+            background: #2563eb;
+            color: white;
+        }
+
+        .remove-btn {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .empty-wishlist {
+            padding: 80px 25px;
+            border: 1px dashed #bfdbfe;
+            border-radius: 25px;
+            background: white;
+            text-align: center;
+        }
+
+        .empty-wishlist-icon {
+            margin-bottom: 15px;
+            font-size: 50px;
+        }
+
+        .empty-wishlist h2 {
+            margin: 0 0 8px;
+            color: #0f172a;
+            font-size: 23px;
+            font-weight: 950;
+        }
+
+        .empty-wishlist p {
+            max-width: 450px;
+            margin: 0 auto 20px;
+            color: #94a3b8;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .browse-btn {
+            display: inline-flex;
+            padding: 12px 18px;
+            border-radius: 12px;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 950;
+        }
+
+        @media (max-width: 950px) {
+
+            .wishlist-grid {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+        }
+
+        @media (max-width: 650px) {
+
+            .wishlist-page {
+                padding: 30px 16px;
+            }
+
+            .wishlist-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .wishlist-grid {
+                grid-template-columns: 1fr;
+            }
+
+        }
+
+    </style>
 
 </head>
 
-
-
 <body>
 
+<?php require_once __DIR__ . '/includes/navbar.php'; ?>
 
-<?php include "../includes/navbar.php"; ?>
+<main class="wishlist-page">
 
+    <div class="wishlist-container">
 
+        <header class="wishlist-header">
 
-<div class="wishlist-container">
+            <div>
 
+                <span class="wishlist-kicker">
+                    Your Collection
+                </span>
 
+                <h1>
+                    Wishlist
+                </h1>
 
-<h1>
+                <p>
+                    Products you don't want to lose track of.
+                </p>
 
-My Wishlist
+            </div>
 
-</h1>
+            <span class="wishlist-count">
+                <?= $totalWishlist ?>
+                saved
+            </span>
 
+        </header>
 
 
+        <?php if (
+            $successMessage !== ''
+        ): ?>
 
-<?php if($result->num_rows==0){ ?>
+            <div class="alert success">
+                ✓ <?= e($successMessage) ?>
+            </div>
 
-<p>
-No wishlist item.
-</p>
+        <?php endif; ?>
 
-<?php } ?>
 
+        <?php if (
+            $errorMessage !== ''
+        ): ?>
 
+            <div class="alert error">
+                ⚠ <?= e($errorMessage) ?>
+            </div>
 
+        <?php endif; ?>
 
 
-<?php while($row=$result->fetch_assoc()){ ?>
+        <?php if (
+            empty($wishlistItems)
+        ): ?>
 
+            <section class="empty-wishlist">
 
+                <div class="empty-wishlist-icon">
+                    ♡
+                </div>
 
-<div class="wishlist-card">
+                <h2>
+                    Your wishlist is empty
+                </h2>
 
+                <p>
+                    Found something you love?
+                    Save it here and come back to it later.
+                </p>
 
+                <a
+                    href="<?= BASE_URL ?>catalog.php"
+                    class="browse-btn"
+                >
+                    Explore Products
+                </a>
 
-<img src="../assets/uploads/products/<?= $row['image']; ?>">
+            </section>
 
+        <?php else: ?>
 
+            <section class="wishlist-grid">
 
-<h3>
+                <?php foreach (
+                    $wishlistItems
+                    as $item
+                ): ?>
 
-<?= htmlspecialchars($row['product_name']); ?>
+                    <?php
 
-</h3>
+                    $productImage =
+                        productImageUrl(
+                            $item['image']
+                        );
 
+                    $isAvailable =
+                        $item['status'] === 'Available'
+                        &&
+                        (int) $item['stock_quantity'] > 0;
 
+                    ?>
 
-<p>
+                    <article class="wishlist-card">
 
-Vendor:
+                        <div class="wishlist-image-wrap">
 
-<?= htmlspecialchars($row['business_name']); ?>
+                            <img
+                                src="<?= e($productImage) ?>"
+                                alt="<?= e(
+                                    $item['product_name']
+                                ) ?>"
+                                class="wishlist-image"
+                                onerror="this.src='<?= e(
+                                    BASE_URL .
+                                    'image/product/default-product.jpg'
+                                ) ?>'"
+                            >
 
-</p>
+                            <span class="wishlist-heart">
+                                ♥
+                            </span>
 
+                            <span
+                                class="wishlist-category"
+                            >
+                                <?= e(
+                                    $item['category_name']
+                                ) ?>
+                            </span>
 
+                        </div>
 
-<p>
 
-RM <?= number_format($row['price'],2); ?>
+                        <div class="wishlist-content">
+
+                            <h2>
+                                <?= e(
+                                    $item['product_name']
+                                ) ?>
+                            </h2>
 
-</p>
 
+                            <div class="wishlist-vendor">
 
+                                Sold by
 
+                                <a
+                                    href="<?= BASE_URL ?>vendor.php?id=<?= (int) $item['vendor_id'] ?>"
+                                >
+                                    <?= e(
+                                        $item['business_name']
+                                    ) ?>
+                                </a>
 
-<button class="remove-wishlist"
+                            </div>
 
-data-id="<?= $row['product_id']; ?>">
 
+                            <div
+                                class="wishlist-description"
+                            >
+                                <?= e(
+                                    $item['description']
+                                    ?: 'No description available.'
+                                ) ?>
+                            </div>
 
-Remove
 
+                            <div
+                                class="wishlist-price-row"
+                            >
 
-</button>
+                                <span
+                                    class="wishlist-price"
+                                >
+                                    <?= formatPrice(
+                                        $item['price']
+                                    ) ?>
+                                </span>
 
 
+                                <?php if (
+                                    $isAvailable
+                                ): ?>
 
-<a href="product_details.php?id=<?= $row['product_id']; ?>">
+                                    <span
+                                        class="stock-status available"
+                                    >
+                                        ● In Stock
+                                    </span>
 
-View Product
+                                <?php else: ?>
 
-</a>
+                                    <span
+                                        class="stock-status out"
+                                    >
+                                        ● Out of Stock
+                                    </span>
 
+                                <?php endif; ?>
 
+                            </div>
 
 
-</div>
+                            <div
+                                class="wishlist-actions"
+                            >
 
+                                <a
+                                    href="<?= BASE_URL ?>product_details.php?id=<?= (int) $item['product_id'] ?>"
+                                    class="wishlist-btn view-btn"
+                                >
+                                    View Product
+                                </a>
 
 
-<?php } ?>
+                                <form
+                                    method="POST"
+                                    onsubmit="return confirm('Remove this product from your wishlist?');"
+                                >
 
+                                    <input
+                                        type="hidden"
+                                        name="product_id"
+                                        value="<?= (int) $item['product_id'] ?>"
+                                    >
 
+                                    <button
+                                        type="submit"
+                                        name="remove_wishlist"
+                                        value="1"
+                                        class="wishlist-btn remove-btn"
+                                    >
+                                        Remove
+                                    </button>
 
-</div>
+                                </form>
 
+                            </div>
 
+                        </div>
 
-<script src="../assets/js/wishlist.js"></script>
+                    </article>
 
+                <?php endforeach; ?>
 
+            </section>
+
+        <?php endif; ?>
+
+    </div>
+
+</main>
+
+<?php require_once __DIR__ . '/includes/footer.php'; ?>
 
 </body>
-
 
 </html>

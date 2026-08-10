@@ -1,69 +1,94 @@
 <?php
 
+require_once "../config.php";
 require_once "../database/db.php";
 
 
-$keyword="%".$_POST['keyword']."%";
+$search =
+    trim($_GET['q'] ?? '');
 
 
+header(
+    'Content-Type: application/json'
+);
 
-$stmt=$conn->prepare("
+
+if ($search === '') {
+
+    echo json_encode([]);
+
+    exit();
+
+}
 
 
-SELECT *
+$searchValue =
+    "%" . $search . "%";
 
-FROM products
 
-WHERE product_name LIKE ?
+$query = $conn->prepare("
 
-AND status='Available'
+    SELECT
 
+        products.product_id,
+        products.product_name,
+        products.price,
+        products.image,
+
+        vendors.business_name
+
+    FROM products
+
+    INNER JOIN vendors
+
+        ON products.vendor_id =
+           vendors.vendor_id
+
+    WHERE products.status = 'Available'
+
+    AND (
+
+        products.product_name LIKE ?
+
+        OR vendors.business_name LIKE ?
+
+    )
+
+    ORDER BY products.product_name ASC
+
+    LIMIT 10
 
 ");
 
 
-$stmt->bind_param(
-
-"s",
-
-$keyword
-
+$query->bind_param(
+    "ss",
+    $searchValue,
+    $searchValue
 );
 
 
-
-$stmt->execute();
-
+$query->execute();
 
 
-$result=$stmt->get_result();
+$result =
+    $query->get_result();
 
 
-
-while($row=$result->fetch_assoc()){
-
-
-?>
+$products = [];
 
 
-<div class="search-item">
+while (
+    $row = $result->fetch_assoc()
+) {
 
-
-<a href="../hochipohub/product_details.php?id=<?= $row['product_id']; ?>">
-
-
-<?= htmlspecialchars($row['product_name']); ?>
-
-
-</a>
-
-
-</div>
-
-
-
-<?php
+    $products[] = $row;
 
 }
 
-?>
+
+echo json_encode(
+    $products
+);
+
+exit();

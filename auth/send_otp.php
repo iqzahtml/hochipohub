@@ -1,306 +1,257 @@
 <?php
 
-session_start();
-
+require_once "../config.php";
 require_once "../database/db.php";
-
+require_once "../includes/functions.php";
 require_once "../mail/send_mail.php";
 
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
-if(!isset($_POST['email'])){
-
-
-    header("Location: ../forgot_password.php");
-
+    header("Location: forgot_password.php");
     exit();
 
 }
 
 
-
-$email = trim($_POST['email']);
-
+$email = trim($_POST['email'] ?? '');
 
 
+if ($email === '') {
+
+    setFlashMessage(
+        "error",
+        "Please enter your email."
+    );
+
+    header("Location: forgot_password.php");
+    exit();
+
+}
 
 
 /*
 |--------------------------------------------------------------------------
-| CHECK USER EMAIL
+| Find User
 |--------------------------------------------------------------------------
 */
 
-
 $stmt = $conn->prepare("
 
-SELECT user_id, name
+    SELECT
+        user_id,
+        name,
+        email,
+        status
 
-FROM users
+    FROM users
 
-WHERE email = ?
+    WHERE email = ?
+
+    LIMIT 1
 
 ");
 
-
-
 $stmt->bind_param(
-
     "s",
-
     $email
-
 );
 
-
-
 $stmt->execute();
-
-
 
 $result = $stmt->get_result();
 
 
+if ($result->num_rows === 0) {
 
+    setFlashMessage(
+        "error",
+        "No account is registered with this email."
+    );
 
-
-if($result->num_rows == 0){
-
-
-    $_SESSION['error'] = "Email not registered";
-
-
-    header("Location: ../forgot_password.php");
-
-
+    header("Location: forgot_password.php");
     exit();
 
-
 }
-
-
 
 
 $user = $result->fetch_assoc();
 
 
+if ($user['status'] === 'suspended') {
 
+    setFlashMessage(
+        "error",
+        "This account has been suspended."
+    );
 
-
-/*
-|--------------------------------------------------------------------------
-| GENERATE OTP
-|--------------------------------------------------------------------------
-*/
-
-
-$otp = random_int(
-
-    100000,
-
-    999999
-
-);
-
-
-
-$expiry = date(
-
-    "Y-m-d H:i:s",
-
-    strtotime("+10 minutes")
-
-);
-
-
-
-
-
-
-/*
-|--------------------------------------------------------------------------
-| SAVE OTP TO DATABASE
-|--------------------------------------------------------------------------
-*/
-
-
-$update = $conn->prepare("
-
-
-UPDATE users
-
-
-SET
-
-
-reset_code = ?,
-
-
-reset_expiry = ?
-
-
-WHERE email = ?
-
-
-
-");
-
-
-
-
-$update->bind_param(
-
-    "sss",
-
-    $otp,
-
-    $expiry,
-
-    $email
-
-);
-
-
-
-
-if(!$update->execute()){
-
-
-
-    $_SESSION['error']="Failed to generate OTP";
-
-
-    header("Location: ../forgot_password.php");
-
-
+    header("Location: forgot_password.php");
     exit();
-
 
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Generate 6 Digit Reset Code
+|--------------------------------------------------------------------------
+*/
+
+$resetCode = (string) random_int(
+    100000,
+    999999
+);
 
 
-
+$expiresAt = date(
+    'Y-m-d H:i:s',
+    time() + (PASSWORD_RESET_EXPIRY_MINUTES * 60)
+);
 
 
 /*
 |--------------------------------------------------------------------------
-| SEND OTP EMAIL
+| Update Users Reset Fields
 |--------------------------------------------------------------------------
 */
 
+$updateUser = $conn->prepare("
+
+    UPDATE users
+
+    SET
+        reset_code = ?,
+        reset_expiry = ?
+
+    WHERE user_id = ?
+
+");
+
+$updateUser->bind_param(
+    "ssi",
+    $resetCode,
+    $expiresAt,
+    $user['user_id']
+);
+
+$updateUser->execute();
+
+
+/*
+|--------------------------------------------------------------------------
+| Store Password Reset History
+|--------------------------------------------------------------------------
+*/
+
+$insertReset = $conn->prepare("
+
+    INSERT INTO password_resets
+
+    (
+        user_id,
+        reset_code,
+        expires_at
+    )
+
+    VALUES
+    (
+        ?,
+        ?,
+        ?
+    )
+
+");
+
+$insertReset->bind_param(
+    "iss",
+    $user['user_id'],
+    $resetCode,
+    $expiresAt
+);
+
+$insertReset->execute();
+
+
+/*
+|--------------------------------------------------------------------------
+| Email
+|--------------------------------------------------------------------------
+*/
 
 $message = "
 
+<div style='font-family:Arial,sans-serif;'>
 
-<div style='font-family:Arial;padding:20px;'>
+    <h2>HochipoHub Password Reset</h2>
 
+    <p>
+        Hello " .
+        htmlspecialchars($user['name']) .
+        ",
+    </p>
 
-<h2>
-HochipoHub Password Reset
-</h2>
+    <p>
+        Your password reset OTP is:
+    </p>
 
+    <h1 style='letter-spacing:8px;'>
+        {$resetCode}
+    </h1>
 
+    <p>
+        This code expires in " .
+        PASSWORD_RESET_EXPIRY_MINUTES .
+        " minutes.
+    </p>
 
-<p>
-Hello {$user['name']},
-</p>
-
-
-
-<p>
-Your OTP verification code is:
-</p>
-
-
-
-<h1 style='letter-spacing:5px;'>
-
-$otp
-
-</h1>
-
-
-
-<p>
-This code will expire in 10 minutes.
-</p>
-
-
-
-<p>
-If you did not request this, please ignore this email.
-</p>
-
-
+    <p>
+        If you did not request this reset, you can ignore this email.
+    </p>
 
 </div>
-
 
 ";
 
 
-
-
-
 $mailSent = sendMail(
-
-
     $email,
-
-
-    "HochipoHub OTP Verification",
-
-
+    "HochipoHub Password Reset OTP",
     $message
-
-
 );
 
 
+if (!$mailSent) {
 
+    setFlashMessage(
+        "error",
+        "Unable to send OTP email. Please try again."
+    );
 
-
-
-
-if($mailSent){
-
-
-
-    $_SESSION['otp_email'] = $email;
-
-
-
-    $_SESSION['success']="OTP has been sent to your email";
-
-
-
-    header("Location: ../verify_otp.php");
-
-
+    header("Location: forgot_password.php");
     exit();
-
-
-
-}
-
-else{
-
-
-
-    $_SESSION['error']="Failed to send email";
-
-
-    header("Location: ../forgot_password.php");
-
-
-    exit();
-
-
 
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Store Session
+|--------------------------------------------------------------------------
+*/
 
-?>
+$_SESSION['reset_user_id'] =
+    $user['user_id'];
+
+$_SESSION['reset_email'] =
+    $user['email'];
+
+
+setFlashMessage(
+    "success",
+    "OTP has been sent to your email."
+);
+
+
+header("Location: verify_otp.php");
+
+exit();

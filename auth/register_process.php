@@ -1,120 +1,112 @@
 <?php
 
-session_start();
+require_once "../config.php";
 
 require_once "../database/db.php";
 
-
-if(isset($_POST['register'])){
-
-
-$name = trim($_POST['name']);
-
-$email = trim($_POST['email']);
-
-$password = $_POST['password'];
-
-$role = $_POST['role'] ?? "customer";
+require_once "../includes/session.php";
 
 
 
 
-$check = $conn->prepare("
 
-SELECT user_id
-
-FROM users
-
-WHERE email=?
-
-");
+if($_SERVER['REQUEST_METHOD'] !== "POST"){
 
 
-$check->bind_param(
-"s",
-$email
+header(
+"Location: ".BASE_URL."index.php"
 );
 
 
-$check->execute();
-
-
-$result=$check->get_result();
-
-
-
-if($result->num_rows > 0){
-
-$_SESSION['error']="Email already registered";
-
-header("Location: ../register.php");
-
 exit();
+
 
 }
 
 
 
 
-$hash=password_hash(
-$password,
+
+
+
+$name = mysqli_real_escape_string(
+$conn,
+$_POST['name']
+);
+
+
+
+$email = mysqli_real_escape_string(
+$conn,
+$_POST['email']
+);
+
+
+
+$phone = mysqli_real_escape_string(
+$conn,
+$_POST['phone']
+);
+
+
+
+$password = password_hash(
+$_POST['password'],
 PASSWORD_DEFAULT
 );
 
 
 
-
-$stmt=$conn->prepare("
-
-
-INSERT INTO users
-
-(name,email,password,role)
-
-VALUES (?,?,?,?)
+$role = mysqli_real_escape_string(
+$conn,
+$_POST['role']
+);
 
 
+
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Check Existing Email
+|--------------------------------------------------------------------------
+*/
+
+
+$check = $conn->query("
+
+SELECT user_id
+
+FROM users
+
+WHERE email='$email'
 
 ");
 
 
 
-$stmt->bind_param(
 
-"ssss",
 
-$name,
+if($check->num_rows > 0){
 
-$email,
 
-$hash,
+setFlashMessage(
 
-$role
+"error",
+
+"Email already registered."
 
 );
 
 
 
-if($stmt->execute()){
-
-
-$_SESSION['success']="Registration successful";
-
-
-header("Location: ../login.php");
-
-
-}else{
-
-
-$_SESSION['error']="Registration failed";
-
-
-header("Location: ../register.php");
-
-
-}
-
+header(
+"Location: ".BASE_URL."index.php"
+);
 
 
 exit();
@@ -122,4 +114,103 @@ exit();
 
 }
 
-?>
+
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Insert User
+|--------------------------------------------------------------------------
+*/
+
+
+$sql="
+
+INSERT INTO users
+
+(
+
+name,
+
+email,
+
+phone,
+
+password,
+
+role
+
+)
+
+
+VALUES
+
+(
+
+'$name',
+
+'$email',
+
+'$phone',
+
+'$password',
+
+'$role'
+
+)
+
+
+
+";
+
+
+
+
+
+
+
+if($conn->query($sql)){
+
+
+
+setFlashMessage(
+
+"success",
+
+"Registration successful. Please login."
+
+);
+
+
+
+}else{
+
+
+
+setFlashMessage(
+
+"error",
+
+"Registration failed."
+
+);
+
+
+
+}
+
+
+
+
+
+
+header(
+"Location: ".BASE_URL."index.php"
+);
+
+
+exit();

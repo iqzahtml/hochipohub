@@ -1,235 +1,273 @@
 <?php
 
-
-session_start();
-
-
-require_once "../config/db.php";
-
+require_once "../config.php";
+require_once "../database/db.php";
+require_once "../includes/session.php";
+require_once "../includes/functions.php";
 
 
-if(!isset($_SESSION['user_id'])){
+$pageTitle = "My Products";
 
 
-header("Location: ../auth/login.php");
+if (!isLoggedIn()) {
 
-
-exit();
-
+    header("Location: " . BASE_URL . "index.php");
+    exit();
 
 }
 
 
+if (currentUserRole() !== 'vendor') {
 
-$user_id=$_SESSION['user_id'];
+    header("Location: " . BASE_URL . "index.php");
+    exit();
 
-
-
-
-$stmt=$conn->prepare("
-
-SELECT vendor_id
-
-FROM vendors
-
-WHERE user_id=?
-
-");
+}
 
 
-
-$stmt->bind_param(
-
-"i",
-
-$user_id
-
-);
+$userID =
+    (int) currentUserID();
 
 
+/*
+|--------------------------------------------------------------------------
+| Get Vendor
+|--------------------------------------------------------------------------
+*/
 
-$stmt->execute();
+$vendorQuery = $conn->prepare("
 
+    SELECT vendor_id
 
+    FROM vendors
 
-$vendor=$stmt->get_result()->fetch_assoc();
+    WHERE user_id = ?
 
-
-
-
-$products=$conn->prepare("
-
-SELECT *
-
-FROM products
-
-WHERE vendor_id=?
-
-ORDER BY product_id DESC
+    LIMIT 1
 
 ");
 
 
-
-$products->bind_param(
-
-"i",
-
-$vendor['vendor_id']
-
+$vendorQuery->bind_param(
+    "i",
+    $userID
 );
 
 
-
-$products->execute();
-
+$vendorQuery->execute();
 
 
-$result=$products->get_result();
+$vendorResult =
+    $vendorQuery->get_result();
 
 
+if ($vendorResult->num_rows === 0) {
+
+    header(
+        "Location: setup_profile.php"
+    );
+
+    exit();
+
+}
+
+
+$vendor =
+    $vendorResult->fetch_assoc();
+
+
+$vendorID =
+    (int) $vendor['vendor_id'];
+
+
+/*
+|--------------------------------------------------------------------------
+| Get Products
+|--------------------------------------------------------------------------
+*/
+
+$query = $conn->prepare("
+
+    SELECT
+
+        products.product_id,
+        products.product_name,
+        products.description,
+        products.price,
+        products.stock_quantity,
+        products.image,
+        products.status,
+        products.created_at,
+
+        categories.category_name
+
+    FROM products
+
+    LEFT JOIN categories
+
+        ON products.category_id =
+           categories.category_id
+
+    WHERE products.vendor_id = ?
+
+    ORDER BY products.created_at DESC
+
+");
+
+
+$query->bind_param(
+    "i",
+    $vendorID
+);
+
+
+$query->execute();
+
+
+$products =
+    $query->get_result();
 
 ?>
 
+<?php include "../includes/header.php"; ?>
 
+<section class="product-page">
 
-<!DOCTYPE html>
+    <div class="page-title">
 
-<html>
+        <div>
 
-<head>
+            <h1>
+                My Products
+            </h1>
 
-<title>
-My Products
-</title>
+            <p>
+                Manage your HochipoHub products.
+            </p>
 
+        </div>
 
-<link rel="stylesheet" href="../assets/css/vendor.css">
 
+        <a
+            href="add_product.php"
+            class="btn-primary"
+        >
+            + Add Product
+        </a>
 
-</head>
+    </div>
 
 
+    <div class="product-grid">
 
-<body>
+        <?php if ($products->num_rows > 0): ?>
 
+            <?php while (
+                $product =
+                $products->fetch_assoc()
+            ): ?>
 
-<h1>
-My Products
-</h1>
+                <div class="product-card">
 
+                    <?php if (
+                        !empty($product['image'])
+                    ): ?>
 
-<a href="add_product.php">
+                        <img
+                            src="<?= BASE_URL; ?>uploads/products/<?= htmlspecialchars(
+                                $product['image']
+                            ); ?>"
+                            alt="<?= htmlspecialchars(
+                                $product['product_name']
+                            ); ?>"
+                        >
 
-Add Product
+                    <?php endif; ?>
 
-</a>
 
+                    <h3>
+                        <?= htmlspecialchars(
+                            $product['product_name']
+                        ); ?>
+                    </h3>
 
 
-<table border="1">
+                    <p>
+                        <?= htmlspecialchars(
+                            $product['category_name']
+                            ?? 'Uncategorized'
+                        ); ?>
+                    </p>
 
 
-<tr>
+                    <p>
+                        RM <?= number_format(
+                            $product['price'],
+                            2
+                        ); ?>
+                    </p>
 
-<th>
-Image
-</th>
 
-<th>
-Name
-</th>
+                    <p>
+                        Stock:
+                        <?= (int)$product['stock_quantity']; ?>
+                    </p>
 
-<th>
-Price
-</th>
 
-<th>
-Stock
-</th>
+                    <p>
+                        Status:
+                        <?= htmlspecialchars(
+                            $product['status']
+                        ); ?>
+                    </p>
 
-<th>
-Action
-</th>
 
+                    <div class="product-actions">
 
-</tr>
+                        <a
+                            href="edit_product.php?id=<?= $product['product_id']; ?>"
+                        >
+                            Edit
+                        </a>
 
+                        <a
+                            href="delete_product.php?id=<?= $product['product_id']; ?>"
+                            onclick="return confirm('Delete this product?');"
+                        >
+                            Delete
+                        </a>
 
+                    </div>
 
-<?php while($row=$result->fetch_assoc()){ ?>
+                </div>
 
+            <?php endwhile; ?>
 
-<tr>
+        <?php else: ?>
 
+            <div class="empty-product">
 
-<td>
+                <h3>
+                    No Products Yet
+                </h3>
 
+                <p>
+                    Add your first product to start selling.
+                </p>
 
-<img src="../assets/uploads/products/<?= $row['image']; ?>"
+                <a
+                    href="add_product.php"
+                    class="btn-primary"
+                >
+                    Add Product
+                </a>
 
-width="70">
+            </div>
 
+        <?php endif; ?>
 
-</td>
+    </div>
 
+</section>
 
-
-<td>
-
-<?= $row['product_name']; ?>
-
-</td>
-
-
-
-<td>
-
-RM <?= $row['price']; ?>
-
-</td>
-
-
-
-
-<td>
-
-<?= $row['stock_quantity']; ?>
-
-</td>
-
-
-
-<td>
-
-
-<a href="edit_product.php?id=<?= $row['product_id']; ?>">
-
-Edit
-
-</a>
-
-
-
-<a href="delete_product.php?id=<?= $row['product_id']; ?>">
-
-Delete
-
-</a>
-
-
-</td>
-
-
-</tr>
-
-
-<?php } ?>
-
-
-</table>
-
-
-</body>
-
-</html>
+<?php include "../includes/footer.php"; ?>

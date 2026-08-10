@@ -1,114 +1,144 @@
 <?php
 
+require_once "../config.php";
 require_once "../database/db.php";
 
 
-header("Content-Type: text/html");
+$search =
+    trim($_GET['search'] ?? '');
 
 
-
-$category=$_POST['category'] ?? '';
-
-
-
-if($category!=""){
+$categoryID =
+    (int) ($_GET['category_id'] ?? 0);
 
 
-$stmt=$conn->prepare("
+$sql = "
 
-SELECT *
+    SELECT
 
-FROM products
+        products.product_id,
+        products.product_name,
+        products.description,
+        products.price,
+        products.stock_quantity,
+        products.image,
+        products.status,
 
-WHERE category_id=?
+        vendors.business_name,
 
-AND status='Available'
+        categories.category_name
 
-ORDER BY product_id DESC
+    FROM products
 
-");
+    INNER JOIN vendors
+
+        ON products.vendor_id =
+           vendors.vendor_id
+
+    INNER JOIN categories
+
+        ON products.category_id =
+           categories.category_id
+
+    WHERE products.status = 'Available'
+
+";
 
 
-$stmt->bind_param(
+$params = [];
+$types = "";
 
-"i",
 
-$category
+if ($search !== '') {
 
-);
+    $sql .= "
 
+        AND (
+
+            products.product_name LIKE ?
+
+            OR vendors.business_name LIKE ?
+
+            OR categories.category_name LIKE ?
+
+        )
+
+    ";
+
+    $searchValue =
+        "%" . $search . "%";
+
+    $params[] = $searchValue;
+    $params[] = $searchValue;
+    $params[] = $searchValue;
+
+    $types .= "sss";
+
+}
+
+
+if ($categoryID > 0) {
+
+    $sql .= "
+
+        AND products.category_id = ?
+
+    ";
+
+    $params[] = $categoryID;
+
+    $types .= "i";
+
+}
+
+
+$sql .= "
+
+    ORDER BY products.created_at DESC
+
+";
+
+
+$stmt =
+    $conn->prepare($sql);
+
+
+if (!empty($params)) {
+
+    $stmt->bind_param(
+        $types,
+        ...$params
+    );
+
+}
 
 
 $stmt->execute();
 
 
-
-$result=$stmt->get_result();
-
-
-
-}
-
-else{
+$result =
+    $stmt->get_result();
 
 
-$result=$conn->query("
+$products = [];
 
-SELECT *
 
-FROM products
+while (
+    $row = $result->fetch_assoc()
+) {
 
-WHERE status='Available'
-
-ORDER BY product_id DESC
-
-");
-
+    $products[] = $row;
 
 }
 
 
-
-while($row=$result->fetch_assoc()){
-
-
-?>
-
-<div class="product-card">
+header(
+    'Content-Type: application/json'
+);
 
 
-<img src="../assets/uploads/products/<?= $row['image']; ?>">
+echo json_encode(
+    $products
+);
 
-
-<h3>
-
-<?= htmlspecialchars($row['product_name']); ?>
-
-</h3>
-
-
-<p>
-
-RM <?= number_format($row['price'],2); ?>
-
-</p>
-
-
-<button class="add-cart"
-
-data-id="<?= $row['product_id']; ?>">
-
-Add Cart
-
-</button>
-
-
-
-</div>
-
-
-<?php
-
-}
-
-?>
+exit();

@@ -1,112 +1,175 @@
 <?php
 
-session_start();
+require_once "../config.php";
 
 require_once "../database/db.php";
 
-
-
-if(isset($_POST['login'])){
-
-
-$email=$_POST['email'];
-
-$password=$_POST['password'];
+require_once "../includes/session.php";
 
 
 
+if($_SERVER['REQUEST_METHOD'] !== "POST"){
 
-$stmt=$conn->prepare("
 
+    header(
+        "Location: ".BASE_URL."index.php"
+    );
+
+
+    exit();
+
+
+}
+
+
+
+
+
+$email = mysqli_real_escape_string(
+    $conn,
+    $_POST['email']
+);
+
+
+
+$password = $_POST['password'];
+
+
+
+
+
+$query = "
 
 SELECT *
 
 FROM users
 
-WHERE email=?
+WHERE email='$email'
+
+LIMIT 1
+
+";
 
 
 
-");
+$result = $conn->query($query);
 
 
-$stmt->bind_param(
-"s",
-$email
+
+
+
+
+if($result && $result->num_rows > 0){
+
+
+
+    $user = $result->fetch_assoc();
+
+
+
+
+
+    if(password_verify($password,$user['password'])){
+
+
+
+
+
+        $_SESSION['user_id'] =
+            $user['user_id'];
+
+
+
+        $_SESSION['name'] =
+            $user['name'];
+
+
+
+        $_SESSION['role'] =
+            $user['role'];
+
+
+
+
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Redirect Based On Role
+        |--------------------------------------------------------------------------
+        */
+
+
+
+
+
+        if($user['role']=="admin"){
+
+
+            header(
+                "Location: ".BASE_URL."admin/dashboard.php"
+            );
+
+
+        }
+
+
+
+
+        elseif($user['role']=="vendor"){
+
+
+            header(
+                "Location: ".BASE_URL."seller/dashboard.php"
+            );
+
+
+        }
+
+
+
+
+
+        else{
+
+
+            header(
+                "Location: ".BASE_URL."dashboard.php"
+            );
+
+
+        }
+
+
+
+
+
+        exit();
+
+
+
+
+    }
+
+
+
+}
+
+
+
+
+
+
+setFlashMessage(
+    "error",
+    "Invalid email or password."
 );
 
 
-$stmt->execute();
 
-
-
-$result=$stmt->get_result();
-
-
-
-if($result->num_rows==1){
-
-
-$user=$result->fetch_assoc();
-
-
-
-if(password_verify($password,$user['password'])){
-
-
-$_SESSION['user_id']=$user['user_id'];
-
-$_SESSION['name']=$user['name'];
-
-$_SESSION['role']=$user['role'];
-
-
-
-if($user['role']=="admin"){
-
-
-header("Location: ../admin/dashboard.php");
-
-
-}
-
-elseif($user['role']=="vendor"){
-
-
-header("Location: ../seller/dashboard.php");
-
-
-}
-
-else{
-
-
-header("Location: ../dashboard.php");
-
-
-}
-
+header(
+    "Location: ".BASE_URL."index.php"
+);
 
 
 exit();
-
-
-
-}
-
-
-
-}
-
-
-
-$_SESSION['error']="Invalid email or password";
-
-
-header("Location: ../login.php");
-
-
-exit();
-
-
-?>

@@ -2,12 +2,12 @@
 
 session_start();
 
-require_once "../config/db.php";
+require_once "database/db.php";
 
 
 if(!isset($_SESSION['user_id']) || $_SESSION['role']!="vendor"){
 
-    header("Location: ../auth/login.php");
+    header("Location: auth/login.php");
     exit();
 
 }
@@ -277,7 +277,7 @@ Edit Product
 </title>
 
 
-<link rel="stylesheet" href="../assets/css/vendor.css">
+<link rel="stylesheet" href="css/vendor.css">
 
 
 </head>

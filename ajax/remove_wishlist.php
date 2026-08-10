@@ -1,116 +1,100 @@
 <?php
 
-session_start();
-
-
+require_once "../config.php";
 require_once "../database/db.php";
+require_once "../includes/session.php";
 
 
-header("Content-Type: application/json");
+if (!isLoggedIn()) {
 
-
-
-if(!isset($_SESSION['user_id'])){
-
-
-echo json_encode([
-
-"status"=>"error",
-
-"message"=>"Login required"
-
-]);
-
-
-exit();
-
+    header("Location: " . BASE_URL . "index.php");
+    exit();
 
 }
 
 
-
-if(!isset($_POST['product_id'])){
-
-
-echo json_encode([
-
-"status"=>"error",
-
-"message"=>"Product ID required"
-
-]);
+$userID =
+    (int) currentUserID();
 
 
-exit();
+$wishlistID =
+    (int) ($_GET['id'] ?? 0);
 
+
+$productID =
+    (int) ($_GET['product_id'] ?? 0);
+
+
+/*
+|--------------------------------------------------------------------------
+| Remove By Wishlist ID
+|--------------------------------------------------------------------------
+*/
+
+if ($wishlistID > 0) {
+
+    $query = $conn->prepare("
+
+        DELETE FROM wishlist
+
+        WHERE wishlist_id = ?
+
+        AND user_id = ?
+
+    ");
+
+    $query->bind_param(
+        "ii",
+        $wishlistID,
+        $userID
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| Remove By Product ID
+|--------------------------------------------------------------------------
+*/
+
+} elseif ($productID > 0) {
+
+    $query = $conn->prepare("
+
+        DELETE FROM wishlist
+
+        WHERE product_id = ?
+
+        AND user_id = ?
+
+    ");
+
+    $query->bind_param(
+        "ii",
+        $productID,
+        $userID
+    );
+
+
+} else {
+
+    header(
+        "Location: " .
+        BASE_URL .
+        "wishlist.php"
+    );
+
+    exit();
 
 }
 
 
-
-$user_id=$_SESSION['user_id'];
-
-$product_id=$_POST['product_id'];
+$query->execute();
 
 
-
-$stmt=$conn->prepare("
-
-
-DELETE FROM wishlist
-
-
-WHERE user_id=?
-
-AND product_id=?
-
-
-
-");
-
-
-
-$stmt->bind_param(
-
-"ii",
-
-$user_id,
-
-$product_id
-
+header(
+    "Location: " .
+    BASE_URL .
+    "wishlist.php"
 );
 
-
-
-if($stmt->execute()){
-
-
-
-echo json_encode([
-
-"status"=>"success",
-
-"message"=>"Removed from wishlist"
-
-]);
-
-
-
-}else{
-
-
-echo json_encode([
-
-"status"=>"error",
-
-"message"=>"Failed"
-
-]);
-
-
-
-}
-
-
-
-?>
+exit();

@@ -1,128 +1,90 @@
 <?php
 
+require_once "../config.php";
 require_once "../database/db.php";
 
 
-header("Content-Type: application/json");
+$productID =
+    (int) ($_GET['product_id'] ?? 0);
 
 
+header(
+    'Content-Type: application/json'
+);
 
-if(!isset($_POST['product_id'])){
+
+if ($productID <= 0) {
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'Invalid product ID.'
+    ]);
+
+    exit();
+}
+
+
+$query = $conn->prepare("
+
+    SELECT
+
+        reviews.review_id,
+        reviews.rating,
+        reviews.review,
+        reviews.image,
+        reviews.review_date,
+
+        users.name
+
+    FROM reviews
+
+    INNER JOIN users
+
+        ON reviews.customer_id =
+           users.user_id
+
+    WHERE reviews.product_id = ?
+
+    AND reviews.status = 'Visible'
+
+    ORDER BY reviews.review_date DESC
+
+");
+
+
+$query->bind_param(
+    "i",
+    $productID
+);
+
+$query->execute();
+
+
+$result =
+    $query->get_result();
+
+
+$reviews = [];
+
+
+while (
+    $row = $result->fetch_assoc()
+) {
+
+    $reviews[] = $row;
+
+}
 
 
 echo json_encode([
 
-"status"=>"error",
+    'success' => true,
 
-"message"=>"Product ID required"
+    'reviews' => $reviews,
+
+    'count' => count($reviews)
 
 ]);
 
 
 exit();
-
-
-}
-
-
-
-$product_id=$_POST['product_id'];
-
-
-
-$stmt=$conn->prepare("
-
-
-SELECT
-
-
-reviews.review_id,
-
-reviews.rating,
-
-reviews.review,
-
-reviews.image,
-
-reviews.review_date,
-
-
-users.name,
-
-
-users.profile_image
-
-
-
-FROM reviews
-
-
-
-JOIN users
-
-
-ON reviews.customer_id = users.user_id
-
-
-
-WHERE reviews.product_id=?
-
-AND reviews.status='Visible'
-
-
-
-ORDER BY reviews.review_date DESC
-
-
-
-");
-
-
-
-$stmt->bind_param(
-
-"i",
-
-$product_id
-
-);
-
-
-
-$stmt->execute();
-
-
-
-$result=$stmt->get_result();
-
-
-
-$reviews=[];
-
-
-
-while($row=$result->fetch_assoc()){
-
-
-
-$reviews[]=$row;
-
-
-
-}
-
-
-
-echo json_encode([
-
-
-"status"=>"success",
-
-
-"data"=>$reviews
-
-
-
-]);
-
-?>
