@@ -5,9 +5,15 @@
 |--------------------------------------------------------------------------
 */
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $baseUrl = defined('BASE_URL')
     ? BASE_URL
     : '/hochipohub/';
+
+$registerOld = $_SESSION['register_old'] ?? [];
 
 ?>
 
@@ -24,16 +30,18 @@ $baseUrl = defined('BASE_URL')
         aria-labelledby="registerModalTitle"
     >
 
+        <!-- CLOSE -->
         <button
             type="button"
             class="modal-close"
             data-modal-close="registerModal"
-            aria-label="Close"
+            aria-label="Close register"
         >
             ×
         </button>
 
 
+        <!-- HEADER -->
         <div class="auth-modal-header">
 
             <div class="auth-modal-icon">
@@ -55,6 +63,7 @@ $baseUrl = defined('BASE_URL')
         </div>
 
 
+        <!-- ERROR -->
         <?php if (
             isset($_SESSION['register_error']) &&
             !empty($_SESSION['register_error'])
@@ -75,16 +84,20 @@ $baseUrl = defined('BASE_URL')
         <?php endif; ?>
 
 
+        <!-- REGISTER FORM -->
         <form
-            action="<?= $baseUrl ?>auth/register_process.php"
+            action="<?= htmlspecialchars(
+                $baseUrl . 'auth/register_process.php',
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>"
             method="POST"
             class="auth-form"
             id="registerForm"
         >
 
-            <?php if (
-                function_exists('csrfToken')
-            ): ?>
+            <!-- CSRF -->
+            <?php if (function_exists('csrfToken')): ?>
 
                 <input
                     type="hidden"
@@ -96,9 +109,7 @@ $baseUrl = defined('BASE_URL')
                     ) ?>"
                 >
 
-            <?php elseif (
-                isset($_SESSION['csrf_token'])
-            ): ?>
+            <?php elseif (isset($_SESSION['csrf_token'])): ?>
 
                 <input
                     type="hidden"
@@ -113,6 +124,7 @@ $baseUrl = defined('BASE_URL')
             <?php endif; ?>
 
 
+            <!-- NAME -->
             <div class="form-group">
 
                 <label for="registerName">
@@ -126,12 +138,18 @@ $baseUrl = defined('BASE_URL')
                     placeholder="Your full name"
                     autocomplete="name"
                     maxlength="100"
+                    value="<?= htmlspecialchars(
+                        $registerOld['name'] ?? '',
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>"
                     required
                 >
 
             </div>
 
 
+            <!-- EMAIL + PHONE -->
             <div class="form-grid-2">
 
                 <div class="form-group">
@@ -146,6 +164,11 @@ $baseUrl = defined('BASE_URL')
                         name="email"
                         placeholder="you@example.com"
                         autocomplete="email"
+                        value="<?= htmlspecialchars(
+                            $registerOld['email'] ?? '',
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>"
                         required
                     >
 
@@ -164,6 +187,12 @@ $baseUrl = defined('BASE_URL')
                         name="phone"
                         placeholder="01X-XXXXXXX"
                         autocomplete="tel"
+                        value="<?= htmlspecialchars(
+                            $registerOld['phone'] ?? '',
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>"
+                        required
                     >
 
                 </div>
@@ -171,6 +200,51 @@ $baseUrl = defined('BASE_URL')
             </div>
 
 
+            <!-- ACCOUNT TYPE -->
+            <div class="form-group">
+
+                <label for="registerRole">
+                    Account Type
+                </label>
+
+                <select
+                    id="registerRole"
+                    name="role"
+                    required
+                >
+
+                    <option
+                        value="customer"
+                        <?= (
+                            ($registerOld['role'] ?? 'customer')
+                            === 'customer'
+                        )
+                            ? 'selected'
+                            : ''
+                        ?>
+                    >
+                        Customer
+                    </option>
+
+                    <option
+                        value="vendor"
+                        <?= (
+                            ($registerOld['role'] ?? '')
+                            === 'vendor'
+                        )
+                            ? 'selected'
+                            : ''
+                        ?>
+                    >
+                        Vendor
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- PASSWORD -->
             <div class="form-group">
 
                 <label for="registerPassword">
@@ -203,6 +277,7 @@ $baseUrl = defined('BASE_URL')
             </div>
 
 
+            <!-- CONFIRM PASSWORD -->
             <div class="form-group">
 
                 <label for="registerConfirmPassword">
@@ -235,6 +310,7 @@ $baseUrl = defined('BASE_URL')
             </div>
 
 
+            <!-- TERMS -->
             <label class="checkbox-row">
 
                 <input
@@ -257,6 +333,7 @@ $baseUrl = defined('BASE_URL')
             </label>
 
 
+            <!-- SUBMIT -->
             <button
                 type="submit"
                 class="auth-submit"
@@ -273,6 +350,7 @@ $baseUrl = defined('BASE_URL')
             </button>
 
 
+            <!-- LOGIN -->
             <p class="auth-switch">
 
                 Already have an account?
@@ -293,3 +371,11 @@ $baseUrl = defined('BASE_URL')
     </div>
 
 </div>
+
+<?php
+
+unset(
+    $_SESSION['register_old']
+);
+
+?>
