@@ -5,15 +5,32 @@
 | HOCHIPOHUB - SESSION MANAGEMENT
 |--------------------------------------------------------------------------
 | File:
-| includes/session.php
+|     includes/session.php
 |
 | Purpose:
-| - Start session
-| - Manage login session
-| - Role checking
-| - Authentication protection
-| - Flash messages
-| - CSRF token
+| - Start PHP session
+| - Manage session timeout
+| - Store login session
+| - Manage MFA session
+| - Logout
+| - Flash message
+| - CSRF helper
+|
+| IMPORTANT:
+| Authentication functions such as:
+|     isLoggedIn()
+|     hasRole()
+|     isAdmin()
+|     isVendor()
+|     isCustomer()
+|     requireLogin()
+|     requireAdmin()
+|     requireVendor()
+|     requireCustomer()
+|
+| are already defined in config.php.
+|
+| Therefore this file DOES NOT redeclare them.
 |--------------------------------------------------------------------------
 */
 
@@ -47,6 +64,9 @@ if (session_status() === PHP_SESSION_NONE) {
 |--------------------------------------------------------------------------
 | SESSION TIMEOUT
 |--------------------------------------------------------------------------
+|
+| Automatically expire inactive sessions after 2 hours.
+|--------------------------------------------------------------------------
 */
 
 $sessionTimeout = 7200;
@@ -55,6 +75,12 @@ if (
     isset($_SESSION['last_activity']) &&
     (time() - $_SESSION['last_activity']) > $sessionTimeout
 ) {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Destroy expired session
+    |--------------------------------------------------------------------------
+    */
 
     $_SESSION = [];
 
@@ -75,25 +101,30 @@ if (
 
     session_destroy();
 
+    /*
+    |--------------------------------------------------------------------------
+    | Start new session
+    |--------------------------------------------------------------------------
+    */
+
     session_start();
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE LAST ACTIVITY
+|--------------------------------------------------------------------------
+*/
 
 $_SESSION['last_activity'] = time();
 
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN CHECK
+| USER SESSION HELPERS
 |--------------------------------------------------------------------------
 */
-
-function isLoggedIn()
-{
-    return (
-        isset($_SESSION['user_id']) &&
-        !empty($_SESSION['user_id'])
-    );
-}
 
 
 /*
@@ -102,9 +133,12 @@ function isLoggedIn()
 |--------------------------------------------------------------------------
 */
 
-function getUserId()
-{
-    return $_SESSION['user_id'] ?? null;
+if (!function_exists('getUserId')) {
+
+    function getUserId()
+    {
+        return $_SESSION['user_id'] ?? null;
+    }
 }
 
 
@@ -114,11 +148,14 @@ function getUserId()
 |--------------------------------------------------------------------------
 */
 
-function getUserName()
-{
-    return $_SESSION['name']
-        ?? $_SESSION['user_name']
-        ?? '';
+if (!function_exists('getUserName')) {
+
+    function getUserName()
+    {
+        return $_SESSION['user_name']
+            ?? $_SESSION['name']
+            ?? '';
+    }
 }
 
 
@@ -128,11 +165,14 @@ function getUserName()
 |--------------------------------------------------------------------------
 */
 
-function getUserEmail()
-{
-    return $_SESSION['email']
-        ?? $_SESSION['user_email']
-        ?? '';
+if (!function_exists('getUserEmail')) {
+
+    function getUserEmail()
+    {
+        return $_SESSION['user_email']
+            ?? $_SESSION['email']
+            ?? '';
+    }
 }
 
 
@@ -141,17 +181,26 @@ function getUserEmail()
 | GET USER ROLE
 |--------------------------------------------------------------------------
 |
-| IMPORTANT:
-| Main config uses:
+| config.php uses:
 |
 | $_SESSION['role']
 |
+| Older session code may use:
+|
+| $_SESSION['user_role']
+|
+| We support BOTH.
 |--------------------------------------------------------------------------
 */
 
-function getUserRole()
-{
-    return $_SESSION['role'] ?? '';
+if (!function_exists('getUserRole')) {
+
+    function getUserRole()
+    {
+        return $_SESSION['role']
+            ?? $_SESSION['user_role']
+            ?? '';
+    }
 }
 
 
@@ -161,312 +210,135 @@ function getUserRole()
 |--------------------------------------------------------------------------
 */
 
-function getUserStatus()
-{
-    return $_SESSION['status']
-        ?? $_SESSION['user_status']
-        ?? 'active';
-}
+if (!function_exists('getUserStatus')) {
 
-
-/*
-|--------------------------------------------------------------------------
-| ADMIN
-|--------------------------------------------------------------------------
-*/
-
-function isAdmin()
-{
-    return (
-        isLoggedIn() &&
-        getUserRole() === 'admin'
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| VENDOR
-|--------------------------------------------------------------------------
-*/
-
-function isVendor()
-{
-    return (
-        isLoggedIn() &&
-        getUserRole() === 'vendor'
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CUSTOMER
-|--------------------------------------------------------------------------
-*/
-
-function isCustomer()
-{
-    return (
-        isLoggedIn() &&
-        getUserRole() === 'customer'
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| ROLE CHECK
-|--------------------------------------------------------------------------
-*/
-
-function hasRole($role)
-{
-    return (
-        isLoggedIn() &&
-        getUserRole() === $role
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRE LOGIN
-|--------------------------------------------------------------------------
-*/
-
-function requireLogin()
-{
-    if (!isLoggedIn()) {
-
-        $_SESSION['error'] =
-            'Please login to continue.';
-
-        $_SESSION['redirect_after_login'] =
-            $_SERVER['REQUEST_URI'] ?? 'index.php';
-
-        header(
-            'Location: ' .
-            (defined('BASE_URL')
-                ? BASE_URL . 'index.php'
-                : '../index.php')
-        );
-
-        exit;
+    function getUserStatus()
+    {
+        return $_SESSION['status']
+            ?? $_SESSION['user_status']
+            ?? 'active';
     }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| REQUIRE ADMIN
+| LOGIN SESSION
+|--------------------------------------------------------------------------
+|
+| Called after successful login.
 |--------------------------------------------------------------------------
 */
 
-function requireAdmin()
-{
-    requireLogin();
+if (!function_exists('createLoginSession')) {
 
-    if (!isAdmin()) {
+    function createLoginSession($user)
+    {
 
-        $_SESSION['error'] =
-            'Access denied.';
+        /*
+        |--------------------------------------------------------------------------
+        | Validate user
+        |--------------------------------------------------------------------------
+        */
 
-        header(
-            'Location: ' .
-            (defined('BASE_URL')
-                ? BASE_URL . 'index.php'
-                : '../index.php')
-        );
+        if (
+            !isset($user['user_id']) ||
+            empty($user['user_id'])
+        ) {
 
-        exit;
+            return false;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Regenerate session ID
+        |--------------------------------------------------------------------------
+        */
+
+        session_regenerate_id(true);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Store user information
+        |--------------------------------------------------------------------------
+        */
+
+        $_SESSION['user_id'] =
+            (int) $user['user_id'];
+
+        $_SESSION['user_name'] =
+            $user['name'] ?? '';
+
+        $_SESSION['user_email'] =
+            $user['email'] ?? '';
+
+        /*
+        |--------------------------------------------------------------------------
+        | IMPORTANT
+        |--------------------------------------------------------------------------
+        | config.php checks $_SESSION['role'].
+        |
+        | Therefore role MUST be stored here.
+        |--------------------------------------------------------------------------
+        */
+
+        $_SESSION['role'] =
+            $user['role'] ?? 'customer';
+
+        /*
+        |--------------------------------------------------------------------------
+        | Keep compatibility with old code
+        |--------------------------------------------------------------------------
+        */
+
+        $_SESSION['user_role'] =
+            $_SESSION['role'];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | User status
+        |--------------------------------------------------------------------------
+        */
+
+        $_SESSION['status'] =
+            $user['status'] ?? 'active';
+
+        $_SESSION['user_status'] =
+            $_SESSION['status'];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Login information
+        |--------------------------------------------------------------------------
+        */
+
+        $_SESSION['login_time'] =
+            time();
+
+        $_SESSION['last_activity'] =
+            time();
+
+        $_SESSION['logged_in'] = true;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MFA
+        |--------------------------------------------------------------------------
+        */
+
+        $_SESSION['mfa_enabled'] =
+            !empty($user['mfa_enabled']);
+
+        $_SESSION['mfa_verified'] = false;
+
+
+        return true;
     }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRE VENDOR
-|--------------------------------------------------------------------------
-*/
-
-function requireVendor()
-{
-    requireLogin();
-
-    if (!isVendor()) {
-
-        $_SESSION['error'] =
-            'Vendor access required.';
-
-        header(
-            'Location: ' .
-            (defined('BASE_URL')
-                ? BASE_URL . 'index.php'
-                : '../index.php')
-        );
-
-        exit;
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRE CUSTOMER
-|--------------------------------------------------------------------------
-*/
-
-function requireCustomer()
-{
-    requireLogin();
-
-    if (!isCustomer()) {
-
-        $_SESSION['error'] =
-            'Customer access required.';
-
-        header(
-            'Location: ' .
-            (defined('BASE_URL')
-                ? BASE_URL . 'index.php'
-                : '../index.php')
-        );
-
-        exit;
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRE ROLE
-|--------------------------------------------------------------------------
-*/
-
-function requireRole($roles)
-{
-    requireLogin();
-
-    if (!is_array($roles)) {
-        $roles = [$roles];
-    }
-
-    if (
-        !in_array(
-            getUserRole(),
-            $roles,
-            true
-        )
-    ) {
-
-        $_SESSION['error'] =
-            'Access denied.';
-
-        header(
-            'Location: ' .
-            (defined('BASE_URL')
-                ? BASE_URL . 'index.php'
-                : '../index.php')
-        );
-
-        exit;
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CREATE LOGIN SESSION
-|--------------------------------------------------------------------------
-*/
-
-function createLoginSession($user)
-{
-    if (
-        !isset($user['user_id']) ||
-        empty($user['user_id'])
-    ) {
-        return false;
-    }
-
-    session_regenerate_id(true);
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | MAIN SESSION VALUES
-    |--------------------------------------------------------------------------
-    */
-
-    $_SESSION['user_id'] =
-        (int) $user['user_id'];
-
-    $_SESSION['name'] =
-        $user['name'] ?? '';
-
-    $_SESSION['email'] =
-        $user['email'] ?? '';
-
-    $_SESSION['role'] =
-        $user['role'] ?? 'customer';
-
-    $_SESSION['status'] =
-        $user['status'] ?? 'active';
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | BACKWARD COMPATIBILITY
-    |--------------------------------------------------------------------------
-    |
-    | Some older pages may still use these.
-    |
-    */
-
-    $_SESSION['user_name'] =
-        $_SESSION['name'];
-
-    $_SESSION['user_email'] =
-        $_SESSION['email'];
-
-    $_SESSION['user_role'] =
-        $_SESSION['role'];
-
-    $_SESSION['user_status'] =
-        $_SESSION['status'];
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | LOGIN INFORMATION
-    |--------------------------------------------------------------------------
-    */
-
-    $_SESSION['login_time'] =
-        time();
-
-    $_SESSION['last_activity'] =
-        time();
-
-    $_SESSION['logged_in'] =
-        true;
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | MFA
-    |--------------------------------------------------------------------------
-    */
-
-    $_SESSION['mfa_enabled'] =
-        !empty($user['mfa_enabled']);
-
-    $_SESSION['mfa_verified'] =
-        false;
-
-
-    return true;
 }
 
 
@@ -476,27 +348,38 @@ function createLoginSession($user)
 |--------------------------------------------------------------------------
 */
 
-function markMfaVerified()
-{
-    $_SESSION['mfa_verified'] = true;
+
+if (!function_exists('markMfaVerified')) {
+
+    function markMfaVerified()
+    {
+        $_SESSION['mfa_verified'] = true;
+    }
 }
 
 
-function isMfaVerified()
-{
-    return !empty(
-        $_SESSION['mfa_verified']
-    );
+if (!function_exists('isMfaVerified')) {
+
+    function isMfaVerified()
+    {
+        return !empty(
+            $_SESSION['mfa_verified']
+        );
+    }
 }
 
 
-function requiresMfa()
-{
-    return (
-        isLoggedIn() &&
-        !empty($_SESSION['mfa_enabled']) &&
-        !isMfaVerified()
-    );
+if (!function_exists('requiresMfa')) {
+
+    function requiresMfa()
+    {
+
+        return (
+            isset($_SESSION['user_id']) &&
+            !empty($_SESSION['mfa_enabled']) &&
+            !isMfaVerified()
+        );
+    }
 }
 
 
@@ -506,27 +389,51 @@ function requiresMfa()
 |--------------------------------------------------------------------------
 */
 
-function logoutUser()
-{
-    $_SESSION = [];
+if (!function_exists('logoutUser')) {
 
-    if (ini_get('session.use_cookies')) {
+    function logoutUser()
+    {
 
-        $params =
-            session_get_cookie_params();
+        /*
+        |--------------------------------------------------------------------------
+        | Clear session
+        |--------------------------------------------------------------------------
+        */
 
-        setcookie(
-            session_name(),
-            '',
-            time() - 42000,
-            $params['path'],
-            $params['domain'] ?? '',
-            $params['secure'],
-            $params['httponly']
-        );
+        $_SESSION = [];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Remove session cookie
+        |--------------------------------------------------------------------------
+        */
+
+        if (ini_get('session.use_cookies')) {
+
+            $params =
+                session_get_cookie_params();
+
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $params['path'],
+                $params['domain'] ?? '',
+                $params['secure'],
+                $params['httponly']
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Destroy session
+        |--------------------------------------------------------------------------
+        */
+
+        session_destroy();
     }
-
-    session_destroy();
 }
 
 
@@ -536,174 +443,260 @@ function logoutUser()
 |--------------------------------------------------------------------------
 */
 
-function setFlashMessage(
-    $type,
-    $message
-) {
+if (!function_exists('setFlashMessage')) {
 
-    $_SESSION['flash_message'] = [
-        'type' => $type,
-        'message' => $message
-    ];
-}
-
-
-function getFlashMessage()
-{
-    if (
-        !isset($_SESSION['flash_message'])
+    function setFlashMessage(
+        $type,
+        $message
     ) {
-        return null;
+
+        $_SESSION['flash_message'] = [
+            'type' => $type,
+            'message' => $message
+        ];
     }
-
-    $message =
-        $_SESSION['flash_message'];
-
-    unset(
-        $_SESSION['flash_message']
-    );
-
-    return $message;
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| REDIRECT AFTER LOGIN
-|--------------------------------------------------------------------------
-*/
+if (!function_exists('getFlashMessage')) {
 
-function getLoginRedirect()
-{
-    if (
-        isset(
-            $_SESSION['redirect_after_login']
-        )
-    ) {
+    function getFlashMessage()
+    {
 
-        $redirect =
-            $_SESSION['redirect_after_login'];
+        if (
+            !isset(
+                $_SESSION['flash_message']
+            )
+        ) {
+
+            return null;
+        }
+
+        $message =
+            $_SESSION['flash_message'];
 
         unset(
-            $_SESSION['redirect_after_login']
+            $_SESSION['flash_message']
         );
 
-        return $redirect;
+        return $message;
     }
-
-
-    if (isAdmin()) {
-
-        return 'admin/dashboard.php';
-    }
-
-
-    if (isVendor()) {
-
-        return 'seller/dashboard.php';
-    }
-
-
-    return 'dashboard.php';
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| REDIRECT BY ROLE
+| FLASH MESSAGE COMPATIBILITY
+|--------------------------------------------------------------------------
+|
+| Some pages may use setFlash() / getFlash()
+| from config.php.
+|
+| These functions are already provided there.
 |--------------------------------------------------------------------------
 */
 
-function redirectByRole()
-{
-    if (isAdmin()) {
+
+/*
+|--------------------------------------------------------------------------
+| LOGIN REDIRECT
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('getLoginRedirect')) {
+
+    function getLoginRedirect()
+    {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Previously requested page
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            isset(
+                $_SESSION['redirect_after_login']
+            )
+        ) {
+
+            $redirect =
+                $_SESSION[
+                    'redirect_after_login'
+                ];
+
+            unset(
+                $_SESSION[
+                    'redirect_after_login'
+                ]
+            );
+
+            return $redirect;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Admin
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            (
+                $_SESSION['role']
+                ?? ''
+            ) === 'admin'
+        ) {
+
+            return 'admin/dashboard.php';
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Vendor
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            (
+                $_SESSION['role']
+                ?? ''
+            ) === 'vendor'
+        ) {
+
+            return 'seller/dashboard.php';
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Customer
+        |--------------------------------------------------------------------------
+        */
+
+        return 'dashboard.php';
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| REDIRECT USER BASED ON ROLE
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('redirectByRole')) {
+
+    function redirectByRole()
+    {
+
+        $role =
+            $_SESSION['role']
+            ?? $_SESSION['user_role']
+            ?? '';
+
+
+        if ($role === 'admin') {
+
+            header(
+                'Location: admin/dashboard.php'
+            );
+
+            exit;
+        }
+
+
+        if ($role === 'vendor') {
+
+            header(
+                'Location: seller/dashboard.php'
+            );
+
+            exit;
+        }
+
 
         header(
-            'Location: admin/dashboard.php'
+            'Location: dashboard.php'
         );
 
         exit;
     }
-
-
-    if (isVendor()) {
-
-        header(
-            'Location: seller/dashboard.php'
-        );
-
-        exit;
-    }
-
-
-    header(
-        'Location: dashboard.php'
-    );
-
-    exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| SESSION VALUE
+| SAFE SESSION VALUE
 |--------------------------------------------------------------------------
 */
 
-function sessionValue(
-    $key,
-    $default = null
-) {
+if (!function_exists('sessionValue')) {
 
-    return $_SESSION[$key]
-        ?? $default;
+    function sessionValue(
+        $key,
+        $default = null
+    ) {
+
+        return $_SESSION[$key]
+            ?? $default;
+    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CSRF TOKEN
+| CSRF COMPATIBILITY
+|--------------------------------------------------------------------------
+|
+| config.php already provides:
+|
+| csrfToken()
+| verifyCsrfToken()
+|
+| So we DON'T redeclare verifyCsrfToken().
+|
+| We only provide generateCsrfToken() for compatibility
+| with older pages.
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('generateCsrfToken')) {
+
+    function generateCsrfToken()
+    {
+
+        if (
+            empty(
+                $_SESSION['csrf_token']
+            )
+        ) {
+
+            $_SESSION['csrf_token'] =
+                bin2hex(
+                    random_bytes(32)
+                );
+        }
+
+        return $_SESSION['csrf_token'];
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| MAKE SURE CSRF TOKEN EXISTS
 |--------------------------------------------------------------------------
 */
 
 if (
-    empty($_SESSION['csrf_token'])
+    empty(
+        $_SESSION['csrf_token']
+    )
 ) {
 
-    $_SESSION['csrf_token'] =
-        bin2hex(
-            random_bytes(32)
-        );
+    generateCsrfToken();
 }
 
-
-function generateCsrfToken()
-{
-    if (
-        empty($_SESSION['csrf_token'])
-    ) {
-
-        $_SESSION['csrf_token'] =
-            bin2hex(
-                random_bytes(32)
-            );
-    }
-
-    return $_SESSION['csrf_token'];
-}
-
-
-function validateCsrfToken($token)
-{
-    if (
-        empty($token) ||
-        empty($_SESSION['csrf_token'])
-    ) {
-        return false;
-    }
-
-    return hash_equals(
-        $_SESSION['csrf_token'],
-        (string) $token
-    );
-}
+?>
