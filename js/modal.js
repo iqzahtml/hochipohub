@@ -1,6 +1,6 @@
 /*
 |--------------------------------------------------------------------------
-| HOCHIPO HUB - MODAL JAVASCRIPT
+| HOCHIPOHUB - MODAL JAVASCRIPT
 |--------------------------------------------------------------------------
 | File:
 | js/modal.js
@@ -8,23 +8,27 @@
 | Handles:
 | - Login modal
 | - Register modal
-| - Open / close modal
-| - Switch Login <-> Register
+| - Modal switching
+| - Close button
 | - Click outside
-| - ESC key
-| - Body scroll lock
+| - ESC
+| - Body scroll
 | - Password visibility
-| - Register password validation
+| - Register password confirmation
 |--------------------------------------------------------------------------
 */
 
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
 
-    initModals();
-    initPasswordToggle();
-    initRegisterValidation();
+        initModals();
+        initPasswordToggles();
+        initRegisterValidation();
+        checkLoginRequired();
 
-});
+    }
+);
 
 
 /*
@@ -40,30 +44,43 @@ function initModals() {
     | OPEN BUTTONS
     |--------------------------------------------------------------------------
     |
-    | Navbar uses:
+    | Supports:
     |
     | data-modal-open="loginModal"
     | data-modal-open="registerModal"
     |
+    |--------------------------------------------------------------------------
     */
 
-    document
-        .querySelectorAll("[data-modal-open]")
-        .forEach(function (button) {
+    const openButtons =
+        document.querySelectorAll(
+            "[data-modal-open]"
+        );
 
-            button.addEventListener("click", function (event) {
 
-                event.preventDefault();
-                event.stopPropagation();
+    openButtons.forEach(
+        function (button) {
 
-                const modalId =
-                    button.getAttribute("data-modal-open");
+            button.addEventListener(
+                "click",
+                function (event) {
 
-                openModal(modalId);
+                    event.preventDefault();
 
-            });
+                    const modalId =
+                        button.getAttribute(
+                            "data-modal-open"
+                        );
 
-        });
+                    openModalByName(
+                        modalId
+                    );
+
+                }
+            );
+
+        }
+    );
 
 
     /*
@@ -72,80 +89,112 @@ function initModals() {
     |--------------------------------------------------------------------------
     */
 
-    document
-        .querySelectorAll("[data-modal-close]")
-        .forEach(function (button) {
-
-            button.addEventListener("click", function (event) {
-
-                event.preventDefault();
-                event.stopPropagation();
-
-                const modalId =
-                    button.getAttribute("data-modal-close");
-
-                closeModal(modalId);
-
-            });
-
-        });
+    const closeButtons =
+        document.querySelectorAll(
+            "[data-modal-close]"
+        );
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | LOGIN <-> REGISTER SWITCH
-    |--------------------------------------------------------------------------
-    */
+    closeButtons.forEach(
+        function (button) {
 
-    document
-        .querySelectorAll("[data-modal-switch]")
-        .forEach(function (button) {
+            button.addEventListener(
+                "click",
+                function (event) {
 
-            button.addEventListener("click", function (event) {
+                    event.preventDefault();
 
-                event.preventDefault();
-                event.stopPropagation();
+                    const modalId =
+                        button.getAttribute(
+                            "data-modal-close"
+                        );
 
-                const currentModal =
-                    button.getAttribute("data-modal-switch");
-
-                const targetModal =
-                    button.getAttribute("data-modal-target");
-
-                closeModal(currentModal);
-
-                setTimeout(function () {
-
-                    openModal(targetModal);
-
-                }, 150);
-
-            });
-
-        });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CLICK OUTSIDE MODAL
-    |--------------------------------------------------------------------------
-    */
-
-    document
-        .querySelectorAll(".modal-overlay")
-        .forEach(function (overlay) {
-
-            overlay.addEventListener("click", function (event) {
-
-                if (event.target === overlay) {
-
-                    closeModal(overlay.id);
+                    closeModalByName(
+                        modalId
+                    );
 
                 }
+            );
 
-            });
+        }
+    );
 
-        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | SWITCH LOGIN <-> REGISTER
+    |--------------------------------------------------------------------------
+    */
+
+    const switchButtons =
+        document.querySelectorAll(
+            "[data-modal-switch]"
+        );
+
+
+    switchButtons.forEach(
+        function (button) {
+
+            button.addEventListener(
+                "click",
+                function (event) {
+
+                    event.preventDefault();
+
+                    const targetModal =
+                        button.getAttribute(
+                            "data-modal-target"
+                        );
+
+                    if (!targetModal) {
+                        return;
+                    }
+
+                    openModalByName(
+                        targetModal
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CLICK OUTSIDE
+    |--------------------------------------------------------------------------
+    */
+
+    const overlays =
+        document.querySelectorAll(
+            ".modal-overlay"
+        );
+
+
+    overlays.forEach(
+        function (overlay) {
+
+            overlay.addEventListener(
+                "click",
+                function (event) {
+
+                    if (
+                        event.target === overlay
+                    ) {
+
+                        closeModal(
+                            overlay
+                        );
+
+                    }
+
+                }
+            );
+
+        }
+    );
 
 
     /*
@@ -154,66 +203,21 @@ function initModals() {
     |--------------------------------------------------------------------------
     */
 
-    document.addEventListener("keydown", function (event) {
+    document.addEventListener(
+        "keydown",
+        function (event) {
 
-        if (event.key === "Escape") {
+            if (
+                event.key === "Escape" ||
+                event.key === "Esc"
+            ) {
 
-            closeAllModals();
+                closeAllModals();
+
+            }
 
         }
-
-    });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | OLD STYLE TRIGGERS
-    |--------------------------------------------------------------------------
-    | Keep these for compatibility with other pages/buttons.
-    |--------------------------------------------------------------------------
-    */
-
-    document
-        .querySelectorAll(
-            "[data-modal='login'], .open-login-modal, #openLoginModal"
-        )
-        .forEach(function (button) {
-
-            button.addEventListener("click", function (event) {
-
-                event.preventDefault();
-
-                openModal("loginModal");
-
-            });
-
-        });
-
-
-    document
-        .querySelectorAll(
-            "[data-modal='register'], .open-register-modal, #openRegisterModal"
-        )
-        .forEach(function (button) {
-
-            button.addEventListener("click", function (event) {
-
-                event.preventDefault();
-
-                openModal("registerModal");
-
-            });
-
-        });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | URL LOGIN REQUIRED
-    |--------------------------------------------------------------------------
-    */
-
-    checkLoginRequired();
+    );
 
 }
 
@@ -224,20 +228,10 @@ function initModals() {
 |--------------------------------------------------------------------------
 */
 
-function openModal(modalId) {
-
-    const modal =
-        document.getElementById(modalId);
+function openModal(modal) {
 
     if (!modal) {
-
-        console.warn(
-            "Modal not found:",
-            modalId
-        );
-
         return;
-
     }
 
 
@@ -247,23 +241,7 @@ function openModal(modalId) {
     |--------------------------------------------------------------------------
     */
 
-    document
-        .querySelectorAll(".modal-overlay")
-        .forEach(function (otherModal) {
-
-            if (otherModal !== modal) {
-
-                otherModal.classList.remove("show");
-                otherModal.classList.remove("active");
-
-                otherModal.setAttribute(
-                    "aria-hidden",
-                    "true"
-                );
-
-            }
-
-        });
+    closeAllModals();
 
 
     /*
@@ -272,8 +250,9 @@ function openModal(modalId) {
     |--------------------------------------------------------------------------
     */
 
-    modal.classList.add("show");
-    modal.classList.add("active");
+    modal.classList.add(
+        "show"
+    );
 
     modal.setAttribute(
         "aria-hidden",
@@ -283,7 +262,7 @@ function openModal(modalId) {
 
     /*
     |--------------------------------------------------------------------------
-    | LOCK BODY SCROLL
+    | PREVENT BACKGROUND SCROLL
     |--------------------------------------------------------------------------
     */
 
@@ -302,20 +281,61 @@ function openModal(modalId) {
     |--------------------------------------------------------------------------
     */
 
-    setTimeout(function () {
+    setTimeout(
+        function () {
 
-        const firstInput =
-            modal.querySelector(
-                "input:not([type='hidden']), textarea, select"
-            );
+            const firstInput =
+                modal.querySelector(
+                    "input:not([type='hidden']), textarea, select"
+                );
 
-        if (firstInput) {
+            if (firstInput) {
 
-            firstInput.focus();
+                firstInput.focus();
 
-        }
+            }
 
-    }, 200);
+        },
+        200
+    );
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| OPEN MODAL BY ID
+|--------------------------------------------------------------------------
+*/
+
+function openModalByName(name) {
+
+    if (!name) {
+        return;
+    }
+
+
+    const modal =
+        document.getElementById(
+            name
+        );
+
+
+    if (!modal) {
+
+        console.warn(
+            "HochipoHub modal not found:",
+            name
+        );
+
+        return;
+
+    }
+
+
+    openModal(
+        modal
+    );
 
 }
 
@@ -326,26 +346,17 @@ function openModal(modalId) {
 |--------------------------------------------------------------------------
 */
 
-function closeModal(modalId) {
-
-    const modal =
-        document.getElementById(modalId);
+function closeModal(modal) {
 
     if (!modal) {
-
         return;
-
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | HIDE MODAL
-    |--------------------------------------------------------------------------
-    */
+    modal.classList.remove(
+        "show"
+    );
 
-    modal.classList.remove("show");
-    modal.classList.remove("active");
 
     modal.setAttribute(
         "aria-hidden",
@@ -353,27 +364,38 @@ function closeModal(modalId) {
     );
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | CHECK OTHER MODALS
-    |--------------------------------------------------------------------------
-    */
+    updateBodyModalState();
 
-    const anotherModalOpen =
-        document.querySelector(
-            ".modal-overlay.show"
-        );
+}
 
 
-    if (!anotherModalOpen) {
+/*
+|--------------------------------------------------------------------------
+| CLOSE MODAL BY NAME
+|--------------------------------------------------------------------------
+*/
 
-        document.body.classList.remove(
-            "modal-open"
-        );
+function closeModalByName(name) {
 
-        document.body.style.overflow = "";
-
+    if (!name) {
+        return;
     }
+
+
+    const modal =
+        document.getElementById(
+            name
+        );
+
+
+    if (!modal) {
+        return;
+    }
+
+
+    closeModal(
+        modal
+    );
 
 }
 
@@ -386,26 +408,72 @@ function closeModal(modalId) {
 
 function closeAllModals() {
 
-    document
-        .querySelectorAll(".modal-overlay")
-        .forEach(function (modal) {
+    const modals =
+        document.querySelectorAll(
+            ".modal-overlay"
+        );
 
-            modal.classList.remove("show");
-            modal.classList.remove("active");
+
+    modals.forEach(
+        function (modal) {
+
+            modal.classList.remove(
+                "show"
+            );
 
             modal.setAttribute(
                 "aria-hidden",
                 "true"
             );
 
-        });
+        }
+    );
 
 
     document.body.classList.remove(
         "modal-open"
     );
 
-    document.body.style.overflow = "";
+
+    document.body.style.overflow =
+        "";
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE BODY MODAL STATE
+|--------------------------------------------------------------------------
+*/
+
+function updateBodyModalState() {
+
+    const activeModal =
+        document.querySelector(
+            ".modal-overlay.show"
+        );
+
+
+    if (activeModal) {
+
+        document.body.classList.add(
+            "modal-open"
+        );
+
+        document.body.style.overflow =
+            "hidden";
+
+    } else {
+
+        document.body.classList.remove(
+            "modal-open"
+        );
+
+        document.body.style.overflow =
+            "";
+
+    }
 
 }
 
@@ -418,7 +486,9 @@ function closeAllModals() {
 
 function openLoginModal() {
 
-    openModal("loginModal");
+    openModalByName(
+        "loginModal"
+    );
 
 }
 
@@ -431,20 +501,24 @@ function openLoginModal() {
 
 function openRegisterModal() {
 
-    openModal("registerModal");
+    openModalByName(
+        "registerModal"
+    );
 
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| FORGOT PASSWORD MODAL
+| FORGOT PASSWORD
 |--------------------------------------------------------------------------
 */
 
 function openForgotPasswordModal() {
 
-    openModal("forgotPasswordModal");
+    openModalByName(
+        "forgotPasswordModal"
+    );
 
 }
 
@@ -457,7 +531,9 @@ function openForgotPasswordModal() {
 
 function closeLoginModal() {
 
-    closeModal("loginModal");
+    closeModalByName(
+        "loginModal"
+    );
 
 }
 
@@ -470,7 +546,9 @@ function closeLoginModal() {
 
 function closeRegisterModal() {
 
-    closeModal("registerModal");
+    closeModalByName(
+        "registerModal"
+    );
 
 }
 
@@ -483,7 +561,9 @@ function closeRegisterModal() {
 
 function closeForgotPasswordModal() {
 
-    closeModal("forgotPasswordModal");
+    closeModalByName(
+        "forgotPasswordModal"
+    );
 
 }
 
@@ -494,58 +574,74 @@ function closeForgotPasswordModal() {
 |--------------------------------------------------------------------------
 */
 
-function initPasswordToggle() {
+function initPasswordToggles() {
 
-    document
-        .querySelectorAll("[data-password-target]")
-        .forEach(function (button) {
+    const toggleButtons =
+        document.querySelectorAll(
+            "[data-password-target]"
+        );
 
-            button.addEventListener("click", function (event) {
 
-                event.preventDefault();
+    toggleButtons.forEach(
+        function (button) {
 
-                const targetId =
-                    button.getAttribute(
-                        "data-password-target"
-                    );
+            button.addEventListener(
+                "click",
+                function () {
 
-                const input =
-                    document.getElementById(targetId);
+                    const targetId =
+                        button.getAttribute(
+                            "data-password-target"
+                        );
 
-                if (!input) {
 
-                    return;
+                    const input =
+                        document.getElementById(
+                            targetId
+                        );
+
+
+                    if (!input) {
+                        return;
+                    }
+
+
+                    if (
+                        input.type ===
+                        "password"
+                    ) {
+
+                        input.type =
+                            "text";
+
+                        button.textContent =
+                            "🙈";
+
+                        button.setAttribute(
+                            "aria-label",
+                            "Hide password"
+                        );
+
+                    } else {
+
+                        input.type =
+                            "password";
+
+                        button.textContent =
+                            "👁";
+
+                        button.setAttribute(
+                            "aria-label",
+                            "Show password"
+                        );
+
+                    }
 
                 }
+            );
 
-
-                if (input.type === "password") {
-
-                    input.type = "text";
-
-                    button.textContent = "🙈";
-
-                    button.setAttribute(
-                        "aria-label",
-                        "Hide password"
-                    );
-
-                } else {
-
-                    input.type = "password";
-
-                    button.textContent = "👁";
-
-                    button.setAttribute(
-                        "aria-label",
-                        "Show password"
-                    );
-
-                }
-
-            });
-
-        });
+        }
+    );
 
 }
 
@@ -563,10 +659,9 @@ function initRegisterValidation() {
             "registerForm"
         );
 
+
     if (!registerForm) {
-
         return;
-
     }
 
 
@@ -578,6 +673,7 @@ function initRegisterValidation() {
                 document.getElementById(
                     "registerPassword"
                 );
+
 
             const confirmPassword =
                 document.getElementById(
@@ -594,13 +690,13 @@ function initRegisterValidation() {
 
                 event.preventDefault();
 
+
                 alert(
                     "Passwords do not match."
                 );
 
-                confirmPassword.focus();
 
-                return;
+                confirmPassword.focus();
 
             }
 
@@ -613,6 +709,12 @@ function initRegisterValidation() {
 /*
 |--------------------------------------------------------------------------
 | CHECK LOGIN REQUIRED
+|--------------------------------------------------------------------------
+|
+| Example:
+|
+| index.php?login=required
+|
 |--------------------------------------------------------------------------
 */
 
@@ -629,7 +731,7 @@ function checkLoginRequired() {
         "required"
     ) {
 
-        openModal("loginModal");
+        openLoginModal();
 
         cleanModalUrl();
 
@@ -641,7 +743,7 @@ function checkLoginRequired() {
         "required"
     ) {
 
-        openModal("registerModal");
+        openRegisterModal();
 
         cleanModalUrl();
 
@@ -664,9 +766,17 @@ function cleanModalUrl() {
         );
 
 
-    url.searchParams.delete("login");
-    url.searchParams.delete("register");
-    url.searchParams.delete("modal");
+    url.searchParams.delete(
+        "login"
+    );
+
+    url.searchParams.delete(
+        "register"
+    );
+
+    url.searchParams.delete(
+        "modal"
+    );
 
 
     window.history.replaceState(
@@ -681,80 +791,6 @@ function cleanModalUrl() {
 
 /*
 |--------------------------------------------------------------------------
-| FORM SUBMIT PROTECTION
-|--------------------------------------------------------------------------
-*/
-
-document.addEventListener(
-    "submit",
-    function (event) {
-
-        const form =
-            event.target;
-
-
-        if (
-            !form.closest(
-                ".modal-overlay"
-            )
-        ) {
-
-            return;
-
-        }
-
-
-        const button =
-            form.querySelector(
-                "button[type='submit'], input[type='submit']"
-            );
-
-
-        if (!button) {
-
-            return;
-
-        }
-
-
-        if (
-            button.dataset.submitting ===
-            "true"
-        ) {
-
-            event.preventDefault();
-
-            return;
-
-        }
-
-
-        button.dataset.submitting =
-            "true";
-
-
-        if (
-            button.tagName ===
-            "BUTTON"
-        ) {
-
-            button.dataset.originalText =
-                button.innerHTML;
-
-            button.innerHTML =
-                "PLEASE WAIT...";
-
-        }
-
-
-        button.disabled = true;
-
-    }
-);
-
-
-/*
-|--------------------------------------------------------------------------
 | GLOBAL FUNCTIONS
 |--------------------------------------------------------------------------
 */
@@ -762,29 +798,42 @@ document.addEventListener(
 window.openModal =
     openModal;
 
+
 window.closeModal =
     closeModal;
+
+
+window.openModalByName =
+    openModalByName;
+
+
+window.closeModalByName =
+    closeModalByName;
+
 
 window.closeAllModals =
     closeAllModals;
 
-window.openModalByName =
-    openModal;
 
 window.openLoginModal =
     openLoginModal;
 
+
 window.openRegisterModal =
     openRegisterModal;
+
 
 window.openForgotPasswordModal =
     openForgotPasswordModal;
 
+
 window.closeLoginModal =
     closeLoginModal;
 
+
 window.closeRegisterModal =
     closeRegisterModal;
+
 
 window.closeForgotPasswordModal =
     closeForgotPasswordModal;
