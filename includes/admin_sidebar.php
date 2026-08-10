@@ -1,541 +1,248 @@
 <?php
+// =========================================================
+// HOCHIPOHUB - ADMIN SIDEBAR
+// File: includes/admin_sidebar.php
+// =========================================================
 
-/*
-|--------------------------------------------------------------------------
-| HochipoHub - Admin Sidebar
-|--------------------------------------------------------------------------
-*/
-
-require_once __DIR__ . '/session.php';
-
-requireAdmin();
-
-
-/*
-|--------------------------------------------------------------------------
-| CURRENT PAGE
-|--------------------------------------------------------------------------
-*/
-
-$currentPage =
-    basename(
-        $_SERVER['PHP_SELF'] ?? ''
-    );
-
-
-/*
-|--------------------------------------------------------------------------
-| ACTIVE LINK
-|--------------------------------------------------------------------------
-*/
-
-function adminSidebarActive(
-    string $page
-): string {
-
-    global $currentPage;
-
-    return $currentPage === $page
-        ? 'active'
-        : '';
+// Pastikan session sudah dimulakan
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| ADMIN INFORMATION
-|--------------------------------------------------------------------------
-*/
-
-$adminName =
-    currentUserName()
-    ?: 'Administrator';
-
-
-/*
-|--------------------------------------------------------------------------
-| CURRENT USER PROFILE
-|--------------------------------------------------------------------------
-*/
-
-$adminImage = '';
-
-if (
-    function_exists(
-        'getCurrentUser'
-    )
-) {
-
-    $currentUser =
-        getCurrentUser();
-
-    if (
-        !empty(
-            $currentUser[
-                'profile_image'
-            ]
-        )
-    ) {
-
-        $adminImage =
-            $currentUser[
-                'profile_image'
-            ];
-    }
+// Pastikan hanya admin boleh akses sidebar ini
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+    header("Location: ../index.php");
+    exit;
 }
 
+// Current page untuk active menu
+$currentPage = basename($_SERVER['PHP_SELF']);
 ?>
 
-<!-- =========================================================
-     ADMIN SIDEBAR
-========================================================= -->
+<aside class="admin-sidebar" id="adminSidebar">
 
-<aside
-    class="dashboard-sidebar admin-sidebar"
-    id="adminSidebar"
->
+    <!-- =====================================================
+         SIDEBAR HEADER
+    ====================================================== -->
+    <div class="admin-sidebar-header">
+
+        <a href="../admin/dashboard.php" class="admin-logo">
+
+            <div class="admin-logo-icon">
+                H
+            </div>
+
+            <div class="admin-logo-text">
+                <strong>HOCHIPO</strong>
+                <span>HUB ADMIN</span>
+            </div>
+
+        </a>
+
+        <!-- Mobile close button -->
+        <button
+            type="button"
+            class="admin-sidebar-close"
+            id="adminSidebarClose"
+            aria-label="Close Sidebar"
+        >
+            &times;
+        </button>
+
+    </div>
 
 
     <!-- =====================================================
          ADMIN PROFILE
     ====================================================== -->
+    <div class="admin-profile">
 
-    <div class="sidebar-profile admin-profile">
-
-        <div class="sidebar-avatar admin-avatar">
-
-            <?php if (
-                $adminImage !== ''
-            ): ?>
-
-                <img
-                    src="<?php echo BASE_URL; ?>image/<?php echo htmlspecialchars(
-                        $adminImage,
-                        ENT_QUOTES,
-                        'UTF-8'
-                    ); ?>"
-                    alt="Administrator"
-                >
-
-            <?php else: ?>
-
-                <span>
-
-                    <?php
-
-                    echo strtoupper(
-                        substr(
-                            $adminName,
-                            0,
-                            1
-                        )
-                    );
-
-                    ?>
-
-                </span>
-
-            <?php endif; ?>
-
+        <div class="admin-profile-avatar">
+            <i class="fa-solid fa-user-shield"></i>
         </div>
 
-
-        <div class="sidebar-profile-info">
+        <div class="admin-profile-info">
 
             <strong>
-
                 <?php
-
-                echo htmlspecialchars(
-                    $adminName,
-                    ENT_QUOTES,
-                    'UTF-8'
-                );
-
+                echo htmlspecialchars($_SESSION['name'] ?? 'Administrator');
                 ?>
-
             </strong>
 
-
-            <small>
-                System Administrator
-            </small>
-
-        </div>
-
-    </div>
-
-
-    <!-- =====================================================
-         ADMIN BADGE
-    ====================================================== -->
-
-    <div class="admin-status-badge">
-
-        <i class="fa-solid fa-shield-halved"></i>
-
-        <span>
-            ADMIN ACCESS
-        </span>
-
-    </div>
-
-
-    <!-- =====================================================
-         NAVIGATION
-    ====================================================== -->
-
-    <nav
-        class="sidebar-navigation"
-        aria-label="Admin Navigation"
-    >
-
-
-        <!-- =================================================
-             OVERVIEW
-        ================================================== -->
-
-        <div class="sidebar-section-title">
-
             <span>
-                OVERVIEW
+                Administrator
             </span>
 
         </div>
 
+    </div>
 
-        <!-- DASHBOARD -->
 
-        <a
-            href="<?php echo BASE_URL; ?>admin/dashboard.php"
-            class="sidebar-link <?php echo adminSidebarActive('dashboard.php'); ?>"
-        >
+    <!-- =====================================================
+         MAIN NAVIGATION
+    ====================================================== -->
+    <nav class="admin-nav">
 
-            <span class="sidebar-link-icon">
+        <!-- Dashboard -->
+        <div class="admin-nav-section">
 
-                <i class="fa-solid fa-gauge-high"></i>
-
+            <span class="admin-nav-title">
+                MAIN
             </span>
 
+            <a
+                href="../admin/dashboard.php"
+                class="admin-nav-link <?php echo ($currentPage === 'dashboard.php') ? 'active' : ''; ?>"
+            >
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Dashboard</span>
+            </a>
 
-            <span class="sidebar-link-text">
-                Dashboard
-            </span>
-
-        </a>
+        </div>
 
 
         <!-- =================================================
              MANAGEMENT
         ================================================== -->
+        <div class="admin-nav-section">
 
-        <div class="sidebar-section-title">
-
-            <span>
+            <span class="admin-nav-title">
                 MANAGEMENT
             </span>
 
-        </div>
+
+            <!-- Products -->
+            <a
+                href="../admin/products.php"
+                class="admin-nav-link <?php echo ($currentPage === 'products.php') ? 'active' : ''; ?>"
+            >
+                <i class="fa-solid fa-box-open"></i>
+                <span>Products</span>
+            </a>
 
 
-        <!-- USERS -->
-
-        <a
-            href="<?php echo BASE_URL; ?>admin/users.php"
-            class="sidebar-link <?php echo adminSidebarActive('users.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
+            <!-- Users -->
+            <a
+                href="../admin/users.php"
+                class="admin-nav-link <?php echo ($currentPage === 'users.php') ? 'active' : ''; ?>"
+            >
                 <i class="fa-solid fa-users"></i>
-
-            </span>
-
-
-            <span class="sidebar-link-text">
-                Users
-            </span>
-
-        </a>
+                <span>Users</span>
+            </a>
 
 
-        <!-- VENDORS -->
-
-        <a
-            href="<?php echo BASE_URL; ?>admin/vendors.php"
-            class="sidebar-link <?php echo adminSidebarActive('vendors.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
+            <!-- Vendors -->
+            <a
+                href="../admin/vendors.php"
+                class="admin-nav-link <?php echo ($currentPage === 'vendors.php') ? 'active' : ''; ?>"
+            >
                 <i class="fa-solid fa-store"></i>
-
-            </span>
-
-
-            <span class="sidebar-link-text">
-                Vendors
-            </span>
-
-        </a>
+                <span>Vendors</span>
+            </a>
 
 
-        <!-- PRODUCTS -->
-
-        <a
-            href="<?php echo BASE_URL; ?>admin/products.php"
-            class="sidebar-link <?php echo adminSidebarActive('products.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-boxes-stacked"></i>
-
-            </span>
+            <!-- Orders -->
+            <a
+                href="../admin/orders.php"
+                class="admin-nav-link <?php echo ($currentPage === 'orders.php') ? 'active' : ''; ?>"
+            >
+                <i class="fa-solid fa-cart-shopping"></i>
+                <span>Orders</span>
+            </a>
 
 
-            <span class="sidebar-link-text">
-                Products
-            </span>
-
-        </a>
-
-
-        <!-- INVENTORY -->
-
-        <a
-            href="<?php echo BASE_URL; ?>admin/inventory.php"
-            class="sidebar-link <?php echo adminSidebarActive('inventory.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-warehouse"></i>
-
-            </span>
-
-
-            <span class="sidebar-link-text">
-                Inventory
-            </span>
-
-        </a>
-
-
-        <!-- =================================================
-             TRANSACTIONS
-        ================================================== -->
-
-        <div class="sidebar-section-title">
-
-            <span>
-                TRANSACTIONS
-            </span>
-
-        </div>
-
-
-        <!-- ORDERS -->
-
-        <a
-            href="<?php echo BASE_URL; ?>admin/orders.php"
-            class="sidebar-link <?php echo adminSidebarActive('orders.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-receipt"></i>
-
-            </span>
-
-
-            <span class="sidebar-link-text">
-                Orders
-            </span>
-
-        </a>
-
-
-        <!-- PAYMENTS -->
-
-        <a
-            href="<?php echo BASE_URL; ?>admin/payments.php"
-            class="sidebar-link <?php echo adminSidebarActive('payments.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
+            <!-- Payments -->
+            <a
+                href="../admin/payments.php"
+                class="admin-nav-link <?php echo ($currentPage === 'payments.php') ? 'active' : ''; ?>"
+            >
                 <i class="fa-solid fa-credit-card"></i>
-
-            </span>
-
-
-            <span class="sidebar-link-text">
-                Payments
-            </span>
-
-        </a>
+                <span>Payments</span>
+            </a>
 
 
-        <!-- COMMISSION -->
-
-        <a
-            href="<?php echo BASE_URL; ?>admin/commission.php"
-            class="sidebar-link <?php echo adminSidebarActive('commission.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-percent"></i>
-
-            </span>
-
-
-            <span class="sidebar-link-text">
-                Commission
-            </span>
-
-        </a>
-
-
-        <!-- =================================================
-             CONTENT
-        ================================================== -->
-
-        <div class="sidebar-section-title">
-
-            <span>
-                CONTENT
-            </span>
+            <!-- Reviews -->
+            <a
+                href="../admin/reviews.php"
+                class="admin-nav-link <?php echo ($currentPage === 'reviews.php') ? 'active' : ''; ?>"
+            >
+                <i class="fa-solid fa-star"></i>
+                <span>Reviews</span>
+            </a>
 
         </div>
 
 
-        <!-- REVIEWS -->
+        <!-- =================================================
+             FINANCIAL
+        ================================================== -->
+        <div class="admin-nav-section">
 
-        <a
-            href="<?php echo BASE_URL; ?>admin/reviews.php"
-            class="sidebar-link <?php echo adminSidebarActive('reviews.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
-                <i class="fa-solid fa-star"></i>
-
+            <span class="admin-nav-title">
+                FINANCIAL
             </span>
 
 
-            <span class="sidebar-link-text">
-                Reviews
-            </span>
+            <!-- Commission -->
+            <a
+                href="../admin/commission.php"
+                class="admin-nav-link <?php echo ($currentPage === 'commission.php') ? 'active' : ''; ?>"
+            >
+                <i class="fa-solid fa-hand-holding-dollar"></i>
+                <span>Commission</span>
+            </a>
 
-        </a>
+        </div>
 
 
         <!-- =================================================
              SYSTEM
         ================================================== -->
+        <div class="admin-nav-section">
 
-        <div class="sidebar-section-title">
-
-            <span>
+            <span class="admin-nav-title">
                 SYSTEM
             </span>
 
-        </div>
 
-
-        <!-- SETTINGS -->
-
-        <a
-            href="<?php echo BASE_URL; ?>admin/settings.php"
-            class="sidebar-link <?php echo adminSidebarActive('settings.php'); ?>"
-        >
-
-            <span class="sidebar-link-icon">
-
+            <!-- Settings -->
+            <a
+                href="../admin/settings.php"
+                class="admin-nav-link <?php echo ($currentPage === 'settings.php') ? 'active' : ''; ?>"
+            >
                 <i class="fa-solid fa-gear"></i>
-
-            </span>
-
-
-            <span class="sidebar-link-text">
-                Settings
-            </span>
-
-        </a>
+                <span>Settings</span>
+            </a>
 
 
-        <!-- MAIN SITE -->
-
-        <a
-            href="<?php echo BASE_URL; ?>index.php"
-            class="sidebar-link"
-        >
-
-            <span class="sidebar-link-icon">
-
+            <!-- Back to Website -->
+            <a
+                href="../index.php"
+                class="admin-nav-link"
+            >
                 <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                <span>Back to Website</span>
+            </a>
 
-            </span>
-
-
-            <span class="sidebar-link-text">
-                View Marketplace
-            </span>
-
-        </a>
+        </div>
 
     </nav>
 
 
     <!-- =====================================================
-         ADMIN SECURITY NOTICE
+         SIDEBAR FOOTER
     ====================================================== -->
-
-    <div class="admin-security-card">
-
-        <div class="admin-security-icon">
-
-            <i class="fa-solid fa-shield-halved"></i>
-
-        </div>
-
-
-        <div>
-
-            <strong>
-                Secure Area
-            </strong>
-
-            <p>
-                Admin actions are monitored and logged.
-            </p>
-
-        </div>
-
-    </div>
-
-
-    <!-- =====================================================
-         LOGOUT
-    ====================================================== -->
-
-    <div class="sidebar-bottom">
+    <div class="admin-sidebar-footer">
 
         <a
-            href="<?php echo BASE_URL; ?>auth/logout.php"
-            class="sidebar-link sidebar-logout"
+            href="../auth/logout.php"
+            class="admin-logout"
+            onclick="return confirm('Are you sure you want to logout?');"
         >
 
-            <span class="sidebar-link-icon">
+            <i class="fa-solid fa-right-from-bracket"></i>
 
-                <i class="fa-solid fa-right-from-bracket"></i>
-
-            </span>
-
-
-            <span class="sidebar-link-text">
+            <span>
                 Logout
             </span>
 
@@ -544,3 +251,96 @@ if (
     </div>
 
 </aside>
+
+
+<!-- =========================================================
+     MOBILE SIDEBAR OVERLAY
+========================================================= -->
+<div
+    class="admin-sidebar-overlay"
+    id="adminSidebarOverlay"
+></div>
+
+
+<!-- =========================================================
+     SIDEBAR JAVASCRIPT
+========================================================= -->
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const sidebar = document.getElementById("adminSidebar");
+    const closeBtn = document.getElementById("adminSidebarClose");
+    const overlay = document.getElementById("adminSidebarOverlay");
+
+    /*
+     * Sidebar toggle function.
+     *
+     * Admin page boleh ada button dengan:
+     *
+     * id="adminSidebarToggle"
+     *
+     * dalam header.
+     */
+    const toggleBtn = document.getElementById("adminSidebarToggle");
+
+
+    if (toggleBtn) {
+
+        toggleBtn.addEventListener("click", function () {
+
+            sidebar.classList.toggle("active");
+            overlay.classList.toggle("active");
+
+        });
+
+    }
+
+
+    // Close sidebar
+    if (closeBtn) {
+
+        closeBtn.addEventListener("click", function () {
+
+            sidebar.classList.remove("active");
+            overlay.classList.remove("active");
+
+        });
+
+    }
+
+
+    // Close bila click overlay
+    if (overlay) {
+
+        overlay.addEventListener("click", function () {
+
+            sidebar.classList.remove("active");
+            overlay.classList.remove("active");
+
+        });
+
+    }
+
+
+    // Close sidebar selepas click navigation pada mobile
+    const navLinks = document.querySelectorAll(".admin-nav-link");
+
+    navLinks.forEach(function (link) {
+
+        link.addEventListener("click", function () {
+
+            if (window.innerWidth <= 768) {
+
+                sidebar.classList.remove("active");
+                overlay.classList.remove("active");
+
+            }
+
+        });
+
+    });
+
+});
+
+</script>
