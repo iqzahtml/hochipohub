@@ -1,225 +1,452 @@
 <?php
 
-require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/database/db.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
-    session_name(SESSION_NAME);
     session_start();
 }
 
-$db = getDB();
-
 /*
 |--------------------------------------------------------------------------
-| ADMIN ACCESS
+| ADMIN LOGIN CHECK
 |--------------------------------------------------------------------------
 */
 
-if (empty($_SESSION['user_id'])) {
-    redirect(BASE_URL . 'index.php');
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ' . site_url('index.php?login=required'));
+    exit;
 }
 
-if (
-    !isset($_SESSION['role']) ||
-    $_SESSION['role'] !== 'admin'
-) {
-    redirect(BASE_URL . 'index.php');
-}
+$userId = (int) $_SESSION['user_id'];
 
 /*
 |--------------------------------------------------------------------------
-| FILTERS
+| CHECK ADMIN
 |--------------------------------------------------------------------------
 */
+
+$stmt = $conn->prepare("
+    SELECT
+        user_id,
+        name,
+        email,
+        role,
+        status
+    FROM users
+    WHERE user_id = ?
+    LIMIT 1
+");
+
+$stmt->bind_param("i", $userId);
+$stmt->execute();
+
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
+
+$stmt->close();
+
+if (!$user) {
+    session_destroy();
+
+    header('Location: ' . site_url('index.php'));
+    exit;
+}
+
+if ($user['role'] !== 'admin') {
+    header('Location: ' . site_url('dashboard.php?access=denied'));
+    exit;
+}
+
+if ($user['status'] !== 'active') {
+    session_destroy();
+
+    header('Location: ' . site_url('index.php?account=inactive'));
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| VARIABLES
+|--------------------------------------------------------------------------
+*/
+
+$message = '';
+$messageType = '';
 
 $search = trim($_GET['search'] ?? '');
-$stockFilter = $_GET['stock'] ?? 'all';
+$statusFilter = trim($_GET['stock_status'] ?? '');
+$vendorFilter = (int) ($_GET['vendor_id'] ?? 0);
+
 
 /*
 |--------------------------------------------------------------------------
-| INVENTORY QUERY
+| UPDATE STOCK
 |--------------------------------------------------------------------------
-|
-| Product inventory is displayed using the products table.
-|
+*/
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'update_stock') {
+
+        $productId = (int) ($_POST['product_id'] ?? 0);
+        $newStock = (int) ($_POST['stock_quantity'] ?? 0);
+
+        if ($productId <= 0) {
+
+            $message = 'Invalid product selected.';
+            $messageType = 'error';
+
+        } elseif ($newStock < 0) {
+
+            $message = 'Stock quantity cannot be negative.';
+            $messageType = 'error';
+
+        } else {
+
+            $stmt = $conn->prepare("
+                UPDATE products
+                SET stock_quantity = ?
+                WHERE product_id = ?
+                LIMIT 1
+            ");
+
+            $stmt->bind_param(
+                "ii",
+                $newStock,
+                $productId
+            );
+
+            if ($stmt->execute()) {
+
+                $message = 'Stock updated successfully.';
+                $messageType = 'success';
+
+            } else {
+
+                $message = 'Failed to update stock.';
+                $messageType = 'error';
+            }
+
+            $stmt->close();
+        }
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| INVENTORY STATISTICS
+|--------------------------------------------------------------------------
+*/
+
+$stats = [
+    'products' => 0,
+    'total_stock' => 0,
+    'low_stock' => 0,
+    'out_stock' => 0
+];
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL PRODUCTS
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM products
+");
+
+if ($result) {
+    $stats['products'] =
+        (int) ($result->fetch_assoc()['total'] ?? 0);
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL STOCK
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT COALESCE(SUM(stock_quantity), 0) AS total
+    FROM products
+    WHERE status != 'Hidden'
+");
+
+if ($result) {
+    $stats['total_stock'] =
+        (int) ($result->fetch_assoc()['total'] ?? 0);
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| LOW STOCK
+|--------------------------------------------------------------------------
+| Low stock = 1 - 10
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM products
+    WHERE stock_quantity BETWEEN 1 AND 10
+    AND status != 'Hidden'
+");
+
+if ($result) {
+    $stats['low_stock'] =
+        (int) ($result->fetch_assoc()['total'] ?? 0);
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| OUT OF STOCK
+|--------------------------------------------------------------------------
+*/
+
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM products
+    WHERE stock_quantity <= 0
+    AND status != 'Hidden'
+");
+
+if ($result) {
+    $stats['out_stock'] =
+        (int) ($result->fetch_assoc()['total'] ?? 0);
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET VENDORS
+|--------------------------------------------------------------------------
+*/
+
+$vendors = [];
+
+$result = $conn->query("
+    SELECT
+        vendor_id,
+        business_name
+    FROM vendors
+    ORDER BY business_name ASC
+");
+
+if ($result) {
+
+    while ($row = $result->fetch_assoc()) {
+        $vendors[] = $row;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| BUILD PRODUCT QUERY
+|--------------------------------------------------------------------------
+*/
+
+$sql = "
+    SELECT
+        p.product_id,
+        p.product_name,
+        p.price,
+        p.stock_quantity,
+        p.image,
+        p.status,
+        p.created_at,
+
+        v.vendor_id,
+        v.business_name,
+
+        c.category_name
+
+    FROM products p
+
+    LEFT JOIN vendors v
+        ON p.vendor_id = v.vendor_id
+
+    LEFT JOIN categories c
+        ON p.category_id = c.category_id
+
+    WHERE 1 = 1
+";
+
+$params = [];
+$types = '';
+
+
+/*
+|--------------------------------------------------------------------------
+| SEARCH
+|--------------------------------------------------------------------------
+*/
+
+if ($search !== '') {
+
+    $sql .= "
+        AND (
+            p.product_name LIKE ?
+            OR v.business_name LIKE ?
+            OR c.category_name LIKE ?
+        )
+    ";
+
+    $searchValue = '%' . $search . '%';
+
+    $params[] = $searchValue;
+    $params[] = $searchValue;
+    $params[] = $searchValue;
+
+    $types .= 'sss';
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| VENDOR FILTER
+|--------------------------------------------------------------------------
+*/
+
+if ($vendorFilter > 0) {
+
+    $sql .= "
+        AND p.vendor_id = ?
+    ";
+
+    $params[] = $vendorFilter;
+    $types .= 'i';
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| STOCK FILTER
+|--------------------------------------------------------------------------
+*/
+
+if ($statusFilter === 'out') {
+
+    $sql .= "
+        AND p.stock_quantity <= 0
+    ";
+
+} elseif ($statusFilter === 'low') {
+
+    $sql .= "
+        AND p.stock_quantity BETWEEN 1 AND 10
+    ";
+
+} elseif ($statusFilter === 'available') {
+
+    $sql .= "
+        AND p.stock_quantity > 10
+    ";
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ORDER
+|--------------------------------------------------------------------------
+*/
+
+$sql .= "
+    ORDER BY p.created_at DESC
+";
+
+
+/*
+|--------------------------------------------------------------------------
+| EXECUTE PRODUCT QUERY
+|--------------------------------------------------------------------------
 */
 
 $products = [];
 
-try {
+$stmt = $conn->prepare($sql);
 
-    $sql = "
-        SELECT
-            p.*
-        FROM products p
-        WHERE 1 = 1
-    ";
+if ($stmt) {
 
-    $params = [];
-
-    /*
-    |--------------------------------------------------------------------------
-    | SEARCH
-    |--------------------------------------------------------------------------
-    */
-
-    if ($search !== '') {
-
-        $sql .= "
-            AND (
-                p.product_name LIKE :search
-                OR p.product_id LIKE :search
-            )
-        ";
-
-        $params[':search'] =
-            '%' . $search . '%';
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | STOCK FILTER
-    |--------------------------------------------------------------------------
-    */
+    $stmt->execute();
 
-    if ($stockFilter === 'out') {
+    $result = $stmt->get_result();
 
-        $sql .= "
-            AND p.stock <= 0
-        ";
-
-    } elseif ($stockFilter === 'low') {
-
-        $sql .= "
-            AND p.stock > 0
-            AND p.stock <= 10
-        ";
-
-    } elseif ($stockFilter === 'available') {
-
-        $sql .= "
-            AND p.stock > 10
-        ";
+    while ($row = $result->fetch_assoc()) {
+        $products[] = $row;
     }
 
-    $sql .= "
-        ORDER BY p.stock ASC, p.product_id DESC
-    ";
-
-    $stmt = $db->prepare($sql);
-
-    $stmt->execute($params);
-
-    $products =
-        $stmt->fetchAll();
-
-} catch (Throwable $e) {
-
-    $products = [];
-
-    if (APP_DEBUG) {
-        $inventoryError =
-            $e->getMessage();
-    }
+    $stmt->close();
 }
+
 
 /*
 |--------------------------------------------------------------------------
-| INVENTORY SUMMARY
+| HELPER FUNCTIONS
 |--------------------------------------------------------------------------
 */
 
-$totalProducts = 0;
-$totalStock = 0;
-$outOfStock = 0;
-$lowStock = 0;
-$stockValue = 0;
+function inventory_stock_class($stock)
+{
+    $stock = (int) $stock;
 
-try {
-
-    $summaryStmt = $db->query("
-        SELECT
-            COUNT(*) AS total_products,
-            COALESCE(
-                SUM(stock),
-                0
-            ) AS total_stock,
-            COALESCE(
-                SUM(
-                    CASE
-                        WHEN stock <= 0
-                        THEN 1
-                        ELSE 0
-                    END
-                ),
-                0
-            ) AS out_of_stock,
-            COALESCE(
-                SUM(
-                    CASE
-                        WHEN stock > 0
-                        AND stock <= 10
-                        THEN 1
-                        ELSE 0
-                    END
-                ),
-                0
-            ) AS low_stock,
-            COALESCE(
-                SUM(
-                    stock * price
-                ),
-                0
-            ) AS stock_value
-        FROM products
-    ");
-
-    $summary =
-        $summaryStmt->fetch();
-
-    if ($summary) {
-
-        $totalProducts =
-            (int) $summary['total_products'];
-
-        $totalStock =
-            (int) $summary['total_stock'];
-
-        $outOfStock =
-            (int) $summary['out_of_stock'];
-
-        $lowStock =
-            (int) $summary['low_stock'];
-
-        $stockValue =
-            (float) $summary['stock_value'];
+    if ($stock <= 0) {
+        return 'stock-out';
     }
 
-} catch (Throwable $e) {
+    if ($stock <= 10) {
+        return 'stock-low';
+    }
 
-    $totalProducts = 0;
-    $totalStock = 0;
-    $outOfStock = 0;
-    $lowStock = 0;
-    $stockValue = 0;
+    return 'stock-good';
 }
 
-/*
-|--------------------------------------------------------------------------
-| PAGE URL
-|--------------------------------------------------------------------------
-*/
 
-$currentQuery = '';
+function inventory_stock_label($stock)
+{
+    $stock = (int) $stock;
 
-if ($search !== '') {
-    $currentQuery .=
-        '&search=' .
-        urlencode($search);
+    if ($stock <= 0) {
+        return 'Out of Stock';
+    }
+
+    if ($stock <= 10) {
+        return 'Low Stock';
+    }
+
+    return 'In Stock';
+}
+
+
+function inventory_product_image($image)
+{
+    if (!$image) {
+        return '';
+    }
+
+    return site_url(
+        'image/product/' . $image
+    );
 }
 
 ?>
+
 <!DOCTYPE html>
 
 <html lang="en">
@@ -234,611 +461,996 @@ if ($search !== '') {
     >
 
     <title>
-        Inventory Management |
-        <?= e(APP_NAME) ?>
+        Inventory |
+        <?php echo htmlspecialchars(SITE_NAME); ?>
     </title>
 
+
     <link
         rel="stylesheet"
-        href="<?= BASE_URL ?>css/style.css"
+        href="<?php
+        echo site_url('css/style.css');
+        ?>"
     >
 
     <link
         rel="stylesheet"
-        href="<?= BASE_URL ?>css/admin.css"
+        href="<?php
+        echo site_url('css/admin.css');
+        ?>"
     >
 
     <link
         rel="stylesheet"
-        href="<?= BASE_URL ?>css/product.css"
+        href="<?php
+        echo site_url('css/responsive.css');
+        ?>"
     >
 
-    <link
-        rel="stylesheet"
-        href="<?= BASE_URL ?>css/responsive.css"
-    >
 
     <style>
 
+        /* =====================================================
+           INVENTORY PAGE
+        ===================================================== */
+
         .inventory-page {
+
             min-height: 100vh;
-            padding: 35px 4%;
+
+            padding: 35px 0 80px;
+
             background:
                 radial-gradient(
-                    circle at 8% 5%,
-                    rgba(37,99,235,.12),
+                    circle at 10% 0%,
+                    rgba(37, 99, 235, .16),
                     transparent 28%
                 ),
                 radial-gradient(
-                    circle at 90% 12%,
-                    rgba(14,165,233,.10),
+                    circle at 90% 10%,
+                    rgba(14, 165, 233, .12),
                     transparent 25%
                 ),
-                #f8fbff;
+                linear-gradient(
+                    145deg,
+                    #020617,
+                    #061a35 55%,
+                    #020617
+                );
+
+            color: #f8fafc;
+
         }
+
 
         .inventory-container {
+
+            width: 92%;
+
             max-width: 1450px;
+
             margin: auto;
+
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | HERO
-        |--------------------------------------------------------------------------
-        */
 
-        .inventory-hero {
-            position: relative;
-            overflow: hidden;
-            padding: 32px;
+        /* =====================================================
+           HEADER
+        ===================================================== */
+
+        .inventory-header {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: flex-end;
+
+            gap: 20px;
+
             margin-bottom: 24px;
-            border-radius: 28px;
+
+        }
+
+
+        .inventory-eyebrow {
+
+            margin-bottom: 7px;
+
+            color: #38bdf8;
+
+            font-size: 9px;
+
+            font-weight: 950;
+
+            letter-spacing: 2px;
+
+            text-transform: uppercase;
+
+        }
+
+
+        .inventory-header h1 {
+
+            margin: 0;
+
+            color: #f8fafc;
+
+            font-size: clamp(
+                27px,
+                4vw,
+                42px
+            );
+
+            font-weight: 950;
+
+            letter-spacing: -1.5px;
+
+        }
+
+
+        .inventory-header p {
+
+            margin: 8px 0 0;
+
+            color: #64748b;
+
+            font-size: 11px;
+
+        }
+
+
+        /* =====================================================
+           STATS
+        ===================================================== */
+
+        .inventory-stats {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, 1fr);
+
+            gap: 13px;
+
+            margin-bottom: 20px;
+
+        }
+
+
+        .inventory-stat {
+
+            position: relative;
+
+            overflow: hidden;
+
+            padding: 20px;
+
+            border:
+                1px solid
+                rgba(148, 163, 184, .09);
+
+            border-radius: 18px;
+
+            background:
+                rgba(15, 23, 42, .78);
+
+            transition: .2s ease;
+
+        }
+
+
+        .inventory-stat:hover {
+
+            transform: translateY(-3px);
+
+            border-color:
+                rgba(56, 189, 248, .25);
+
+        }
+
+
+        .inventory-stat-label {
+
+            display: block;
+
+            margin-bottom: 7px;
+
+            color: #64748b;
+
+            font-size: 8px;
+
+            font-weight: 900;
+
+            letter-spacing: 1px;
+
+            text-transform: uppercase;
+
+        }
+
+
+        .inventory-stat-value {
+
+            color: #f8fafc;
+
+            font-size: 25px;
+
+            font-weight: 950;
+
+        }
+
+
+        .inventory-stat.blue
+        .inventory-stat-value {
+
+            color: #38bdf8;
+
+        }
+
+
+        .inventory-stat.yellow
+        .inventory-stat-value {
+
+            color: #facc15;
+
+        }
+
+
+        .inventory-stat.red
+        .inventory-stat-value {
+
+            color: #f87171;
+
+        }
+
+
+        /* =====================================================
+           FILTER CARD
+        ===================================================== */
+
+        .inventory-filter {
+
+            margin-bottom: 18px;
+
+            padding: 17px;
+
+            border:
+                1px solid
+                rgba(148, 163, 184, .09);
+
+            border-radius: 18px;
+
+            background:
+                rgba(15, 23, 42, .78);
+
+        }
+
+
+        .inventory-filter-form {
+
+            display: grid;
+
+            grid-template-columns:
+                1.8fr 1fr 1fr auto;
+
+            gap: 10px;
+
+            align-items: end;
+
+        }
+
+
+        .inventory-field label {
+
+            display: block;
+
+            margin-bottom: 6px;
+
+            color: #64748b;
+
+            font-size: 8px;
+
+            font-weight: 900;
+
+            letter-spacing: 1px;
+
+            text-transform: uppercase;
+
+        }
+
+
+        .inventory-field input,
+        .inventory-field select {
+
+            width: 100%;
+
+            box-sizing: border-box;
+
+            padding: 11px 12px;
+
+            border:
+                1px solid
+                rgba(148, 163, 184, .12);
+
+            border-radius: 11px;
+
+            outline: none;
+
+            background:
+                rgba(2, 6, 23, .65);
+
+            color: #cbd5e1;
+
+            font-size: 10px;
+
+        }
+
+
+        .inventory-field input:focus,
+        .inventory-field select:focus {
+
+            border-color:
+                rgba(56, 189, 248, .45);
+
+        }
+
+
+        .inventory-button {
+
+            display: inline-flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            padding: 11px 17px;
+
+            border: 0;
+
+            border-radius: 11px;
+
             background:
                 linear-gradient(
                     135deg,
-                    #071f4d,
-                    #1d4ed8 55%,
-                    #0284c7
+                    #0284c7,
+                    #2563eb
                 );
+
             color: white;
-            box-shadow:
-                0 25px 60px
-                rgba(29,78,216,.22);
-        }
 
-        .inventory-hero::before {
-            content: "";
-            position: absolute;
-            width: 350px;
-            height: 350px;
-            top: -190px;
-            right: -80px;
-            border-radius: 50%;
-            background:
-                rgba(255,255,255,.08);
-        }
-
-        .inventory-hero::after {
-            content: "";
-            position: absolute;
-            width: 180px;
-            height: 180px;
-            bottom: -120px;
-            right: 250px;
-            border-radius: 50%;
-            background:
-                rgba(255,255,255,.05);
-        }
-
-        .hero-content {
-            position: relative;
-            z-index: 2;
-        }
-
-        .hero-kicker {
-            margin-bottom: 8px;
-            color:
-                rgba(255,255,255,.65);
-            font-size: 10px;
-            font-weight: 950;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
-        .inventory-hero h1 {
-            margin: 0 0 8px;
-            font-size: clamp(
-                28px,
-                5vw,
-                44px
-            );
-            font-weight: 950;
-        }
-
-        .inventory-hero p {
-            max-width: 720px;
-            margin: 0;
-            color:
-                rgba(255,255,255,.76);
-            font-size: 12px;
-            line-height: 1.7;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | SUMMARY
-        |--------------------------------------------------------------------------
-        */
-
-        .summary-grid {
-            display: grid;
-            grid-template-columns:
-                repeat(4, 1fr);
-            gap: 15px;
-            margin-bottom: 22px;
-        }
-
-        .summary-card {
-            position: relative;
-            overflow: hidden;
-            padding: 21px;
-            border:
-                1px solid #dbeafe;
-            border-radius: 20px;
-            background: white;
-            box-shadow:
-                0 12px 35px
-                rgba(15,23,42,.05);
-        }
-
-        .summary-card::after {
-            content: "";
-            position: absolute;
-            width: 80px;
-            height: 80px;
-            right: -35px;
-            bottom: -35px;
-            border-radius: 50%;
-            background:
-                rgba(37,99,235,.06);
-        }
-
-        .summary-label {
-            margin-bottom: 9px;
-            color: #64748b;
             font-size: 9px;
+
             font-weight: 900;
-            letter-spacing: .5px;
-            text-transform: uppercase;
-        }
 
-        .summary-value {
-            color: #0f172a;
-            font-size: 27px;
-            font-weight: 950;
-        }
-
-        .summary-value.blue {
-            color: #2563eb;
-        }
-
-        .summary-value.orange {
-            color: #d97706;
-        }
-
-        .summary-value.red {
-            color: #dc2626;
-        }
-
-        .summary-note {
-            margin-top: 5px;
-            color: #94a3b8;
-            font-size: 8px;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | MAIN PANEL
-        |--------------------------------------------------------------------------
-        */
-
-        .inventory-panel {
-            overflow: hidden;
-            border:
-                1px solid #dbeafe;
-            border-radius: 22px;
-            background: white;
-            box-shadow:
-                0 12px 35px
-                rgba(15,23,42,.05);
-        }
-
-        .panel-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-            padding: 20px 22px;
-            border-bottom:
-                1px solid #eff6ff;
-        }
-
-        .panel-title h2 {
-            margin: 0 0 4px;
-            color: #0f172a;
-            font-size: 15px;
-            font-weight: 950;
-        }
-
-        .panel-title p {
-            margin: 0;
-            color: #94a3b8;
-            font-size: 9px;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | SEARCH
-        |--------------------------------------------------------------------------
-        */
-
-        .filter-area {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 15px 22px;
-            border-bottom:
-                1px solid #eff6ff;
-            background: #fbfdff;
-        }
-
-        .search-form {
-            display: flex;
-            flex: 1;
-            max-width: 500px;
-            gap: 8px;
-        }
-
-        .search-input {
-            flex: 1;
-            min-width: 0;
-            padding: 12px 14px;
-            border:
-                1px solid #dbeafe;
-            border-radius: 12px;
-            outline: none;
-            background: white;
-            color: #0f172a;
-            font-size: 10px;
-        }
-
-        .search-input:focus {
-            border-color:
-                #2563eb;
-            box-shadow:
-                0 0 0 4px
-                rgba(37,99,235,.07);
-        }
-
-        .search-btn {
-            padding: 12px 16px;
-            border: 0;
-            border-radius: 12px;
             cursor: pointer;
-            background:
-                #2563eb;
-            color: white;
-            font-size: 9px;
-            font-weight: 900;
+
+            text-decoration: none;
+
         }
 
-        .clear-btn {
-            display: inline-flex;
-            align-items: center;
-            padding: 12px;
-            border:
-                1px solid #dbeafe;
+
+        .inventory-button:hover {
+
+            filter: brightness(1.12);
+
+        }
+
+
+        .inventory-reset {
+
+            margin-left: 6px;
+
+            color: #64748b;
+
+            font-size: 9px;
+
+            text-decoration: none;
+
+        }
+
+
+        /* =====================================================
+           MESSAGE
+        ===================================================== */
+
+        .inventory-message {
+
+            margin-bottom: 17px;
+
+            padding: 13px 16px;
+
             border-radius: 12px;
-            background: white;
-            color: #64748b;
-            text-decoration: none;
-            font-size: 9px;
-            font-weight: 900;
+
+            font-size: 10px;
+
+            font-weight: 800;
+
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | FILTER TABS
-        |--------------------------------------------------------------------------
-        */
 
-        .filter-tabs {
-            display: flex;
-            gap: 7px;
-            padding: 0 22px 18px;
-            background: #fbfdff;
-        }
+        .inventory-message.success {
 
-        .filter-tab {
-            padding: 8px 12px;
             border:
-                1px solid #dbeafe;
-            border-radius: 999px;
-            background: white;
-            color: #64748b;
-            text-decoration: none;
-            font-size: 8px;
-            font-weight: 900;
-            transition: .2s ease;
-        }
+                1px solid
+                rgba(34, 197, 94, .18);
 
-        .filter-tab:hover {
-            border-color:
-                #93c5fd;
-            color: #2563eb;
-        }
-
-        .filter-tab.active {
-            border-color:
-                #2563eb;
             background:
-                #2563eb;
-            color: white;
+                rgba(34, 197, 94, .07);
+
+            color: #86efac;
+
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | TABLE
-        |--------------------------------------------------------------------------
-        */
 
-        .table-wrap {
+        .inventory-message.error {
+
+            border:
+                1px solid
+                rgba(239, 68, 68, .18);
+
+            background:
+                rgba(239, 68, 68, .07);
+
+            color: #fca5a5;
+
+        }
+
+
+        /* =====================================================
+           TABLE
+        ===================================================== */
+
+        .inventory-card {
+
+            overflow: hidden;
+
+            border:
+                1px solid
+                rgba(148, 163, 184, .09);
+
+            border-radius: 20px;
+
+            background:
+                rgba(15, 23, 42, .78);
+
+        }
+
+
+        .inventory-card-header {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            padding: 18px 20px;
+
+            border-bottom:
+                1px solid
+                rgba(148, 163, 184, .07);
+
+        }
+
+
+        .inventory-card-header h2 {
+
+            margin: 0;
+
+            color: #e2e8f0;
+
+            font-size: 14px;
+
+            font-weight: 900;
+
+        }
+
+
+        .inventory-card-header span {
+
+            color: #475569;
+
+            font-size: 9px;
+
+        }
+
+
+        .inventory-table-wrap {
+
             overflow-x: auto;
+
         }
+
 
         .inventory-table {
+
             width: 100%;
-            min-width: 850px;
+
+            min-width: 900px;
+
             border-collapse: collapse;
+
         }
+
 
         .inventory-table th {
-            padding:
-                13px 16px;
+
+            padding: 13px 15px;
+
             border-bottom:
-                1px solid #e2e8f0;
-            background: #f8fbff;
-            color: #64748b;
+                1px solid
+                rgba(148, 163, 184, .07);
+
+            background:
+                rgba(2, 6, 23, .25);
+
+            color: #475569;
+
             font-size: 8px;
-            font-weight: 950;
+
+            font-weight: 900;
+
+            letter-spacing: 1px;
+
             text-align: left;
+
             text-transform: uppercase;
-            letter-spacing: .4px;
+
         }
+
 
         .inventory-table td {
-            padding:
-                14px 16px;
+
+            padding: 13px 15px;
+
             border-bottom:
-                1px solid #f1f5f9;
-            color: #334155;
+                1px solid
+                rgba(148, 163, 184, .055);
+
+            color: #94a3b8;
+
             font-size: 9px;
+
             vertical-align: middle;
+
         }
+
 
         .inventory-table tbody tr {
-            transition: .15s ease;
+
+            transition: .2s ease;
+
         }
+
 
         .inventory-table tbody tr:hover {
+
             background:
-                #f8fbff;
+                rgba(14, 165, 233, .035);
+
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | PRODUCT
-        |--------------------------------------------------------------------------
-        */
 
-        .product-cell {
+        .inventory-table tbody tr:last-child td {
+
+            border-bottom: 0;
+
+        }
+
+
+        /* =====================================================
+           PRODUCT
+        ===================================================== */
+
+        .inventory-product {
+
             display: flex;
+
             align-items: center;
-            gap: 11px;
-            min-width: 220px;
+
+            gap: 10px;
+
+            min-width: 230px;
+
         }
 
-        .product-image {
-            width: 48px;
-            height: 48px;
+
+        .inventory-product-image {
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
             flex-shrink: 0;
+
+            width: 43px;
+
+            height: 43px;
+
             overflow: hidden;
-            border-radius: 12px;
+
             border:
-                1px solid #dbeafe;
+                1px solid
+                rgba(148, 163, 184, .08);
+
+            border-radius: 11px;
+
             background:
-                #eff6ff;
+                rgba(2, 6, 23, .65);
+
         }
 
-        .product-image img {
+
+        .inventory-product-image img {
+
             width: 100%;
+
             height: 100%;
+
             object-fit: cover;
+
         }
 
-        .product-info strong {
-            display: block;
-            margin-bottom: 4px;
-            color: #0f172a;
-            font-size: 10px;
-            font-weight: 950;
-        }
 
-        .product-info span {
-            color: #94a3b8;
-            font-size: 8px;
-        }
+        .inventory-product-placeholder {
 
-        .price {
-            color: #1d4ed8;
-            font-weight: 950;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | STOCK
-        |--------------------------------------------------------------------------
-        */
-
-        .stock-number {
-            color: #0f172a;
-            font-size: 14px;
-            font-weight: 950;
-        }
-
-        .stock-badge {
-            display: inline-block;
-            margin-top: 4px;
-            padding: 5px 8px;
-            border-radius: 999px;
-            font-size: 7px;
-            font-weight: 950;
-            text-transform: uppercase;
-        }
-
-        .stock-badge.available {
-            background:
-                #dcfce7;
-            color:
-                #166534;
-        }
-
-        .stock-badge.low {
-            background:
-                #fef3c7;
-            color:
-                #92400e;
-        }
-
-        .stock-badge.out {
-            background:
-                #fee2e2;
-            color:
-                #991b1b;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | STOCK BAR
-        |--------------------------------------------------------------------------
-        */
-
-        .stock-progress {
-            width: 100px;
-            height: 6px;
-            overflow: hidden;
-            margin-top: 7px;
-            border-radius: 999px;
-            background:
-                #e2e8f0;
-        }
-
-        .stock-progress span {
-            display: block;
-            height: 100%;
-            border-radius: 999px;
-        }
-
-        .progress-good {
-            background:
-                #22c55e;
-        }
-
-        .progress-low {
-            background:
-                #f59e0b;
-        }
-
-        .progress-out {
-            background:
-                #ef4444;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | EMPTY
-        |--------------------------------------------------------------------------
-        */
-
-        .empty-state {
-            padding: 60px 20px;
-            text-align: center;
-        }
-
-        .empty-icon {
-            margin-bottom: 12px;
-            font-size: 38px;
-        }
-
-        .empty-state strong {
-            display: block;
-            margin-bottom: 6px;
             color: #334155;
-            font-size: 12px;
-            font-weight: 950;
+
+            font-size: 15px;
+
         }
 
-        .empty-state span {
-            color: #94a3b8;
+
+        .inventory-product-name {
+
+            display: block;
+
+            max-width: 230px;
+
+            overflow: hidden;
+
+            color: #cbd5e1;
+
+            font-size: 10px;
+
+            font-weight: 850;
+
+            text-overflow: ellipsis;
+
+            white-space: nowrap;
+
+        }
+
+
+        .inventory-product-id {
+
+            display: block;
+
+            margin-top: 3px;
+
+            color: #475569;
+
+            font-size: 8px;
+
+        }
+
+
+        /* =====================================================
+           STOCK
+        ===================================================== */
+
+        .inventory-stock {
+
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 5px;
+
+            padding: 5px 8px;
+
+            border-radius: 99px;
+
+            font-size: 8px;
+
+            font-weight: 900;
+
+        }
+
+
+        .inventory-stock::before {
+
+            content: "";
+
+            width: 5px;
+
+            height: 5px;
+
+            border-radius: 50%;
+
+        }
+
+
+        .stock-good {
+
+            color: #86efac;
+
+            background:
+                rgba(34, 197, 94, .08);
+
+        }
+
+
+        .stock-good::before {
+
+            background: #22c55e;
+
+        }
+
+
+        .stock-low {
+
+            color: #fde047;
+
+            background:
+                rgba(250, 204, 21, .08);
+
+        }
+
+
+        .stock-low::before {
+
+            background: #facc15;
+
+        }
+
+
+        .stock-out {
+
+            color: #fca5a5;
+
+            background:
+                rgba(239, 68, 68, .08);
+
+        }
+
+
+        .stock-out::before {
+
+            background: #ef4444;
+
+        }
+
+
+        /* =====================================================
+           STOCK UPDATE
+        ===================================================== */
+
+        .stock-form {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 6px;
+
+        }
+
+
+        .stock-input {
+
+            width: 65px;
+
+            padding: 7px 8px;
+
+            box-sizing: border-box;
+
+            border:
+                1px solid
+                rgba(148, 163, 184, .12);
+
+            border-radius: 8px;
+
+            outline: none;
+
+            background:
+                rgba(2, 6, 23, .6);
+
+            color: #e2e8f0;
+
             font-size: 9px;
+
+            text-align: center;
+
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | RESPONSIVE
-        |--------------------------------------------------------------------------
-        */
 
-        @media (max-width: 1050px) {
+        .stock-input:focus {
 
-            .summary-grid {
+            border-color:
+                rgba(56, 189, 248, .45);
+
+        }
+
+
+        .stock-save {
+
+            padding: 7px 9px;
+
+            border: 0;
+
+            border-radius: 8px;
+
+            background:
+                rgba(14, 165, 233, .10);
+
+            color: #38bdf8;
+
+            font-size: 8px;
+
+            font-weight: 900;
+
+            cursor: pointer;
+
+        }
+
+
+        .stock-save:hover {
+
+            background:
+                rgba(14, 165, 233, .18);
+
+        }
+
+
+        /* =====================================================
+           STATUS
+        ===================================================== */
+
+        .product-status {
+
+            display: inline-flex;
+
+            padding: 5px 8px;
+
+            border-radius: 99px;
+
+            background:
+                rgba(148, 163, 184, .07);
+
+            color: #94a3b8;
+
+            font-size: 8px;
+
+            font-weight: 900;
+
+        }
+
+
+        /* =====================================================
+           EMPTY
+        ===================================================== */
+
+        .inventory-empty {
+
+            padding: 55px 20px;
+
+            text-align: center;
+
+        }
+
+
+        .inventory-empty-icon {
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            width: 55px;
+
+            height: 55px;
+
+            margin: 0 auto 13px;
+
+            border-radius: 17px;
+
+            background:
+                rgba(14, 165, 233, .08);
+
+            color: #38bdf8;
+
+            font-size: 20px;
+
+        }
+
+
+        .inventory-empty h3 {
+
+            margin: 0;
+
+            color: #cbd5e1;
+
+            font-size: 14px;
+
+        }
+
+
+        .inventory-empty p {
+
+            margin: 6px auto 0;
+
+            max-width: 360px;
+
+            color: #475569;
+
+            font-size: 9px;
+
+            line-height: 1.6;
+
+        }
+
+
+        /* =====================================================
+           RESPONSIVE
+        ===================================================== */
+
+        @media (max-width: 1000px) {
+
+            .inventory-stats {
+
                 grid-template-columns:
                     repeat(2, 1fr);
+
+            }
+
+            .inventory-filter-form {
+
+                grid-template-columns:
+                    1fr 1fr;
+
             }
 
         }
 
-        @media (max-width: 700px) {
+
+        @media (max-width: 600px) {
 
             .inventory-page {
-                padding: 25px 15px;
+
+                padding-top: 25px;
+
             }
 
-            .inventory-hero {
-                padding: 25px 20px;
-            }
+            .inventory-header {
 
-            .summary-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .panel-top {
                 align-items: flex-start;
+
                 flex-direction: column;
+
             }
 
-            .filter-area {
-                align-items: stretch;
-                flex-direction: column;
+            .inventory-stats {
+
+                grid-template-columns: 1fr;
+
             }
 
-            .search-form {
-                max-width: none;
+            .inventory-filter-form {
+
+                grid-template-columns: 1fr;
+
             }
 
-            .filter-tabs {
-                overflow-x: auto;
+            .inventory-reset {
+
+                display: inline-block;
+
+                margin: 8px 0 0;
+
             }
 
         }
@@ -847,299 +1459,371 @@ if ($search !== '') {
 
 </head>
 
+
 <body>
 
+
 <?php
-require_once dirname(__DIR__) . '/includes/navbar.php';
+require_once __DIR__ . '/../includes/navbar.php';
 ?>
+
 
 <main class="inventory-page">
 
+
     <div class="inventory-container">
 
-        <!-- HERO -->
 
-        <section class="inventory-hero">
+        <!-- =================================================
+             HEADER
+        ================================================== -->
 
-            <div class="hero-content">
+        <div class="inventory-header">
 
-                <div class="hero-kicker">
-                    HochipoHub Admin
+            <div>
+
+                <div class="inventory-eyebrow">
+                    ADMIN CONTROL
                 </div>
 
                 <h1>
-                    Inventory Control
+                    Inventory
                 </h1>
 
                 <p>
-                    Monitor product stock across
-                    the marketplace and quickly
-                    identify products that need
-                    attention.
+                    Monitor product stock across all
+                    HochipoHub vendors.
                 </p>
 
             </div>
 
-        </section>
+        </div>
 
 
-        <!-- SUMMARY -->
+        <!-- =================================================
+             MESSAGE
+        ================================================== -->
 
-        <section class="summary-grid">
+        <?php if ($message !== ''): ?>
 
-            <div class="summary-card">
+            <div
+                class="
+                    inventory-message
+                    <?php echo htmlspecialchars($messageType); ?>
+                "
+            >
 
-                <div class="summary-label">
+                <?php
+                echo htmlspecialchars($message);
+                ?>
+
+            </div>
+
+        <?php endif; ?>
+
+
+        <!-- =================================================
+             STATS
+        ================================================== -->
+
+        <section class="inventory-stats">
+
+
+            <div class="inventory-stat">
+
+                <span class="inventory-stat-label">
                     Total Products
-                </div>
+                </span>
 
-                <div class="summary-value blue">
-                    <?= number_format(
-                        $totalProducts
-                    ) ?>
-                </div>
-
-                <div class="summary-note">
-                    Active marketplace products
-                </div>
+                <strong class="inventory-stat-value">
+                    <?php
+                    echo number_format(
+                        $stats['products']
+                    );
+                    ?>
+                </strong>
 
             </div>
 
 
-            <div class="summary-card">
+            <div class="inventory-stat blue">
 
-                <div class="summary-label">
+                <span class="inventory-stat-label">
                     Total Stock
-                </div>
+                </span>
 
-                <div class="summary-value">
-                    <?= number_format(
-                        $totalStock
-                    ) ?>
-                </div>
-
-                <div class="summary-note">
-                    Units currently listed
-                </div>
+                <strong class="inventory-stat-value">
+                    <?php
+                    echo number_format(
+                        $stats['total_stock']
+                    );
+                    ?>
+                </strong>
 
             </div>
 
 
-            <div class="summary-card">
+            <div class="inventory-stat yellow">
 
-                <div class="summary-label">
+                <span class="inventory-stat-label">
                     Low Stock
-                </div>
+                </span>
 
-                <div class="summary-value orange">
-                    <?= number_format(
-                        $lowStock
-                    ) ?>
-                </div>
-
-                <div class="summary-note">
-                    1–10 units remaining
-                </div>
+                <strong class="inventory-stat-value">
+                    <?php
+                    echo number_format(
+                        $stats['low_stock']
+                    );
+                    ?>
+                </strong>
 
             </div>
 
 
-            <div class="summary-card">
+            <div class="inventory-stat red">
 
-                <div class="summary-label">
+                <span class="inventory-stat-label">
                     Out of Stock
-                </div>
+                </span>
 
-                <div class="summary-value red">
-                    <?= number_format(
-                        $outOfStock
-                    ) ?>
-                </div>
-
-                <div class="summary-note">
-                    Products requiring restock
-                </div>
+                <strong class="inventory-stat-value">
+                    <?php
+                    echo number_format(
+                        $stats['out_stock']
+                    );
+                    ?>
+                </strong>
 
             </div>
+
 
         </section>
 
 
-        <!-- INVENTORY -->
+        <!-- =================================================
+             FILTER
+        ================================================== -->
 
-        <section class="inventory-panel">
+        <section class="inventory-filter">
 
-            <div class="panel-top">
 
-                <div class="panel-title">
+            <form
+                method="GET"
+                action="<?php
+                echo htmlspecialchars(
+                    site_url('admin/inventory.php')
+                );
+                ?>"
+                class="inventory-filter-form"
+            >
+
+
+                <div class="inventory-field">
+
+                    <label>
+                        Search
+                    </label>
+
+                    <input
+                        type="text"
+                        name="search"
+                        value="<?php
+                        echo htmlspecialchars($search);
+                        ?>"
+                        placeholder="Search product, vendor or category..."
+                    >
+
+                </div>
+
+
+                <div class="inventory-field">
+
+                    <label>
+                        Vendor
+                    </label>
+
+                    <select name="vendor_id">
+
+                        <option value="0">
+                            All Vendors
+                        </option>
+
+                        <?php foreach (
+                            $vendors
+                            as $vendor
+                        ): ?>
+
+                            <option
+                                value="<?php
+                                echo (int)
+                                    $vendor['vendor_id'];
+                                ?>"
+                                <?php
+                                echo $vendorFilter ===
+                                    (int)
+                                    $vendor['vendor_id']
+                                    ? 'selected'
+                                    : '';
+                                ?>
+                            >
+
+                                <?php
+                                echo htmlspecialchars(
+                                    $vendor[
+                                        'business_name'
+                                    ]
+                                );
+                                ?>
+
+                            </option>
+
+                        <?php endforeach; ?>
+
+                    </select>
+
+                </div>
+
+
+                <div class="inventory-field">
+
+                    <label>
+                        Stock Status
+                    </label>
+
+                    <select name="stock_status">
+
+                        <option value="">
+                            All Stock
+                        </option>
+
+                        <option
+                            value="available"
+                            <?php
+                            echo $statusFilter ===
+                                'available'
+                                ? 'selected'
+                                : '';
+                            ?>
+                        >
+                            In Stock
+                        </option>
+
+                        <option
+                            value="low"
+                            <?php
+                            echo $statusFilter ===
+                                'low'
+                                ? 'selected'
+                                : '';
+                            ?>
+                        >
+                            Low Stock
+                        </option>
+
+                        <option
+                            value="out"
+                            <?php
+                            echo $statusFilter ===
+                                'out'
+                                ? 'selected'
+                                : '';
+                            ?>
+                        >
+                            Out of Stock
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div>
+
+                    <button
+                        type="submit"
+                        class="inventory-button"
+                    >
+                        FILTER
+                    </button>
+
+                    <a
+                        href="<?php
+                        echo site_url(
+                            'admin/inventory.php'
+                        );
+                        ?>"
+                        class="inventory-reset"
+                    >
+                        Reset
+                    </a>
+
+                </div>
+
+
+            </form>
+
+
+        </section>
+
+
+        <!-- =================================================
+             INVENTORY TABLE
+        ================================================== -->
+
+        <section class="inventory-card">
+
+
+            <div class="inventory-card-header">
+
+                <div>
 
                     <h2>
                         Product Inventory
                     </h2>
 
-                    <p>
-                        Manage and monitor
-                        marketplace stock levels.
-                    </p>
-
-                </div>
-
-            </div>
-
-
-            <!-- SEARCH -->
-
-            <div class="filter-area">
-
-                <form
-                    method="GET"
-                    class="search-form"
-                >
-
-                    <input
-                        type="text"
-                        name="search"
-                        class="search-input"
-                        placeholder="Search product..."
-                        value="<?= e(
-                            $search
-                        ) ?>"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="stock"
-                        value="<?= e(
-                            $stockFilter
-                        ) ?>"
-                    >
-
-                    <button
-                        type="submit"
-                        class="search-btn"
-                    >
-                        SEARCH
-                    </button>
-
-                </form>
-
-
-                <?php if (
-                    $search !== ''
-                ): ?>
-
-                    <a
-                        href="<?= BASE_URL ?>admin/inventory.php"
-                        class="clear-btn"
-                    >
-                        Clear
-                    </a>
-
-                <?php endif; ?>
-
-            </div>
-
-
-            <!-- FILTERS -->
-
-            <div class="filter-tabs">
-
-                <a
-                    href="?stock=all<?= $currentQuery ?>"
-                    class="filter-tab
-                    <?= $stockFilter === 'all'
-                        ? 'active'
-                        : '' ?>"
-                >
-                    All Products
-                </a>
-
-                <a
-                    href="?stock=available<?= $currentQuery ?>"
-                    class="filter-tab
-                    <?= $stockFilter === 'available'
-                        ? 'active'
-                        : '' ?>"
-                >
-                    Available
-                </a>
-
-                <a
-                    href="?stock=low<?= $currentQuery ?>"
-                    class="filter-tab
-                    <?= $stockFilter === 'low'
-                        ? 'active'
-                        : '' ?>"
-                >
-                    Low Stock
-                </a>
-
-                <a
-                    href="?stock=out<?= $currentQuery ?>"
-                    class="filter-tab
-                    <?= $stockFilter === 'out'
-                        ? 'active'
-                        : '' ?>"
-                >
-                    Out of Stock
-                </a>
-
-            </div>
-
-
-            <?php if (
-                isset($inventoryError)
-                &&
-                $inventoryError !== ''
-            ): ?>
-
-                <div
-                    style="
-                        margin:20px;
-                        padding:15px;
-                        border-radius:12px;
-                        background:#fef2f2;
-                        border:1px solid #fecaca;
-                        color:#991b1b;
-                        font-size:10px;
-                    "
-                >
-                    <?= e(
-                        $inventoryError
-                    ) ?>
-                </div>
-
-            <?php endif; ?>
-
-
-            <?php if (
-                empty($products)
-            ): ?>
-
-                <div class="empty-state">
-
-                    <div class="empty-icon">
-                        📦
-                    </div>
-
-                    <strong>
-                        No products found
-                    </strong>
-
                     <span>
-                        There are no products matching
-                        the current inventory filter.
+                        <?php
+                        echo number_format(
+                            count($products)
+                        );
+                        ?>
+                        product(s) found
                     </span>
 
                 </div>
 
+            </div>
+
+
+            <?php if (empty($products)): ?>
+
+
+                <div class="inventory-empty">
+
+                    <div class="inventory-empty-icon">
+                        #
+                    </div>
+
+                    <h3>
+                        No products found
+                    </h3>
+
+                    <p>
+                        Try changing your search or
+                        stock filters.
+                    </p>
+
+                </div>
+
+
             <?php else: ?>
 
-                <div class="table-wrap">
 
-                    <table
-                        class="inventory-table"
-                    >
+                <div class="inventory-table-wrap">
+
+
+                    <table class="inventory-table">
+
 
                         <thead>
 
@@ -1150,178 +1834,193 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                                 </th>
 
                                 <th>
+                                    Vendor
+                                </th>
+
+                                <th>
+                                    Category
+                                </th>
+
+                                <th>
                                     Price
                                 </th>
 
                                 <th>
-                                    Stock
+                                    Current Stock
                                 </th>
 
                                 <th>
-                                    Stock Level
+                                    Stock Status
                                 </th>
 
                                 <th>
-                                    Status
+                                    Product Status
+                                </th>
+
+                                <th>
+                                    Update
                                 </th>
 
                             </tr>
 
                         </thead>
 
+
                         <tbody>
+
 
                             <?php foreach (
                                 $products
                                 as $product
                             ): ?>
 
-                                <?php
-
-                                $stock =
-                                    (int) (
-                                        $product['stock']
-                                        ?? 0
-                                    );
-
-                                $price =
-                                    (float) (
-                                        $product['price']
-                                        ?? 0
-                                    );
-
-                                /*
-                                |--------------------------------------------------------------------------
-                                | Product image
-                                |--------------------------------------------------------------------------
-                                */
-
-                                $image =
-                                    $product['image']
-                                    ?? $product[
-                                        'product_image'
-                                    ]
-                                    ?? '';
-
-                                $imageUrl =
-                                    productImageUrl(
-                                        $image
-                                    );
-
-                                /*
-                                |--------------------------------------------------------------------------
-                                | Stock status
-                                |--------------------------------------------------------------------------
-                                */
-
-                                if (
-                                    $stock <= 0
-                                ) {
-
-                                    $stockStatus =
-                                        'out';
-
-                                    $stockLabel =
-                                        'Out of Stock';
-
-                                } elseif (
-                                    $stock <= 10
-                                ) {
-
-                                    $stockStatus =
-                                        'low';
-
-                                    $stockLabel =
-                                        'Low Stock';
-
-                                } else {
-
-                                    $stockStatus =
-                                        'available';
-
-                                    $stockLabel =
-                                        'Available';
-                                }
-
-                                /*
-                                |--------------------------------------------------------------------------
-                                | Progress
-                                |--------------------------------------------------------------------------
-                                */
-
-                                $progress =
-                                    min(
-                                        100,
-                                        max(
-                                            4,
-                                            $stock
-                                        )
-                                    );
-
-                                ?>
 
                                 <tr>
+
 
                                     <!-- PRODUCT -->
 
                                     <td>
 
                                         <div
-                                            class="product-cell"
+                                            class="
+                                                inventory-product
+                                            "
                                         >
 
+
                                             <div
-                                                class="product-image"
+                                                class="
+                                                    inventory-product-image
+                                                "
                                             >
 
-                                                <img
-                                                    src="<?= e(
-                                                        $imageUrl
-                                                    ) ?>"
-                                                    alt="<?= e(
-                                                        $product[
-                                                            'product_name'
-                                                        ]
-                                                        ?? 'Product'
-                                                    ) ?>"
-                                                    onerror="
-                                                        this.src='<?= e(
-                                                            productImageUrl(
-                                                                ''
+                                                <?php
+                                                $image =
+                                                    $product[
+                                                        'image'
+                                                    ] ?? '';
+                                                ?>
+
+
+                                                <?php if (
+                                                    $image !== ''
+                                                ): ?>
+
+                                                    <img
+                                                        src="<?php
+                                                        echo htmlspecialchars(
+                                                            inventory_product_image(
+                                                                $image
                                                             )
-                                                        ) ?>';
+                                                        );
+                                                        ?>"
+                                                        alt="<?php
+                                                        echo htmlspecialchars(
+                                                            $product[
+                                                                'product_name'
+                                                            ]
+                                                        );
+                                                        ?>"
+                                                        onerror="
+                                                            this.style.display='none';
+                                                            this.nextElementSibling.style.display='block';
+                                                        "
+                                                    >
+
+                                                <?php endif; ?>
+
+
+                                                <span
+                                                    class="
+                                                        inventory-product-placeholder
+                                                    "
+                                                    style="
+                                                        <?php
+                                                        echo $image !== ''
+                                                            ? 'display:none;'
+                                                            : '';
+                                                        ?>
                                                     "
                                                 >
+                                                    #
+                                                </span>
+
 
                                             </div>
 
 
-                                            <div
-                                                class="product-info"
-                                            >
+                                            <div>
 
-                                                <strong>
-                                                    <?= e(
+                                                <span
+                                                    class="
+                                                        inventory-product-name
+                                                    "
+                                                >
+
+                                                    <?php
+                                                    echo htmlspecialchars(
                                                         $product[
                                                             'product_name'
                                                         ]
-                                                        ?? 'Unnamed Product'
-                                                    ) ?>
-                                                </strong>
+                                                    );
+                                                    ?>
 
-                                                <span>
-                                                    Product ID:
-                                                    #<?= e(
+                                                </span>
+
+
+                                                <span
+                                                    class="
+                                                        inventory-product-id
+                                                    "
+                                                >
+
+                                                    ID:
+                                                    #<?php
+                                                    echo (int)
                                                         $product[
                                                             'product_id'
-                                                        ]
-                                                        ?? '-'
-                                                    ) ?>
+                                                        ];
+                                                    ?>
+
                                                 </span>
 
                                             </div>
 
+
                                         </div>
+
+                                    </td>
+
+
+                                    <!-- VENDOR -->
+
+                                    <td>
+
+                                        <?php
+                                        echo htmlspecialchars(
+                                            $product[
+                                                'business_name'
+                                            ]
+                                            ?? 'Unknown Vendor'
+                                        );
+                                        ?>
+
+                                    </td>
+
+
+                                    <!-- CATEGORY -->
+
+                                    <td>
+
+                                        <?php
+                                        echo htmlspecialchars(
+                                            $product[
+                                                'category_name'
+                                            ]
+                                            ?? 'Uncategorized'
+                                        );
+                                        ?>
 
                                     </td>
 
@@ -1330,94 +2029,190 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
                                     <td>
 
-                                        <span
-                                            class="price"
+                                        RM
+                                        <?php
+                                        echo number_format(
+                                            (float)
+                                            $product[
+                                                'price'
+                                            ],
+                                            2
+                                        );
+                                        ?>
+
+                                    </td>
+
+
+                                    <!-- STOCK -->
+
+                                    <td>
+
+                                        <strong
+                                            style="
+                                                color:#f8fafc;
+                                                font-size:11px;
+                                            "
                                         >
-                                            <?= formatPrice(
-                                                $price
-                                            ) ?>
+
+                                            <?php
+                                            echo number_format(
+                                                (int)
+                                                $product[
+                                                    'stock_quantity'
+                                                ]
+                                            );
+                                            ?>
+
+                                        </strong>
+
+                                    </td>
+
+
+                                    <!-- STOCK STATUS -->
+
+                                    <td>
+
+                                        <span
+                                            class="
+                                                inventory-stock
+                                                <?php
+                                                echo inventory_stock_class(
+                                                    $product[
+                                                        'stock_quantity'
+                                                    ]
+                                                );
+                                                ?>
+                                            "
+                                        >
+
+                                            <?php
+                                            echo inventory_stock_label(
+                                                $product[
+                                                    'stock_quantity'
+                                                ]
+                                            );
+                                            ?>
+
                                         </span>
 
                                     </td>
 
 
-                                    <!-- STOCK NUMBER -->
-
-                                    <td>
-
-                                        <div
-                                            class="stock-number"
-                                        >
-                                            <?= number_format(
-                                                $stock
-                                            ) ?>
-                                        </div>
-
-                                    </td>
-
-
-                                    <!-- PROGRESS -->
-
-                                    <td>
-
-                                        <div
-                                            class="stock-progress"
-                                        >
-
-                                            <span
-                                                class="progress-<?= e(
-                                                    $stockStatus
-                                                ) ?>"
-                                                style="
-                                                    width:
-                                                    <?= $progress ?>%;
-                                                "
-                                            ></span>
-
-                                        </div>
-
-                                    </td>
-
-
-                                    <!-- STATUS -->
+                                    <!-- PRODUCT STATUS -->
 
                                     <td>
 
                                         <span
-                                            class="stock-badge
-                                            <?= e(
-                                                $stockStatus
-                                            ) ?>"
+                                            class="
+                                                product-status
+                                            "
                                         >
-                                            <?= e(
-                                                $stockLabel
-                                            ) ?>
+
+                                            <?php
+                                            echo htmlspecialchars(
+                                                $product[
+                                                    'status'
+                                                ]
+                                                ?? 'Unknown'
+                                            );
+                                            ?>
+
                                         </span>
 
                                     </td>
+
+
+                                    <!-- UPDATE -->
+
+                                    <td>
+
+
+                                        <form
+                                            method="POST"
+                                            class="stock-form"
+                                        >
+
+
+                                            <input
+                                                type="hidden"
+                                                name="action"
+                                                value="update_stock"
+                                            >
+
+
+                                            <input
+                                                type="hidden"
+                                                name="product_id"
+                                                value="<?php
+                                                echo (int)
+                                                    $product[
+                                                        'product_id'
+                                                    ];
+                                                ?>"
+                                            >
+
+
+                                            <input
+                                                type="number"
+                                                name="stock_quantity"
+                                                class="stock-input"
+                                                min="0"
+                                                value="<?php
+                                                echo (int)
+                                                    $product[
+                                                        'stock_quantity'
+                                                    ];
+                                                ?>"
+                                                required
+                                            >
+
+
+                                            <button
+                                                type="submit"
+                                                class="stock-save"
+                                            >
+                                                SAVE
+                                            </button>
+
+
+                                        </form>
+
+
+                                    </td>
+
 
                                 </tr>
 
+
                             <?php endforeach; ?>
+
 
                         </tbody>
 
+
                     </table>
+
 
                 </div>
 
+
             <?php endif; ?>
+
 
         </section>
 
+
     </div>
+
 
 </main>
 
+
 <?php
-require_once dirname(__DIR__) . '/includes/footer.php';
+require_once __DIR__ . '/../includes/footer.php';
 ?>
+
 
 </body>
 
-</html> 
+</html>
