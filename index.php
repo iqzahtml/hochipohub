@@ -246,7 +246,7 @@ require_once __DIR__ . '/includes/navbar.php';
                                 <?php if (!empty($category['category_image'])): ?>
 
                                     <img
-                                        src="<?= e(BASE_URL) ?>uploads/products/logo.jpeg<?= e(basename($category['category_image'])) ?>"
+                                        src="<?= e(BASE_URL) ?>uploads/products/<?= e(basename($category['category_image'])) ?>"
                                         alt="<?= e($category['category_name']) ?>"
                                     >
 
