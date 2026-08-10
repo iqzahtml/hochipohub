@@ -4,28 +4,6 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - REGISTER PROCESS
 |--------------------------------------------------------------------------
-| File:
-| auth/register_process.php
-|
-| Purpose:
-| Handle new customer/vendor registration.
-|
-| Form fields:
-| - name
-| - email
-| - phone
-| - role
-| - password
-| - confirm_password
-| - terms
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| LOAD CONFIGURATION
-|--------------------------------------------------------------------------
 */
 
 require_once dirname(__DIR__) . '/config.php';
@@ -35,17 +13,17 @@ require_once dirname(__DIR__) . '/includes/functions.php';
 
 /*
 |--------------------------------------------------------------------------
-| ONLY POST REQUEST ALLOWED
+| ONLY POST
 |--------------------------------------------------------------------------
 */
 
-if (
-    $_SERVER['REQUEST_METHOD'] !== 'POST'
-) {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
     redirect(
         BASE_URL . 'index.php'
     );
+
+    exit;
 }
 
 
@@ -57,52 +35,40 @@ if (
 
 $name =
     trim(
-        $_POST['name']
-        ?? ''
+        $_POST['name'] ?? ''
     );
 
 $email =
     trim(
-        $_POST['email']
-        ?? ''
+        $_POST['email'] ?? ''
     );
 
 $phone =
     trim(
-        $_POST['phone']
-        ?? ''
+        $_POST['phone'] ?? ''
     );
 
 $role =
     strtolower(
         trim(
-            $_POST['role']
-            ?? 'customer'
+            $_POST['role'] ?? 'customer'
         )
     );
 
 $password =
-    $_POST['password']
-    ?? '';
+    $_POST['password'] ?? '';
 
 $confirmPassword =
-    $_POST['confirm_password']
-    ?? '';
+    $_POST['confirm_password'] ?? '';
 
 $terms =
-    isset(
-        $_POST['terms']
-    )
-    &&
+    isset($_POST['terms']) &&
     $_POST['terms'] === '1';
 
 
 /*
 |--------------------------------------------------------------------------
-| KEEP FORM DATA
-|--------------------------------------------------------------------------
-|
-| Used to repopulate the form if registration fails.
+| SAVE OLD DATA
 |--------------------------------------------------------------------------
 */
 
@@ -125,15 +91,13 @@ $_SESSION['register_old'] = [
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE NAME
+| NAME
 |--------------------------------------------------------------------------
 */
 
 if (
-    $name === ''
-    ||
-    mb_strlen($name) < 2
-    ||
+    $name === '' ||
+    mb_strlen($name) < 2 ||
     mb_strlen($name) > 100
 ) {
 
@@ -143,24 +107,23 @@ if (
     redirect(
         BASE_URL . 'index.php?register=1'
     );
+
+    exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE EMAIL
+| EMAIL
 |--------------------------------------------------------------------------
 */
 
 if (
-    $email === ''
-    ||
+    $email === '' ||
     !filter_var(
         $email,
         FILTER_VALIDATE_EMAIL
     )
-    ||
-    strlen($email) > 150
 ) {
 
     $_SESSION['register_error'] =
@@ -169,18 +132,18 @@ if (
     redirect(
         BASE_URL . 'index.php?register=1'
     );
+
+    exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE PHONE
+| PHONE
 |--------------------------------------------------------------------------
 */
 
-if (
-    $phone === ''
-) {
+if ($phone === '') {
 
     $_SESSION['register_error'] =
         'Please enter your phone number.';
@@ -188,21 +151,10 @@ if (
     redirect(
         BASE_URL . 'index.php?register=1'
     );
+
+    exit;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| PHONE FORMAT
-|--------------------------------------------------------------------------
-|
-| Allows:
-| 0123456789
-| +60123456789
-| 01-23456789
-| spaces and brackets
-|--------------------------------------------------------------------------
-*/
 
 $cleanPhone =
     preg_replace(
@@ -213,8 +165,7 @@ $cleanPhone =
 
 
 if (
-    $cleanPhone === null
-    ||
+    $cleanPhone === null ||
     !preg_match(
         '/^\+?[0-9]{9,15}$/',
         $cleanPhone
@@ -227,25 +178,20 @@ if (
     redirect(
         BASE_URL . 'index.php?register=1'
     );
+
+    exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE ROLE
-|--------------------------------------------------------------------------
-|
-| Only customer and vendor can register.
-| Admin accounts must never be created through
-| the public registration form.
+| ROLE
 |--------------------------------------------------------------------------
 */
 
 $allowedRoles = [
-
     'customer',
     'vendor'
-
 ];
 
 
@@ -263,18 +209,19 @@ if (
     redirect(
         BASE_URL . 'index.php?register=1'
     );
+
+    exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE PASSWORD
+| PASSWORD
 |--------------------------------------------------------------------------
 */
 
 if (
-    $password === ''
-    ||
+    $password === '' ||
     strlen($password) < 6
 ) {
 
@@ -284,6 +231,8 @@ if (
     redirect(
         BASE_URL . 'index.php?register=1'
     );
+
+    exit;
 }
 
 
@@ -303,6 +252,8 @@ if (
     redirect(
         BASE_URL . 'index.php?register=1'
     );
+
+    exit;
 }
 
 
@@ -312,9 +263,7 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if (
-    !$terms
-) {
+if (!$terms) {
 
     $_SESSION['register_error'] =
         'You must agree to the terms and conditions.';
@@ -322,6 +271,8 @@ if (
     redirect(
         BASE_URL . 'index.php?register=1'
     );
+
+    exit;
 }
 
 
@@ -344,8 +295,7 @@ try {
 
     $stmt =
         $db->prepare("
-            SELECT
-                user_id
+            SELECT user_id
             FROM users
             WHERE email = ?
             LIMIT 1
@@ -356,9 +306,7 @@ try {
     ]);
 
 
-    if (
-        $stmt->fetch()
-    ) {
+    if ($stmt->fetch()) {
 
         $_SESSION['register_error'] =
             'An account with this email already exists.';
@@ -366,6 +314,8 @@ try {
         redirect(
             BASE_URL . 'index.php?register=1'
         );
+
+        exit;
     }
 
 
@@ -377,8 +327,7 @@ try {
 
     $stmt =
         $db->prepare("
-            SELECT
-                user_id
+            SELECT user_id
             FROM users
             WHERE phone = ?
             LIMIT 1
@@ -389,9 +338,7 @@ try {
     ]);
 
 
-    if (
-        $stmt->fetch()
-    ) {
+    if ($stmt->fetch()) {
 
         $_SESSION['register_error'] =
             'An account with this phone number already exists.';
@@ -399,12 +346,14 @@ try {
         redirect(
             BASE_URL . 'index.php?register=1'
         );
+
+        exit;
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | HASH PASSWORD
+    | PASSWORD HASH
     |--------------------------------------------------------------------------
     */
 
@@ -415,16 +364,16 @@ try {
         );
 
 
-    if (
-        $passwordHash === false
-    ) {
+    if ($passwordHash === false) {
 
         $_SESSION['register_error'] =
-            'Unable to secure your password. Please try again.';
+            'Unable to secure your password.';
 
         redirect(
             BASE_URL . 'index.php?register=1'
         );
+
+        exit;
     }
 
 
@@ -439,13 +388,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CREATE USER
-    |--------------------------------------------------------------------------
-    |
-    | New accounts start as active.
-    |
-    | Vendor approval is handled separately through
-    | the vendors table.
+    | INSERT USER
     |--------------------------------------------------------------------------
     */
 
@@ -457,8 +400,7 @@ try {
                 email,
                 phone,
                 password,
-                role,
-                status
+                role
             )
             VALUES
             (
@@ -466,8 +408,7 @@ try {
                 ?,
                 ?,
                 ?,
-                ?,
-                'active'
+                ?
             )
         ");
 
@@ -484,7 +425,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | GET NEW USER ID
+    | NEW USER ID
     |--------------------------------------------------------------------------
     */
 
@@ -494,43 +435,59 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | VENDOR ACCOUNT
+    | VENDOR
     |--------------------------------------------------------------------------
     |
-    | If the user registers as a vendor,
-    | create the vendor record.
+    | Only execute if your vendors table exists.
     |
-    | Vendor starts as Pending and must be
-    | approved by admin.
-    |--------------------------------------------------------------------------
     */
 
-    if (
-        $role === 'vendor'
-    ) {
+    if ($role === 'vendor') {
 
-        $stmt =
-            $db->prepare("
-                INSERT INTO vendors
-                (
-                    user_id,
-                    business_name,
-                    approval_status
-                )
-                VALUES
-                (
-                    ?,
-                    ?,
-                    'Pending'
-                )
-            ");
+        /*
+        |--------------------------------------------------------------------------
+        | Check vendors table
+        |--------------------------------------------------------------------------
+        */
 
-        $stmt->execute([
+        try {
 
-            $userId,
-            $name
+            $stmt =
+                $db->prepare("
+                    INSERT INTO vendors
+                    (
+                        user_id,
+                        business_name,
+                        approval_status
+                    )
+                    VALUES
+                    (
+                        ?,
+                        ?,
+                        'Pending'
+                    )
+                ");
 
-        ]);
+            $stmt->execute([
+
+                $userId,
+                $name
+
+            ]);
+
+        } catch (PDOException $vendorError) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | If vendor table structure is different,
+            | rollback the whole registration.
+            |--------------------------------------------------------------------------
+            */
+
+            throw $vendorError;
+
+        }
+
     }
 
 
@@ -545,7 +502,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CLEAR OLD FORM DATA
+    | CLEAR OLD DATA
     |--------------------------------------------------------------------------
     */
 
@@ -556,18 +513,18 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | SUCCESS MESSAGE
+    | SUCCESS
     |--------------------------------------------------------------------------
     */
 
-    $_SESSION['register_success'] =
+    $_SESSION['login_success'] =
         'Account created successfully. '
         . 'You can now login.';
 
 
     /*
     |--------------------------------------------------------------------------
-    | REDIRECT TO LOGIN
+    | REDIRECT LOGIN MODAL
     |--------------------------------------------------------------------------
     */
 
@@ -575,16 +532,10 @@ try {
         BASE_URL . 'index.php?login=1'
     );
 
+    exit;
 
-/*
-|--------------------------------------------------------------------------
-| DATABASE ERROR
-|--------------------------------------------------------------------------
-*/
 
-} catch (
-    PDOException $e
-) {
+} catch (PDOException $e) {
 
     /*
     |--------------------------------------------------------------------------
@@ -593,46 +544,50 @@ try {
     */
 
     if (
-        isset($db)
-        &&
-        $db instanceof PDO
-        &&
+        isset($db) &&
+        $db instanceof PDO &&
         $db->inTransaction()
     ) {
 
         $db->rollBack();
+
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | ERROR MESSAGE
+    | ERROR
     |--------------------------------------------------------------------------
     */
 
     if (
+        defined('APP_DEBUG') &&
         APP_DEBUG
     ) {
 
         $_SESSION['register_error'] =
-            'Database error: '
-            . $e->getMessage();
+            'Database error: ' .
+            $e->getMessage();
 
     } else {
 
         $_SESSION['register_error'] =
             'Something went wrong while creating your account. '
             . 'Please try again later.';
+
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | REDIRECT BACK
+    | REDIRECT
     |--------------------------------------------------------------------------
     */
 
     redirect(
-        BASE_URL . 'index.php?register=1'
+        BASE_URL .
+        'index.php?register=1'
     );
+
+    exit;
 }
