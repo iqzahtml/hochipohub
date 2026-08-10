@@ -1,100 +1,334 @@
 <?php
 
-require_once "../config.php";
-require_once "../database/db.php";
-require_once "../includes/session.php";
-
-
-if (!isLoggedIn()) {
-
-    header("Location: " . BASE_URL . "index.php");
-    exit();
-
-}
-
-
-$userID =
-    (int) currentUserID();
-
-
-$wishlistID =
-    (int) ($_GET['id'] ?? 0);
-
-
-$productID =
-    (int) ($_GET['product_id'] ?? 0);
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - AJAX REMOVE WISHLIST
+|--------------------------------------------------------------------------
+| File:
+| ajax/remove_wishlist.php
+|
+| Purpose:
+| Remove a product from the customer's wishlist.
+|--------------------------------------------------------------------------
+*/
 
 
 /*
 |--------------------------------------------------------------------------
-| Remove By Wishlist ID
+| LOAD REQUIRED FILES
 |--------------------------------------------------------------------------
 */
 
-if ($wishlistID > 0) {
+require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/includes/session.php';
+require_once dirname(__DIR__) . '/includes/functions.php';
+require_once dirname(__DIR__) . '/database/db.php';
 
-    $query = $conn->prepare("
 
+/*
+|--------------------------------------------------------------------------
+| JSON RESPONSE
+|--------------------------------------------------------------------------
+*/
+
+header('Content-Type: application/json; charset=UTF-8');
+
+
+/*
+|--------------------------------------------------------------------------
+| DEFAULT RESPONSE
+|--------------------------------------------------------------------------
+*/
+
+$response = [
+
+    'success' => false,
+
+    'message' => 'Unable to remove item from wishlist.'
+
+];
+
+
+/*
+|--------------------------------------------------------------------------
+| REQUIRE LOGIN
+|--------------------------------------------------------------------------
+*/
+
+if (!isLoggedIn()) {
+
+    http_response_code(401);
+
+    $response['message'] =
+        'Please login to manage your wishlist.';
+
+    echo json_encode($response);
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| REQUIRE CUSTOMER
+|--------------------------------------------------------------------------
+*/
+
+if (!isCustomer()) {
+
+    http_response_code(403);
+
+    $response['message'] =
+        'Only customers can manage wishlist.';
+
+    echo json_encode($response);
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET USER ID
+|--------------------------------------------------------------------------
+*/
+
+$userId = currentUserId();
+
+
+if (!$userId) {
+
+    http_response_code(401);
+
+    $response['message'] =
+        'User session is invalid.';
+
+    echo json_encode($response);
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET PRODUCT ID
+|--------------------------------------------------------------------------
+*/
+
+$productId = filter_input(
+    INPUT_POST,
+    'product_id',
+    FILTER_VALIDATE_INT
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| VALIDATE PRODUCT ID
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !$productId
+    ||
+    $productId <= 0
+) {
+
+    http_response_code(400);
+
+    $response['message'] =
+        'Invalid product selected.';
+
+    echo json_encode($response);
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE
+|--------------------------------------------------------------------------
+*/
+
+$pdo = getDB();
+
+
+/*
+|--------------------------------------------------------------------------
+| CHECK WISHLIST ITEM
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    $stmt = $pdo->prepare("
+        SELECT
+            wishlist_id
+
+        FROM wishlist
+
+        WHERE user_id = ?
+
+        AND product_id = ?
+
+        LIMIT 1
+    ");
+
+    $stmt->execute([
+
+        $userId,
+
+        $productId
+
+    ]);
+
+    $wishlistItem =
+        $stmt->fetch();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ITEM NOT FOUND
+    |--------------------------------------------------------------------------
+    */
+
+    if (!$wishlistItem) {
+
+        http_response_code(404);
+
+        $response['message'] =
+            'Product is not in your wishlist.';
+
+        echo json_encode($response);
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | REMOVE FROM WISHLIST
+    |--------------------------------------------------------------------------
+    */
+
+    $deleteStmt = $pdo->prepare("
         DELETE FROM wishlist
 
         WHERE wishlist_id = ?
 
         AND user_id = ?
-
     ");
 
-    $query->bind_param(
-        "ii",
-        $wishlistID,
-        $userID
-    );
+    $deleteStmt->execute([
+
+        $wishlistItem['wishlist_id'],
+
+        $userId
+
+    ]);
 
 
-/*
-|--------------------------------------------------------------------------
-| Remove By Product ID
-|--------------------------------------------------------------------------
-*/
+    /*
+    |--------------------------------------------------------------------------
+    | CHECK DELETE RESULT
+    |--------------------------------------------------------------------------
+    */
 
-} elseif ($productID > 0) {
+    if (
+        $deleteStmt->rowCount() > 0
+    ) {
 
-    $query = $conn->prepare("
+        /*
+        |--------------------------------------------------------------------------
+        | GET UPDATED WISHLIST COUNT
+        |--------------------------------------------------------------------------
+        */
 
-        DELETE FROM wishlist
+        $countStmt = $pdo->prepare("
+            SELECT COUNT(*)
 
-        WHERE product_id = ?
+            FROM wishlist
 
-        AND user_id = ?
+            WHERE user_id = ?
+        ");
 
-    ");
+        $countStmt->execute([
 
-    $query->bind_param(
-        "ii",
-        $productID,
-        $userID
-    );
+            $userId
+
+        ]);
+
+        $wishlistCount =
+            (int) $countStmt->fetchColumn();
 
 
-} else {
+        /*
+        |--------------------------------------------------------------------------
+        | SUCCESS RESPONSE
+        |--------------------------------------------------------------------------
+        */
 
-    header(
-        "Location: " .
-        BASE_URL .
-        "wishlist.php"
-    );
+        $response = [
 
-    exit();
+            'success' => true,
 
+            'message' =>
+                'Product removed from wishlist.',
+
+            'product_id' =>
+                $productId,
+
+            'wishlist_count' =>
+                $wishlistCount
+
+        ];
+
+        echo json_encode($response);
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE FAILED
+    |--------------------------------------------------------------------------
+    */
+
+    http_response_code(500);
+
+    $response['message'] =
+        'Failed to remove product from wishlist.';
+
+    echo json_encode($response);
+
+    exit;
+
+
+} catch (PDOException $e) {
+
+    /*
+    |--------------------------------------------------------------------------
+    | DATABASE ERROR
+    |--------------------------------------------------------------------------
+    */
+
+    http_response_code(500);
+
+    if (APP_DEBUG) {
+
+        $response['message'] =
+            'Database error: '
+            . $e->getMessage();
+
+    } else {
+
+        $response['message'] =
+            'A database error occurred. Please try again.';
+    }
+
+    echo json_encode($response);
+
+    exit;
 }
-
-
-$query->execute();
-
-
-header(
-    "Location: " .
-    BASE_URL .
-    "wishlist.php"
-);
-
-exit();
