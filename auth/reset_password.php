@@ -1,236 +1,272 @@
 <?php
 
-require_once "../config.php";
-require_once "../database/db.php";
-require_once "../includes/functions.php";
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - RESET PASSWORD
+|--------------------------------------------------------------------------
+| File:
+| auth/reset_password.php
+|
+| Purpose:
+| Allows user to create a new password after
+| successfully verifying the password reset OTP.
+|--------------------------------------------------------------------------
+*/
+
+require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/includes/session.php';
+require_once dirname(__DIR__) . '/includes/functions.php';
 
 
 /*
 |--------------------------------------------------------------------------
-| Check Verification
+| ONLY ALLOW RESET FLOW
 |--------------------------------------------------------------------------
 */
 
-if (
-    !isset($_SESSION['reset_verified']) ||
-    $_SESSION['reset_verified'] !== true ||
-    !isset($_SESSION['reset_id']) ||
-    !isset($_SESSION['reset_user_id'])
-) {
+$resetUserId = getResetUser();
 
-    header("Location: forgot_password.php");
-    exit();
+if ($resetUserId === null) {
 
+    setFlashMessageSafe(
+        'error',
+        'Password reset session expired. Please request a new reset code.'
+    );
+
+    redirect(
+        BASE_URL . 'index.php'
+    );
 }
 
 
-$resetID =
-    (int) $_SESSION['reset_id'];
+/*
+|--------------------------------------------------------------------------
+| GET USER
+|--------------------------------------------------------------------------
+*/
 
-$userID =
-    (int) $_SESSION['reset_user_id'];
+$pdo = getDB();
 
+$user = getUserById(
+    $pdo,
+    $resetUserId
+);
+
+if (!$user) {
+
+    clearResetUser();
+
+    setFlashMessageSafe(
+        'error',
+        'User account could not be found.'
+    );
+
+    redirect(
+        BASE_URL . 'index.php'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| HANDLE FORM
+|--------------------------------------------------------------------------
+*/
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-
-    $password =
-        $_POST['password'] ?? '';
-
+    $password = $_POST['password'] ?? '';
     $confirmPassword =
         $_POST['confirm_password'] ?? '';
 
 
     /*
     |--------------------------------------------------------------------------
-    | Validation
+    | VALIDATE PASSWORD
     |--------------------------------------------------------------------------
     */
 
-    if (strlen($password) < 8) {
+    if ($password === '') {
 
-        setFlashMessage(
-            "error",
-            "Password must be at least 8 characters."
+        setFlashMessageSafe(
+            'error',
+            'Please enter your new password.'
         );
 
-    } elseif ($password !== $confirmPassword) {
+        redirect(
+            BASE_URL . 'auth/reset_password.php'
+        );
+    }
 
-        setFlashMessage(
-            "error",
-            "Passwords do not match."
+
+    if (strlen($password) < 6) {
+
+        setFlashMessageSafe(
+            'error',
+            'Password must contain at least 6 characters.'
         );
 
-    } else {
+        redirect(
+            BASE_URL . 'auth/reset_password.php'
+        );
+    }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Hash Password
-        |--------------------------------------------------------------------------
-        */
+    if ($password !== $confirmPassword) {
 
-        $hashedPassword =
-            password_hash(
-                $password,
-                PASSWORD_DEFAULT
-            );
+        setFlashMessageSafe(
+            'error',
+            'Passwords do not match.'
+        );
+
+        redirect(
+            BASE_URL . 'auth/reset_password.php'
+        );
+    }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Update User Password
-        |--------------------------------------------------------------------------
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | FIND VERIFIED RESET CODE
+    |--------------------------------------------------------------------------
+    |
+    | verify_otp.php marks the OTP as used only after
+    | successful verification.
+    |
+    | We use the session flag below to make sure the
+    | user cannot directly access this page.
+    |--------------------------------------------------------------------------
+    */
 
-        $update = $conn->prepare("
+    if (
+        empty(
+            $_SESSION['password_reset_verified']
+        )
+        ||
+        $_SESSION['password_reset_verified']
+            !== true
+    ) {
 
+        setFlashMessageSafe(
+            'error',
+            'Please verify the reset code first.'
+        );
+
+        redirect(
+            BASE_URL . 'index.php'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE PASSWORD
+    |--------------------------------------------------------------------------
+    */
+
+    $hashedPassword =
+        password_hash(
+            $password,
+            PASSWORD_DEFAULT
+        );
+
+
+    try {
+
+        $pdo->beginTransaction();
+
+
+        $stmt = $pdo->prepare("
             UPDATE users
-
             SET
                 password = ?,
                 reset_code = NULL,
-                reset_expiry = NULL
-
+                reset_expiry = NULL,
+                updated_at = CURRENT_TIMESTAMP
             WHERE user_id = ?
-
+            LIMIT 1
         ");
 
-        $update->bind_param(
-            "si",
+
+        $stmt->execute([
             $hashedPassword,
-            $userID
+            $resetUserId
+        ]);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CLEAR PASSWORD RESET HISTORY
+        |--------------------------------------------------------------------------
+        |
+        | The verified OTP has already been marked as used.
+        | We keep history for audit purposes.
+        |--------------------------------------------------------------------------
+        */
+
+
+        $pdo->commit();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CLEAR RESET SESSION
+        |--------------------------------------------------------------------------
+        */
+
+        clearResetUser();
+
+        unset(
+            $_SESSION['password_reset_verified']
         );
 
 
-        if ($update->execute()) {
+        /*
+        |--------------------------------------------------------------------------
+        | SUCCESS
+        |--------------------------------------------------------------------------
+        */
+
+        setFlashMessageSafe(
+            'success',
+            'Password reset successfully. You can now login with your new password.'
+        );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Mark Reset Code Used
-            |--------------------------------------------------------------------------
-            */
-
-            $markUsed = $conn->prepare("
-
-                UPDATE password_resets
-
-                SET used_at = NOW()
-
-                WHERE reset_id = ?
-
-            ");
-
-            $markUsed->bind_param(
-                "i",
-                $resetID
-            );
-
-            $markUsed->execute();
+        redirect(
+            BASE_URL . 'index.php'
+        );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Clear Reset Session
-            |--------------------------------------------------------------------------
-            */
+    } catch (PDOException $e) {
 
-            unset(
-                $_SESSION['reset_user_id'],
-                $_SESSION['reset_email'],
-                $_SESSION['reset_verified'],
-                $_SESSION['reset_id']
-            );
+        if (
+            $pdo->inTransaction()
+        ) {
 
-
-            setFlashMessage(
-                "success",
-                "Password changed successfully. Please login."
-            );
-
-
-            header(
-                "Location: " .
-                BASE_URL .
-                "index.php"
-            );
-
-            exit();
-
+            $pdo->rollBack();
         }
 
 
-        setFlashMessage(
-            "error",
-            "Unable to reset password."
+        if (APP_DEBUG) {
+
+            die(
+                'Password reset error: '
+                . e(
+                    $e->getMessage()
+                )
+            );
+        }
+
+
+        setFlashMessageSafe(
+            'error',
+            'Unable to reset your password. Please try again.'
         );
 
+
+        redirect(
+            BASE_URL . 'auth/reset_password.php'
+        );
     }
-
 }
-
-?>
-
-<?php include "../includes/header.php"; ?>
-
-<section class="auth-page">
-
-    <div class="auth-box">
-
-        <h1>Create New Password</h1>
-
-        <p>
-            Enter your new password below.
-        </p>
-
-        <form method="POST">
-
-            <div class="form-group">
-
-                <label for="password">
-                    New Password
-                </label>
-
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    minlength="8"
-                    required
-                >
-
-            </div>
-
-
-            <div class="form-group">
-
-                <label for="confirm_password">
-                    Confirm Password
-                </label>
-
-                <input
-                    type="password"
-                    id="confirm_password"
-                    name="confirm_password"
-                    minlength="8"
-                    required
-                >
-
-            </div>
-
-
-            <button
-                type="submit"
-                class="btn-primary"
-            >
-                Reset Password
-            </button>
-
-        </form>
-
-    </div>
-
-</section>
-
-<?php include "../includes/footer.php"; ?>
