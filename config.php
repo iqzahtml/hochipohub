@@ -34,7 +34,7 @@ if (session_status() === PHP_SESSION_NONE) {
 */
 
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'hochipoHub');
+define('DB_NAME', 'hochipohub');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
