@@ -6,22 +6,8 @@
 | File:
 | includes/navbar.php
 |
-| Works with:
-| /index.php
-| /catalog.php
-| /category.php
-| /vendor.php
-| /cart.php
-| /wishlist.php
-| /profile.php
-| /order.php
-| /seller/*
-| /admin/*
-| /auth/*
-|
-| LOGIN & REGISTER:
-| Uses existing login_modal.php and register_modal.php.
-| There is NO auth/login.php or auth/register.php.
+| Login/Register menggunakan modal.
+| Modal HTML dimuatkan terus di bawah navbar.
 |--------------------------------------------------------------------------
 */
 /*
@@ -73,7 +59,7 @@ $currentPage = $currentPage
     );
 /*
 |--------------------------------------------------------------------------
-| ACTIVE NAVIGATION HELPER
+| ACTIVE NAVIGATION
 |--------------------------------------------------------------------------
 */
 if (!function_exists('navActive')) {
@@ -99,9 +85,7 @@ if (!function_exists('navActive')) {
 */
 $userInitial = 'U';
 if (!empty($userName)) {
-    $cleanName = trim(
-        $userName
-    );
+    $cleanName = trim($userName);
     $userInitial = strtoupper(
         substr(
             $cleanName,
@@ -112,96 +96,373 @@ if (!empty($userName)) {
 }
 ?>
 <!-- =========================================================
-     HOCHIPOHUB NAVBAR
+     NAVBAR
      ========================================================= -->
 <header class="site-header">
-    <div class="navbar-container">
-        <!-- =====================================================
-             BRAND / LOGO
-             ===================================================== -->
+<div class="navbar-container">
+    <!-- =====================================================
+         BRAND
+         ===================================================== -->
+    <a
+        href="<?= htmlspecialchars(
+            navUrl('index.php'),
+            ENT_QUOTES,
+            'UTF-8'
+        ) ?>"
+        class="brand"
+        aria-label="HochipoHub Home"
+    >
+        <span class="brand-mark">
+            H
+        </span>
+        <span class="brand-text">
+            Hochipo<span>Hub</span>
+        </span>
+    </a>
+    <!-- =====================================================
+         MAIN NAVIGATION
+         ===================================================== -->
+    <nav
+        class="main-nav"
+        aria-label="Main Navigation"
+    >
         <a
             href="<?= htmlspecialchars(
                 navUrl('index.php'),
                 ENT_QUOTES,
                 'UTF-8'
             ) ?>"
-            class="brand"
-            aria-label="HochipoHub Home"
+            class="<?= navActive('index.php') ?>"
         >
-            <span class="brand-mark">
-                H
-            </span>
-            <span class="brand-text">
-                Hochipo<span>Hub</span>
-            </span>
+            Home
         </a>
-        <!-- =====================================================
-             MAIN NAVIGATION
-             ===================================================== -->
-        <nav
-            class="main-nav"
-            aria-label="Main Navigation"
+        <a
+            href="<?= htmlspecialchars(
+                navUrl('catalog.php'),
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>"
+            class="<?= navActive([
+                'catalog.php',
+                'product.php',
+                'product_details.php'
+            ]) ?>"
         >
-            <!-- HOME -->
-            <a
-                href="<?= htmlspecialchars(
-                    navUrl('index.php'),
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
-                class="<?= navActive([
-                    'index.php'
-                ]) ?>"
-            >
-                Home
-            </a>
-            <!-- CATALOG -->
-            <a
-                href="<?= htmlspecialchars(
-                    navUrl('catalog.php'),
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
-                class="<?= navActive([
-                    'catalog.php',
-                    'product.php',
-                    'product_details.php'
-                ]) ?>"
-            >
-                Catalog
-            </a>
-            <!-- CATEGORIES -->
-            <a
-                href="<?= htmlspecialchars(
-                    navUrl('category.php'),
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
-                class="<?= navActive([
-                    'category.php'
-                ]) ?>"
-            >
-                Categories
-            </a>
-            <!-- VENDORS -->
-            <a
-                href="<?= htmlspecialchars(
-                    navUrl('vendor.php'),
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
-                class="<?= navActive([
-                    'vendor.php'
-                ]) ?>"
-            >
-                Vendors
-            </a>
-        </nav>
-        <!-- =====================================================
-             SEARCH
-             ===================================================== -->
+            Catalog
+        </a>
+        <a
+            href="<?= htmlspecialchars(
+                navUrl('category.php'),
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>"
+            class="<?= navActive('category.php') ?>"
+        >
+            Categories
+        </a>
+        <a
+            href="<?= htmlspecialchars(
+                navUrl('vendor.php'),
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>"
+            class="<?= navActive('vendor.php') ?>"
+        >
+            Vendors
+        </a>
+    </nav>
+    <!-- =====================================================
+         SEARCH
+         ===================================================== -->
+    <form
+        class="navbar-search"
+        action="<?= htmlspecialchars(
+            navUrl('search.php'),
+            ENT_QUOTES,
+            'UTF-8'
+        ) ?>"
+        method="GET"
+    >
+        <span class="search-icon">
+            🔍
+        </span>
+        <input
+            type="search"
+            name="q"
+            placeholder="Search products..."
+            value="<?= htmlspecialchars(
+                $_GET['q'] ?? '',
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>"
+            autocomplete="off"
+        >
+        <button type="submit">
+            Search
+        </button>
+    </form>
+    <!-- =====================================================
+         RIGHT ACTIONS
+         ===================================================== -->
+    <div class="navbar-actions">
+        <?php if ($isLoggedIn): ?>
+            <!-- CUSTOMER -->
+            <?php if ($userRole === 'customer'): ?>
+                <a
+                    href="<?= htmlspecialchars(
+                        navUrl('cart.php'),
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>"
+                    class="nav-icon-btn"
+                    aria-label="Shopping Cart"
+                >
+                    <span class="nav-icon">
+                        🛒
+                    </span>
+                    <?php if ($cartCount > 0): ?>
+                        <span class="nav-badge">
+                            <?= $cartCount > 99
+                                ? '99+'
+                                : $cartCount ?>
+                        </span>
+                    <?php endif; ?>
+                </a>
+                <a
+                    href="<?= htmlspecialchars(
+                        navUrl('wishlist.php'),
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>"
+                    class="nav-icon-btn"
+                    aria-label="Wishlist"
+                >
+                    <span class="nav-icon wishlist-icon">
+                        ♡
+                    </span>
+                    <?php if ($wishlistCount > 0): ?>
+                        <span class="nav-badge">
+                            <?= $wishlistCount > 99
+                                ? '99+'
+                                : $wishlistCount ?>
+                        </span>
+                    <?php endif; ?>
+                </a>
+            <?php endif; ?>
+            <!-- USER MENU -->
+            <div class="user-menu">
+                <button
+                    type="button"
+                    class="user-menu-button"
+                    id="userMenuButton"
+                    aria-expanded="false"
+                >
+                    <span class="user-avatar">
+                        <?= htmlspecialchars(
+                            $userInitial,
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>
+                    </span>
+                    <span class="user-menu-name">
+                        <?= htmlspecialchars(
+                            $userName ?: 'Account',
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>
+                    </span>
+                    <span class="user-chevron">
+                        ▼
+                    </span>
+                </button>
+                <div
+                    class="user-dropdown"
+                    id="userDropdown"
+                >
+                    <div class="dropdown-user-info">
+                        <span class="dropdown-avatar">
+                            <?= htmlspecialchars(
+                                $userInitial,
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
+                        </span>
+                        <div>
+                            <strong>
+                                <?= htmlspecialchars(
+                                    $userName ?: 'User',
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>
+                            </strong>
+                            <small>
+                                <?= htmlspecialchars(
+                                    ucfirst($userRole),
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>
+                            </small>
+                        </div>
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <a
+                        href="<?= htmlspecialchars(
+                            navUrl('profile.php'),
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>"
+                        class="dropdown-link"
+                    >
+                        👤 Profile
+                    </a>
+                    <?php if ($userRole === 'customer'): ?>
+                        <a
+                            href="<?= htmlspecialchars(
+                                navUrl('order.php'),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>"
+                            class="dropdown-link"
+                        >
+                            📦 My Orders
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($userRole === 'vendor'): ?>
+                        <a
+                            href="<?= htmlspecialchars(
+                                navUrl(
+                                    'seller/dashboard.php'
+                                ),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>"
+                            class="dropdown-link"
+                        >
+                            🏪 Vendor Dashboard
+                        </a>
+                        <a
+                            href="<?= htmlspecialchars(
+                                navUrl(
+                                    'seller/products.php'
+                                ),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>"
+                            class="dropdown-link"
+                        >
+                            🛍️ My Products
+                        </a>
+                        <a
+                            href="<?= htmlspecialchars(
+                                navUrl(
+                                    'seller/orders.php'
+                                ),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>"
+                            class="dropdown-link"
+                        >
+                            📦 Orders
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($userRole === 'admin'): ?>
+                        <a
+                            href="<?= htmlspecialchars(
+                                navUrl(
+                                    'admin/dashboard.php'
+                                ),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>"
+                            class="dropdown-link"
+                        >
+                            ⚙️ Admin Dashboard
+                        </a>
+                        <a
+                            href="<?= htmlspecialchars(
+                                navUrl(
+                                    'admin/products.php'
+                                ),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>"
+                            class="dropdown-link"
+                        >
+                            🛍️ Manage Products
+                        </a>
+                        <a
+                            href="<?= htmlspecialchars(
+                                navUrl(
+                                    'admin/users.php'
+                                ),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>"
+                            class="dropdown-link"
+                        >
+                            👥 Manage Users
+                        </a>
+                    <?php endif; ?>
+                    <div class="dropdown-divider"></div>
+                    <a
+                        href="<?= htmlspecialchars(
+                            navUrl(
+                                'auth/logout.php'
+                            ),
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>"
+                        class="dropdown-link dropdown-danger"
+                    >
+                        ↪ Logout
+                    </a>
+                </div>
+            </div>
+        <?php else: ?>
+            <!-- =================================================
+                 GUEST AUTH
+                 ================================================= -->
+            <div class="auth-buttons">
+                <button
+                    type="button"
+                    class="btn-login"
+                    data-modal-open="loginModal"
+                >
+                    Login
+                </button>
+                <button
+                    type="button"
+                    class="btn-register"
+                    data-modal-open="registerModal"
+                >
+                    Register
+                </button>
+            </div>
+        <?php endif; ?>
+        <!-- MOBILE -->
+        <button
+            type="button"
+            class="mobile-menu-toggle"
+            id="mobileMenuToggle"
+            aria-label="Open navigation menu"
+            aria-expanded="false"
+        >
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+</div>
+<!-- =========================================================
+     MOBILE MENU
+     ========================================================= -->
+<div
+    class="mobile-menu"
+    id="mobileMenu"
+>
+    <div class="mobile-menu-inner">
         <form
-            class="navbar-search"
+            class="mobile-search"
             action="<?= htmlspecialchars(
                 navUrl('search.php'),
                 ENT_QUOTES,
@@ -209,565 +470,65 @@ if (!empty($userName)) {
             ) ?>"
             method="GET"
         >
-            <span class="search-icon">
-                🔍
-            </span>
             <input
                 type="search"
                 name="q"
                 placeholder="Search products..."
-                value="<?= htmlspecialchars(
-                    $_GET['q'] ?? '',
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
-                autocomplete="off"
             >
             <button type="submit">
-                Search
+                🔍
             </button>
         </form>
-        <!-- =====================================================
-             RIGHT ACTIONS
-             ===================================================== -->
-        <div class="navbar-actions">
-            <?php if ($isLoggedIn): ?>
-                <!-- =================================================
-                     CUSTOMER CART + WISHLIST
-                     ================================================= -->
-                <?php if ($userRole === 'customer'): ?>
-                    <!-- CART -->
-                    <a
-                        href="<?= htmlspecialchars(
-                            navUrl('cart.php'),
-                            ENT_QUOTES,
-                            'UTF-8'
-                        ) ?>"
-                        class="nav-icon-btn"
-                        aria-label="Shopping Cart"
-                        title="Shopping Cart"
-                    >
-                        <span class="nav-icon">
-                            🛒
-                        </span>
-                        <?php if ($cartCount > 0): ?>
-                            <span class="nav-badge">
-                                <?= $cartCount > 99
-                                    ? '99+'
-                                    : $cartCount ?>
-                            </span>
-                        <?php endif; ?>
-                    </a>
-                    <!-- WISHLIST -->
-                    <a
-                        href="<?= htmlspecialchars(
-                            navUrl('wishlist.php'),
-                            ENT_QUOTES,
-                            'UTF-8'
-                        ) ?>"
-                        class="nav-icon-btn"
-                        aria-label="Wishlist"
-                        title="Wishlist"
-                    >
-                        <span class="nav-icon wishlist-icon">
-                            ♡
-                        </span>
-                        <?php if ($wishlistCount > 0): ?>
-                            <span class="nav-badge">
-                                <?= $wishlistCount > 99
-                                    ? '99+'
-                                    : $wishlistCount ?>
-                            </span>
-                        <?php endif; ?>
-                    </a>
-                <?php endif; ?>
-                <!-- =================================================
-                     USER MENU
-                     ================================================= -->
-                <div class="user-menu">
-                    <button
-                        type="button"
-                        class="user-menu-button"
-                        id="userMenuButton"
-                        aria-expanded="false"
-                        aria-haspopup="true"
-                    >
-                        <span class="user-avatar">
-                            <?= htmlspecialchars(
-                                $userInitial,
-                                ENT_QUOTES,
-                                'UTF-8'
-                            ) ?>
-                        </span>
-                        <span class="user-menu-name">
-                            <?= htmlspecialchars(
-                                $userName ?: 'Account',
-                                ENT_QUOTES,
-                                'UTF-8'
-                            ) ?>
-                        </span>
-                        <span class="user-chevron">
-                            ▼
-                        </span>
-                    </button>
-                    <!-- =================================================
-                         USER DROPDOWN
-                         ================================================= -->
-                    <div
-                        class="user-dropdown"
-                        id="userDropdown"
-                    >
-                        <div class="dropdown-user-info">
-                            <span class="dropdown-avatar">
-                                <?= htmlspecialchars(
-                                    $userInitial,
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>
-                            </span>
-                            <div>
-                                <strong>
-                                    <?= htmlspecialchars(
-                                        $userName ?: 'User',
-                                        ENT_QUOTES,
-                                        'UTF-8'
-                                    ) ?>
-                                </strong>
-                                <small>
-                                    <?= htmlspecialchars(
-                                        ucfirst(
-                                            $userRole ?: 'customer'
-                                        ),
-                                        ENT_QUOTES,
-                                        'UTF-8'
-                                    ) ?>
-                                </small>
-                            </div>
-                        </div>
-                        <div class="dropdown-divider"></div>
-                        <!-- PROFILE -->
-                        <a
-                            href="<?= htmlspecialchars(
-                                navUrl('profile.php'),
-                                ENT_QUOTES,
-                                'UTF-8'
-                            ) ?>"
-                            class="dropdown-link"
-                        >
-                            <span>
-                                👤
-                            </span>
-                            Profile
-                        </a>
-                        <!-- CUSTOMER ORDERS -->
-                        <?php if ($userRole === 'customer'): ?>
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl('order.php'),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                <span>
-                                    📦
-                                </span>
-                                My Orders
-                            </a>
-                        <?php endif; ?>
-                        <!-- =================================================
-                             VENDOR
-                             ================================================= -->
-                        <?php if ($userRole === 'vendor'): ?>
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'seller/dashboard.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                <span>
-                                    🏪
-                                </span>
-                                Vendor Dashboard
-                            </a>
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'seller/products.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                <span>
-                                    🛍️
-                                </span>
-                                My Products
-                            </a>
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'seller/orders.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                <span>
-                                    📦
-                                </span>
-                                Orders
-                            </a>
-                        <?php endif; ?>
-                        <!-- =================================================
-                             ADMIN
-                             ================================================= -->
-                        <?php if ($userRole === 'admin'): ?>
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'admin/dashboard.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                <span>
-                                    ⚙️
-                                </span>
-                                Admin Dashboard
-                            </a>
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'admin/products.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                <span>
-                                    🛍️
-                                </span>
-                                Manage Products
-                            </a>
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'admin/users.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                <span>
-                                    👥
-                                </span>
-                                Manage Users
-                            </a>
-                        <?php endif; ?>
-                        <div class="dropdown-divider"></div>
-                        <!-- LOGOUT -->
-                        <a
-                            href="<?= htmlspecialchars(
-                                navUrl(
-                                    'auth/logout.php'
-                                ),
-                                ENT_QUOTES,
-                                'UTF-8'
-                            ) ?>"
-                            class="dropdown-link dropdown-danger"
-                        >
-                            <span>
-                                ↪
-                            </span>
-                            Logout
-                        </a>
-                    </div>
-                </div>
-            <?php else: ?>
-                <!-- =================================================
-                     GUEST AUTH BUTTONS
-                     =================================================
-                     
-                     IMPORTANT:
-                     There is NO:
-                     auth/login.php
-                     auth/register.php
-                     Login/Register use existing modals.
-                     ================================================= -->
-                <div class="auth-buttons">
-                    <!-- LOGIN -->
-                    <button
-                        type="button"
-                        class="btn-login"
-                        data-modal-open="loginModal"
-                    >
-                        Login
-                    </button>
-                    <!-- REGISTER -->
-                    <button
-                        type="button"
-                        class="btn-register"
-                        data-modal-open="registerModal"
-                    >
-                        Register
-                    </button>
-                </div>
-            <?php endif; ?>
-            <!-- =================================================
-                 MOBILE TOGGLE
-                 ================================================= -->
+        <a href="<?= htmlspecialchars(navUrl('index.php'), ENT_QUOTES, 'UTF-8') ?>">
+            🏠 Home
+        </a>
+        <a href="<?= htmlspecialchars(navUrl('catalog.php'), ENT_QUOTES, 'UTF-8') ?>">
+            🛍️ Catalog
+        </a>
+        <a href="<?= htmlspecialchars(navUrl('category.php'), ENT_QUOTES, 'UTF-8') ?>">
+            📂 Categories
+        </a>
+        <a href="<?= htmlspecialchars(navUrl('vendor.php'), ENT_QUOTES, 'UTF-8') ?>">
+            🏪 Vendors
+        </a>
+        <?php if (!$isLoggedIn): ?>
             <button
                 type="button"
-                class="mobile-menu-toggle"
-                id="mobileMenuToggle"
-                aria-label="Open navigation menu"
-                aria-expanded="false"
+                class="mobile-login-button"
+                data-modal-open="loginModal"
             >
-                <span></span>
-                <span></span>
-                <span></span>
+                Login
             </button>
-        </div>
+            <button
+                type="button"
+                class="mobile-register-button"
+                data-modal-open="registerModal"
+            >
+                Register
+            </button>
+        <?php endif; ?>
     </div>
-    <!-- =========================================================
-         MOBILE MENU
-         ========================================================= -->
-    <div
-        class="mobile-menu"
-        id="mobileMenu"
-    >
-        <div class="mobile-menu-inner">
-            <!-- MOBILE SEARCH -->
-            <form
-                class="mobile-search"
-                action="<?= htmlspecialchars(
-                    navUrl('search.php'),
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
-                method="GET"
-            >
-                <input
-                    type="search"
-                    name="q"
-                    placeholder="Search products..."
-                    value="<?= htmlspecialchars(
-                        $_GET['q'] ?? '',
-                        ENT_QUOTES,
-                        'UTF-8'
-                    ) ?>"
-                >
-                <button type="submit">
-                    🔍
-                </button>
-            </form>
-            <!-- HOME -->
-            <a
-                href="<?= htmlspecialchars(
-                    navUrl('index.php'),
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
-                class="<?= navActive([
-                    'index.php'
-                ]) ?>"
-            >
-                🏠 Home
-            </a>
-            <!-- CATALOG -->
-            <a
-                href="<?= htmlspecialchars(
-                    navUrl('catalog.php'),
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
-                class="<?= navActive([
-                    'catalog.php',
-                    'product.php',
-                    'product_details.php'
-                ]) ?>"
-            >
-                🛍️ Catalog
-            </a>
-            <!-- CATEGORIES -->
-            <a
-                href="<?= htmlspecialchars(
-                    navUrl('category.php'),
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
-                class="<?= navActive([
-                    'category.php'
-                ]) ?>"
-            >
-                📂 Categories
-            </a>
-            <!-- VENDORS -->
-            <a
-                href="<?= htmlspecialchars(
-                    navUrl('vendor.php'),
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>"
-                class="<?= navActive([
-                    'vendor.php'
-                ]) ?>"
-            >
-                🏪 Vendors
-            </a>
-            <?php if ($isLoggedIn): ?>
-                <!-- =================================================
-                     CUSTOMER MOBILE
-                     ================================================= -->
-                <?php if ($userRole === 'customer'): ?>
-                    <!-- CART -->
-                    <a
-                        href="<?= htmlspecialchars(
-                            navUrl('cart.php'),
-                            ENT_QUOTES,
-                            'UTF-8'
-                        ) ?>"
-                    >
-                        🛒 Cart
-                        <?php if ($cartCount > 0): ?>
-                            (<?= $cartCount ?>)
-                        <?php endif; ?>
-                    </a>
-                    <!-- WISHLIST -->
-                    <a
-                        href="<?= htmlspecialchars(
-                            navUrl('wishlist.php'),
-                            ENT_QUOTES,
-                            'UTF-8'
-                        ) ?>"
-                    >
-                        ♡ Wishlist
-                        <?php if ($wishlistCount > 0): ?>
-                            (<?= $wishlistCount ?>)
-                        <?php endif; ?>
-                    </a>
-                    <!-- ORDERS -->
-                    <a
-                        href="<?= htmlspecialchars(
-                            navUrl('order.php'),
-                            ENT_QUOTES,
-                            'UTF-8'
-                        ) ?>"
-                    >
-                        📦 My Orders
-                    </a>
-                <?php endif; ?>
-                <!-- =================================================
-                     VENDOR MOBILE
-                     ================================================= -->
-                <?php if ($userRole === 'vendor'): ?>
-                    <a
-                        href="<?= htmlspecialchars(
-                            navUrl(
-                                'seller/dashboard.php'
-                            ),
-                            ENT_QUOTES,
-                            'UTF-8'
-                        ) ?>"
-                    >
-                        🏪 Vendor Dashboard
-                    </a>
-                    <a
-                        href="<?= htmlspecialchars(
-                            navUrl(
-                                'seller/products.php'
-                            ),
-                            ENT_QUOTES,
-                            'UTF-8'
-                        ) ?>"
-                    >
-                        🛍️ My Products
-                    </a>
-                    <a
-                        href="<?= htmlspecialchars(
-                            navUrl(
-                                'seller/orders.php'
-                            ),
-                            ENT_QUOTES,
-                            'UTF-8'
-                        ) ?>"
-                    >
-                        📦 Orders
-                    </a>
-                <?php endif; ?>
-                <!-- =================================================
-                     ADMIN MOBILE
-                     ================================================= -->
-                <?php if ($userRole === 'admin'): ?>
-                    <a
-                        href="<?= htmlspecialchars(
-                            navUrl(
-                                'admin/dashboard.php'
-                            ),
-                            ENT_QUOTES,
-                            'UTF-8'
-                        ) ?>"
-                    >
-                        ⚙️ Admin Dashboard
-                    </a>
-                <?php endif; ?>
-                <!-- PROFILE -->
-                <a
-                    href="<?= htmlspecialchars(
-                        navUrl('profile.php'),
-                        ENT_QUOTES,
-                        'UTF-8'
-                    ) ?>"
-                >
-                    👤 Profile
-                </a>
-                <!-- LOGOUT -->
-                <a
-                    href="<?= htmlspecialchars(
-                        navUrl(
-                            'auth/logout.php'
-                        ),
-                        ENT_QUOTES,
-                        'UTF-8'
-                    ) ?>"
-                >
-                    ↪ Logout
-                </a>
-            <?php else: ?>
-                <!-- =================================================
-                     GUEST MOBILE AUTH
-                     ================================================= -->
-                <!-- LOGIN -->
-                <button
-                    type="button"
-                    class="mobile-login-button"
-                    data-modal-open="loginModal"
-                >
-                    Login
-                </button>
-                <!-- REGISTER -->
-                <button
-                    type="button"
-                    class="mobile-register-button"
-                    data-modal-open="registerModal"
-                >
-                    Register
-                </button>
-            <?php endif; ?>
-        </div>
-    </div>
+</div>
 </header>
+<!-- =========================================================
+     AUTH MODALS
+     IMPORTANT: THESE MUST EXIST ON THE PAGE
+     ========================================================= -->
+<?php
+/*
+|--------------------------------------------------------------------------
+| Prevent duplicate modal inclusion
+|--------------------------------------------------------------------------
+*/
+if (!defined('HOCHIPOHUB_AUTH_MODALS_LOADED')):
+    define(
+        'HOCHIPOHUB_AUTH_MODALS_LOADED',
+        true
+    );
+    require_once __DIR__ . '/login_modal.php';
+    require_once __DIR__ . '/register_modal.php';
+endif;
+?>
 <!-- =========================================================
      NAVBAR JAVASCRIPT
      ========================================================= -->
@@ -775,11 +536,9 @@ if (!empty($userName)) {
 document.addEventListener(
     'DOMContentLoaded',
     function () {
-        /*
-        |--------------------------------------------------------------------------
-        | USER DROPDOWN
-        |--------------------------------------------------------------------------
-        */
+        /* =====================================================
+           USER DROPDOWN
+           ===================================================== */
         const userButton =
             document.getElementById(
                 'userMenuButton'
@@ -815,8 +574,7 @@ document.addEventListener(
                     if (
                         !userDropdown.contains(
                             event.target
-                        )
-                        &&
+                        ) &&
                         !userButton.contains(
                             event.target
                         )
@@ -832,11 +590,9 @@ document.addEventListener(
                 }
             );
         }
-        /*
-        |--------------------------------------------------------------------------
-        | MOBILE MENU
-        |--------------------------------------------------------------------------
-        */
+        /* =====================================================
+           MOBILE MENU
+           ===================================================== */
         const mobileToggle =
             document.getElementById(
                 'mobileMenuToggle'
@@ -869,70 +625,6 @@ document.addEventListener(
                 }
             );
         }
-        /*
-        |--------------------------------------------------------------------------
-        | CLOSE MOBILE MENU AFTER NORMAL LINK CLICK
-        |--------------------------------------------------------------------------
-        */
-        const mobileLinks =
-            document.querySelectorAll(
-                '.mobile-menu-inner > a'
-            );
-        mobileLinks.forEach(
-            function (link) {
-                link.addEventListener(
-                    'click',
-                    function () {
-                        if (mobileMenu) {
-                            mobileMenu.classList.remove(
-                                'show'
-                            );
-                        }
-                        if (mobileToggle) {
-                            mobileToggle.classList.remove(
-                                'active'
-                            );
-                            mobileToggle.setAttribute(
-                                'aria-expanded',
-                                'false'
-                            );
-                        }
-                    }
-                );
-            }
-        );
-        /*
-        |--------------------------------------------------------------------------
-        | CLOSE MOBILE MENU WHEN LOGIN / REGISTER IS CLICKED
-        |--------------------------------------------------------------------------
-        */
-        const mobileAuthButtons =
-            document.querySelectorAll(
-                '.mobile-login-button, .mobile-register-button'
-            );
-        mobileAuthButtons.forEach(
-            function (button) {
-                button.addEventListener(
-                    'click',
-                    function () {
-                        if (mobileMenu) {
-                            mobileMenu.classList.remove(
-                                'show'
-                            );
-                        }
-                        if (mobileToggle) {
-                            mobileToggle.classList.remove(
-                                'active'
-                            );
-                            mobileToggle.setAttribute(
-                                'aria-expanded',
-                                'false'
-                            );
-                        }
-                    }
-                );
-            }
-        );
     }
 );
 </script>
