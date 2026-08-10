@@ -12,28 +12,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| DATABASE
-|--------------------------------------------------------------------------
-*/
-
-if (!isset($db) || !($db instanceof PDO)) {
-
-    if (function_exists('getDB')) {
-        $db = getDB();
-    }
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| USER SESSION
-|--------------------------------------------------------------------------
-*/
-
 $isLoggedIn = isset($_SESSION['user_id']);
 
 $userName = $_SESSION['user_name']
@@ -46,69 +24,16 @@ $userRole = $_SESSION['user_role']
 
 $userId = $_SESSION['user_id'] ?? null;
 
-
-/*
-|--------------------------------------------------------------------------
-| COUNTS
-|--------------------------------------------------------------------------
-*/
-
 $cartCount = $cartCount ?? 0;
 $wishlistCount = $wishlistCount ?? 0;
-
-
-/*
-|--------------------------------------------------------------------------
-| BASE URL
-|--------------------------------------------------------------------------
-*/
 
 $baseUrl = defined('BASE_URL')
     ? BASE_URL
     : '/hochipohub/';
 
-
-/*
-|--------------------------------------------------------------------------
-| CURRENT PAGE
-|--------------------------------------------------------------------------
-*/
-
 $currentPage = basename(
     $_SERVER['PHP_SELF'] ?? 'index.php'
 );
-
-
-/*
-|--------------------------------------------------------------------------
-| GET CATEGORIES
-|--------------------------------------------------------------------------
-*/
-
-$navbarCategories = [];
-
-try {
-
-    if (isset($db) && $db instanceof PDO) {
-
-        $stmt = $db->query("
-            SELECT
-                category_id,
-                category_name
-            FROM categories
-            ORDER BY category_name ASC
-        ");
-
-        $navbarCategories =
-            $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    }
-
-} catch (PDOException $e) {
-
-    $navbarCategories = [];
-
-}
 
 ?>
 
@@ -116,13 +41,12 @@ try {
 
     <div class="navbar-container">
 
-
         <!-- =====================================================
              LOGO
         ====================================================== -->
 
         <a
-            href="<?= e($baseUrl) ?>index.php"
+            href="<?= $baseUrl ?>index.php"
             class="brand"
         >
 
@@ -143,11 +67,8 @@ try {
 
         <nav class="main-nav">
 
-
-            <!-- HOME -->
-
             <a
-                href="<?= e($baseUrl) ?>index.php"
+                href="<?= $baseUrl ?>index.php"
                 class="<?= $currentPage === 'index.php'
                     ? 'active'
                     : '' ?>"
@@ -155,11 +76,8 @@ try {
                 Home
             </a>
 
-
-            <!-- SHOP -->
-
             <a
-                href="<?= e($baseUrl) ?>catalog.php"
+                href="<?= $baseUrl ?>catalog.php"
                 class="<?= $currentPage === 'catalog.php'
                     ? 'active'
                     : '' ?>"
@@ -167,118 +85,17 @@ try {
                 Shop
             </a>
 
-
-            <!-- =================================================
-                 CATEGORIES DROPDOWN
-            ================================================== -->
-
-            <div class="nav-dropdown">
-
-                <button
-                    type="button"
-                    class="nav-dropdown-button
-                    <?= $currentPage === 'category.php'
-                        ? 'active'
-                        : '' ?>"
-                    id="categoryDropdownButton"
-                    aria-expanded="false"
-                >
-
-                    Categories
-
-                    <span class="nav-chevron">
-                        ▾
-                    </span>
-
-                </button>
-
-
-                <div
-                    class="nav-dropdown-menu"
-                    id="categoryDropdownMenu"
-                >
-
-                    <!-- ALL CATEGORIES -->
-
-                    <a
-                        href="<?= e($baseUrl) ?>category.php"
-                        class="category-dropdown-item
-                        category-all"
-                    >
-
-                        <span class="category-item-icon">
-                            ✦
-                        </span>
-
-                        <span>
-                            All Categories
-                        </span>
-
-                    </a>
-
-
-                    <div class="category-divider"></div>
-
-
-                    <?php if (
-                        !empty($navbarCategories)
-                    ): ?>
-
-
-                        <?php foreach (
-                            $navbarCategories
-                            as $navCategory
-                        ): ?>
-
-                            <a
-                                href="<?= e(
-                                    $baseUrl
-                                ) ?>category.php?category_id=<?= (int)
-                                    $navCategory[
-                                        'category_id'
-                                    ] ?>"
-                                class="category-dropdown-item"
-                            >
-
-                                <span class="category-item-icon">
-                                    ▪
-                                </span>
-
-                                <span>
-                                    <?= e(
-                                        $navCategory[
-                                            'category_name'
-                                        ]
-                                    ) ?>
-                                </span>
-
-                            </a>
-
-                        <?php endforeach; ?>
-
-
-                    <?php else: ?>
-
-                        <div
-                            class="category-empty"
-                        >
-
-                            No categories available.
-
-                        </div>
-
-                    <?php endif; ?>
-
-
-                </div>
-
-            </div>
-
-
-            <!-- VENDORS -->
+            <a
+                href="<?= $baseUrl ?>category.php"
+                class="<?= $currentPage === 'category.php'
+                    ? 'active'
+                    : '' ?>"
+            >
+                Categories
+            </a>
 
             <a
-                href="<?= e($baseUrl) ?>vendor.php"
+                href="<?= $baseUrl ?>vendor.php"
                 class="<?= $currentPage === 'vendor.php'
                     ? 'active'
                     : '' ?>"
@@ -294,7 +111,7 @@ try {
         ====================================================== -->
 
         <form
-            action="<?= e($baseUrl) ?>search.php"
+            action="<?= $baseUrl ?>search.php"
             method="GET"
             class="navbar-search"
         >
@@ -307,8 +124,10 @@ try {
                 type="search"
                 name="q"
                 placeholder="Search products, vendors..."
-                value="<?= e(
-                    $_GET['q'] ?? ''
+                value="<?= htmlspecialchars(
+                    $_GET['q'] ?? '',
+                    ENT_QUOTES,
+                    'UTF-8'
                 ) ?>"
                 autocomplete="off"
             >
@@ -327,10 +146,10 @@ try {
         <div class="navbar-actions">
 
 
-            <!-- WISHLIST -->
+            <!-- Wishlist -->
 
             <a
-                href="<?= e($baseUrl) ?>wishlist.php"
+                href="<?= $baseUrl ?>wishlist.php"
                 class="nav-icon-btn"
                 aria-label="Wishlist"
                 title="Wishlist"
@@ -340,16 +159,12 @@ try {
                     ♡
                 </span>
 
-                <?php if (
-                    $wishlistCount > 0
-                ): ?>
+                <?php if ($wishlistCount > 0): ?>
 
                     <small class="nav-badge">
-
                         <?= $wishlistCount > 99
                             ? '99+'
-                            : (int) $wishlistCount ?>
-
+                            : $wishlistCount ?>
                     </small>
 
                 <?php endif; ?>
@@ -357,10 +172,10 @@ try {
             </a>
 
 
-            <!-- CART -->
+            <!-- Cart -->
 
             <a
-                href="<?= e($baseUrl) ?>cart.php"
+                href="<?= $baseUrl ?>cart.php"
                 class="nav-icon-btn"
                 aria-label="Cart"
                 title="Shopping Cart"
@@ -370,16 +185,12 @@ try {
                     🛒
                 </span>
 
-                <?php if (
-                    $cartCount > 0
-                ): ?>
+                <?php if ($cartCount > 0): ?>
 
                     <small class="nav-badge">
-
                         <?= $cartCount > 99
                             ? '99+'
-                            : (int) $cartCount ?>
-
+                            : $cartCount ?>
                     </small>
 
                 <?php endif; ?>
@@ -387,14 +198,11 @@ try {
             </a>
 
 
-            <!-- =================================================
-                 LOGGED IN USER
-            ================================================== -->
-
             <?php if ($isLoggedIn): ?>
 
-                <div class="user-menu">
+                <!-- USER -->
 
+                <div class="user-menu">
 
                     <button
                         type="button"
@@ -403,22 +211,22 @@ try {
                     >
 
                         <span class="user-avatar">
-
-                            <?= e(
-                                strtoupper(
-                                    substr(
-                                        trim($userName),
-                                        0,
-                                        1
-                                    )
+                            <?= strtoupper(
+                                substr(
+                                    trim($userName),
+                                    0,
+                                    1
                                 )
                             ) ?>
-
                         </span>
 
                         <span class="user-menu-name">
 
-                            <?= e($userName) ?>
+                            <?= htmlspecialchars(
+                                $userName,
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
 
                         </span>
 
@@ -434,47 +242,38 @@ try {
                         id="userDropdown"
                     >
 
+                        <div class="dropdown-user-info">
 
-                        <div
-                            class="dropdown-user-info"
-                        >
+                            <span class="dropdown-avatar">
 
-                            <span
-                                class="dropdown-avatar"
-                            >
-
-                                <?= e(
-                                    strtoupper(
-                                        substr(
-                                            trim(
-                                                $userName
-                                            ),
-                                            0,
-                                            1
-                                        )
+                                <?= strtoupper(
+                                    substr(
+                                        trim($userName),
+                                        0,
+                                        1
                                     )
                                 ) ?>
 
                             </span>
 
-
                             <div>
 
                                 <strong>
-                                    <?= e(
-                                        $userName
+                                    <?= htmlspecialchars(
+                                        $userName,
+                                        ENT_QUOTES,
+                                        'UTF-8'
                                     ) ?>
                                 </strong>
 
                                 <small>
-
-                                    <?= e(
+                                    <?= htmlspecialchars(
                                         ucfirst(
-                                            $userRole
-                                            ?: 'customer'
-                                        )
+                                            $userRole ?: 'customer'
+                                        ),
+                                        ENT_QUOTES,
+                                        'UTF-8'
                                     ) ?>
-
                                 </small>
 
                             </div>
@@ -482,139 +281,75 @@ try {
                         </div>
 
 
-                        <div
-                            class="dropdown-divider"
-                        ></div>
+                        <div class="dropdown-divider"></div>
 
-
-                        <!-- PROFILE -->
 
                         <a
-                            href="<?= e(
-                                $baseUrl
-                            ) ?>profile.php"
+                            href="<?= $baseUrl ?>profile.php"
                             class="dropdown-link"
                         >
-
-                            <span>
-                                👤
-                            </span>
-
+                            <span>👤</span>
                             My Profile
-
                         </a>
 
 
-                        <!-- CUSTOMER -->
-
-                        <?php if (
-                            $userRole === 'customer'
-                        ): ?>
+                        <?php if ($userRole === 'customer'): ?>
 
                             <a
-                                href="<?= e(
-                                    $baseUrl
-                                ) ?>order.php"
+                                href="<?= $baseUrl ?>order.php"
                                 class="dropdown-link"
                             >
-
-                                <span>
-                                    📦
-                                </span>
-
+                                <span>📦</span>
                                 My Orders
-
                             </a>
 
-
                             <a
-                                href="<?= e(
-                                    $baseUrl
-                                ) ?>wishlist.php"
+                                href="<?= $baseUrl ?>wishlist.php"
                                 class="dropdown-link"
                             >
-
-                                <span>
-                                    ♡
-                                </span>
-
+                                <span>♡</span>
                                 Wishlist
-
                             </a>
 
                         <?php endif; ?>
 
 
-                        <!-- VENDOR -->
-
-                        <?php if (
-                            $userRole === 'vendor'
-                        ): ?>
+                        <?php if ($userRole === 'vendor'): ?>
 
                             <a
-                                href="<?= e(
-                                    $baseUrl
-                                ) ?>seller/dashboard.php"
+                                href="<?= $baseUrl ?>seller/dashboard.php"
                                 class="dropdown-link"
                             >
-
-                                <span>
-                                    📊
-                                </span>
-
+                                <span>📊</span>
                                 Seller Center
-
                             </a>
 
                         <?php endif; ?>
 
 
-                        <!-- ADMIN -->
-
-                        <?php if (
-                            $userRole === 'admin'
-                        ): ?>
+                        <?php if ($userRole === 'admin'): ?>
 
                             <a
-                                href="<?= e(
-                                    $baseUrl
-                                ) ?>admin/dashboard.php"
+                                href="<?= $baseUrl ?>admin/dashboard.php"
                                 class="dropdown-link"
                             >
-
-                                <span>
-                                    ⚙️
-                                </span>
-
+                                <span>⚙️</span>
                                 Admin Panel
-
                             </a>
 
                         <?php endif; ?>
 
 
-                        <div
-                            class="dropdown-divider"
-                        ></div>
+                        <div class="dropdown-divider"></div>
 
-
-                        <!-- LOGOUT -->
 
                         <a
-                            href="<?= e(
-                                $baseUrl
-                            ) ?>auth/logout.php"
+                            href="<?= $baseUrl ?>auth/logout.php"
                             class="dropdown-link dropdown-danger"
                         >
-
-                            <span>
-                                ↪
-                            </span>
-
+                            <span>↪</span>
                             Logout
-
                         </a>
-
 
                     </div>
 
@@ -623,13 +358,9 @@ try {
 
             <?php else: ?>
 
-
-                <!-- =================================================
-                     LOGIN / REGISTER
-                ================================================== -->
+                <!-- AUTH BUTTONS -->
 
                 <div class="auth-buttons">
-
 
                     <button
                         type="button"
@@ -639,7 +370,6 @@ try {
                         Login
                     </button>
 
-
                     <button
                         type="button"
                         class="btn-register"
@@ -648,16 +378,12 @@ try {
                         Register
                     </button>
 
-
                 </div>
-
 
             <?php endif; ?>
 
 
-            <!-- =================================================
-                 MOBILE MENU BUTTON
-            ================================================== -->
+            <!-- MOBILE MENU -->
 
             <button
                 type="button"
@@ -672,15 +398,14 @@ try {
 
             </button>
 
-
         </div>
 
     </div>
 
 
-    <!-- =========================================================
+    <!-- =====================================================
          MOBILE NAVIGATION
-    ========================================================== -->
+    ====================================================== -->
 
     <div
         class="mobile-menu"
@@ -689,11 +414,8 @@ try {
 
         <div class="mobile-menu-inner">
 
-
-            <!-- MOBILE SEARCH -->
-
             <form
-                action="<?= e($baseUrl) ?>search.php"
+                action="<?= $baseUrl ?>search.php"
                 method="GET"
                 class="mobile-search"
             >
@@ -711,109 +433,32 @@ try {
             </form>
 
 
-            <!-- MOBILE LINKS -->
-
-            <a
-                href="<?= e($baseUrl) ?>index.php"
-            >
+            <a href="<?= $baseUrl ?>index.php">
                 Home
             </a>
 
-
-            <a
-                href="<?= e($baseUrl) ?>catalog.php"
-            >
+            <a href="<?= $baseUrl ?>catalog.php">
                 Shop
             </a>
 
+            <a href="<?= $baseUrl ?>category.php">
+                Categories
+            </a>
 
-            <!-- MOBILE CATEGORIES -->
-
-            <div class="mobile-category-section">
-
-                <button
-                    type="button"
-                    class="mobile-category-button"
-                    id="mobileCategoryButton"
-                >
-
-                    <span>
-                        Categories
-                    </span>
-
-                    <span>
-                        ▾
-                    </span>
-
-                </button>
-
-
-                <div
-                    class="mobile-category-list"
-                    id="mobileCategoryList"
-                >
-
-                    <a
-                        href="<?= e(
-                            $baseUrl
-                        ) ?>category.php"
-                    >
-                        All Categories
-                    </a>
-
-
-                    <?php foreach (
-                        $navbarCategories
-                        as $navCategory
-                    ): ?>
-
-                        <a
-                            href="<?= e(
-                                $baseUrl
-                            ) ?>category.php?category_id=<?= (int)
-                                $navCategory[
-                                    'category_id'
-                                ] ?>"
-                        >
-
-                            <?= e(
-                                $navCategory[
-                                    'category_name'
-                                ]
-                            ) ?>
-
-                        </a>
-
-                    <?php endforeach; ?>
-
-                </div>
-
-            </div>
-
-
-            <a
-                href="<?= e($baseUrl) ?>vendor.php"
-            >
+            <a href="<?= $baseUrl ?>vendor.php">
                 Vendors
             </a>
 
-
-            <a
-                href="<?= e($baseUrl) ?>wishlist.php"
-            >
+            <a href="<?= $baseUrl ?>wishlist.php">
                 Wishlist
             </a>
 
-
-            <a
-                href="<?= e($baseUrl) ?>cart.php"
-            >
+            <a href="<?= $baseUrl ?>cart.php">
                 Cart
             </a>
 
 
             <?php if (!$isLoggedIn): ?>
-
 
                 <button
                     type="button"
@@ -823,7 +468,6 @@ try {
                     Login
                 </button>
 
-
                 <button
                     type="button"
                     class="mobile-register-button"
@@ -832,30 +476,17 @@ try {
                     Create Account
                 </button>
 
-
             <?php else: ?>
 
-
-                <a
-                    href="<?= e(
-                        $baseUrl
-                    ) ?>profile.php"
-                >
+                <a href="<?= $baseUrl ?>profile.php">
                     My Profile
                 </a>
 
-
-                <a
-                    href="<?= e(
-                        $baseUrl
-                    ) ?>auth/logout.php"
-                >
+                <a href="<?= $baseUrl ?>auth/logout.php">
                     Logout
                 </a>
 
-
             <?php endif; ?>
-
 
         </div>
 
@@ -870,276 +501,91 @@ try {
 
 <script>
 
-document.addEventListener(
-    'DOMContentLoaded',
-    function () {
+document.addEventListener('DOMContentLoaded', function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | USER DROPDOWN
+    |--------------------------------------------------------------------------
+    */
+
+    const userButton =
+        document.getElementById('userMenuButton');
+
+    const userDropdown =
+        document.getElementById('userDropdown');
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | CATEGORY DROPDOWN
-        |--------------------------------------------------------------------------
-        */
+    if (userButton && userDropdown) {
 
-        const categoryButton =
-            document.getElementById(
-                'categoryDropdownButton'
-            );
-
-        const categoryMenu =
-            document.getElementById(
-                'categoryDropdownMenu'
-            );
-
-
-        if (
-            categoryButton &&
-            categoryMenu
-        ) {
-
-            categoryButton.addEventListener(
-                'click',
-                function (event) {
-
-                    event.stopPropagation();
-
-                    const isOpen =
-                        categoryMenu.classList.contains(
-                            'show'
-                        );
-
-
-                    /*
-                    | Close user dropdown
-                    */
-
-                    const userDropdown =
-                        document.getElementById(
-                            'userDropdown'
-                        );
-
-                    if (userDropdown) {
-
-                        userDropdown.classList.remove(
-                            'show'
-                        );
-
-                    }
-
-
-                    /*
-                    | Toggle category dropdown
-                    */
-
-                    categoryMenu.classList.toggle(
-                        'show'
-                    );
-
-                    categoryButton.setAttribute(
-                        'aria-expanded',
-                        !isOpen
-                    );
-
-                }
-            );
-
-
-            categoryMenu.addEventListener(
-                'click',
-                function (event) {
-
-                    event.stopPropagation();
-
-                }
-            );
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | USER DROPDOWN
-        |--------------------------------------------------------------------------
-        */
-
-        const userButton =
-            document.getElementById(
-                'userMenuButton'
-            );
-
-        const userDropdown =
-            document.getElementById(
-                'userDropdown'
-            );
-
-
-        if (
-            userButton &&
-            userDropdown
-        ) {
-
-            userButton.addEventListener(
-                'click',
-                function (event) {
-
-                    event.stopPropagation();
-
-
-                    /*
-                    | Close category dropdown
-                    */
-
-                    if (
-                        categoryMenu
-                    ) {
-
-                        categoryMenu.classList.remove(
-                            'show'
-                        );
-
-                    }
-
-
-                    userDropdown.classList.toggle(
-                        'show'
-                    );
-
-                }
-            );
-
-
-            userDropdown.addEventListener(
-                'click',
-                function (event) {
-
-                    event.stopPropagation();
-
-                }
-            );
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CLOSE DROPDOWNS WHEN CLICK OUTSIDE
-        |--------------------------------------------------------------------------
-        */
-
-        document.addEventListener(
+        userButton.addEventListener(
             'click',
-            function () {
+            function (event) {
 
-                if (categoryMenu) {
+                event.stopPropagation();
 
-                    categoryMenu.classList.remove(
-                        'show'
-                    );
-
-                    categoryButton?.setAttribute(
-                        'aria-expanded',
-                        'false'
-                    );
-
-                }
-
-
-                if (userDropdown) {
-
-                    userDropdown.classList.remove(
-                        'show'
-                    );
-
-                }
+                userDropdown.classList.toggle(
+                    'show'
+                );
 
             }
         );
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | MOBILE MENU
-        |--------------------------------------------------------------------------
-        */
+        document.addEventListener(
+            'click',
+            function () {
 
-        const mobileToggle =
-            document.getElementById(
-                'mobileMenuToggle'
-            );
+                userDropdown.classList.remove(
+                    'show'
+                );
 
-        const mobileMenu =
-            document.getElementById(
-                'mobileMenu'
-            );
-
-
-        if (
-            mobileToggle &&
-            mobileMenu
-        ) {
-
-            mobileToggle.addEventListener(
-                'click',
-                function () {
-
-                    mobileToggle.classList.toggle(
-                        'active'
-                    );
-
-                    mobileMenu.classList.toggle(
-                        'show'
-                    );
-
-                    document.body.classList.toggle(
-                        'menu-open'
-                    );
-
-                }
-            );
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | MOBILE CATEGORY
-        |--------------------------------------------------------------------------
-        */
-
-        const mobileCategoryButton =
-            document.getElementById(
-                'mobileCategoryButton'
-            );
-
-        const mobileCategoryList =
-            document.getElementById(
-                'mobileCategoryList'
-            );
-
-
-        if (
-            mobileCategoryButton &&
-            mobileCategoryList
-        ) {
-
-            mobileCategoryButton.addEventListener(
-                'click',
-                function () {
-
-                    mobileCategoryList.classList.toggle(
-                        'show'
-                    );
-
-                    mobileCategoryButton.classList.toggle(
-                        'active'
-                    );
-
-                }
-            );
-
-        }
+            }
+        );
 
     }
-);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MOBILE MENU
+    |--------------------------------------------------------------------------
+    */
+
+    const mobileToggle =
+        document.getElementById(
+            'mobileMenuToggle'
+        );
+
+    const mobileMenu =
+        document.getElementById(
+            'mobileMenu'
+        );
+
+
+    if (mobileToggle && mobileMenu) {
+
+        mobileToggle.addEventListener(
+            'click',
+            function () {
+
+                mobileToggle.classList.toggle(
+                    'active'
+                );
+
+                mobileMenu.classList.toggle(
+                    'show'
+                );
+
+                document.body.classList.toggle(
+                    'menu-open'
+                );
+
+            }
+        );
+
+    }
+
+});
 
 </script>
