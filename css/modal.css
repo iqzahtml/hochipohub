@@ -1,471 +1,811 @@
-/* =========================================================
+/*
+=========================================================
 HOCHIPOHUB - AUTH MODAL
-FORCE CENTER POPUP
-========================================================= */
+LOGIN / REGISTER POPUP
+=========================================================
+*/
 
-/* ––––– OVERLAY ––––– */
+
+/* =========================================================
+   MODAL OVERLAY
+   ========================================================= */
 
 .modal-overlay {
-display: none !important;
 
-position: fixed !important;
-top: 0 !important;
-right: 0 !important;
-bottom: 0 !important;
-left: 0 !important;
-width: 100% !important;
-height: 100% !important;
-padding: 20px !important;
-box-sizing: border-box !important;
-align-items: center !important;
-justify-content: center !important;
-background: rgba(15, 23, 42, 0.78) !important;
-z-index: 2147483647 !important;
+    display: none !important;
+
+    position: fixed !important;
+
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+
+    width: 100% !important;
+    height: 100% !important;
+
+    padding: 20px !important;
+
+    box-sizing: border-box !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    background: rgba(15, 23, 42, 0.78) !important;
+
+    z-index: 2147483647 !important;
 
 }
 
-/* ––––– SHOW OVERLAY ––––– */
+
+/* =========================================================
+   SHOW MODAL
+   ========================================================= */
 
 .modal-overlay.show {
-display: flex !important;
 
-opacity: 1 !important;
-visibility: visible !important;
-pointer-events: auto !important;
+    display: flex !important;
+
+    opacity: 1 !important;
+
+    visibility: visible !important;
+
+    pointer-events: auto !important;
 
 }
 
-/* ––––– MODAL BOX ––––– */
+
+/* =========================================================
+   MODAL BOX
+   ========================================================= */
 
 .modal-overlay .auth-modal {
-display: block !important;
 
-position: relative !important;
-width: 100% !important;
-max-width: 460px !important;
-max-height: calc(100vh - 40px) !important;
-margin: auto !important;
-padding: 32px !important;
-box-sizing: border-box !important;
-overflow-y: auto !important;
-background: #ffffff !important;
-border: 1px solid #e2e8f0 !important;
-border-radius: 24px !important;
-box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.40),
-    0 10px 30px rgba(37, 99, 235, 0.20) !important;
-color: #0f172a !important;
-transform: translateY(0) scale(1) !important;
-opacity: 1 !important;
-visibility: visible !important;
+    display: block !important;
+
+    position: relative !important;
+
+    width: 100% !important;
+
+    max-width: 460px !important;
+
+    max-height: calc(100vh - 40px) !important;
+
+    margin: auto !important;
+
+    padding: 32px !important;
+
+    box-sizing: border-box !important;
+
+    overflow-y: auto !important;
+
+    background: #ffffff !important;
+
+    border: 1px solid #e2e8f0 !important;
+
+    border-radius: 24px !important;
+
+    box-shadow:
+        0 30px 80px rgba(0, 0, 0, 0.40),
+        0 10px 30px rgba(37, 99, 235, 0.20) !important;
+
+    color: #0f172a !important;
+
+    transform: translateY(0) scale(1) !important;
+
+    opacity: 1 !important;
+
+    visibility: visible !important;
 
 }
 
-/* ––––– REGISTER ––––– */
+
+/* =========================================================
+   REGISTER MODAL
+   ========================================================= */
 
 .modal-overlay .auth-modal-register {
-max-width: 560px !important;
+
+    max-width: 560px !important;
+
 }
 
-/* ––––– CLOSE BUTTON ––––– */
+
+/* =========================================================
+   CLOSE BUTTON
+   ========================================================= */
 
 .modal-overlay .modal-close {
-position: absolute !important;
 
-top: 14px !important;
-right: 14px !important;
-width: 38px !important;
-height: 38px !important;
-display: flex !important;
-align-items: center !important;
-justify-content: center !important;
-margin: 0 !important;
-padding: 0 !important;
-border: 0 !important;
-border-radius: 50% !important;
-background: #f1f5f9 !important;
-color: #475569 !important;
-font-size: 25px !important;
-line-height: 1 !important;
-cursor: pointer !important;
-z-index: 10 !important;
+    position: absolute !important;
+
+    top: 14px !important;
+
+    right: 14px !important;
+
+    width: 38px !important;
+
+    height: 38px !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+
+    justify-content: center !important;
+
+    margin: 0 !important;
+
+    padding: 0 !important;
+
+    border: 0 !important;
+
+    border-radius: 50% !important;
+
+    background: #f1f5f9 !important;
+
+    color: #475569 !important;
+
+    font-size: 25px !important;
+
+    line-height: 1 !important;
+
+    cursor: pointer !important;
+
+    z-index: 10 !important;
 
 }
+
 
 .modal-overlay .modal-close:hover {
-background: #dbeafe !important;
-color: #2563eb !important;
+
+    background: #dbeafe !important;
+
+    color: #2563eb !important;
+
 }
 
-/* ––––– HEADER ––––– */
+
+/* =========================================================
+   HEADER
+   ========================================================= */
 
 .auth-modal-header {
-display: block !important;
 
-width: 100% !important;
-margin: 0 0 24px !important;
-text-align: center !important;
+    display: block !important;
+
+    width: 100% !important;
+
+    margin: 0 0 24px !important;
+
+    text-align: center !important;
 
 }
+
 
 .auth-modal-icon {
-width: 58px !important;
-height: 58px !important;
 
-display: flex !important;
-align-items: center !important;
-justify-content: center !important;
-margin: 0 auto 12px !important;
-border-radius: 18px !important;
-background:
-    linear-gradient(
-        135deg,
-        #2563eb,
-        #4f46e5
-    ) !important;
-color: #ffffff !important;
-font-size: 27px !important;
-box-shadow:
-    0 10px 25px rgba(37, 99, 235, 0.25) !important;
+    width: 58px !important;
+
+    height: 58px !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+
+    justify-content: center !important;
+
+    margin: 0 auto 12px !important;
+
+    border-radius: 18px !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #4f46e5
+        ) !important;
+
+    color: #ffffff !important;
+
+    font-size: 27px !important;
+
+    box-shadow:
+        0 10px 25px rgba(37, 99, 235, 0.25) !important;
 
 }
+
 
 .auth-eyebrow {
-display: block !important;
 
-margin: 0 0 5px !important;
-color: #2563eb !important;
-font-size: 11px !important;
-font-weight: 800 !important;
-letter-spacing: 1.5px !important;
+    display: block !important;
+
+    margin: 0 0 5px !important;
+
+    color: #2563eb !important;
+
+    font-size: 11px !important;
+
+    font-weight: 800 !important;
+
+    letter-spacing: 1.5px !important;
 
 }
+
 
 .auth-modal-header h2 {
-display: block !important;
 
-margin: 0 0 7px !important;
-color: #0f172a !important;
-font-size: 25px !important;
-font-weight: 800 !important;
-line-height: 1.25 !important;
+    display: block !important;
+
+    margin: 0 0 7px !important;
+
+    color: #0f172a !important;
+
+    font-size: 25px !important;
+
+    font-weight: 800 !important;
+
+    line-height: 1.25 !important;
 
 }
+
 
 .auth-modal-header p {
-display: block !important;
 
-margin: 0 !important;
-color: #64748b !important;
-font-size: 14px !important;
-line-height: 1.5 !important;
+    display: block !important;
+
+    margin: 0 !important;
+
+    color: #64748b !important;
+
+    font-size: 14px !important;
+
+    line-height: 1.5 !important;
 
 }
 
-/* ––––– ALERT ––––– */
+
+/* =========================================================
+   ALERT
+   ========================================================= */
 
 .auth-alert {
-display: block !important;
 
-width: 100% !important;
-box-sizing: border-box !important;
-padding: 12px 14px !important;
-margin: 0 0 18px !important;
-border-radius: 12px !important;
-font-size: 13px !important;
-line-height: 1.5 !important;
+    display: block !important;
+
+    width: 100% !important;
+
+    box-sizing: border-box !important;
+
+    padding: 12px 14px !important;
+
+    margin: 0 0 18px !important;
+
+    border-radius: 12px !important;
+
+    font-size: 13px !important;
+
+    line-height: 1.5 !important;
 
 }
+
 
 .auth-alert-success {
-background: #ecfdf5 !important;
-border: 1px solid #a7f3d0 !important;
-color: #047857 !important;
+
+    background: #ecfdf5 !important;
+
+    border: 1px solid #a7f3d0 !important;
+
+    color: #047857 !important;
+
 }
+
 
 .auth-alert-error {
-background: #fef2f2 !important;
-border: 1px solid #fecaca !important;
-color: #b91c1c !important;
+
+    background: #fef2f2 !important;
+
+    border: 1px solid #fecaca !important;
+
+    color: #b91c1c !important;
+
 }
 
-/* ––––– FORM ––––– */
+
+/* =========================================================
+   FORM
+   ========================================================= */
 
 .auth-form {
-display: block !important;
 
-width: 100% !important;
-margin: 0 !important;
-padding: 0 !important;
+    display: block !important;
+
+    width: 100% !important;
+
+    margin: 0 !important;
+
+    padding: 0 !important;
 
 }
+
 
 .form-group {
-display: block !important;
 
-width: 100% !important;
-margin: 0 0 17px !important;
+    display: block !important;
+
+    width: 100% !important;
+
+    margin: 0 0 17px !important;
 
 }
+
 
 .form-group label {
-display: block !important;
 
-margin: 0 0 7px !important;
-color: #334155 !important;
-font-size: 13px !important;
-font-weight: 700 !important;
+    display: block !important;
+
+    margin: 0 0 7px !important;
+
+    color: #334155 !important;
+
+    font-size: 13px !important;
+
+    font-weight: 700 !important;
 
 }
 
-/* ––––– INPUT ––––– */
 
-.auth-form input:not(
-[type=“checkbox”]
-):not(
-[type=“hidden”]
-),
+/* =========================================================
+   INPUT
+   ========================================================= */
+
+.auth-form input:not([type="checkbox"]):not([type="hidden"]),
 .auth-form select {
-display: block !important;
 
-width: 100% !important;
-height: 46px !important;
-min-height: 46px !important;
-margin: 0 !important;
-padding: 0 14px !important;
-box-sizing: border-box !important;
-border: 1px solid #cbd5e1 !important;
-border-radius: 12px !important;
-background: #f8fafc !important;
-color: #0f172a !important;
-font-family: inherit !important;
-font-size: 14px !important;
-outline: none !important;
+    display: block !important;
+
+    width: 100% !important;
+
+    height: 46px !important;
+
+    min-height: 46px !important;
+
+    margin: 0 !important;
+
+    padding: 0 14px !important;
+
+    box-sizing: border-box !important;
+
+    border: 1px solid #cbd5e1 !important;
+
+    border-radius: 12px !important;
+
+    background: #f8fafc !important;
+
+    color: #0f172a !important;
+
+    font-family: inherit !important;
+
+    font-size: 14px !important;
+
+    outline: none !important;
 
 }
 
-.auth-form input:not(
-[type=“checkbox”]
-):not(
-[type=“hidden”]
-):focus,
+
+.auth-form input:not([type="checkbox"]):not([type="hidden"]):focus,
 .auth-form select:focus {
-background: #ffffff !important;
 
-border-color: #2563eb !important;
-box-shadow:
-    0 0 0 4px rgba(37, 99, 235, 0.10) !important;
+    background: #ffffff !important;
+
+    border-color: #2563eb !important;
+
+    box-shadow:
+        0 0 0 4px rgba(37, 99, 235, 0.10) !important;
 
 }
 
-/* ––––– PASSWORD ––––– */
+
+/* =========================================================
+   PASSWORD
+   ========================================================= */
 
 .password-input {
-position: relative !important;
 
-display: block !important;
-width: 100% !important;
+    position: relative !important;
+
+    display: block !important;
+
+    width: 100% !important;
 
 }
+
 
 .password-input input {
-padding-right: 48px !important;
+
+    padding-right: 48px !important;
+
 }
+
 
 .password-toggle {
-position: absolute !important;
 
-top: 50% !important;
-right: 8px !important;
-width: 34px !important;
-height: 34px !important;
-min-width: 34px !important;
-margin: 0 !important;
-padding: 0 !important;
-transform: translateY(-50%) !important;
-border: none !important;
-border-radius: 8px !important;
-background: transparent !important;
-color: #475569 !important;
-font-size: 17px !important;
-cursor: pointer !important;
-z-index: 5 !important;
+    position: absolute !important;
+
+    top: 50% !important;
+
+    right: 8px !important;
+
+    width: 34px !important;
+
+    height: 34px !important;
+
+    min-width: 34px !important;
+
+    margin: 0 !important;
+
+    padding: 0 !important;
+
+    transform: translateY(-50%) !important;
+
+    border: none !important;
+
+    border-radius: 8px !important;
+
+    background: transparent !important;
+
+    color: #475569 !important;
+
+    font-size: 17px !important;
+
+    cursor: pointer !important;
+
+    z-index: 5 !important;
 
 }
+
 
 .password-toggle:hover {
-background: #e2e8f0 !important;
+
+    background: #e2e8f0 !important;
+
 }
 
-/* ––––– TWO COLUMN ––––– */
+
+/* =========================================================
+   FORM LABEL ROW
+   ========================================================= */
+
+.form-label-row {
+
+    display: flex !important;
+
+    align-items: center !important;
+
+    justify-content: space-between !important;
+
+    gap: 10px !important;
+
+    margin-bottom: 7px !important;
+
+}
+
+
+.form-label-row label {
+
+    margin: 0 !important;
+
+}
+
+
+.form-link {
+
+    color: #2563eb !important;
+
+    font-size: 12px !important;
+
+    font-weight: 700 !important;
+
+    text-decoration: none !important;
+
+}
+
+
+.form-link:hover {
+
+    text-decoration: underline !important;
+
+}
+
+
+/* =========================================================
+   TWO COLUMN
+   ========================================================= */
 
 .form-grid-2 {
-display: grid !important;
 
-grid-template-columns: 1fr 1fr !important;
-gap: 14px !important;
-width: 100% !important;
+    display: grid !important;
+
+    grid-template-columns: 1fr 1fr !important;
+
+    gap: 14px !important;
+
+    width: 100% !important;
 
 }
 
-/* ––––– CHECKBOX ––––– */
+
+/* =========================================================
+   CHECKBOX
+   ========================================================= */
 
 .checkbox-row {
-display: flex !important;
 
-align-items: flex-start !important;
-gap: 9px !important;
-width: 100% !important;
-margin: 4px 0 18px !important;
-padding: 0 !important;
-color: #64748b !important;
-font-size: 12px !important;
-line-height: 1.5 !important;
-cursor: pointer !important;
+    display: flex !important;
 
-}
+    align-items: flex-start !important;
 
-.checkbox-row input[type=“checkbox”] {
-width: 16px !important;
-height: 16px !important;
+    gap: 9px !important;
 
-min-width: 16px !important;
-min-height: 16px !important;
-margin: 1px 0 0 !important;
-padding: 0 !important;
-accent-color: #2563eb !important;
+    width: 100% !important;
+
+    margin: 4px 0 18px !important;
+
+    padding: 0 !important;
+
+    color: #64748b !important;
+
+    font-size: 12px !important;
+
+    line-height: 1.5 !important;
+
+    cursor: pointer !important;
 
 }
 
-/* ––––– SUBMIT ––––– */
+
+.checkbox-row input[type="checkbox"] {
+
+    width: 16px !important;
+
+    height: 16px !important;
+
+    min-width: 16px !important;
+
+    min-height: 16px !important;
+
+    margin: 1px 0 0 !important;
+
+    padding: 0 !important;
+
+    accent-color: #2563eb !important;
+
+}
+
+
+/* =========================================================
+   SUBMIT BUTTON
+   ========================================================= */
 
 .auth-submit {
-display: flex !important;
 
-align-items: center !important;
-justify-content: space-between !important;
-width: 100% !important;
-min-height: 48px !important;
-margin: 0 !important;
-padding: 0 18px !important;
-box-sizing: border-box !important;
-border: none !important;
-border-radius: 13px !important;
-background:
-    linear-gradient(
-        135deg,
-        #2563eb,
-        #4f46e5
-    ) !important;
-color: #ffffff !important;
-font-family: inherit !important;
-font-size: 14px !important;
-font-weight: 800 !important;
-cursor: pointer !important;
-box-shadow:
-    0 8px 20px rgba(37, 99, 235, 0.25) !important;
+    display: flex !important;
+
+    align-items: center !important;
+
+    justify-content: space-between !important;
+
+    width: 100% !important;
+
+    min-height: 48px !important;
+
+    margin: 0 !important;
+
+    padding: 0 18px !important;
+
+    box-sizing: border-box !important;
+
+    border: none !important;
+
+    border-radius: 13px !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #4f46e5
+        ) !important;
+
+    color: #ffffff !important;
+
+    font-family: inherit !important;
+
+    font-size: 14px !important;
+
+    font-weight: 800 !important;
+
+    cursor: pointer !important;
+
+    box-shadow:
+        0 8px 20px rgba(37, 99, 235, 0.25) !important;
 
 }
+
 
 .auth-submit:hover {
-transform: translateY(-2px) !important;
 
-box-shadow:
-    0 12px 28px rgba(37, 99, 235, 0.32) !important;
+    transform: translateY(-2px) !important;
+
+    box-shadow:
+        0 12px 28px rgba(37, 99, 235, 0.32) !important;
 
 }
 
-/* ––––– DIVIDER ––––– */
+
+/* =========================================================
+   DIVIDER
+   ========================================================= */
 
 .auth-divider {
-display: flex !important;
 
-align-items: center !important;
-gap: 12px !important;
-margin: 21px 0 17px !important;
-color: #94a3b8 !important;
-font-size: 11px !important;
-font-weight: 700 !important;
+    display: flex !important;
+
+    align-items: center !important;
+
+    gap: 12px !important;
+
+    margin: 21px 0 17px !important;
+
+    color: #94a3b8 !important;
+
+    font-size: 11px !important;
+
+    font-weight: 700 !important;
 
 }
+
 
 .auth-divider::before,
 .auth-divider::after {
-content: “” !important;
 
-flex: 1 !important;
-height: 1px !important;
-background: #e2e8f0 !important;
+    content: "";
+
+    flex: 1;
+
+    height: 1px;
+
+    background: #e2e8f0;
 
 }
 
-/* ––––– SWITCH ––––– */
+
+/* =========================================================
+   SWITCH
+   ========================================================= */
 
 .auth-switch {
-display: block !important;
 
-margin: 0 !important;
-text-align: center !important;
-color: #64748b !important;
-font-size: 13px !important;
+    display: block !important;
+
+    margin: 0 !important;
+
+    text-align: center !important;
+
+    color: #64748b !important;
+
+    font-size: 13px !important;
 
 }
+
 
 .auth-switch-button {
-display: inline !important;
 
-width: auto !important;
-height: auto !important;
-margin: 0 !important;
-padding: 0 !important;
-border: none !important;
-background: transparent !important;
-color: #2563eb !important;
-font-family: inherit !important;
-font-size: 13px !important;
-font-weight: 800 !important;
-cursor: pointer !important;
+    display: inline !important;
+
+    width: auto !important;
+
+    height: auto !important;
+
+    margin: 0 !important;
+
+    padding: 0 !important;
+
+    border: none !important;
+
+    background: transparent !important;
+
+    color: #2563eb !important;
+
+    font-family: inherit !important;
+
+    font-size: 13px !important;
+
+    font-weight: 800 !important;
+
+    cursor: pointer !important;
 
 }
 
-/* ––––– BODY ––––– */
+
+.auth-switch-button:hover {
+
+    text-decoration: underline !important;
+
+}
+
+
+/* =========================================================
+   BODY LOCK
+   ========================================================= */
 
 body.modal-open {
-overflow: hidden !important;
+
+    overflow: hidden !important;
+
 }
 
-/* ––––– SCROLLBAR ––––– */
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
 
 .auth-modal::-webkit-scrollbar {
-width: 6px !important;
+
+    width: 6px !important;
+
 }
+
 
 .auth-modal::-webkit-scrollbar-thumb {
-background: #cbd5e1 !important;
-border-radius: 10px !important;
+
+    background: #cbd5e1 !important;
+
+    border-radius: 10px !important;
+
 }
 
-/* ––––– MOBILE ––––– */
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
 
 @media (max-width: 600px) {
 
-.modal-overlay {
-    padding: 14px !important;
-}
-.modal-overlay .auth-modal,
-.modal-overlay .auth-modal-register {
-    width: 100% !important;
-    max-width: 100% !important;
-    max-height: calc(100vh - 28px) !important;
-    padding: 26px 20px !important;
-    border-radius: 20px !important;
-}
-.form-grid-2 {
-    grid-template-columns: 1fr !important;
-    gap: 0 !important;
-}
-.auth-modal-header h2 {
-    font-size: 22px !important;
-}
+    .modal-overlay {
+
+        padding: 14px !important;
+
+    }
+
+
+    .modal-overlay .auth-modal,
+    .modal-overlay .auth-modal-register {
+
+        width: 100% !important;
+
+        max-width: 100% !important;
+
+        max-height: calc(100vh - 28px) !important;
+
+        padding: 26px 20px !important;
+
+        border-radius: 20px !important;
+
+    }
+
+
+    .form-grid-2 {
+
+        grid-template-columns: 1fr !important;
+
+        gap: 0 !important;
+
+    }
+
+
+    .auth-modal-header h2 {
+
+        font-size: 22px !important;
+
+    }
 
 }
