@@ -15,6 +15,7 @@
 | - Prepare logged-in user information
 | - Prepare cart & wishlist count
 | - Load global CSS
+| - Load modal JavaScript
 | - Include navbar
 |--------------------------------------------------------------------------
 */
@@ -29,14 +30,6 @@ if (!defined('HOCHIPOHUB')) {
 /*
 |--------------------------------------------------------------------------
 | LOAD CONFIG
-|--------------------------------------------------------------------------
-|
-| header.php berada dalam:
-| includes/header.php
-|
-| Jadi ../config.php bermaksud:
-| hochipohub/config.php
-|
 |--------------------------------------------------------------------------
 */
 $configPath = dirname(__DIR__) . '/config.php';
@@ -69,7 +62,6 @@ if (session_status() === PHP_SESSION_NONE) {
 |
 | Expected file:
 | database/db.php
-|
 |--------------------------------------------------------------------------
 */
 $dbPath = dirname(__DIR__) . '/database/db.php';
@@ -90,7 +82,9 @@ if (file_exists($functionsPath)) {
 | CURRENT PAGE
 |--------------------------------------------------------------------------
 */
-$currentPage = basename($_SERVER['PHP_SELF']);
+$currentPage = basename(
+    $_SERVER['PHP_SELF'] ?? ''
+);
 /*
 |--------------------------------------------------------------------------
 | LOGIN STATUS
@@ -108,11 +102,15 @@ if (
 | USER INFORMATION
 |--------------------------------------------------------------------------
 */
-$userId = $_SESSION['user_id'] ?? null;
-$userName = $_SESSION['name']
+$userId =
+    $_SESSION['user_id']
+    ?? null;
+$userName =
+    $_SESSION['name']
     ?? $_SESSION['user_name']
     ?? '';
-$userRole = $_SESSION['role']
+$userRole =
+    $_SESSION['role']
     ?? $_SESSION['user_role']
     ?? 'customer';
 /*
@@ -121,7 +119,9 @@ $userRole = $_SESSION['role']
 |--------------------------------------------------------------------------
 */
 $userRole = strtolower(
-    trim($userRole)
+    trim(
+        (string) $userRole
+    )
 );
 /*
 |--------------------------------------------------------------------------
@@ -129,43 +129,46 @@ $userRole = strtolower(
 |--------------------------------------------------------------------------
 */
 $cartCount = 0;
-if ($isLoggedIn && $userRole === 'customer') {
+if (
+    $isLoggedIn &&
+    $userRole === 'customer'
+) {
     /*
-     * If cart count is already stored in session,
-     * use it first.
-     */
-    if (isset($_SESSION['cart_count'])) {
-        $cartCount = (int) $_SESSION['cart_count'];
+    |--------------------------------------------------------------------------
+    | SESSION CART COUNT
+    |--------------------------------------------------------------------------
+    */
+    if (
+        isset(
+            $_SESSION['cart_count']
+        )
+    ) {
+        $cartCount =
+            (int) $_SESSION['cart_count'];
     } else {
         /*
-         * Try database count if $conn exists.
-         */
-        if (
-            isset($conn) &&
-            $conn instanceof mysqli &&
-            $userId
-        ) {
-            $stmt = $conn->prepare(
-                "SELECT COALESCE(SUM(quantity), 0)
-                 AS total_items
-                 FROM cart
-                 WHERE user_id = ?"
-            );
-            if ($stmt) {
-                $stmt->bind_param(
-                    "i",
-                    $userId
-                );
-                $stmt->execute();
-                $result = $stmt->get_result();
-                if ($result) {
-                    $row = $result->fetch_assoc();
-                    $cartCount = (int) (
-                        $row['total_items'] ?? 0
+        |--------------------------------------------------------------------------
+        | PDO CART COUNT
+        |--------------------------------------------------------------------------
+        |
+        | Use the same PDO structure as functions.php.
+        |--------------------------------------------------------------------------
+        */
+        try {
+            if (
+                function_exists('getCartCount') &&
+                isset($db) &&
+                $db instanceof PDO &&
+                $userId
+            ) {
+                $cartCount =
+                    getCartCount(
+                        $db,
+                        $userId
                     );
-                }
-                $stmt->close();
             }
+        } catch (Throwable $e) {
+            $cartCount = 0;
         }
     }
 }
@@ -175,43 +178,43 @@ if ($isLoggedIn && $userRole === 'customer') {
 |--------------------------------------------------------------------------
 */
 $wishlistCount = 0;
-if ($isLoggedIn && $userRole === 'customer') {
+if (
+    $isLoggedIn &&
+    $userRole === 'customer'
+) {
     /*
-     * If wishlist count is stored in session,
-     * use it.
-     */
-    if (isset($_SESSION['wishlist_count'])) {
+    |--------------------------------------------------------------------------
+    | SESSION WISHLIST COUNT
+    |--------------------------------------------------------------------------
+    */
+    if (
+        isset(
+            $_SESSION['wishlist_count']
+        )
+    ) {
         $wishlistCount =
             (int) $_SESSION['wishlist_count'];
     } else {
         /*
-         * Try database count if connection exists.
-         */
-        if (
-            isset($conn) &&
-            $conn instanceof mysqli &&
-            $userId
-        ) {
-            $stmt = $conn->prepare(
-                "SELECT COUNT(*) AS total
-                 FROM wishlist
-                 WHERE user_id = ?"
-            );
-            if ($stmt) {
-                $stmt->bind_param(
-                    "i",
-                    $userId
-                );
-                $stmt->execute();
-                $result = $stmt->get_result();
-                if ($result) {
-                    $row = $result->fetch_assoc();
-                    $wishlistCount = (int) (
-                        $row['total'] ?? 0
+        |--------------------------------------------------------------------------
+        | PDO WISHLIST COUNT
+        |--------------------------------------------------------------------------
+        */
+        try {
+            if (
+                function_exists('getWishlistCount') &&
+                isset($db) &&
+                $db instanceof PDO &&
+                $userId
+            ) {
+                $wishlistCount =
+                    getWishlistCount(
+                        $db,
+                        $userId
                     );
-                }
-                $stmt->close();
             }
+        } catch (Throwable $e) {
+            $wishlistCount = 0;
         }
     }
 }
@@ -220,7 +223,8 @@ if ($isLoggedIn && $userRole === 'customer') {
 | HTML TITLE
 |--------------------------------------------------------------------------
 */
-$pageTitle = $pageTitle
+$pageTitle =
+    $pageTitle
     ?? 'HochipoHub';
 /*
 |--------------------------------------------------------------------------
@@ -230,7 +234,6 @@ $pageTitle = $pageTitle
 | Individual pages can set:
 |
 | $extraCSS = ['product.css'];
-|
 |--------------------------------------------------------------------------
 */
 if (!isset($extraCSS)) {
@@ -243,6 +246,11 @@ if (!is_array($extraCSS)) {
 |--------------------------------------------------------------------------
 | EXTRA JS
 |--------------------------------------------------------------------------
+|
+| Individual pages can add:
+|
+| $extraJS = ['product.js'];
+|--------------------------------------------------------------------------
 */
 if (!isset($extraJS)) {
     $extraJS = [];
@@ -250,11 +258,47 @@ if (!isset($extraJS)) {
 if (!is_array($extraJS)) {
     $extraJS = [$extraJS];
 }
+/*
+|--------------------------------------------------------------------------
+| DEFAULT GLOBAL JAVASCRIPT
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| modal.js is required for:
+|
+| - Login button
+| - Register button
+| - Modal switching
+| - Close button
+| - ESC
+| - Click outside modal
+| - Password visibility
+|
+|--------------------------------------------------------------------------
+*/
+$globalJS = [
+    'modal.js'
+];
+/*
+|--------------------------------------------------------------------------
+| COMBINE GLOBAL JS + PAGE JS
+|--------------------------------------------------------------------------
+*/
+$allJS = array_merge(
+    $globalJS,
+    $extraJS
+);
+/*
+|--------------------------------------------------------------------------
+| REMOVE DUPLICATE JS
+|--------------------------------------------------------------------------
+*/
+$allJS = array_unique(
+    $allJS
+);
 ?>
 <!DOCTYPE html>
-<html
-    lang="en"
->
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta
@@ -263,7 +307,7 @@ if (!is_array($extraJS)) {
     >
     <meta
         name="description"
-        content="HochipoHub - Gen Z Marketplace"
+        content="HochipoHub - Marketplace"
     >
     <meta
         name="theme-color"
@@ -299,7 +343,8 @@ if (!is_array($extraJS)) {
     <link
         rel="stylesheet"
         href="<?= htmlspecialchars(
-            rtrim(BASE_URL, '/') . '/css/style.css',
+            rtrim(BASE_URL, '/') .
+            '/css/style.css',
             ENT_QUOTES,
             'UTF-8'
         ) ?>"
@@ -310,7 +355,8 @@ if (!is_array($extraJS)) {
     <link
         rel="stylesheet"
         href="<?= htmlspecialchars(
-            rtrim(BASE_URL, '/') . '/css/responsive.css',
+            rtrim(BASE_URL, '/') .
+            '/css/responsive.css',
             ENT_QUOTES,
             'UTF-8'
         ) ?>"
@@ -332,14 +378,36 @@ if (!is_array($extraJS)) {
             >
         <?php endif; ?>
     <?php endforeach; ?>
+    <!-- =====================================================
+         GLOBAL JAVASCRIPT
+         ===================================================== -->
+    <?php foreach ($allJS as $jsFile): ?>
+        <?php if (!empty($jsFile)): ?>
+            <script
+                src="<?= htmlspecialchars(
+                    rtrim(BASE_URL, '/') .
+                    '/js/' .
+                    ltrim($jsFile, '/'),
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>"
+                defer
+            ></script>
+        <?php endif; ?>
+    <?php endforeach; ?>
 </head>
 <body>
     <!-- =====================================================
          NAVBAR
          ===================================================== -->
     <?php
-    $navbarPath = __DIR__ . '/navbar.php';
-    if (file_exists($navbarPath)) {
+    $navbarPath =
+        __DIR__ . '/navbar.php';
+    if (
+        file_exists(
+            $navbarPath
+        )
+    ) {
         require_once $navbarPath;
     }
     ?>
