@@ -6,50 +6,35 @@
 |--------------------------------------------------------------------------
 | File:
 | vendor.php
-|--------------------------------------------------------------------------
 |
 | Purpose:
-| - Display all approved vendors
-| - Display individual vendor profile
-| - Display vendor products
+| - Display approved vendors
+| - View products belonging to vendor
 |--------------------------------------------------------------------------
 */
 
-require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/database/db.php';
+require_once __DIR__ . '/includes/session.php';
 require_once __DIR__ . '/includes/functions.php';
 
 $db = getDB();
 
-$vendorId = (int) ($_GET['id'] ?? 0);
+
+$vendorId =
+    (int) ($_GET['id'] ?? 0);
 
 
 /*
 |--------------------------------------------------------------------------
-| SINGLE VENDOR
+| GET VENDOR
 |--------------------------------------------------------------------------
 */
 
 if ($vendorId > 0) {
 
-    /*
-    |--------------------------------------------------------------------------
-    | GET VENDOR
-    |--------------------------------------------------------------------------
-    */
-
     $stmt = $db->prepare("
         SELECT
-
-            v.vendor_id,
-            v.user_id,
-            v.business_name,
-            v.business_logo,
-            v.business_description,
-            v.category,
-            v.delivery_method,
-            v.approval_status,
-
+            v.*,
             u.name,
             u.email,
             u.phone
@@ -60,8 +45,7 @@ if ($vendorId > 0) {
             ON v.user_id = u.user_id
 
         WHERE v.vendor_id = ?
-          AND v.approval_status = 'Approved'
-          AND u.status = 'active'
+        AND v.approval_status = 'Approved'
 
         LIMIT 1
     ");
@@ -70,46 +54,27 @@ if ($vendorId > 0) {
         $vendorId
     ]);
 
-    $vendor = $stmt->fetch(PDO::FETCH_ASSOC);
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | INVALID VENDOR
-    |--------------------------------------------------------------------------
-    */
+    $vendor =
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
 
     if (!$vendor) {
 
-        header(
-            'Location: ' .
-            BASE_URL .
-            'vendor.php'
-        );
-
-        exit;
+        redirect('vendor.php');
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | GET PRODUCTS
+    | GET VENDOR PRODUCTS
     |--------------------------------------------------------------------------
     */
 
     $stmt = $db->prepare("
         SELECT
 
-            p.product_id,
-            p.vendor_id,
-            p.category_id,
-            p.product_name,
-            p.description,
-            p.price,
-            p.stock_quantity,
-            p.image,
-            p.status,
-            p.created_at,
+            p.*,
 
             c.category_name
 
@@ -120,9 +85,7 @@ if ($vendorId > 0) {
 
         WHERE p.vendor_id = ?
 
-          AND p.status = 'Available'
-
-          AND p.stock_quantity > 0
+        AND p.status != 'Hidden'
 
         ORDER BY p.created_at DESC
     ");
@@ -132,14 +95,13 @@ if ($vendorId > 0) {
     ]);
 
     $products =
-        $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        );
 
 
     $pageTitle =
-        $vendor['business_name'] .
-        ' - ' .
-        SITE_NAME;
-
+        $vendor['business_name'];
 
 } else {
 
@@ -162,30 +124,21 @@ if ($vendorId > 0) {
 
         FROM vendors v
 
-        INNER JOIN users u
-            ON v.user_id = u.user_id
-
         WHERE v.approval_status = 'Approved'
-          AND u.status = 'active'
 
         ORDER BY v.business_name ASC
     ");
 
     $vendors =
-        $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        );
 
 
     $pageTitle =
-        'Vendors - ' .
-        SITE_NAME;
+        'Vendors - ' . SITE_NAME;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| HEADER
-|--------------------------------------------------------------------------
-*/
 
 require_once __DIR__ . '/includes/header.php';
 require_once __DIR__ . '/includes/navbar.php';
@@ -193,282 +146,249 @@ require_once __DIR__ . '/includes/navbar.php';
 ?>
 
 
-<main class="vendor-page">
+<main class="dashboard-page">
+
+    <div class="dashboard-container">
 
 
-<?php if ($vendorId > 0): ?>
+        <?php if (
+            $vendorId > 0
+        ): ?>
 
 
-    <!-- =====================================================
-         SINGLE VENDOR HERO
-    ====================================================== -->
+            <!-- SINGLE VENDOR -->
 
-    <section class="vendor-detail-hero">
+            <section class="dashboard-header">
 
-        <div class="vendor-detail-hero-inner">
-
-
-            <a
-                href="<?= e(BASE_URL) ?>vendor.php"
-                class="vendor-back-link"
-            >
-                ← Back to Vendors
-            </a>
-
-
-            <div class="vendor-detail-main">
-
-
-                <!-- LOGO -->
-
-                <div class="vendor-detail-logo">
-
-                    <?php if (
-                        !empty($vendor['business_logo'])
-                    ): ?>
-
-                        <img
-                            src="<?= e(
-                                getVendorImage(
-                                    $vendor['business_logo']
-                                )
-                            ) ?>"
-                            alt="<?= e(
-                                $vendor['business_name']
-                            ) ?>"
-                        >
-
-                    <?php else: ?>
-
-                        <div class="vendor-logo-placeholder">
-                            🏪
-                        </div>
-
-                    <?php endif; ?>
-
-                </div>
-
-
-                <!-- INFORMATION -->
-
-                <div class="vendor-detail-info">
+                <div>
 
                     <span class="small-label">
-                        VERIFIED LOCAL VENDOR
+                        VENDOR
                     </span>
 
                     <h1>
-
                         <?= e(
-                            $vendor['business_name']
+                            $vendor[
+                                'business_name'
+                            ]
                         ) ?>
-
                     </h1>
 
-
                     <?php if (
                         !empty(
-                            $vendor['category']
-                        )
-                    ): ?>
-
-                        <span class="vendor-detail-category">
-
-                            <?= e(
-                                $vendor['category']
-                            ) ?>
-
-                        </span>
-
-                    <?php endif; ?>
-
-
-                    <?php if (
-                        !empty(
-                            $vendor['business_description']
+                            $vendor[
+                                'category'
+                            ]
                         )
                     ): ?>
 
                         <p>
 
-                            <?= nl2br(
-                                e(
-                                    $vendor[
-                                        'business_description'
-                                    ]
-                                )
+                            <?= e(
+                                $vendor[
+                                    'category'
+                                ]
                             ) ?>
 
                         </p>
 
                     <?php endif; ?>
 
+                </div>
 
-                    <div class="vendor-detail-meta">
+
+                <div>
+
+                    <a
+                        href="vendor.php"
+                        class="btn btn-secondary"
+                    >
+                        ← All Vendors
+                    </a>
+
+                </div>
+
+            </section>
+
+
+            <!-- VENDOR INFO -->
+
+            <section class="dashboard-section">
+
+                <div class="vendor-profile">
+
+                    <div>
+
+                        <img
+                            src="<?= e(
+                                getVendorImage(
+                                    $vendor[
+                                        'business_logo'
+                                    ]
+                                )
+                            ) ?>"
+                            alt="<?= e(
+                                $vendor[
+                                    'business_name'
+                                ]
+                            ) ?>"
+                            class="vendor-logo"
+                        >
+
+                    </div>
+
+
+                    <div>
+
+                        <h2>
+                            <?= e(
+                                $vendor[
+                                    'business_name'
+                                ]
+                            ) ?>
+                        </h2>
 
 
                         <?php if (
                             !empty(
-                                $vendor['delivery_method']
+                                $vendor[
+                                    'business_description'
+                                ]
                             )
                         ): ?>
 
-                            <span>
+                            <p>
 
-                                🚚
-
-                                <strong>
-                                    Delivery
-                                </strong>
-
-                                <?= e(
-                                    $vendor[
-                                        'delivery_method'
-                                    ]
+                                <?= nl2br(
+                                    e(
+                                        $vendor[
+                                            'business_description'
+                                        ]
+                                    )
                                 ) ?>
 
-                            </span>
+                            </p>
 
                         <?php endif; ?>
 
 
-                        <span>
-
-                            📦
+                        <p>
 
                             <strong>
-                                Products
+                                Delivery:
                             </strong>
 
-                            <?= count($products) ?>
+                            <?= e(
+                                $vendor[
+                                    'delivery_method'
+                                ]
+                            ) ?>
 
-                        </span>
-
+                        </p>
 
                     </div>
 
                 </div>
 
-            </div>
-
-        </div>
-
-    </section>
+            </section>
 
 
-    <!-- =====================================================
-         VENDOR PRODUCTS
-    ====================================================== -->
+            <!-- PRODUCTS -->
 
-    <section class="vendor-products-section">
+            <section class="dashboard-section">
 
-        <div class="vendor-content-container">
+                <div class="section-heading">
 
+                    <div>
 
-            <div class="section-heading">
+                        <span class="small-label">
+                            SHOP
+                        </span>
 
-                <div>
+                        <h2>
+                            Products
+                        </h2>
 
-                    <span class="small-label">
-                        SHOP FROM THIS STORE
-                    </span>
-
-                    <h2>
-                        <?= e(
-                            $vendor['business_name']
-                        ) ?>
-                        Products
-                    </h2>
-
-                    <p>
-                        Browse products available from this vendor.
-                    </p>
+                    </div>
 
                 </div>
 
-            </div>
 
+                <?php if (
+                    empty($products)
+                ): ?>
 
-            <?php if (!empty($products)): ?>
+                    <div class="empty-state">
 
+                        <div class="empty-icon">
+                            📦
+                        </div>
 
-                <div class="vendor-product-grid">
+                        <h3>
+                            No products available
+                        </h3>
 
-                    <?php foreach (
-                        $products
-                        as $product
-                    ): ?>
+                        <p>
+                            This vendor has not listed
+                            any products yet.
+                        </p>
 
-                        <?php
+                    </div>
 
-                        $productId =
-                            (int)
-                            $product['product_id'];
+                <?php else: ?>
 
-                        $productImage =
-                            getProductImage(
-                                $product['image']
-                            );
+                    <div class="product-grid">
 
-                        ?>
+                        <?php foreach (
+                            $products
+                            as $product
+                        ): ?>
 
-
-                        <article class="vendor-product-card">
-
-
-                            <a
-                                href="<?= e(BASE_URL) ?>product_details.php?id=<?= $productId ?>"
-                                class="vendor-product-image"
+                            <article
+                                class="product-card"
                             >
 
-                                <?php if (
-                                    !empty(
-                                        $product['image']
-                                    )
-                                ): ?>
+                                <a
+                                    href="product_details.php?id=<?= (int)
+                                        $product[
+                                            'product_id'
+                                        ] ?>"
+                                >
 
                                     <img
                                         src="<?= e(
-                                            $productImage
+                                            getProductImage(
+                                                $product[
+                                                    'image'
+                                                ]
+                                            )
                                         ) ?>"
                                         alt="<?= e(
                                             $product[
                                                 'product_name'
                                             ]
                                         ) ?>"
-                                        loading="lazy"
                                     >
 
-                                <?php else: ?>
-
-                                    <div class="vendor-product-placeholder">
-                                        🛍️
-                                    </div>
-
-                                <?php endif; ?>
-
-                            </a>
+                                </a>
 
 
-                            <div class="vendor-product-info">
+                                <div
+                                    class="product-card-body"
+                                >
+
+                                    <small>
+
+                                        <?= e(
+                                            $product[
+                                                'category_name'
+                                            ]
+                                        ) ?>
+
+                                    </small>
 
 
-                                <span class="vendor-product-category">
-
-                                    <?= e(
-                                        $product[
-                                            'category_name'
-                                        ]
-                                    ) ?>
-
-                                </span>
-
-
-                                <h3>
-
-                                    <a
-                                        href="<?= e(BASE_URL) ?>product_details.php?id=<?= $productId ?>"
-                                    >
+                                    <h3>
 
                                         <?= e(
                                             $product[
@@ -476,38 +396,8 @@ require_once __DIR__ . '/includes/navbar.php';
                                             ]
                                         ) ?>
 
-                                    </a>
+                                    </h3>
 
-                                </h3>
-
-
-                                <?php if (
-                                    !empty(
-                                        $product[
-                                            'description'
-                                        ]
-                                    )
-                                ): ?>
-
-                                    <p>
-
-                                        <?= e(
-                                            mb_strimwidth(
-                                                $product[
-                                                    'description'
-                                                ],
-                                                0,
-                                                90,
-                                                '...'
-                                            )
-                                        ) ?>
-
-                                    </p>
-
-                                <?php endif; ?>
-
-
-                                <div class="vendor-product-bottom">
 
                                     <strong>
 
@@ -522,167 +412,88 @@ require_once __DIR__ . '/includes/navbar.php';
 
                                     </strong>
 
-
-                                    <a
-                                        href="<?= e(BASE_URL) ?>product_details.php?id=<?= $productId ?>"
-                                        class="vendor-view-product"
-                                    >
-                                        View →
-                                    </a>
-
                                 </div>
 
-                            </div>
+                            </article>
 
-                        </article>
+                        <?php endforeach; ?>
 
-                    <?php endforeach; ?>
-
-                </div>
-
-
-            <?php else: ?>
-
-
-                <div class="vendor-empty">
-
-                    <div class="vendor-empty-icon">
-                        📦
                     </div>
 
-                    <span class="small-label">
-                        STORE EMPTY
-                    </span>
+                <?php endif; ?>
 
-                    <h2>
-                        No products available
-                    </h2>
-
-                    <p>
-                        This vendor has not listed any
-                        available products yet.
-                    </p>
-
-                    <a
-                        href="<?= e(BASE_URL) ?>vendor.php"
-                        class="btn btn-primary"
-                    >
-                        Browse Other Vendors
-                    </a>
-
-                </div>
-
-            <?php endif; ?>
-
-        </div>
-
-    </section>
+            </section>
 
 
-<?php else: ?>
+        <?php else: ?>
 
 
-    <!-- =====================================================
-         ALL VENDORS HERO
-    ====================================================== -->
+            <!-- ALL VENDORS -->
 
-    <section class="vendor-hero">
-
-        <div class="vendor-hero-inner">
-
-            <span class="small-label">
-                MARKETPLACE • LOCAL SELLERS
-            </span>
-
-            <h1>
-                Meet Our
-                <span>Vendors.</span>
-            </h1>
-
-            <p>
-                Discover the people, businesses and creators
-                behind the products on HochipoHub.
-            </p>
-
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         VENDORS
-    ====================================================== -->
-
-    <section class="vendors-section">
-
-        <div class="vendor-content-container">
-
-
-            <div class="section-heading">
+            <section class="dashboard-header">
 
                 <div>
 
                     <span class="small-label">
-                        OUR MARKETPLACE
+                        MARKETPLACE
                     </span>
 
-                    <h2>
-                        Local Sellers
-                    </h2>
+                    <h1>
+                        Vendors
+                    </h1>
 
                     <p>
-                        Find a vendor and explore their store.
+                        Discover approved sellers
+                        on HochipoHub.
                     </p>
 
                 </div>
 
-
-                <span class="vendor-count">
-
-                    <?= count($vendors) ?>
-
-                    vendor<?= count($vendors) !== 1 ? 's' : '' ?>
-
-                </span>
-
-            </div>
+            </section>
 
 
-            <?php if (!empty($vendors)): ?>
+            <section class="dashboard-section">
 
+                <?php if (
+                    empty($vendors)
+                ): ?>
 
-                <div class="vendor-marketplace-grid">
+                    <div class="empty-state">
 
-                    <?php foreach (
-                        $vendors
-                        as $item
-                    ): ?>
+                        <div class="empty-icon">
+                            🏪
+                        </div>
 
-                        <?php
+                        <h3>
+                            No vendors available
+                        </h3>
 
-                        $itemId =
-                            (int)
-                            $item['vendor_id'];
+                        <p>
+                            There are currently no approved
+                            vendors.
+                        </p>
 
-                        ?>
+                    </div>
 
-                        <article class="vendor-marketplace-card">
+                <?php else: ?>
 
+                    <div class="vendor-grid">
 
-                            <!-- LOGO -->
+                        <?php foreach (
+                            $vendors
+                            as $item
+                        ): ?>
 
-                            <a
-                                href="<?= e(BASE_URL) ?>vendor.php?id=<?= $itemId ?>"
-                                class="vendor-marketplace-logo"
+                            <article
+                                class="vendor-card"
                             >
 
-                                <?php if (
-                                    !empty(
+                                <a
+                                    href="vendor.php?id=<?= (int)
                                         $item[
-                                            'business_logo'
-                                        ]
-                                    )
-                                ): ?>
+                                            'vendor_id'
+                                        ] ?>"
+                                >
 
                                     <img
                                         src="<?= e(
@@ -697,35 +508,14 @@ require_once __DIR__ . '/includes/navbar.php';
                                                 'business_name'
                                             ]
                                         ) ?>"
-                                        loading="lazy"
                                     >
 
-                                <?php else: ?>
-
-                                    <div class="vendor-marketplace-placeholder">
-                                        🏪
-                                    </div>
-
-                                <?php endif; ?>
-
-                            </a>
+                                </a>
 
 
-                            <!-- CONTENT -->
+                                <div>
 
-                            <div class="vendor-marketplace-body">
-
-
-                                <span class="vendor-status">
-                                    ● APPROVED VENDOR
-                                </span>
-
-
-                                <h2>
-
-                                    <a
-                                        href="<?= e(BASE_URL) ?>vendor.php?id=<?= $itemId ?>"
-                                    >
+                                    <h2>
 
                                         <?= e(
                                             $item[
@@ -733,87 +523,22 @@ require_once __DIR__ . '/includes/navbar.php';
                                             ]
                                         ) ?>
 
-                                    </a>
+                                    </h2>
 
-                                </h2>
-
-
-                                <?php if (
-                                    !empty(
-                                        $item[
-                                            'category'
-                                        ]
-                                    )
-                                ): ?>
-
-                                    <span
-                                        class="vendor-marketplace-category"
-                                    >
-
-                                        <?= e(
-                                            $item[
-                                                'category'
-                                            ]
-                                        ) ?>
-
-                                    </span>
-
-                                <?php endif; ?>
-
-
-                                <?php if (
-                                    !empty(
-                                        $item[
-                                            'business_description'
-                                        ]
-                                    )
-                                ): ?>
-
-                                    <p>
-
-                                        <?= e(
-                                            mb_strimwidth(
-                                                $item[
-                                                    'business_description'
-                                                ],
-                                                0,
-                                                130,
-                                                '...'
-                                            )
-                                        ) ?>
-
-                                    </p>
-
-                                <?php else: ?>
-
-                                    <p>
-                                        Discover products
-                                        from this local seller
-                                        on HochipoHub.
-                                    </p>
-
-                                <?php endif; ?>
-
-
-                                <div
-                                    class="vendor-marketplace-footer"
-                                >
 
                                     <?php if (
                                         !empty(
                                             $item[
-                                                'delivery_method'
+                                                'category'
                                             ]
                                         )
                                     ): ?>
 
                                         <span>
 
-                                            🚚
-
                                             <?= e(
                                                 $item[
-                                                    'delivery_method'
+                                                    'category'
                                                 ]
                                             ) ?>
 
@@ -822,108 +547,62 @@ require_once __DIR__ . '/includes/navbar.php';
                                     <?php endif; ?>
 
 
+                                    <?php if (
+                                        !empty(
+                                            $item[
+                                                'business_description'
+                                            ]
+                                        )
+                                    ): ?>
+
+                                        <p>
+
+                                            <?= e(
+                                                mb_strimwidth(
+                                                    $item[
+                                                        'business_description'
+                                                    ],
+                                                    0,
+                                                    120,
+                                                    '...'
+                                                )
+                                            ) ?>
+
+                                        </p>
+
+                                    <?php endif; ?>
+
+
                                     <a
-                                        href="<?= e(BASE_URL) ?>vendor.php?id=<?= $itemId ?>"
-                                        class="vendor-store-btn"
+                                        href="vendor.php?id=<?= (int)
+                                            $item[
+                                                'vendor_id'
+                                            ] ?>"
+                                        class="btn btn-primary"
                                     >
-                                        View Store →
+                                        View Store
                                     </a>
 
                                 </div>
 
-                            </div>
+                            </article>
 
-                        </article>
+                        <?php endforeach; ?>
 
-                    <?php endforeach; ?>
-
-                </div>
-
-
-            <?php else: ?>
-
-
-                <div class="vendor-empty">
-
-                    <div class="vendor-empty-icon">
-                        🏪
                     </div>
 
-                    <span class="small-label">
-                        MARKETPLACE
-                    </span>
+                <?php endif; ?>
 
-                    <h2>
-                        No vendors available
-                    </h2>
+            </section>
 
-                    <p>
-                        There are currently no approved vendors
-                        on HochipoHub.
-                    </p>
-
-                </div>
-
-            <?php endif; ?>
-
-        </div>
-
-    </section>
+        <?php endif; ?>
 
 
-    <!-- =====================================================
-         CTA
-    ====================================================== -->
-
-    <section class="vendor-cta">
-
-        <div class="vendor-content-container">
-
-            <div class="vendor-cta-content">
-
-                <span class="small-label">
-                    GROW WITH HOCHIPOHUB
-                </span>
-
-                <h2>
-                    Ready to become a vendor?
-                </h2>
-
-                <p>
-                    Put your products in front of more customers
-                    and grow your local business with HochipoHub.
-                </p>
-
-                <a
-                    href="<?= e(BASE_URL) ?>dashboard.php"
-                    class="btn btn-primary"
-                >
-                    Start Selling →
-                </a>
-
-            </div>
-
-        </div>
-
-    </section>
-
-
-<?php endif; ?>
-
+    </div>
 
 </main>
 
 
 <?php
-
 require_once __DIR__ . '/includes/footer.php';
-
 ?>
-
-
-<script src="<?= e(BASE_URL) ?>js/script.js"></script>
-<script src="<?= e(BASE_URL) ?>js/cart.js"></script>
-<script src="<?= e(BASE_URL) ?>js/wishlist.js"></script>
-
-</body>
-</html>
