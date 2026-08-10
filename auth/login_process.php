@@ -4,37 +4,6 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - LOGIN PROCESS
 |--------------------------------------------------------------------------
-| File:
-| auth/login_process.php
-|
-| Purpose:
-| Handle user authentication.
-|
-| Flow:
-|
-| Login Modal
-|      ↓
-| POST email + password
-|      ↓
-| Validate input
-|      ↓
-| Find user
-|      ↓
-| Verify password
-|      ↓
-| Check account status
-|      ↓
-| Create session
-|      ↓
-| Redirect by role
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| LOAD CONFIGURATION
-|--------------------------------------------------------------------------
 */
 
 require_once dirname(__DIR__) . '/config.php';
@@ -44,38 +13,36 @@ require_once dirname(__DIR__) . '/includes/functions.php';
 
 /*
 |--------------------------------------------------------------------------
-| ONLY POST REQUEST ALLOWED
+| ONLY POST
 |--------------------------------------------------------------------------
 */
 
-if (
-    $_SERVER['REQUEST_METHOD'] !== 'POST'
-) {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
     redirect(
         BASE_URL . 'index.php'
     );
+
+    exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| GET FORM DATA
+| FORM DATA
 |--------------------------------------------------------------------------
 */
 
-$email = trim(
-    $_POST['email']
-    ?? ''
-);
+$email =
+    trim(
+        $_POST['email'] ?? ''
+    );
 
 $password =
-    $_POST['password']
-    ?? '';
+    $_POST['password'] ?? '';
 
 $remember =
-    isset($_POST['remember'])
-    &&
+    isset($_POST['remember']) &&
     $_POST['remember'] === '1';
 
 
@@ -86,8 +53,7 @@ $remember =
 */
 
 if (
-    $email === ''
-    ||
+    $email === '' ||
     !filter_var(
         $email,
         FILTER_VALIDATE_EMAIL
@@ -103,6 +69,8 @@ if (
     redirect(
         BASE_URL . 'index.php?login=1'
     );
+
+    exit;
 }
 
 
@@ -112,9 +80,7 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if (
-    $password === ''
-) {
+if ($password === '') {
 
     $_SESSION['login_error'] =
         'Please enter your password.';
@@ -125,6 +91,8 @@ if (
     redirect(
         BASE_URL . 'index.php?login=1'
     );
+
+    exit;
 }
 
 
@@ -143,6 +111,9 @@ try {
     |--------------------------------------------------------------------------
     | FIND USER
     |--------------------------------------------------------------------------
+    |
+    | Only use columns that are part of the known users table.
+    |
     */
 
     $stmt = $db->prepare("
@@ -153,16 +124,9 @@ try {
             phone,
             password,
             profile_image,
-            role,
-            status,
-            mfa_enabled,
-            created_at,
-            updated_at
-
+            role
         FROM users
-
         WHERE email = ?
-
         LIMIT 1
     ");
 
@@ -171,16 +135,13 @@ try {
     ]);
 
     $user =
-        $stmt->fetch();
+        $stmt->fetch(PDO::FETCH_ASSOC);
 
 
     /*
     |--------------------------------------------------------------------------
     | USER NOT FOUND
     |--------------------------------------------------------------------------
-    |
-    | Do not reveal whether the email exists.
-    |
     */
 
     if (!$user) {
@@ -194,18 +155,19 @@ try {
         redirect(
             BASE_URL . 'index.php?login=1'
         );
+
+        exit;
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | VERIFY PASSWORD
+    | PASSWORD
     |--------------------------------------------------------------------------
     */
 
     if (
-        empty($user['password'])
-        ||
+        empty($user['password']) ||
         !password_verify(
             $password,
             $user['password']
@@ -221,73 +183,32 @@ try {
         redirect(
             BASE_URL . 'index.php?login=1'
         );
+
+        exit;
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | CHECK ACCOUNT STATUS
+    | ROLE
     |--------------------------------------------------------------------------
     */
-
-    $accountStatus =
-        strtolower(
-            trim(
-                (string) (
-                    $user['status']
-                    ?? 'active'
-                )
-            )
-        );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | INACTIVE ACCOUNT
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        $accountStatus !== 'active'
-    ) {
-
-        $_SESSION['login_error'] =
-            'Your account is not active. '
-            . 'Please contact the administrator.';
-
-        $_SESSION['login_email'] =
-            $email;
-
-        redirect(
-            BASE_URL . 'index.php?login=1'
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CHECK ROLE
-    |--------------------------------------------------------------------------
-    */
-
-    $allowedRoles = [
-
-        'customer',
-        'vendor',
-        'admin'
-
-    ];
-
 
     $role =
         strtolower(
             trim(
                 (string) (
-                    $user['role']
-                    ?? ''
+                    $user['role'] ?? ''
                 )
             )
         );
+
+
+    $allowedRoles = [
+        'customer',
+        'vendor',
+        'admin'
+    ];
 
 
     if (
@@ -299,8 +220,7 @@ try {
     ) {
 
         $_SESSION['login_error'] =
-            'Your account has an invalid role. '
-            . 'Please contact the administrator.';
+            'Invalid account role.';
 
         $_SESSION['login_email'] =
             $email;
@@ -308,6 +228,8 @@ try {
         redirect(
             BASE_URL . 'index.php?login=1'
         );
+
+        exit;
     }
 
 
@@ -315,34 +237,37 @@ try {
     |--------------------------------------------------------------------------
     | LOGIN USER
     |--------------------------------------------------------------------------
-    |
-    | loginUser() will:
-    |
-    | - regenerate session ID
-    | - store user ID
-    | - store name
-    | - store email
-    | - store role
-    | - store status
-    | - mark logged in
-    |
     */
 
-    loginUser(
-        $user
-    );
+    if (function_exists('loginUser')) {
+
+        loginUser($user);
+
+    } else {
+
+        session_regenerate_id(true);
+
+        $_SESSION['logged_in'] = true;
+
+        $_SESSION['user_id'] =
+            $user['user_id'];
+
+        $_SESSION['user_name'] =
+            $user['name'];
+
+        $_SESSION['user_email'] =
+            $user['email'];
+
+        $_SESSION['user_role'] =
+            $role;
+
+    }
 
 
     /*
     |--------------------------------------------------------------------------
     | REMEMBER ME
     |--------------------------------------------------------------------------
-    |
-    | For now we store the preference in session.
-    |
-    | A persistent remember-me token can be added later
-    | without changing the login form.
-    |
     */
 
     $_SESSION['remember_me'] =
@@ -351,16 +276,20 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | UPDATE LAST ACTIVITY
+    | ACTIVITY
     |--------------------------------------------------------------------------
     */
 
-    updateSessionActivity();
+    if (function_exists('updateSessionActivity')) {
+
+        updateSessionActivity();
+
+    }
 
 
     /*
     |--------------------------------------------------------------------------
-    | CLEAR OLD LOGIN DATA
+    | CLEAR LOGIN DATA
     |--------------------------------------------------------------------------
     */
 
@@ -372,17 +301,11 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | ROLE-BASED REDIRECT
+    | REDIRECT BY ROLE
     |--------------------------------------------------------------------------
     */
 
     switch ($role) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | ADMIN
-        |--------------------------------------------------------------------------
-        */
 
         case 'admin':
 
@@ -391,14 +314,8 @@ try {
                 'admin/dashboard.php'
             );
 
-            break;
+            exit;
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | VENDOR
-        |--------------------------------------------------------------------------
-        */
 
         case 'vendor':
 
@@ -407,14 +324,8 @@ try {
                 'dashboard.php'
             );
 
-            break;
+            exit;
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | CUSTOMER
-        |--------------------------------------------------------------------------
-        */
 
         case 'customer':
 
@@ -423,50 +334,46 @@ try {
                 'dashboard.php'
             );
 
-            break;
+            exit;
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | FALLBACK
-        |--------------------------------------------------------------------------
-        */
 
         default:
 
-            logoutUser();
-
             $_SESSION['login_error'] =
-                'Unable to determine your account type.';
+                'Unable to determine account type.';
 
             redirect(
                 BASE_URL .
                 'index.php?login=1'
             );
+
+            exit;
     }
 
 
-/*
-|--------------------------------------------------------------------------
-| DATABASE ERROR
-|--------------------------------------------------------------------------
-*/
+} catch (PDOException $e) {
 
-} catch (
-    PDOException $e
-) {
+    /*
+    |--------------------------------------------------------------------------
+    | DATABASE ERROR
+    |--------------------------------------------------------------------------
+    */
 
-    if (APP_DEBUG) {
+    if (
+        defined('APP_DEBUG') &&
+        APP_DEBUG
+    ) {
 
         $_SESSION['login_error'] =
-            'Database error: '
-            . $e->getMessage();
+            'Database error: ' .
+            $e->getMessage();
 
     } else {
 
         $_SESSION['login_error'] =
             'Something went wrong while logging in. '
             . 'Please try again later.';
+
     }
 
 
@@ -478,4 +385,6 @@ try {
         BASE_URL .
         'index.php?login=1'
     );
+
+    exit;
 }
