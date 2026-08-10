@@ -1,565 +1,451 @@
 <?php
 
-require_once __DIR__ . '/database/db.php';
-require_once __DIR__ . '/includes/session.php';
-require_once __DIR__ . '/includes/functions.php';
-
-requireLogin();
-
-$db = getDB();
-
-$user_id = (int) $_SESSION['user_id'];
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - GLOBAL CONFIGURATION
+|--------------------------------------------------------------------------
+| File:
+| config.php
+|
+| Purpose:
+| - Database configuration
+| - PDO connection
+| - Application configuration
+| - Helper function for database access
+|--------------------------------------------------------------------------
+*/
 
 
 /*
 |--------------------------------------------------------------------------
-| CHECK USER
+| SESSION
 |--------------------------------------------------------------------------
 */
 
-$stmt = $db->prepare("
-    SELECT
-        user_id,
-        name,
-        role
-    FROM users
-    WHERE user_id = ?
-    LIMIT 1
-");
-
-$stmt->execute([$user_id]);
-
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-
-if (!$user) {
-
-    header("Location: index.php");
-    exit;
-
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| ONLY VENDOR
+| DATABASE CONFIGURATION
 |--------------------------------------------------------------------------
 */
 
-if ($user['role'] !== 'vendor') {
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'hochipoHub');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+define('DB_CHARSET', 'utf8mb4');
 
-    header("Location: dashboard.php");
-    exit;
 
+/*
+|--------------------------------------------------------------------------
+| APPLICATION CONFIGURATION
+|--------------------------------------------------------------------------
+*/
+
+define('SITE_NAME', 'HochipoHub');
+
+define(
+    'BASE_URL',
+    'http://localhost/hochipoHub/'
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| UPLOAD PATH
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'PRODUCT_UPLOAD_PATH',
+    __DIR__ . '/uploads/products/'
+);
+
+define(
+    'VENDOR_UPLOAD_PATH',
+    __DIR__ . '/uploads/vendors/'
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| UPLOAD URL
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'PRODUCT_UPLOAD_URL',
+    BASE_URL . 'uploads/products/'
+);
+
+define(
+    'VENDOR_UPLOAD_URL',
+    BASE_URL . 'uploads/vendors/'
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| DEFAULT COMMISSION RATE
+|--------------------------------------------------------------------------
+|
+| 5% default commission.
+| Admin can still manage commission records from admin panel.
+|--------------------------------------------------------------------------
+*/
+
+define('DEFAULT_COMMISSION_RATE', 5.00);
+
+
+/*
+|--------------------------------------------------------------------------
+| PDO DATABASE CONNECTION
+|--------------------------------------------------------------------------
+*/
+
+function getDB()
+{
+    static $db = null;
+
+    if ($db instanceof PDO) {
+        return $db;
+    }
+
+    $dsn = 'mysql:host=' . DB_HOST .
+           ';dbname=' . DB_NAME .
+           ';charset=' . DB_CHARSET;
+
+    try {
+
+        $db = new PDO(
+            $dsn,
+            DB_USER,
+            DB_PASS,
+            [
+                PDO::ATTR_ERRMODE =>
+                    PDO::ERRMODE_EXCEPTION,
+
+                PDO::ATTR_DEFAULT_FETCH_MODE =>
+                    PDO::FETCH_ASSOC,
+
+                PDO::ATTR_EMULATE_PREPARES =>
+                    false
+            ]
+        );
+
+        return $db;
+
+    } catch (PDOException $e) {
+
+        die(
+            'Database connection failed. Please check your database configuration.'
+        );
+    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| GET VENDOR
+| SECURITY / ESCAPE HELPER
 |--------------------------------------------------------------------------
 */
 
-$stmt = $db->prepare("
-    SELECT
-        vendor_id,
-        business_name,
-        approval_status
-    FROM vendors
-    WHERE user_id = ?
-    LIMIT 1
-");
-
-$stmt->execute([$user_id]);
-
-$vendor = $stmt->fetch(PDO::FETCH_ASSOC);
-
-
-if (!$vendor) {
-
-    header("Location: dashboard.php");
-    exit;
-
+function e($value)
+{
+    return htmlspecialchars(
+        (string) $value,
+        ENT_QUOTES,
+        'UTF-8'
+    );
 }
 
 
-$vendor_id =
-    (int) $vendor['vendor_id'];
+/*
+|--------------------------------------------------------------------------
+| REDIRECT HELPER
+|--------------------------------------------------------------------------
+*/
+
+function redirect($url)
+{
+    header('Location: ' . $url);
+    exit;
+}
 
 
 /*
 |--------------------------------------------------------------------------
-| COMMISSION SUMMARY
+| LOGIN CHECK
 |--------------------------------------------------------------------------
 */
 
-$stmt = $db->prepare("
-    SELECT
-
-        COUNT(*) AS total_records,
-
-        COALESCE(
-            SUM(commission_amount),
-            0
-        ) AS total_commission,
-
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN status = 'Paid'
-                    THEN commission_amount
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS paid_commission,
-
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN status = 'Pending'
-                    THEN commission_amount
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS pending_commission
-
-    FROM commission
-
-    WHERE vendor_id = ?
-");
-
-$stmt->execute([$vendor_id]);
-
-$summary =
-    $stmt->fetch(PDO::FETCH_ASSOC);
+function isLoggedIn()
+{
+    return isset($_SESSION['user_id']);
+}
 
 
 /*
 |--------------------------------------------------------------------------
-| COMMISSION RECORDS
+| CURRENT USER ID
 |--------------------------------------------------------------------------
 */
 
-$stmt = $db->prepare("
-    SELECT
+function currentUserId()
+{
+    return $_SESSION['user_id'] ?? null;
+}
 
-        c.commission_id,
-        c.order_id,
-        c.vendor_order_id,
-        c.commission_rate,
-        c.commission_amount,
-        c.status,
-        c.created_at,
+
+/*
+|--------------------------------------------------------------------------
+| CURRENT USER ROLE
+|--------------------------------------------------------------------------
+*/
 
-        vo.subtotal,
-        vo.vendor_status,
+function currentUserRole()
+{
+    return $_SESSION['role'] ?? null;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ROLE CHECK
+|--------------------------------------------------------------------------
+*/
 
-        o.order_date,
-        o.order_status
+function hasRole($role)
+{
+    return (
+        isset($_SESSION['role']) &&
+        $_SESSION['role'] === $role
+    );
+}
+
 
-    FROM commission c
+/*
+|--------------------------------------------------------------------------
+| ADMIN CHECK
+|--------------------------------------------------------------------------
+*/
+
+function isAdmin()
+{
+    return hasRole('admin');
+}
 
-    INNER JOIN orders o
-        ON c.order_id = o.order_id
 
-    LEFT JOIN vendor_orders vo
-        ON c.vendor_order_id =
-           vo.vendor_order_id
+/*
+|--------------------------------------------------------------------------
+| VENDOR CHECK
+|--------------------------------------------------------------------------
+*/
 
-    WHERE c.vendor_id = ?
+function isVendor()
+{
+    return hasRole('vendor');
+}
 
-    ORDER BY c.created_at DESC
-");
 
-$stmt->execute([$vendor_id]);
+/*
+|--------------------------------------------------------------------------
+| CUSTOMER CHECK
+|--------------------------------------------------------------------------
+*/
 
-$commissions =
-    $stmt->fetchAll(PDO::FETCH_ASSOC);
+function isCustomer()
+{
+    return hasRole('customer');
+}
 
 
-$pageTitle =
-    "Commission - " .
-    $vendor['business_name'];
+/*
+|--------------------------------------------------------------------------
+| REQUIRE LOGIN
+|--------------------------------------------------------------------------
+*/
 
-require_once __DIR__ . '/includes/header.php';
-require_once __DIR__ . '/includes/navbar.php';
-require_once __DIR__ . '/includes/vendor_sidebar.php';
+function requireLogin()
+{
+    if (!isLoggedIn()) {
 
-?>
+        $_SESSION['error'] =
+            'Please login to continue.';
 
+        redirect(
+            BASE_URL . 'index.php'
+        );
+    }
+}
 
-<main class="dashboard-page">
 
-    <div class="dashboard-container">
+/*
+|--------------------------------------------------------------------------
+| REQUIRE ADMIN
+|--------------------------------------------------------------------------
+*/
+
+function requireAdmin()
+{
+    requireLogin();
 
+    if (!isAdmin()) {
 
-        <section class="dashboard-header">
+        $_SESSION['error'] =
+            'Access denied.';
 
-            <div>
+        redirect(
+            BASE_URL . 'index.php'
+        );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| REQUIRE VENDOR
+|--------------------------------------------------------------------------
+*/
 
-                <span class="small-label">
-                    VENDOR CENTER
-                </span>
+function requireVendor()
+{
+    requireLogin();
 
-                <h1>
-                    Commission
-                </h1>
+    if (!isVendor()) {
+
+        $_SESSION['error'] =
+            'Vendor access required.';
+
+        redirect(
+            BASE_URL . 'index.php'
+        );
+    }
+}
 
-                <p>
-                    Track commission generated from your orders.
-                </p>
 
-            </div>
+/*
+|--------------------------------------------------------------------------
+| REQUIRE CUSTOMER
+|--------------------------------------------------------------------------
+*/
 
-        </section>
+function requireCustomer()
+{
+    requireLogin();
 
+    if (!isCustomer()) {
 
-        <?php if (
-            $vendor['approval_status'] !== 'Approved'
-        ): ?>
+        $_SESSION['error'] =
+            'Customer access required.';
 
-            <div class="alert alert-warning">
-
-                Your vendor account is currently
-
-                <strong>
-                    <?= htmlspecialchars(
-                        $vendor['approval_status']
-                    ) ?>
-                </strong>.
-
-                Commission information may be limited until
-                your vendor account is approved.
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <section class="stats-grid">
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Total Commission
-                </span>
-
-                <strong class="stat-value">
-
-                    RM
-                    <?= number_format(
-                        (float) $summary['total_commission'],
-                        2
-                    ) ?>
-
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Paid Commission
-                </span>
-
-                <strong class="stat-value">
-
-                    RM
-                    <?= number_format(
-                        (float) $summary['paid_commission'],
-                        2
-                    ) ?>
-
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Pending Commission
-                </span>
-
-                <strong class="stat-value">
-
-                    RM
-                    <?= number_format(
-                        (float) $summary['pending_commission'],
-                        2
-                    ) ?>
-
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Commission Records
-                </span>
-
-                <strong class="stat-value">
-
-                    <?= (int) $summary['total_records'] ?>
-
-                </strong>
-
-            </div>
-
-
-        </section>
-
-
-        <section class="dashboard-section">
-
-            <div class="section-heading">
-
-                <div>
-
-                    <span class="small-label">
-                        TRANSACTIONS
-                    </span>
-
-                    <h2>
-                        Commission History
-                    </h2>
-
-                </div>
-
-            </div>
-
-
-            <?php if (empty($commissions)): ?>
-
-                <div class="empty-state">
-
-                    <div class="empty-icon">
-                        💰
-                    </div>
-
-                    <h3>
-                        No commission yet
-                    </h3>
-
-                    <p>
-                        Commission records will appear here
-                        when your products generate orders.
-                    </p>
-
-                </div>
-
-            <?php else: ?>
-
-
-                <div class="table-wrapper">
-
-                    <table class="dashboard-table">
-
-                        <thead>
-
-                            <tr>
-
-                                <th>
-                                    Commission ID
-                                </th>
-
-                                <th>
-                                    Order
-                                </th>
-
-                                <th>
-                                    Vendor Order
-                                </th>
-
-                                <th>
-                                    Order Amount
-                                </th>
-
-                                <th>
-                                    Rate
-                                </th>
-
-                                <th>
-                                    Commission
-                                </th>
-
-                                <th>
-                                    Status
-                                </th>
-
-                                <th>
-                                    Date
-                                </th>
-
-                            </tr>
-
-                        </thead>
-
-
-                        <tbody>
-
-                            <?php foreach (
-                                $commissions
-                                as $commission
-                            ): ?>
-
-                                <tr>
-
-                                    <td>
-
-                                        #
-                                        <?= (int)
-                                            $commission[
-                                                'commission_id'
-                                            ] ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        #
-                                        <?= (int)
-                                            $commission[
-                                                'order_id'
-                                            ] ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?php if (
-                                            !empty(
-                                                $commission[
-                                                    'vendor_order_id'
-                                                ]
-                                            )
-                                        ): ?>
-
-                                            #
-
-                                            <?= (int)
-                                                $commission[
-                                                    'vendor_order_id'
-                                                ] ?>
-
-                                        <?php else: ?>
-
-                                            —
-
-                                        <?php endif; ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        RM
-                                        <?= number_format(
-                                            (float)
-                                            $commission[
-                                                'subtotal'
-                                            ],
-                                            2
-                                        ) ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?= number_format(
-                                            (float)
-                                            $commission[
-                                                'commission_rate'
-                                            ],
-                                            2
-                                        ) ?>%
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <strong>
-
-                                            RM
-                                            <?= number_format(
-                                                (float)
-                                                $commission[
-                                                    'commission_amount'
-                                                ],
-                                                2
-                                            ) ?>
-
-                                        </strong>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?php if (
-                                            $commission['status']
-                                            === 'Paid'
-                                        ): ?>
-
-                                            <span class="status-badge status-success">
-                                                Paid
-                                            </span>
-
-                                        <?php else: ?>
-
-                                            <span class="status-badge status-warning">
-                                                Pending
-                                            </span>
-
-                                        <?php endif; ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?= htmlspecialchars(
-                                            date(
-                                                'd M Y, h:i A',
-                                                strtotime(
-                                                    $commission[
-                                                        'created_at'
-                                                    ]
-                                                )
-                                            )
-                                        ) ?>
-
-                                    </td>
-
-                                </tr>
-
-                            <?php endforeach; ?>
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            <?php endif; ?>
-
-
-        </section>
-
-
-    </div>
-
-</main>
-
-
-<?php require_once __DIR__ . '/includes/footer.php'; ?>
+        redirect(
+            BASE_URL . 'index.php'
+        );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CSRF TOKEN
+|--------------------------------------------------------------------------
+*/
+
+if (!isset($_SESSION['csrf_token'])) {
+
+    $_SESSION['csrf_token'] =
+        bin2hex(random_bytes(32));
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET CSRF TOKEN
+|--------------------------------------------------------------------------
+*/
+
+function csrfToken()
+{
+    return $_SESSION['csrf_token'];
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| VERIFY CSRF TOKEN
+|--------------------------------------------------------------------------
+*/
+
+function verifyCsrfToken($token)
+{
+    return (
+        isset($_SESSION['csrf_token']) &&
+        hash_equals(
+            $_SESSION['csrf_token'],
+            $token
+        )
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| FLASH MESSAGE
+|--------------------------------------------------------------------------
+*/
+
+function setFlash($type, $message)
+{
+    $_SESSION['flash'] = [
+        'type' => $type,
+        'message' => $message
+    ];
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET FLASH MESSAGE
+|--------------------------------------------------------------------------
+*/
+
+function getFlash()
+{
+    if (!isset($_SESSION['flash'])) {
+        return null;
+    }
+
+    $flash = $_SESSION['flash'];
+
+    unset($_SESSION['flash']);
+
+    return $flash;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CREATE UPLOAD DIRECTORIES
+|--------------------------------------------------------------------------
+*/
+
+if (!is_dir(PRODUCT_UPLOAD_PATH)) {
+    @mkdir(
+        PRODUCT_UPLOAD_PATH,
+        0777,
+        true
+    );
+}
+
+if (!is_dir(VENDOR_UPLOAD_PATH)) {
+    @mkdir(
+        VENDOR_UPLOAD_PATH,
+        0777,
+        true
+    );
+}
