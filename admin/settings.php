@@ -1,228 +1,411 @@
 <?php
+/**
+ * HOCHIPOHUB
+ * Admin - Settings
+ */
 
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../database/db.php';
+require_once dirname(__DIR__) . '/database/db.php';
+require_once dirname(__DIR__) . '/includes/session.php';
 
 $db = getDB();
 
 if (session_status() === PHP_SESSION_NONE) {
-    session_name(SESSION_NAME);
     session_start();
 }
 
-if (empty($_SESSION['user_id'])) {
-    redirect(BASE_URL . 'index.php');
-}
+/*
+|--------------------------------------------------------------------------
+| ADMIN ACCESS
+|--------------------------------------------------------------------------
+*/
 
 if (
-    !isset($_SESSION['role']) ||
-    $_SESSION['role'] !== 'admin'
+    !isset($_SESSION['user_id']) ||
+    ($_SESSION['role'] ?? '') !== 'admin'
 ) {
-    redirect(BASE_URL . 'index.php');
+    header("Location: ../index.php");
+    exit;
 }
 
-$successMessage = '';
-$errorMessage = '';
+$admin_id = (int) $_SESSION['user_id'];
+
+$success = '';
+$error = '';
 
 /*
 |--------------------------------------------------------------------------
-| CURRENT SETTINGS
+| GET ADMIN DATA
 |--------------------------------------------------------------------------
 */
 
-$settings = [
-    'site_name' => APP_NAME,
-    'commission_rate' => DEFAULT_COMMISSION_RATE,
-    'currency' => CURRENCY_SYMBOL,
-    'timezone' => 'Asia/Kuala_Lumpur'
-];
+$stmt = $db->prepare("
+    SELECT
+        user_id,
+        name,
+        email,
+        phone,
+        profile_image,
+        mfa_enabled,
+        created_at
+    FROM users
+    WHERE user_id = ?
+      AND role = 'admin'
+    LIMIT 1
+");
 
-/*
-|--------------------------------------------------------------------------
-| LOAD SETTINGS TABLE IF AVAILABLE
-|--------------------------------------------------------------------------
-*/
+$stmt->execute([$admin_id]);
 
-try {
+$admin = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $tableCheck = $db->query("
-        SHOW TABLES LIKE 'settings'
-    ");
-
-    if ($tableCheck->fetch()) {
-
-        $stmt = $db->query("
-            SELECT setting_key, setting_value
-            FROM settings
-        ");
-
-        $rows = $stmt->fetchAll();
-
-        foreach ($rows as $row) {
-
-            $key = $row['setting_key'];
-
-            if (array_key_exists($key, $settings)) {
-
-                $settings[$key] =
-                    $row['setting_value'];
-            }
-        }
-    }
-
-} catch (PDOException $e) {
-
-    if (APP_DEBUG) {
-        $errorMessage = $e->getMessage();
-    }
+if (!$admin) {
+    session_destroy();
+    header("Location: ../index.php");
+    exit;
 }
 
 /*
 |--------------------------------------------------------------------------
-| UPDATE SETTINGS
+| UPDATE PROFILE
 |--------------------------------------------------------------------------
 */
 
 if (
     $_SERVER['REQUEST_METHOD'] === 'POST' &&
-    isset($_POST['save_settings'])
+    isset($_POST['update_profile'])
 ) {
 
-    $siteName =
-        trim($_POST['site_name'] ?? '');
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
 
-    $commissionRate =
-        (float) (
-            $_POST['commission_rate']
-            ?? DEFAULT_COMMISSION_RATE
-        );
+    if ($name === '' || $email === '') {
 
-    $currency =
-        trim($_POST['currency'] ?? 'RM');
+        $error = "Name and email are required.";
 
-    $timezone =
-        trim(
-            $_POST['timezone']
-            ?? 'Asia/Kuala_Lumpur'
-        );
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
-    if ($siteName === '') {
-
-        $errorMessage =
-            'Site name cannot be empty.';
-
-    } elseif (
-        $commissionRate < 0 ||
-        $commissionRate > 100
-    ) {
-
-        $errorMessage =
-            'Commission rate must be between 0% and 100%.';
-
-    } elseif (
-        !in_array(
-            $timezone,
-            timezone_identifiers_list(),
-            true
-        )
-    ) {
-
-        $errorMessage =
-            'Invalid timezone selected.';
+        $error = "Please enter a valid email address.";
 
     } else {
 
         try {
 
             /*
-            |--------------------------------------------------------------------------
-            | CHECK SETTINGS TABLE
-            |--------------------------------------------------------------------------
-            */
+             * Check duplicate email
+             */
 
-            $tableCheck = $db->query("
-                SHOW TABLES LIKE 'settings'
+            $stmt = $db->prepare("
+                SELECT user_id
+                FROM users
+                WHERE email = ?
+                  AND user_id != ?
+                LIMIT 1
             ");
 
-            if (!$tableCheck->fetch()) {
+            $stmt->execute([
+                $email,
+                $admin_id
+            ]);
 
-                $errorMessage =
-                    'Settings table does not exist in the database.';
+            if ($stmt->fetch()) {
+
+                $error = "This email is already being used.";
 
             } else {
 
-                $saveStmt = $db->prepare("
-                    INSERT INTO settings
-                        (
-                            setting_key,
-                            setting_value
-                        )
-                    VALUES
-                        (
-                            :setting_key,
-                            :setting_value
-                        )
-                    ON DUPLICATE KEY UPDATE
-                        setting_value =
-                            VALUES(setting_value)
-                ");
+                /*
+                 * Check duplicate phone
+                 */
 
-                $values = [
-                    'site_name' =>
-                        $siteName,
+                if ($phone !== '') {
 
-                    'commission_rate' =>
-                        number_format(
-                            $commissionRate,
-                            2,
-                            '.',
-                            ''
-                        ),
+                    $stmt = $db->prepare("
+                        SELECT user_id
+                        FROM users
+                        WHERE phone = ?
+                          AND user_id != ?
+                        LIMIT 1
+                    ");
 
-                    'currency' =>
-                        $currency,
-
-                    'timezone' =>
-                        $timezone
-                ];
-
-                foreach (
-                    $values
-                    as $key => $value
-                ) {
-
-                    $saveStmt->execute([
-                        ':setting_key' =>
-                            $key,
-
-                        ':setting_value' =>
-                            $value
+                    $stmt->execute([
+                        $phone,
+                        $admin_id
                     ]);
+
+                    if ($stmt->fetch()) {
+                        $error = "This phone number is already being used.";
+                    }
                 }
 
-                $settings =
-                    array_merge(
-                        $settings,
-                        $values
-                    );
 
-                $successMessage =
-                    'Settings updated successfully.';
+                if ($error === '') {
+
+                    $stmt = $db->prepare("
+                        UPDATE users
+                        SET
+                            name = ?,
+                            email = ?,
+                            phone = ?
+                        WHERE user_id = ?
+                          AND role = 'admin'
+                    ");
+
+                    $stmt->execute([
+                        $name,
+                        $email,
+                        $phone !== '' ? $phone : null,
+                        $admin_id
+                    ]);
+
+
+                    $_SESSION['name'] = $name;
+                    $_SESSION['email'] = $email;
+
+
+                    /*
+                     * Admin log
+                     */
+
+                    $stmt = $db->prepare("
+                        INSERT INTO admin_logs
+                        (
+                            admin_id,
+                            action,
+                            target_type,
+                            target_id
+                        )
+                        VALUES (?, ?, ?, ?)
+                    ");
+
+                    $stmt->execute([
+                        $admin_id,
+                        'Updated admin profile',
+                        'user',
+                        $admin_id
+                    ]);
+
+
+                    $success = "Profile updated successfully.";
+
+
+                    /*
+                     * Refresh admin data
+                     */
+
+                    $admin['name'] = $name;
+                    $admin['email'] = $email;
+                    $admin['phone'] = $phone;
+                }
             }
 
         } catch (PDOException $e) {
 
-            $errorMessage = APP_DEBUG
-                ? $e->getMessage()
-                : 'Unable to save settings.';
+            $error = "Unable to update profile.";
         }
     }
 }
 
+/*
+|--------------------------------------------------------------------------
+| CHANGE PASSWORD
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['change_password'])
+) {
+
+    $current_password =
+        $_POST['current_password'] ?? '';
+
+    $new_password =
+        $_POST['new_password'] ?? '';
+
+    $confirm_password =
+        $_POST['confirm_password'] ?? '';
+
+
+    if (
+        $current_password === '' ||
+        $new_password === '' ||
+        $confirm_password === ''
+    ) {
+
+        $error = "All password fields are required.";
+
+    } elseif ($new_password !== $confirm_password) {
+
+        $error = "New passwords do not match.";
+
+    } elseif (strlen($new_password) < 8) {
+
+        $error = "Password must contain at least 8 characters.";
+
+    } else {
+
+        try {
+
+            /*
+             * Get current password
+             */
+
+            $stmt = $db->prepare("
+                SELECT password
+                FROM users
+                WHERE user_id = ?
+                  AND role = 'admin'
+                LIMIT 1
+            ");
+
+            $stmt->execute([
+                $admin_id
+            ]);
+
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+
+            if (
+                !$row ||
+                !password_verify(
+                    $current_password,
+                    $row['password']
+                )
+            ) {
+
+                $error = "Current password is incorrect.";
+
+            } else {
+
+                $hashed_password =
+                    password_hash(
+                        $new_password,
+                        PASSWORD_DEFAULT
+                    );
+
+
+                $stmt = $db->prepare("
+                    UPDATE users
+                    SET password = ?
+                    WHERE user_id = ?
+                      AND role = 'admin'
+                ");
+
+                $stmt->execute([
+                    $hashed_password,
+                    $admin_id
+                ]);
+
+
+                /*
+                 * Admin log
+                 */
+
+                $stmt = $db->prepare("
+                    INSERT INTO admin_logs
+                    (
+                        admin_id,
+                        action,
+                        target_type,
+                        target_id
+                    )
+                    VALUES (?, ?, ?, ?)
+                ");
+
+                $stmt->execute([
+                    $admin_id,
+                    'Changed admin password',
+                    'user',
+                    $admin_id
+                ]);
+
+
+                $success =
+                    "Password changed successfully.";
+            }
+
+        } catch (PDOException $e) {
+
+            $error =
+                "Unable to change password.";
+        }
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| MFA TOGGLE
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['toggle_mfa'])
+) {
+
+    $mfa_enabled =
+        isset($_POST['mfa_enabled'])
+            ? (int) $_POST['mfa_enabled']
+            : 0;
+
+    $mfa_enabled =
+        $mfa_enabled === 1 ? 1 : 0;
+
+
+    try {
+
+        $stmt = $db->prepare("
+            UPDATE users
+            SET mfa_enabled = ?
+            WHERE user_id = ?
+              AND role = 'admin'
+        ");
+
+        $stmt->execute([
+            $mfa_enabled,
+            $admin_id
+        ]);
+
+
+        $admin['mfa_enabled'] =
+            $mfa_enabled;
+
+
+        $stmt = $db->prepare("
+            INSERT INTO admin_logs
+            (
+                admin_id,
+                action,
+                target_type,
+                target_id
+            )
+            VALUES (?, ?, ?, ?)
+        ");
+
+        $stmt->execute([
+            $admin_id,
+            $mfa_enabled
+                ? 'Enabled MFA'
+                : 'Disabled MFA',
+            'user',
+            $admin_id
+        ]);
+
+
+        $success =
+            $mfa_enabled
+                ? "MFA enabled."
+                : "MFA disabled.";
+
+    } catch (PDOException $e) {
+
+        $error =
+            "Unable to update MFA setting.";
+    }
+}
+
 ?>
-
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
@@ -235,1096 +418,369 @@ if (
     >
 
     <title>
-        Settings |
-        <?= e(APP_NAME) ?>
+        Settings | HochipoHub Admin
     </title>
 
     <link
         rel="stylesheet"
-        href="<?= BASE_URL ?>css/style.css"
+        href="../css/admin.css"
     >
 
     <link
         rel="stylesheet"
-        href="<?= BASE_URL ?>css/admin.css"
+        href="../css/responsive.css"
     >
-
-    <link
-        rel="stylesheet"
-        href="<?= BASE_URL ?>css/responsive.css"
-    >
-
-    <style>
-
-        .settings-page {
-            min-height: 100vh;
-
-            padding:
-                35px 4%
-                60px;
-
-            background:
-                radial-gradient(
-                    circle at 5% 5%,
-                    rgba(37,99,235,.14),
-                    transparent 28%
-                ),
-                radial-gradient(
-                    circle at 95% 20%,
-                    rgba(14,165,233,.12),
-                    transparent 25%
-                ),
-                #f8fbff;
-        }
-
-        .settings-container {
-            max-width: 1200px;
-            margin: auto;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | HERO
-        |--------------------------------------------------------------------------
-        */
-
-        .settings-hero {
-            position: relative;
-
-            overflow: hidden;
-
-            margin-bottom: 24px;
-
-            padding: 35px;
-
-            border-radius: 28px;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #020617,
-                    #172554 35%,
-                    #1d4ed8 68%,
-                    #0284c7
-                );
-
-            color: white;
-
-            box-shadow:
-                0 25px 65px
-                rgba(29,78,216,.22);
-        }
-
-        .settings-hero::before {
-            content: "";
-
-            position: absolute;
-
-            width: 370px;
-            height: 370px;
-
-            top: -230px;
-            right: -80px;
-
-            border-radius: 50%;
-
-            background:
-                rgba(96,165,250,.14);
-        }
-
-        .settings-hero::after {
-            content: "";
-
-            position: absolute;
-
-            width: 220px;
-            height: 220px;
-
-            right: 230px;
-            bottom: -175px;
-
-            border-radius: 50%;
-
-            background:
-                rgba(56,189,248,.09);
-        }
-
-        .hero-content {
-            position: relative;
-            z-index: 2;
-        }
-
-        .hero-kicker {
-            margin-bottom: 8px;
-
-            color:
-                rgba(255,255,255,.62);
-
-            font-size: 9px;
-            font-weight: 950;
-
-            letter-spacing: 2px;
-
-            text-transform: uppercase;
-        }
-
-        .settings-hero h1 {
-            margin: 0 0 8px;
-
-            font-size:
-                clamp(
-                    29px,
-                    5vw,
-                    45px
-                );
-
-            font-weight: 950;
-        }
-
-        .settings-hero p {
-            max-width: 680px;
-
-            margin: 0;
-
-            color:
-                rgba(255,255,255,.75);
-
-            font-size: 11px;
-
-            line-height: 1.7;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | MESSAGE
-        |--------------------------------------------------------------------------
-        */
-
-        .message {
-            margin-bottom: 18px;
-
-            padding: 13px 15px;
-
-            border-radius: 12px;
-
-            font-size: 9px;
-            font-weight: 850;
-        }
-
-        .message.success {
-            border:
-                1px solid #bbf7d0;
-
-            background: #f0fdf4;
-
-            color: #166534;
-        }
-
-        .message.error {
-            border:
-                1px solid #fecaca;
-
-            background: #fef2f2;
-
-            color: #991b1b;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | GRID
-        |--------------------------------------------------------------------------
-        */
-
-        .settings-grid {
-            display: grid;
-
-            grid-template-columns:
-                1fr 1fr;
-
-            gap: 18px;
-        }
-
-        .settings-card {
-            padding: 25px;
-
-            border:
-                1px solid #dbeafe;
-
-            border-radius: 23px;
-
-            background: white;
-
-            box-shadow:
-                0 12px 40px
-                rgba(15,23,42,.055);
-        }
-
-        .settings-card.full {
-            grid-column:
-                1 / -1;
-        }
-
-        .card-heading {
-            display: flex;
-
-            align-items: center;
-
-            gap: 11px;
-
-            margin-bottom: 20px;
-
-            padding-bottom: 15px;
-
-            border-bottom:
-                1px solid #eff6ff;
-        }
-
-        .card-icon {
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            width: 37px;
-            height: 37px;
-
-            border-radius: 11px;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #dbeafe,
-                    #e0f2fe
-                );
-
-            color: #2563eb;
-
-            font-size: 17px;
-        }
-
-        .card-heading h2 {
-            margin: 0;
-
-            color: #0f172a;
-
-            font-size: 14px;
-            font-weight: 950;
-        }
-
-        .card-heading p {
-            margin: 3px 0 0;
-
-            color: #94a3b8;
-
-            font-size: 8px;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | FORM
-        |--------------------------------------------------------------------------
-        */
-
-        .form-group {
-            margin-bottom: 17px;
-        }
-
-        .form-group:last-child {
-            margin-bottom: 0;
-        }
-
-        .form-label {
-            display: block;
-
-            margin-bottom: 7px;
-
-            color: #334155;
-
-            font-size: 8px;
-            font-weight: 950;
-
-            text-transform: uppercase;
-
-            letter-spacing: .5px;
-        }
-
-        .form-input,
-        .form-select {
-            width: 100%;
-
-            box-sizing: border-box;
-
-            padding: 12px 13px;
-
-            border:
-                1px solid #dbeafe;
-
-            border-radius: 11px;
-
-            outline: none;
-
-            background: #fbfdff;
-
-            color: #0f172a;
-
-            font-family: inherit;
-
-            font-size: 9px;
-
-            transition:
-                .2s ease;
-        }
-
-        .form-input:focus,
-        .form-select:focus {
-            border-color: #2563eb;
-
-            background: white;
-
-            box-shadow:
-                0 0 0 4px
-                rgba(37,99,235,.06);
-        }
-
-        .form-help {
-            margin-top: 6px;
-
-            color: #94a3b8;
-
-            font-size: 7px;
-
-            line-height: 1.5;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | READONLY
-        |--------------------------------------------------------------------------
-        */
-
-        .readonly-box {
-            width: 100%;
-
-            box-sizing: border-box;
-
-            padding: 12px 13px;
-
-            border:
-                1px solid #e2e8f0;
-
-            border-radius: 11px;
-
-            background: #f8fafc;
-
-            color: #64748b;
-
-            font-size: 9px;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | INFO CARDS
-        |--------------------------------------------------------------------------
-        */
-
-        .info-grid {
-            display: grid;
-
-            grid-template-columns:
-                repeat(3, 1fr);
-
-            gap: 10px;
-        }
-
-        .info-item {
-            padding: 15px;
-
-            border:
-                1px solid #e0f2fe;
-
-            border-radius: 15px;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #f8fbff,
-                    #eff6ff
-                );
-        }
-
-        .info-item span {
-            display: block;
-
-            margin-bottom: 5px;
-
-            color: #94a3b8;
-
-            font-size: 7px;
-            font-weight: 850;
-
-            text-transform: uppercase;
-        }
-
-        .info-item strong {
-            color: #1e40af;
-
-            font-size: 11px;
-            font-weight: 950;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | SAVE
-        |--------------------------------------------------------------------------
-        */
-
-        .save-area {
-            display: flex;
-
-            align-items: center;
-            justify-content: space-between;
-
-            gap: 15px;
-
-            margin-top: 22px;
-
-            padding-top: 20px;
-
-            border-top:
-                1px solid #eff6ff;
-        }
-
-        .save-note {
-            color: #94a3b8;
-
-            font-size: 8px;
-
-            line-height: 1.5;
-        }
-
-        .save-button {
-            padding: 12px 22px;
-
-            border: 0;
-
-            border-radius: 11px;
-
-            cursor: pointer;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #2563eb,
-                    #0284c7
-                );
-
-            color: white;
-
-            font-size: 8px;
-            font-weight: 950;
-
-            box-shadow:
-                0 8px 20px
-                rgba(37,99,235,.18);
-
-            transition:
-                transform .2s ease,
-                box-shadow .2s ease;
-        }
-
-        .save-button:hover {
-            transform:
-                translateY(-2px);
-
-            box-shadow:
-                0 12px 28px
-                rgba(37,99,235,.25);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | MOBILE
-        |--------------------------------------------------------------------------
-        */
-
-        @media (max-width: 850px) {
-
-            .settings-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .settings-card.full {
-                grid-column: auto;
-            }
-
-            .info-grid {
-                grid-template-columns:
-                    1fr;
-            }
-
-        }
-
-        @media (max-width: 600px) {
-
-            .settings-page {
-                padding:
-                    25px 15px 50px;
-            }
-
-            .settings-hero {
-                padding: 27px 21px;
-            }
-
-            .settings-card {
-                padding: 19px;
-            }
-
-            .save-area {
-                align-items: stretch;
-
-                flex-direction: column;
-            }
-
-            .save-button {
-                width: 100%;
-            }
-
-        }
-
-    </style>
 
 </head>
 
 <body>
 
-<?php
-require_once __DIR__ . '/../includes/navbar.php';
-?>
+<div class="admin-wrapper">
 
+    <?php
 
-<main class="settings-page">
+    $sidebar =
+        dirname(__DIR__) .
+        '/includes/admin_sidebar.php';
 
-    <div class="settings-container">
+    if (file_exists($sidebar)) {
+        require_once $sidebar;
+    }
 
+    ?>
 
-        <!-- HERO -->
+    <main class="admin-main">
 
-        <section class="settings-hero">
+        <div class="admin-topbar">
 
-            <div class="hero-content">
+            <div>
 
-                <div class="hero-kicker">
-                    HochipoHub Admin
-                </div>
-
-                <h1>
-                    System Settings
-                </h1>
+                <h1>Settings</h1>
 
                 <p>
-                    Manage your marketplace configuration,
-                    commission rate, currency and regional
-                    preferences.
+                    Manage your administrator account.
                 </p>
+
+            </div>
+
+        </div>
+
+
+        <?php if ($success !== ''): ?>
+
+            <div class="admin-alert success">
+                <?= htmlspecialchars($success) ?>
+            </div>
+
+        <?php endif; ?>
+
+
+        <?php if ($error !== ''): ?>
+
+            <div class="admin-alert error">
+                <?= htmlspecialchars($error) ?>
+            </div>
+
+        <?php endif; ?>
+
+
+        <section class="admin-panel">
+
+            <div class="panel-header">
+
+                <div>
+
+                    <h2>
+                        Administrator Profile
+                    </h2>
+
+                    <p>
+                        Update your personal account information.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <form
+                method="POST"
+                class="admin-form"
+            >
+
+                <input
+                    type="hidden"
+                    name="update_profile"
+                    value="1"
+                >
+
+
+                <div class="form-group">
+
+                    <label>
+                        Name
+                    </label>
+
+                    <input
+                        type="text"
+                        name="name"
+                        value="<?= htmlspecialchars($admin['name']) ?>"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Email
+                    </label>
+
+                    <input
+                        type="email"
+                        name="email"
+                        value="<?= htmlspecialchars($admin['email']) ?>"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Phone
+                    </label>
+
+                    <input
+                        type="text"
+                        name="phone"
+                        value="<?= htmlspecialchars($admin['phone'] ?? '') ?>"
+                    >
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="admin-btn primary"
+                >
+                    Save Profile
+                </button>
+
+            </form>
+
+        </section>
+
+
+        <section class="admin-panel">
+
+            <div class="panel-header">
+
+                <div>
+
+                    <h2>
+                        Change Password
+                    </h2>
+
+                    <p>
+                        Use a strong password with at least 8 characters.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <form
+                method="POST"
+                class="admin-form"
+            >
+
+                <input
+                    type="hidden"
+                    name="change_password"
+                    value="1"
+                >
+
+
+                <div class="form-group">
+
+                    <label>
+                        Current Password
+                    </label>
+
+                    <input
+                        type="password"
+                        name="current_password"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        New Password
+                    </label>
+
+                    <input
+                        type="password"
+                        name="new_password"
+                        minlength="8"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        Confirm New Password
+                    </label>
+
+                    <input
+                        type="password"
+                        name="confirm_password"
+                        minlength="8"
+                        required
+                    >
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="admin-btn primary"
+                >
+                    Change Password
+                </button>
+
+            </form>
+
+        </section>
+
+
+        <section class="admin-panel">
+
+            <div class="panel-header">
+
+                <div>
+
+                    <h2>
+                        Multi-Factor Authentication
+                    </h2>
+
+                    <p>
+                        Manage MFA protection for your administrator account.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="settings-row">
+
+                <div>
+
+                    <strong>
+                        MFA Status
+                    </strong>
+
+                    <p>
+
+                        <?=
+                            $admin['mfa_enabled']
+                                ? 'MFA is currently enabled.'
+                                : 'MFA is currently disabled.'
+                        ?>
+
+                    </p>
+
+                </div>
+
+
+                <form
+                    method="POST"
+                >
+
+                    <input
+                        type="hidden"
+                        name="toggle_mfa"
+                        value="1"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="mfa_enabled"
+                        value="<?= $admin['mfa_enabled'] ? 0 : 1 ?>"
+                    >
+
+
+                    <button
+                        type="submit"
+                        class="admin-btn <?= $admin['mfa_enabled'] ? 'danger' : 'primary' ?>"
+                    >
+
+                        <?= $admin['mfa_enabled']
+                            ? 'Disable MFA'
+                            : 'Enable MFA'
+                        ?>
+
+                    </button>
+
+                </form>
 
             </div>
 
         </section>
 
 
-        <!-- MESSAGE -->
+        <section class="admin-panel">
 
-        <?php if (
-            $successMessage !== ''
-        ): ?>
+            <div class="panel-header">
 
-            <div class="message success">
+                <div>
 
-                ✓
-                <?= e(
-                    $successMessage
-                ) ?>
+                    <h2>
+                        Account Information
+                    </h2>
 
-            </div>
-
-        <?php endif; ?>
-
-
-        <?php if (
-            $errorMessage !== ''
-        ): ?>
-
-            <div class="message error">
-
-                ⚠
-                <?= e(
-                    $errorMessage
-                ) ?>
+                </div>
 
             </div>
 
-        <?php endif; ?>
-
-
-        <!-- SETTINGS -->
-
-        <form
-            method="POST"
-            action=""
-        >
-
-            <div class="settings-grid">
-
-
-                <!-- GENERAL -->
-
-                <section class="settings-card">
-
-                    <div class="card-heading">
-
-                        <div class="card-icon">
-                            ⚙
-                        </div>
-
-                        <div>
-
-                            <h2>
-                                General Settings
-                            </h2>
-
-                            <p>
-                                Basic marketplace information
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label
-                            class="form-label"
-                            for="site_name"
-                        >
-                            Application Name
-                        </label>
-
-                        <input
-                            type="text"
-                            id="site_name"
-                            name="site_name"
-                            class="form-input"
-                            value="<?= e(
-                                $settings[
-                                    'site_name'
-                                ]
-                            ) ?>"
-                            maxlength="100"
-                            required
-                        >
-
-                        <div class="form-help">
-                            This name will be displayed
-                            throughout the marketplace.
-                        </div>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label
-                            class="form-label"
-                        >
-                            Base URL
-                        </label>
-
-                        <div class="readonly-box">
-                            <?= e(
-                                BASE_URL
-                            ) ?>
-                        </div>
-
-                        <div class="form-help">
-                            Configured in config.php.
-                        </div>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label
-                            class="form-label"
-                        >
-                            Database
-                        </label>
-
-                        <div class="readonly-box">
-                            <?= e(
-                                DB_NAME
-                            ) ?>
-                        </div>
-
-                    </div>
-
-                </section>
-
-
-                <!-- MARKETPLACE -->
-
-                <section class="settings-card">
-
-                    <div class="card-heading">
-
-                        <div class="card-icon">
-                            💰
-                        </div>
-
-                        <div>
-
-                            <h2>
-                                Marketplace
-                            </h2>
-
-                            <p>
-                                Financial configuration
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label
-                            class="form-label"
-                            for="commission_rate"
-                        >
-                            Commission Rate (%)
-                        </label>
-
-                        <input
-                            type="number"
-                            id="commission_rate"
-                            name="commission_rate"
-                            class="form-input"
-                            value="<?= e(
-                                $settings[
-                                    'commission_rate'
-                                ]
-                            ) ?>"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            required
-                        >
-
-                        <div class="form-help">
-                            Percentage deducted from vendor
-                            transactions.
-                        </div>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label
-                            class="form-label"
-                            for="currency"
-                        >
-                            Currency
-                        </label>
-
-                        <input
-                            type="text"
-                            id="currency"
-                            name="currency"
-                            class="form-input"
-                            value="<?= e(
-                                $settings[
-                                    'currency'
-                                ]
-                            ) ?>"
-                            maxlength="10"
-                            required
-                        >
-
-                        <div class="form-help">
-                            Example: RM, USD, SGD.
-                        </div>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label
-                            class="form-label"
-                        >
-                            Default Commission
-                        </label>
-
-                        <div class="readonly-box">
-                            <?= number_format(
-                                DEFAULT_COMMISSION_RATE,
-                                2
-                            ) ?>%
-                        </div>
-
-                    </div>
-
-                </section>
-
-
-                <!-- REGIONAL -->
-
-                <section class="settings-card">
-
-                    <div class="card-heading">
-
-                        <div class="card-icon">
-                            🌐
-                        </div>
-
-                        <div>
-
-                            <h2>
-                                Regional Settings
-                            </h2>
-
-                            <p>
-                                Timezone and regional preferences
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label
-                            class="form-label"
-                            for="timezone"
-                        >
-                            Timezone
-                        </label>
-
-                        <select
-                            id="timezone"
-                            name="timezone"
-                            class="form-select"
-                        >
-
-                            <?php
-
-                            $timezones = [
-                                'Asia/Kuala_Lumpur' =>
-                                    'Malaysia — Kuala Lumpur',
-
-                                'Asia/Singapore' =>
-                                    'Singapore',
-
-                                'Asia/Bangkok' =>
-                                    'Thailand — Bangkok',
-
-                                'Asia/Jakarta' =>
-                                    'Indonesia — Jakarta',
-
-                                'Asia/Manila' =>
-                                    'Philippines — Manila',
-
-                                'Asia/Tokyo' =>
-                                    'Japan — Tokyo',
-
-                                'Asia/Seoul' =>
-                                    'South Korea — Seoul',
-
-                                'Asia/Hong_Kong' =>
-                                    'Hong Kong',
-
-                                'UTC' =>
-                                    'UTC'
-                            ];
-
-                            foreach (
-                                $timezones
-                                as $timezoneValue =>
-                                $timezoneLabel
-                            ):
-
-                            ?>
-
-                                <option
-                                    value="<?= e(
-                                        $timezoneValue
-                                    ) ?>"
-                                    <?= $settings[
-                                        'timezone'
-                                    ] ===
-                                    $timezoneValue
-                                        ? 'selected'
-                                        : '' ?>
-                                >
-                                    <?= e(
-                                        $timezoneLabel
-                                    ) ?>
-                                </option>
-
-                            <?php endforeach; ?>
-
-                        </select>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label
-                            class="form-label"
-                        >
-                            Current Server Time
-                        </label>
-
-                        <div class="readonly-box">
-
-                            <?= e(
-                                date(
-                                    'd M Y, h:i A'
-                                )
-                            ) ?>
-
-                        </div>
-
-                    </div>
-
-                </section>
-
-
-                <!-- SYSTEM INFO -->
-
-                <section class="settings-card">
-
-                    <div class="card-heading">
-
-                        <div class="card-icon">
-                            🛡️
-                        </div>
-
-                        <div>
-
-                            <h2>
-                                System Information
-                            </h2>
-
-                            <p>
-                                Current application configuration
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="info-grid">
-
-
-                        <div class="info-item">
-
-                            <span>
-                                Debug Mode
-                            </span>
-
-                            <strong>
-                                <?= APP_DEBUG
-                                    ? 'ON'
-                                    : 'OFF'
-                                ?>
-                            </strong>
-
-                        </div>
-
-
-                        <div class="info-item">
-
-                            <span>
-                                PHP Version
-                            </span>
-
-                            <strong>
-                                <?= e(
-                                    PHP_VERSION
-                                ) ?>
-                            </strong>
-
-                        </div>
-
-
-                        <div class="info-item">
-
-                            <span>
-                                Currency
-                            </span>
-
-                            <strong>
-                                <?= e(
-                                    $settings[
-                                        'currency'
-                                    ]
-                                ) ?>
-                            </strong>
-
-                        </div>
-
-
-                    </div>
-
-                </section>
-
-
-                <!-- SAVE -->
-
-                <section class="settings-card full">
-
-                    <div class="save-area">
-
-                        <div class="save-note">
-
-                            Changes will be applied to the
-                            marketplace configuration after
-                            saving.
-
-                        </div>
-
-                        <button
-                            type="submit"
-                            name="save_settings"
-                            value="1"
-                            class="save-button"
-                        >
-                            SAVE SETTINGS
-                        </button>
-
-                    </div>
-
-                </section>
+            <div class="settings-info">
+
+                <p>
+                    <strong>User ID:</strong>
+                    #<?= (int) $admin['user_id'] ?>
+                </p>
+
+                <p>
+                    <strong>Role:</strong>
+                    Administrator
+                </p>
+
+                <p>
+                    <strong>Account Created:</strong>
+                    <?= date(
+                        'd M Y, h:i A',
+                        strtotime($admin['created_at'])
+                    ) ?>
+                </p>
 
             </div>
 
-        </form>
+        </section>
 
-    </div>
+    </main>
 
-</main>
-
-
-<?php
-require_once __DIR__ . '/../includes/footer.php';
-?>
+</div>
 
 </body>
 
