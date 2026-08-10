@@ -19,14 +19,835 @@
 document.addEventListener("DOMContentLoaded", function () {
 
 
-    /* ==============================================================
-       MOBILE NAVIGATION
-    ============================================================== */
+    /* ===============================================/* ==========================================================================
+   HOCHIPOHUB - GLOBAL JAVASCRIPT
+   ========================================================================== */
 
-    const menuToggle =
-        document.querySelector(
-            ".menu-toggle, .navbar-toggle, #menu-toggle"
+"use strict";
+
+
+/* ==========================================================================
+   DOM READY
+   ========================================================================== */
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    initMobileNavbar();
+    initDropdowns();
+    initAlerts();
+    initImageFallback();
+    initScrollEffects();
+    initQuantityInputs();
+    initPasswordToggle();
+    initAutoHideMessages();
+
+});
+
+
+/* ==========================================================================
+   MOBILE NAVBAR
+   ========================================================================== */
+
+function initMobileNavbar() {
+
+    const toggle =
+        document.querySelector(".navbar-toggle");
+
+    const menu =
+        document.querySelector(".navbar-menu");
+
+    if (!toggle || !menu) {
+        return;
+    }
+
+    toggle.addEventListener("click", function (event) {
+
+        event.stopPropagation();
+
+        menu.classList.toggle("active");
+
+        toggle.classList.toggle("active");
+
+        const expanded =
+            menu.classList.contains("active");
+
+        toggle.setAttribute(
+            "aria-expanded",
+            expanded ? "true" : "false"
         );
+
+    });
+
+
+    document.addEventListener("click", function (event) {
+
+        if (
+            !menu.contains(event.target) &&
+            !toggle.contains(event.target)
+        ) {
+
+            menu.classList.remove("active");
+            toggle.classList.remove("active");
+
+            toggle.setAttribute(
+                "aria-expanded",
+                "false"
+            );
+        }
+
+    });
+
+}
+
+
+/* ==========================================================================
+   DROPDOWNS
+   ========================================================================== */
+
+function initDropdowns() {
+
+    const dropdowns =
+        document.querySelectorAll(
+            ".dropdown, .nav-dropdown"
+        );
+
+    dropdowns.forEach(function (dropdown) {
+
+        const trigger =
+            dropdown.querySelector(
+                ".dropdown-toggle, .nav-dropdown-toggle"
+            );
+
+        if (!trigger) {
+            return;
+        }
+
+        trigger.addEventListener("click", function (event) {
+
+            if (window.innerWidth <= 900) {
+
+                event.preventDefault();
+
+                dropdowns.forEach(function (item) {
+
+                    if (item !== dropdown) {
+                        item.classList.remove("active");
+                    }
+
+                });
+
+                dropdown.classList.toggle("active");
+            }
+
+        });
+
+    });
+
+}
+
+
+/* ==========================================================================
+   ALERT CLOSE
+   ========================================================================== */
+
+function initAlerts() {
+
+    document.addEventListener(
+        "click",
+        function (event) {
+
+            const closeButton =
+                event.target.closest(
+                    ".alert-close, [data-dismiss='alert']"
+                );
+
+            if (!closeButton) {
+                return;
+            }
+
+            const alert =
+                closeButton.closest(
+                    ".alert, .message, .flash-message"
+                );
+
+            if (!alert) {
+                return;
+            }
+
+            alert.style.opacity = "0";
+
+            alert.style.transform =
+                "translateY(-5px)";
+
+            setTimeout(function () {
+
+                alert.remove();
+
+            }, 250);
+
+        }
+    );
+
+}
+
+
+/* ==========================================================================
+   AUTO HIDE SUCCESS / ERROR MESSAGES
+   ========================================================================== */
+
+function initAutoHideMessages() {
+
+    const messages =
+        document.querySelectorAll(
+            ".alert-success.auto-hide, " +
+            ".success-message.auto-hide"
+        );
+
+    messages.forEach(function (message) {
+
+        setTimeout(function () {
+
+            if (!document.body.contains(message)) {
+                return;
+            }
+
+            message.style.opacity = "0";
+
+            message.style.transform =
+                "translateY(-5px)";
+
+            setTimeout(function () {
+
+                message.remove();
+
+            }, 300);
+
+        }, 4000);
+
+    });
+
+}
+
+
+/* ==========================================================================
+   IMAGE FALLBACK
+   ========================================================================== */
+
+function initImageFallback() {
+
+    const images =
+        document.querySelectorAll("img");
+
+    images.forEach(function (image) {
+
+        image.addEventListener(
+            "error",
+            function () {
+
+                if (
+                    image.dataset.fallbackApplied === "true"
+                ) {
+                    return;
+                }
+
+                image.dataset.fallbackApplied =
+                    "true";
+
+                const type =
+                    image.dataset.imageType || "product";
+
+                if (type === "vendor") {
+
+                    image.src =
+                        getBaseUrl() +
+                        "image/vendors/default-vendor.jpg";
+
+                } else {
+
+                    image.src =
+                        getBaseUrl() +
+                        "image/product/default-product.jpg";
+
+                }
+
+            }
+        );
+
+    });
+
+}
+
+
+/* ==========================================================================
+   GET BASE URL
+   ========================================================================== */
+
+function getBaseUrl() {
+
+    if (
+        typeof window.HOCHIPOHUB_BASE_URL !==
+        "undefined"
+    ) {
+
+        return window.HOCHIPOHUB_BASE_URL;
+    }
+
+    const meta =
+        document.querySelector(
+            'meta[name="base-url"]'
+        );
+
+    if (meta) {
+        return meta.getAttribute("content");
+    }
+
+    const path =
+        window.location.pathname;
+
+    const marker =
+        "/hochipohub/";
+
+    const position =
+        path.indexOf(marker);
+
+    if (position !== -1) {
+
+        return (
+            window.location.origin +
+            path.substring(
+                0,
+                position + marker.length
+            )
+        );
+    }
+
+    return "/";
+}
+
+
+/* ==========================================================================
+   SCROLL EFFECTS
+   ========================================================================== */
+
+function initScrollEffects() {
+
+    const navbar =
+        document.querySelector(".navbar");
+
+    if (!navbar) {
+        return;
+    }
+
+    function updateNavbar() {
+
+        if (window.scrollY > 20) {
+
+            navbar.classList.add(
+                "navbar-scrolled"
+            );
+
+        } else {
+
+            navbar.classList.remove(
+                "navbar-scrolled"
+            );
+
+        }
+
+    }
+
+    updateNavbar();
+
+    window.addEventListener(
+        "scroll",
+        updateNavbar,
+        {
+            passive: true
+        }
+    );
+
+}
+
+
+/* ==========================================================================
+   QUANTITY INPUTS
+   ========================================================================== */
+
+function initQuantityInputs() {
+
+    document.addEventListener(
+        "click",
+        function (event) {
+
+            const button =
+                event.target.closest(
+                    "[data-quantity-action]"
+                );
+
+            if (!button) {
+                return;
+            }
+
+            const action =
+                button.dataset.quantityAction;
+
+            const targetSelector =
+                button.dataset.quantityTarget;
+
+            let input = null;
+
+            if (targetSelector) {
+
+                input =
+                    document.querySelector(
+                        targetSelector
+                    );
+
+            } else {
+
+                const wrapper =
+                    button.closest(
+                        ".quantity-control, " +
+                        ".product-quantity, " +
+                        ".quantity-selector"
+                    );
+
+                if (wrapper) {
+
+                    input =
+                        wrapper.querySelector(
+                            "input[type='number']"
+                        );
+                }
+
+            }
+
+            if (!input) {
+                return;
+            }
+
+            let value =
+                parseInt(input.value, 10);
+
+            if (Number.isNaN(value)) {
+                value = 1;
+            }
+
+            const min =
+                parseInt(
+                    input.min || "1",
+                    10
+                );
+
+            const max =
+                parseInt(
+                    input.max || "999",
+                    10
+                );
+
+            if (action === "increase") {
+
+                value++;
+
+            } else if (action === "decrease") {
+
+                value--;
+
+            }
+
+            value =
+                Math.max(
+                    min,
+                    Math.min(
+                        max,
+                        value
+                    )
+                );
+
+            input.value = value;
+
+            input.dispatchEvent(
+                new Event(
+                    "change",
+                    {
+                        bubbles: true
+                    }
+                )
+            );
+
+        }
+    );
+
+}
+
+
+/* ==========================================================================
+   PASSWORD TOGGLE
+   ========================================================================== */
+
+function initPasswordToggle() {
+
+    document.addEventListener(
+        "click",
+        function (event) {
+
+            const button =
+                event.target.closest(
+                    "[data-password-toggle]"
+                );
+
+            if (!button) {
+                return;
+            }
+
+            const selector =
+                button.dataset.passwordToggle;
+
+            let input = null;
+
+            if (selector) {
+
+                input =
+                    document.querySelector(
+                        selector
+                    );
+
+            } else {
+
+                input =
+                    button
+                    .closest(".password-wrapper")
+                    ?.querySelector(
+                        "input"
+                    );
+
+            }
+
+            if (!input) {
+                return;
+            }
+
+            if (
+                input.type === "password"
+            ) {
+
+                input.type = "text";
+
+                button.classList.add(
+                    "password-visible"
+                );
+
+            } else {
+
+                input.type = "password";
+
+                button.classList.remove(
+                    "password-visible"
+                );
+
+            }
+
+        }
+    );
+
+}
+
+
+/* ==========================================================================
+   FORM SUBMIT LOADING
+   ========================================================================== */
+
+document.addEventListener(
+    "submit",
+    function (event) {
+
+        const form =
+            event.target;
+
+        if (
+            form.dataset.noLoading ===
+            "true"
+        ) {
+            return;
+        }
+
+        const submitButton =
+            form.querySelector(
+                "button[type='submit'], " +
+                "input[type='submit']"
+            );
+
+        if (!submitButton) {
+            return;
+        }
+
+        if (
+            form.dataset.allowMultipleSubmit ===
+            "true"
+        ) {
+            return;
+        }
+
+        setTimeout(function () {
+
+            if (!event.defaultPrevented) {
+
+                submitButton.disabled =
+                    true;
+
+                submitButton.dataset.originalText =
+                    submitButton.innerHTML;
+
+                if (
+                    submitButton.tagName ===
+                    "BUTTON"
+                ) {
+
+                    submitButton.innerHTML =
+                        "Processing...";
+
+                }
+
+            }
+
+        }, 0);
+
+    }
+);
+
+
+/* ==========================================================================
+   CONFIRM ACTION
+   ========================================================================== */
+
+document.addEventListener(
+    "click",
+    function (event) {
+
+        const element =
+            event.target.closest(
+                "[data-confirm]"
+            );
+
+        if (!element) {
+            return;
+        }
+
+        const message =
+            element.dataset.confirm ||
+            "Are you sure you want to continue?";
+
+        if (!window.confirm(message)) {
+
+            event.preventDefault();
+
+        }
+
+    }
+);
+
+
+/* ==========================================================================
+   FORMAT CURRENCY
+   ========================================================================== */
+
+function formatCurrency(amount) {
+
+    const number =
+        parseFloat(amount);
+
+    if (Number.isNaN(number)) {
+        return "RM 0.00";
+    }
+
+    return (
+        "RM " +
+        number.toFixed(2)
+    );
+
+}
+
+
+/* ==========================================================================
+   DEBOUNCE
+   ========================================================================== */
+
+function debounce(
+    callback,
+    delay = 300
+) {
+
+    let timeout;
+
+    return function () {
+
+        const context = this;
+        const args = arguments;
+
+        clearTimeout(timeout);
+
+        timeout =
+            setTimeout(
+                function () {
+
+                    callback.apply(
+                        context,
+                        args
+                    );
+
+                },
+                delay
+            );
+
+    };
+
+}
+
+
+/* ==========================================================================
+   SHOW TOAST
+   ========================================================================== */
+
+function showToast(
+    message,
+    type = "success"
+) {
+
+    let container =
+        document.querySelector(
+            ".toast-container"
+        );
+
+    if (!container) {
+
+        container =
+            document.createElement(
+                "div"
+            );
+
+        container.className =
+            "toast-container";
+
+        container.style.position =
+            "fixed";
+
+        container.style.right =
+            "20px";
+
+        container.style.bottom =
+            "20px";
+
+        container.style.zIndex =
+            "10000";
+
+        container.style.display =
+            "flex";
+
+        container.style.flexDirection =
+            "column";
+
+        container.style.gap =
+            "10px";
+
+        document.body.appendChild(
+            container
+        );
+
+    }
+
+
+    const toast =
+        document.createElement(
+            "div"
+        );
+
+    toast.className =
+        "hochipo-toast " +
+        "toast-" +
+        type;
+
+    toast.textContent =
+        message;
+
+    toast.style.padding =
+        "12px 17px";
+
+    toast.style.borderRadius =
+        "12px";
+
+    toast.style.background =
+        "#0f172a";
+
+    toast.style.color =
+        "#ffffff";
+
+    toast.style.fontSize =
+        "13px";
+
+    toast.style.fontWeight =
+        "700";
+
+    toast.style.boxShadow =
+        "0 10px 30px rgba(0,0,0,.2)";
+
+    toast.style.animation =
+        "toastIn .25s ease";
+
+    container.appendChild(
+        toast
+    );
+
+
+    setTimeout(function () {
+
+        toast.style.opacity =
+            "0";
+
+        toast.style.transform =
+            "translateY(10px)";
+
+        toast.style.transition =
+            "all .25s ease";
+
+        setTimeout(function () {
+
+            toast.remove();
+
+        }, 250);
+
+    }, 3000);
+
+}
+
+
+/* ==========================================================================
+   EXPORT GLOBAL HELPERS
+   ========================================================================== */
+
+window.HochipoHub = {
+
+    baseUrl: getBaseUrl,
+
+    formatCurrency:
+        formatCurrency,
+
+    debounce:
+        debounce,
+
+    showToast:
+        showToast
+
+};
+
+
+/* ==========================================================================
+   MOBILE NAVIGATION
+   ========================================================================== */
+
+const menuToggle =
+    document.querySelector(
+        ".menu-toggle, .navbar-toggle, #menu-toggle"
+    );
 
     const mobileMenu =
         document.querySelector(
