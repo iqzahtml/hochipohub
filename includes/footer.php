@@ -24,7 +24,9 @@ $baseUrl = defined('BASE_URL')
             <div class="footer-container">
 
 
-                <!-- BRAND -->
+                <!-- =================================================
+                     BRAND
+                ================================================== -->
 
                 <div class="footer-brand">
 
@@ -45,11 +47,9 @@ $baseUrl = defined('BASE_URL')
 
 
                     <p>
-
                         Your local marketplace for discovering
                         products, supporting vendors and shopping
                         smarter.
-
                     </p>
 
 
@@ -84,7 +84,9 @@ $baseUrl = defined('BASE_URL')
                 </div>
 
 
-                <!-- SHOP -->
+                <!-- =================================================
+                     SHOP
+                ================================================== -->
 
                 <div class="footer-column">
 
@@ -111,7 +113,9 @@ $baseUrl = defined('BASE_URL')
                 </div>
 
 
-                <!-- SELL -->
+                <!-- =================================================
+                     SELL
+                ================================================== -->
 
                 <div class="footer-column">
 
@@ -138,7 +142,9 @@ $baseUrl = defined('BASE_URL')
                 </div>
 
 
-                <!-- SUPPORT -->
+                <!-- =================================================
+                     SUPPORT
+                ================================================== -->
 
                 <div class="footer-column">
 
@@ -168,14 +174,16 @@ $baseUrl = defined('BASE_URL')
             </div>
 
 
-            <!-- BOTTOM -->
+            <!-- =====================================================
+                 FOOTER BOTTOM
+            ====================================================== -->
 
             <div class="footer-bottom">
 
                 <div class="footer-bottom-inner">
 
                     <span>
-                        © <?= date('Y') ?> HochipoHub.
+                        ©️ <?= date('Y') ?> HochipoHub.
                         All rights reserved.
                     </span>
 
@@ -198,20 +206,36 @@ $baseUrl = defined('BASE_URL')
 
         /*
         |--------------------------------------------------------------------------
-        | Automatically load authentication modals
+        | LOAD LOGIN MODAL
         |--------------------------------------------------------------------------
         */
 
-        if (file_exists(__DIR__ . '/login_modal.php')) {
+        if (
+            file_exists(
+                __DIR__ . '/login_modal.php'
+            )
+        ) {
 
-            require_once __DIR__ . '/login_modal.php';
+            require_once
+                __DIR__ . '/login_modal.php';
 
         }
 
 
-        if (file_exists(__DIR__ . '/register_modal.php')) {
+        /*
+        |--------------------------------------------------------------------------
+        | LOAD REGISTER MODAL
+        |--------------------------------------------------------------------------
+        */
 
-            require_once __DIR__ . '/register_modal.php';
+        if (
+            file_exists(
+                __DIR__ . '/register_modal.php'
+            )
+        ) {
+
+            require_once
+                __DIR__ . '/register_modal.php';
 
         }
 
@@ -219,397 +243,12 @@ $baseUrl = defined('BASE_URL')
 
 
         <!-- =====================================================
-             MAIN JAVASCRIPT
+             MODAL JAVASCRIPT
         ====================================================== -->
 
-        <script>
-
-        document.addEventListener(
-            'DOMContentLoaded',
-            function () {
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | OPEN MODAL
-                |--------------------------------------------------------------------------
-                */
-
-                document
-                    .querySelectorAll(
-                        '[data-modal-open]'
-                    )
-                    .forEach(function (button) {
-
-                        button.addEventListener(
-                            'click',
-                            function () {
-
-                                const modalId =
-                                    button.getAttribute(
-                                        'data-modal-open'
-                                    );
-
-                                openModal(modalId);
-
-                            }
-                        );
-
-                    });
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | CLOSE MODAL
-                |--------------------------------------------------------------------------
-                */
-
-                document
-                    .querySelectorAll(
-                        '[data-modal-close]'
-                    )
-                    .forEach(function (button) {
-
-                        button.addEventListener(
-                            'click',
-                            function () {
-
-                                const modalId =
-                                    button.getAttribute(
-                                        'data-modal-close'
-                                    );
-
-                                closeModal(modalId);
-
-                            }
-                        );
-
-                    });
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | SWITCH MODAL
-                |--------------------------------------------------------------------------
-                */
-
-                document
-                    .querySelectorAll(
-                        '[data-modal-switch]'
-                    )
-                    .forEach(function (button) {
-
-                        button.addEventListener(
-                            'click',
-                            function () {
-
-                                const currentModal =
-                                    button.getAttribute(
-                                        'data-modal-switch'
-                                    );
-
-                                const targetModal =
-                                    button.getAttribute(
-                                        'data-modal-target'
-                                    );
-
-                                closeModal(
-                                    currentModal
-                                );
-
-                                setTimeout(
-                                    function () {
-
-                                        openModal(
-                                            targetModal
-                                        );
-
-                                    },
-                                    180
-                                );
-
-                            }
-                        );
-
-                    });
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | CLOSE WHEN CLICK OUTSIDE
-                |--------------------------------------------------------------------------
-                */
-
-                document
-                    .querySelectorAll(
-                        '.modal-overlay'
-                    )
-                    .forEach(function (modal) {
-
-                        modal.addEventListener(
-                            'click',
-                            function (event) {
-
-                                if (
-                                    event.target === modal
-                                ) {
-
-                                    closeModal(
-                                        modal.id
-                                    );
-
-                                }
-
-                            }
-                        );
-
-                    });
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | ESCAPE KEY
-                |--------------------------------------------------------------------------
-                */
-
-                document.addEventListener(
-                    'keydown',
-                    function (event) {
-
-                        if (
-                            event.key === 'Escape'
-                        ) {
-
-                            document
-                                .querySelectorAll(
-                                    '.modal-overlay.show'
-                                )
-                                .forEach(
-                                    function (modal) {
-
-                                        closeModal(
-                                            modal.id
-                                        );
-
-                                    }
-                                );
-
-                        }
-
-                    }
-                );
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | PASSWORD TOGGLE
-                |--------------------------------------------------------------------------
-                */
-
-                document
-                    .querySelectorAll(
-                        '[data-password-target]'
-                    )
-                    .forEach(function (button) {
-
-                        button.addEventListener(
-                            'click',
-                            function () {
-
-                                const targetId =
-                                    button.getAttribute(
-                                        'data-password-target'
-                                    );
-
-                                const input =
-                                    document.getElementById(
-                                        targetId
-                                    );
-
-                                if (!input) {
-                                    return;
-                                }
-
-                                if (
-                                    input.type ===
-                                    'password'
-                                ) {
-
-                                    input.type =
-                                        'text';
-
-                                    button.textContent =
-                                        '🙈';
-
-                                } else {
-
-                                    input.type =
-                                        'password';
-
-                                    button.textContent =
-                                        '👁';
-
-                                }
-
-                            }
-                        );
-
-                    });
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | REGISTER PASSWORD MATCH
-                |--------------------------------------------------------------------------
-                */
-
-                const registerForm =
-                    document.getElementById(
-                        'registerForm'
-                    );
-
-                if (registerForm) {
-
-                    registerForm.addEventListener(
-                        'submit',
-                        function (event) {
-
-                            const password =
-                                document.getElementById(
-                                    'registerPassword'
-                                );
-
-                            const confirmPassword =
-                                document.getElementById(
-                                    'registerConfirmPassword'
-                                );
-
-                            if (
-                                password &&
-                                confirmPassword &&
-                                password.value !==
-                                confirmPassword.value
-                            ) {
-
-                                event.preventDefault();
-
-                                alert(
-                                    'Passwords do not match.'
-                                );
-
-                                confirmPassword.focus();
-
-                            }
-
-                        }
-                    );
-
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | PREVENT BODY SCROLL WHEN MODAL OPEN
-                |--------------------------------------------------------------------------
-                */
-
-                function updateBodyModalState() {
-
-                    const activeModal =
-                        document.querySelector(
-                            '.modal-overlay.show'
-                        );
-
-                    document.body.classList.toggle(
-                        'modal-open',
-                        !!activeModal
-                    );
-
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | GLOBAL FUNCTIONS
-                |--------------------------------------------------------------------------
-                */
-
-                window.openModal =
-                    function (modalId) {
-
-                        const modal =
-                            document.getElementById(
-                                modalId
-                            );
-
-                        if (!modal) {
-                            return;
-                        }
-
-                        modal.classList.add(
-                            'show'
-                        );
-
-                        modal.setAttribute(
-                            'aria-hidden',
-                            'false'
-                        );
-
-                        document.body.classList.add(
-                            'modal-open'
-                        );
-
-
-                        const firstInput =
-                            modal.querySelector(
-                                'input:not([type="hidden"])'
-                            );
-
-                        if (firstInput) {
-
-                            setTimeout(
-                                function () {
-
-                                    firstInput.focus();
-
-                                },
-                                250
-                            );
-
-                        }
-
-                    };
-
-
-                window.closeModal =
-                    function (modalId) {
-
-                        const modal =
-                            document.getElementById(
-                                modalId
-                            );
-
-                        if (!modal) {
-                            return;
-                        }
-
-                        modal.classList.remove(
-                            'show'
-                        );
-
-                        modal.setAttribute(
-                            'aria-hidden',
-                            'true'
-                        );
-
-                        updateBodyModalState();
-
-                    };
-
-            }
-        );
-
-        </script>
+        <script
+            src="<?= $baseUrl ?>js/modal.js"
+        ></script>
 
 
     </body>
