@@ -19,6 +19,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
 /*
 |--------------------------------------------------------------------------
 | LOAD CONFIG
@@ -28,6 +29,7 @@ if (session_status() === PHP_SESSION_NONE) {
 if (file_exists(__DIR__ . '/../config.php')) {
     require_once __DIR__ . '/../config.php';
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -39,6 +41,7 @@ if (file_exists(__DIR__ . '/../database/db.php')) {
     require_once __DIR__ . '/../database/db.php';
 }
 
+
 /*
 |--------------------------------------------------------------------------
 | LOAD SESSION
@@ -48,6 +51,7 @@ if (file_exists(__DIR__ . '/../database/db.php')) {
 if (file_exists(__DIR__ . '/session.php')) {
     require_once __DIR__ . '/session.php';
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -59,6 +63,7 @@ if (file_exists(__DIR__ . '/functions.php')) {
     require_once __DIR__ . '/functions.php';
 }
 
+
 /*
 |--------------------------------------------------------------------------
 | PAGE TITLE
@@ -69,13 +74,17 @@ if (!isset($pageTitle) || empty($pageTitle)) {
     $pageTitle = SITE_NAME ?? 'HochipoHub';
 }
 
+
 /*
 |--------------------------------------------------------------------------
 | CURRENT PAGE
 |--------------------------------------------------------------------------
 */
 
-$currentPage = basename($_SERVER['PHP_SELF'] ?? 'index.php');
+$currentPage = basename(
+    $_SERVER['PHP_SELF'] ?? 'index.php'
+);
+
 
 /*
 |--------------------------------------------------------------------------
@@ -95,7 +104,9 @@ $userRole = $_SESSION['user_role']
     ?? $_SESSION['role']
     ?? '';
 
-$userId = $_SESSION['user_id'] ?? null;
+$userId = $_SESSION['user_id']
+    ?? null;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -105,7 +116,12 @@ $userId = $_SESSION['user_id'] ?? null;
 
 $cartCount = 0;
 
-if ($isLoggedIn && $userId && isset($db) && $db instanceof PDO) {
+if (
+    $isLoggedIn &&
+    $userId &&
+    isset($db) &&
+    $db instanceof PDO
+) {
 
     try {
 
@@ -126,7 +142,9 @@ if ($isLoggedIn && $userId && isset($db) && $db instanceof PDO) {
         $cartCount = 0;
 
     }
+
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -136,7 +154,12 @@ if ($isLoggedIn && $userId && isset($db) && $db instanceof PDO) {
 
 $wishlistCount = 0;
 
-if ($isLoggedIn && $userId && isset($db) && $db instanceof PDO) {
+if (
+    $isLoggedIn &&
+    $userId &&
+    isset($db) &&
+    $db instanceof PDO
+) {
 
     try {
 
@@ -157,9 +180,11 @@ if ($isLoggedIn && $userId && isset($db) && $db instanceof PDO) {
         $wishlistCount = 0;
 
     }
+
 }
 
 ?>
+
 <!DOCTYPE html>
 
 <html lang="en">
@@ -187,7 +212,11 @@ if ($isLoggedIn && $userId && isset($db) && $db instanceof PDO) {
         | HochipoHub
     </title>
 
-    <!-- Google Font -->
+
+    <!-- =====================================================
+         GOOGLE FONTS
+    ====================================================== -->
+
     <link
         rel="preconnect"
         href="https://fonts.googleapis.com"
@@ -204,7 +233,11 @@ if ($isLoggedIn && $userId && isset($db) && $db instanceof PDO) {
         rel="stylesheet"
     >
 
-    <!-- Main CSS -->
+
+    <!-- =====================================================
+         MAIN CSS
+    ====================================================== -->
+
     <link
         rel="stylesheet"
         href="<?= defined('BASE_URL')
@@ -212,8 +245,15 @@ if ($isLoggedIn && $userId && isset($db) && $db instanceof PDO) {
             : 'css/style.css' ?>"
     >
 
-    <!-- Page Specific CSS -->
-    <?php if (isset($pageCSS) && is_array($pageCSS)): ?>
+
+    <!-- =====================================================
+         PAGE SPECIFIC CSS
+    ====================================================== -->
+
+    <?php if (
+        isset($pageCSS) &&
+        is_array($pageCSS)
+    ): ?>
 
         <?php foreach ($pageCSS as $css): ?>
 
@@ -232,9 +272,12 @@ if ($isLoggedIn && $userId && isset($db) && $db instanceof PDO) {
 
 </head>
 
+
 <body>
 
-    <!-- Page Wrapper -->
+    <!-- =====================================================
+         PAGE WRAPPER
+    ====================================================== -->
 
     <div id="page-wrapper">
 
@@ -245,7 +288,11 @@ if ($isLoggedIn && $userId && isset($db) && $db instanceof PDO) {
         |--------------------------------------------------------------------------
         |
         | Individual pages can load navbar manually.
-        | Therefore header.php DOES NOT automatically include navbar.
         |
+        | Example:
+        |
+        | require_once 'includes/navbar.php';
+        |
+        |--------------------------------------------------------------------------
         */
         ?>
