@@ -1,480 +1,324 @@
 <?php
-
-/*
-|--------------------------------------------------------------------------
-| HochipoHub - Global Footer
-|--------------------------------------------------------------------------
-*/
-
-if (!defined('BASE_URL')) {
-    require_once dirname(__DIR__) . '/config.php';
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CURRENT PAGE
-|--------------------------------------------------------------------------
-*/
-
-$currentPage =
-    basename(
-        $_SERVER['PHP_SELF'] ?? 'index.php'
-    );
-
+// =========================================================
+// HOCHIPO HUB - GLOBAL FOOTER
+// File: includes/footer.php
+// =========================================================
 ?>
 
-</main>
+    </main>
 
 
-<!-- =========================================================
-     FOOTER
-========================================================= -->
+    <!-- =====================================================
+         FOOTER
+    ====================================================== -->
+    <footer class="site-footer">
 
-<footer class="site-footer">
-
-    <div class="footer-container">
-
-
-        <!-- =================================================
-             BRAND
-        ================================================== -->
-
-        <div class="footer-brand">
-
-            <a
-                href="<?php echo BASE_URL; ?>index.php"
-                class="footer-logo"
-            >
-
-                <img
-                    src="<?php echo BASE_URL; ?>image/logo.jpg"
-                    alt="HochipoHub"
-                >
-
-                <span>
-                    HochipoHub
-                </span>
-
-            </a>
+        <div class="footer-container">
 
 
-            <p class="footer-description">
+            <!-- =================================================
+                 FOOTER BRAND
+            ================================================== -->
+            <div class="footer-column footer-brand">
 
-                Discover local products,
-                support local businesses,
-                and shop with confidence.
+                <a href="<?php echo (isset($basePath) ? $basePath : ''); ?>index.php"
+                   class="footer-logo">
 
-            </p>
+                    <div class="footer-logo-icon">
+                        H
+                    </div>
 
-
-            <div class="footer-socials">
-
-                <a
-                    href="#"
-                    aria-label="Facebook"
-                    title="Facebook"
-                >
-
-                    <i class="fa-brands fa-facebook-f"></i>
+                    <div class="footer-logo-text">
+                        <strong>HOCHIPO</strong>
+                        <span>HUB</span>
+                    </div>
 
                 </a>
 
 
-                <a
-                    href="#"
-                    aria-label="Instagram"
-                    title="Instagram"
-                >
+                <p class="footer-description">
 
-                    <i class="fa-brands fa-instagram"></i>
+                    Your trusted digital marketplace for discovering
+                    products and supporting local vendors.
 
-                </a>
+                </p>
 
 
-                <a
-                    href="#"
-                    aria-label="TikTok"
-                    title="TikTok"
-                >
+                <!-- Social Media -->
+                <div class="footer-social">
 
-                    <i class="fa-brands fa-tiktok"></i>
+                    <a
+                        href="#"
+                        aria-label="Facebook"
+                        class="footer-social-link"
+                    >
+                        <i class="fa-brands fa-facebook-f"></i>
+                    </a>
 
-                </a>
+
+                    <a
+                        href="#"
+                        aria-label="Instagram"
+                        class="footer-social-link"
+                    >
+                        <i class="fa-brands fa-instagram"></i>
+                    </a>
 
 
-                <a
-                    href="#"
-                    aria-label="X"
-                    title="X"
-                >
+                    <a
+                        href="#"
+                        aria-label="TikTok"
+                        class="footer-social-link"
+                    >
+                        <i class="fa-brands fa-tiktok"></i>
+                    </a>
 
-                    <i class="fa-brands fa-x-twitter"></i>
 
-                </a>
+                    <a
+                        href="#"
+                        aria-label="X"
+                        class="footer-social-link"
+                    >
+                        <i class="fa-brands fa-x-twitter"></i>
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================================
+                 QUICK LINKS
+            ================================================== -->
+            <div class="footer-column">
+
+                <h3>
+                    Quick Links
+                </h3>
+
+                <ul class="footer-links">
+
+                    <li>
+                        <a href="../index.php">
+                            Home
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../catalog.php">
+                            Products
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../category.php">
+                            Categories
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../vendor.php">
+                            Vendors
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../contact.php">
+                            Contact
+                        </a>
+                    </li>
+
+                </ul>
+
+            </div>
+
+
+            <!-- =================================================
+                 CUSTOMER
+            ================================================== -->
+            <div class="footer-column">
+
+                <h3>
+                    Customer
+                </h3>
+
+                <ul class="footer-links">
+
+                    <li>
+                        <a href="../cart.php">
+                            My Cart
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../wishlist.php">
+                            Wishlist
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../order.php">
+                            My Orders
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../profile.php">
+                            My Profile
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../contact.php">
+                            Help & Support
+                        </a>
+                    </li>
+
+                </ul>
+
+            </div>
+
+
+            <!-- =================================================
+                 VENDOR
+            ================================================== -->
+            <div class="footer-column">
+
+                <h3>
+                    Become a Vendor
+                </h3>
+
+                <ul class="footer-links">
+
+                    <li>
+                        <a href="../seller/setup_profile.php">
+                            Start Selling
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../seller/dashboard.php">
+                            Seller Dashboard
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../seller/products.php">
+                            Manage Products
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../seller/orders.php">
+                            Manage Orders
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="../seller/sales.php">
+                            Sales
+                        </a>
+                    </li>
+
+                </ul>
+
+            </div>
+
+
+            <!-- =================================================
+                 CONTACT
+            ================================================== -->
+            <div class="footer-column">
+
+                <h3>
+                    Get In Touch
+                </h3>
+
+
+                <div class="footer-contact-item">
+
+                    <i class="fa-solid fa-envelope"></i>
+
+                    <span>
+                        support@hochipohub.com
+                    </span>
+
+                </div>
+
+
+                <div class="footer-contact-item">
+
+                    <i class="fa-solid fa-phone"></i>
+
+                    <span>
+                        +60 12-345 6789
+                    </span>
+
+                </div>
+
+
+                <div class="footer-contact-item">
+
+                    <i class="fa-solid fa-location-dot"></i>
+
+                    <span>
+                        Johor, Malaysia
+                    </span>
+
+                </div>
 
             </div>
 
         </div>
 
 
-        <!-- =================================================
-             QUICK LINKS
-        ================================================== -->
+        <!-- =====================================================
+             FOOTER BOTTOM
+        ====================================================== -->
+        <div class="footer-bottom">
 
-        <div class="footer-column">
+            <div class="footer-bottom-container">
 
-            <h3>
-                Explore
-            </h3>
-
-
-            <ul>
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>index.php"
-                    >
-                        Home
-                    </a>
-
-                </li>
+                <p>
+                    &copy;
+                    <?php echo date('Y'); ?>
+                    HochipoHub. All rights reserved.
+                </p>
 
 
-                <li>
+                <div class="footer-bottom-links">
 
-                    <a
-                        href="<?php echo BASE_URL; ?>catalog.php"
-                    >
-                        Catalog
-                    </a>
-
-                </li>
-
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>category.php"
-                    >
-                        Categories
-                    </a>
-
-                </li>
-
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>vendor.php"
-                    >
-                        Vendors
-                    </a>
-
-                </li>
-
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>search.php"
-                    >
-                        Search Products
-                    </a>
-
-                </li>
-
-            </ul>
-
-        </div>
-
-
-        <!-- =================================================
-             CUSTOMER
-        ================================================== -->
-
-        <div class="footer-column">
-
-            <h3>
-                Customer
-            </h3>
-
-
-            <ul>
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>cart.php"
-                    >
-                        Shopping Cart
-                    </a>
-
-                </li>
-
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>wishlist.php"
-                    >
-                        Wishlist
-                    </a>
-
-                </li>
-
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>order.php"
-                    >
-                        My Orders
-                    </a>
-
-                </li>
-
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>profile.php"
-                    >
-                        My Profile
-                    </a>
-
-                </li>
-
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>contact.php"
-                    >
+                    <a href="../contact.php">
                         Contact Us
                     </a>
 
-                </li>
+                    <span>
+                        |
+                    </span>
 
-            </ul>
-
-        </div>
-
-
-        <!-- =================================================
-             SELLER
-        ================================================== -->
-
-        <div class="footer-column">
-
-            <h3>
-                Sell With Us
-            </h3>
-
-
-            <ul>
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>seller/setup_profile.php"
-                    >
-                        Become a Vendor
+                    <a href="../index.php">
+                        HochipoHub
                     </a>
 
-                </li>
-
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>seller/dashboard.php"
-                    >
-                        Seller Dashboard
-                    </a>
-
-                </li>
-
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>seller/products.php"
-                    >
-                        Manage Products
-                    </a>
-
-                </li>
-
-
-                <li>
-
-                    <a
-                        href="<?php echo BASE_URL; ?>seller/orders.php"
-                    >
-                        Manage Orders
-                    </a>
-
-                </li>
-
-            </ul>
-
-        </div>
-
-
-        <!-- =================================================
-             CONTACT
-        ================================================== -->
-
-        <div class="footer-column footer-contact">
-
-            <h3>
-                Get In Touch
-            </h3>
-
-
-            <div class="contact-item">
-
-                <i class="fa-solid fa-location-dot"></i>
-
-                <span>
-                    Malaysia
-                </span>
-
-            </div>
-
-
-            <div class="contact-item">
-
-                <i class="fa-solid fa-envelope"></i>
-
-                <span>
-                    support@hochipohub.com
-                </span>
-
-            </div>
-
-
-            <div class="contact-item">
-
-                <i class="fa-solid fa-clock"></i>
-
-                <span>
-                    Mon - Fri, 9AM - 6PM
-                </span>
+                </div>
 
             </div>
 
         </div>
 
-    </div>
+    </footer>
 
 
-    <!-- =================================================
-         FOOTER BOTTOM
-    ================================================== -->
+    <!-- =====================================================
+         GLOBAL JAVASCRIPT
+    ====================================================== -->
 
-    <div class="footer-bottom">
+    <!-- Main Script -->
+    <script src="../js/script.js"></script>
 
-        <div class="footer-bottom-container">
-
-            <p>
-
-                &copy;
-
-                <?php echo date('Y'); ?>
-
-                HochipoHub.
-                All rights reserved.
-
-            </p>
-
-
-            <div class="footer-bottom-links">
-
-                <a href="#">
-                    Privacy Policy
-                </a>
-
-                <a href="#">
-                    Terms &amp; Conditions
-                </a>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</footer>
-
-
-<!-- =========================================================
-     GLOBAL JAVASCRIPT
-========================================================= -->
-
-<script
-    src="<?php echo BASE_URL; ?>js/script.js"
-    defer
-></script>
-
-<script
-    src="<?php echo BASE_URL; ?>js/modal.js"
-    defer
-></script>
-
-<script
-    src="<?php echo BASE_URL; ?>js/validation.js"
-    defer
-></script>
-
-
-<!-- =========================================================
-     PAGE-SPECIFIC JAVASCRIPT
-========================================================= -->
-
-<?php
-
-$pageJs = [
-
-    'cart.php'
-        => 'cart.js',
-
-    'checkout.php'
-        => 'checkout.js',
-
-    'dashboard.php'
-        => 'dashboard.js',
-
-    'review.php'
-        => 'review.js',
-
-    'search.php'
-        => 'search.js',
-
-    'wishlist.php'
-        => 'wishlist.js'
-
-];
-
-
-if (
-    isset(
-        $pageJs[$currentPage]
-    )
-):
-
-?>
-
-<script
-    src="<?php echo BASE_URL; ?>js/<?php echo $pageJs[$currentPage]; ?>"
-    defer
-></script>
-
-<?php endif; ?>
+    <!-- Validation -->
+    <script src="../js/validation.js"></script>
 
 
 </body>
-
 </html>
