@@ -1,4 +1,3 @@
-```php
 <?php
 
 /*
@@ -78,147 +77,6 @@ if (!function_exists('getCurrentUserRole')) {
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN USER
-|--------------------------------------------------------------------------
-*/
-
-if (!function_exists('loginUser')) {
-
-    function loginUser($user)
-    {
-        // Make sure session is started
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        // Regenerate session ID
-        session_regenerate_id(true);
-
-        // Store user information
-        $_SESSION['user_id'] =
-            $user['user_id'];
-
-        $_SESSION['name'] =
-            $user['name'];
-
-        $_SESSION['email'] =
-            $user['email'];
-
-        $_SESSION['role'] =
-            $user['role'];
-
-        $_SESSION['status'] =
-            $user['status'];
-
-        // Mark user as logged in
-        $_SESSION['logged_in'] = true;
-
-        // Login time
-        $_SESSION['login_time'] = time();
-
-        // Last activity
-        $_SESSION['last_activity'] = time();
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| UPDATE SESSION ACTIVITY
-|--------------------------------------------------------------------------
-*/
-
-if (!function_exists('updateSessionActivity')) {
-
-    function updateSessionActivity()
-    {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        $_SESSION['last_activity'] = time();
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| LOGOUT USER
-|--------------------------------------------------------------------------
-*/
-
-if (!function_exists('logoutUser')) {
-
-    function logoutUser()
-    {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        // Clear session
-        $_SESSION = array();
-
-        // Remove session cookie
-        if (ini_get('session.use_cookies')) {
-
-            $params =
-                session_get_cookie_params();
-
-            setcookie(
-                session_name(),
-                '',
-                time() - 42000,
-                $params['path'],
-                $params['domain'],
-                $params['secure'],
-                $params['httponly']
-            );
-        }
-
-        // Destroy session
-        session_destroy();
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CHECK LOGIN
-|--------------------------------------------------------------------------
-*/
-
-if (!function_exists('isLoggedIn')) {
-
-    function isLoggedIn()
-    {
-        return isset($_SESSION['logged_in'])
-            && $_SESSION['logged_in'] === true;
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRE LOGIN
-|--------------------------------------------------------------------------
-*/
-
-if (!function_exists('requireLogin')) {
-
-    function requireLogin()
-    {
-        if (!isLoggedIn()) {
-
-            redirect(
-                BASE_URL . 'index.php?login=1'
-            );
-        }
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
 | GET USER BY ID
 |--------------------------------------------------------------------------
 */
@@ -242,8 +100,11 @@ if (!function_exists('getUserById')) {
                 mfa_enabled,
                 created_at,
                 updated_at
+
             FROM users
+
             WHERE user_id = ?
+
             LIMIT 1
         ");
 
@@ -309,8 +170,11 @@ if (!function_exists('getVendorByUserId')) {
                 approval_status,
                 created_at,
                 updated_at
+
             FROM vendors
+
             WHERE user_id = ?
+
             LIMIT 1
         ");
 
@@ -341,14 +205,19 @@ if (!function_exists('getVendorById')) {
         $stmt = $db->prepare("
             SELECT
                 v.*,
+
                 u.name,
                 u.email,
                 u.phone,
                 u.status AS user_status
+
             FROM vendors v
+
             INNER JOIN users u
                 ON v.user_id = u.user_id
+
             WHERE v.vendor_id = ?
+
             LIMIT 1
         ");
 
@@ -378,16 +247,24 @@ if (!function_exists('getProductById')) {
 
         $stmt = $db->prepare("
             SELECT
+
                 p.*,
+
                 v.business_name,
                 v.business_logo,
+
                 c.category_name
+
             FROM products p
+
             INNER JOIN vendors v
                 ON p.vendor_id = v.vendor_id
+
             INNER JOIN categories c
                 ON p.category_id = c.category_id
+
             WHERE p.product_id = ?
+
             LIMIT 1
         ");
 
@@ -528,7 +405,9 @@ if (!function_exists('updateProductStatus')) {
 
         $stmt = $db->prepare("
             UPDATE products
+
             SET status = ?
+
             WHERE product_id = ?
         ");
 
@@ -559,7 +438,9 @@ if (!function_exists('getCartCount')) {
                     SUM(quantity),
                     0
                 ) AS total
+
             FROM cart
+
             WHERE customer_id = ?
         ");
 
@@ -595,7 +476,9 @@ if (!function_exists('getWishlistCount')) {
         $stmt = $db->prepare("
             SELECT
                 COUNT(*) AS total
+
             FROM wishlist
+
             WHERE user_id = ?
         ");
 
@@ -631,9 +514,12 @@ if (!function_exists('isInWishlist')) {
 
         $stmt = $db->prepare("
             SELECT wishlist_id
+
             FROM wishlist
+
             WHERE user_id = ?
             AND product_id = ?
+
             LIMIT 1
         ");
 
@@ -664,9 +550,12 @@ if (!function_exists('isInCart')) {
 
         $stmt = $db->prepare("
             SELECT cart_id
+
             FROM cart
+
             WHERE customer_id = ?
             AND product_id = ?
+
             LIMIT 1
         ");
 
@@ -696,14 +585,20 @@ if (!function_exists('getOrderById')) {
 
         $stmt = $db->prepare("
             SELECT
+
                 o.*,
+
                 u.name AS customer_name,
                 u.email AS customer_email,
                 u.phone AS customer_phone
+
             FROM orders o
+
             INNER JOIN users u
                 ON o.customer_id = u.user_id
+
             WHERE o.order_id = ?
+
             LIMIT 1
         ");
 
@@ -733,17 +628,25 @@ if (!function_exists('getOrderDetails')) {
 
         $stmt = $db->prepare("
             SELECT
+
                 od.*,
+
                 p.product_name,
                 p.image,
                 p.vendor_id,
+
                 v.business_name
+
             FROM order_details od
+
             INNER JOIN products p
                 ON od.product_id = p.product_id
+
             INNER JOIN vendors v
                 ON p.vendor_id = v.vendor_id
+
             WHERE od.order_id = ?
+
             ORDER BY
                 od.order_detail_id ASC
         ");
@@ -774,17 +677,25 @@ if (!function_exists('getVendorOrders')) {
 
         $stmt = $db->prepare("
             SELECT
+
                 vo.*,
+
                 o.customer_id,
                 o.order_date,
                 o.order_status,
+
                 u.name AS customer_name
+
             FROM vendor_orders vo
+
             INNER JOIN orders o
                 ON vo.order_id = o.order_id
+
             INNER JOIN users u
                 ON o.customer_id = u.user_id
+
             WHERE vo.vendor_id = ?
+
             ORDER BY
                 vo.created_at DESC
         ");
@@ -815,9 +726,13 @@ if (!function_exists('getPaymentByOrder')) {
 
         $stmt = $db->prepare("
             SELECT *
+
             FROM payments
+
             WHERE order_id = ?
+
             ORDER BY payment_id DESC
+
             LIMIT 1
         ");
 
@@ -931,6 +846,7 @@ if (!function_exists('addAdminLog')) {
                 target_type,
                 target_id
             )
+
             VALUES (?, ?, ?, ?)
         ");
 
@@ -1099,4 +1015,3 @@ if (!function_exists('getTotalPages')) {
         );
     }
 }
-```
