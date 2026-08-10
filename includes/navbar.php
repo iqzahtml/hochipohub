@@ -1,778 +1,591 @@
 <?php
 /*
- * HOCHIPOHUB
- * includes/navbar.php
- *
- * Main navigation
- *
- * Supported roles:
- * - customer
- * - vendor
- * - admin
- * - guest
- */
-
-
-/*
- * START SESSION SAFELY
- */
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - MAIN NAVBAR
+|--------------------------------------------------------------------------
+| File:
+| includes/navbar.php
+|--------------------------------------------------------------------------
+*/
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
-/*
- * USER LOGIN STATUS
- */
-
 $isLoggedIn = isset($_SESSION['user_id']);
 
-$userName = $_SESSION['name'] ?? '';
+$userName = $_SESSION['user_name']
+    ?? $_SESSION['name']
+    ?? 'User';
 
-$userRole = $_SESSION['role'] ?? 'customer';
+$userRole = $_SESSION['user_role']
+    ?? $_SESSION['role']
+    ?? '';
 
+$userId = $_SESSION['user_id'] ?? null;
 
-/*
- * PROFILE IMAGE
- */
+$cartCount = $cartCount ?? 0;
+$wishlistCount = $wishlistCount ?? 0;
 
-$userProfileImage =
-    $_SESSION['profile_image'] ?? '';
+$baseUrl = defined('BASE_URL')
+    ? BASE_URL
+    : '/hochipohub/';
 
-
-/*
- * CURRENT PAGE
- */
-
-$currentPage =
-    basename($_SERVER['PHP_SELF']);
-
-
-/*
- * CART COUNT
- *
- * If cart count already exists in session,
- * use it.
- */
-
-$cartCount =
-    isset($_SESSION['cart_count'])
-        ? (int) $_SESSION['cart_count']
-        : 0;
-
-
-/*
- * WISHLIST COUNT
- */
-
-$wishlistCount =
-    isset($_SESSION['wishlist_count'])
-        ? (int) $_SESSION['wishlist_count']
-        : 0;
+$currentPage = basename(
+    $_SERVER['PHP_SELF'] ?? 'index.php'
+);
 
 ?>
 
-<nav class="main-navbar">
+<header class="site-header">
 
     <div class="navbar-container">
 
-
-        <!-- =========================================
+        <!-- =====================================================
              LOGO
-        ========================================== -->
+        ====================================================== -->
 
         <a
-            href="index.php"
-            class="navbar-logo">
+            href="<?= $baseUrl ?>index.php"
+            class="brand"
+        >
 
-            <img
-                src="image/logo.jpg"
-                alt="HochipoHub Logo">
+            <span class="brand-mark">
+                H
+            </span>
 
-            <span>
+            <span class="brand-text">
                 Hochipo<span>Hub</span>
             </span>
 
         </a>
 
 
-        <!-- =========================================
-             MOBILE MENU BUTTON
-        ========================================== -->
+        <!-- =====================================================
+             DESKTOP NAVIGATION
+        ====================================================== -->
 
-        <button
-            type="button"
-            class="mobile-menu-btn"
-            id="mobileMenuBtn"
-            aria-label="Open navigation menu">
-
-            <i class="fas fa-bars"></i>
-
-        </button>
-
-
-        <!-- =========================================
-             NAVIGATION
-        ========================================== -->
-
-        <div
-            class="navbar-menu"
-            id="navbarMenu">
-
-
-            <!-- MAIN LINKS -->
+        <nav class="main-nav">
 
             <a
-                href="index.php"
-                class="nav-link
-                <?php echo $currentPage === 'index.php'
+                href="<?= $baseUrl ?>index.php"
+                class="<?= $currentPage === 'index.php'
                     ? 'active'
-                    : ''; ?>">
+                    : '' ?>"
+            >
+                Home
+            </a>
 
-                <i class="fas fa-home"></i>
+            <a
+                href="<?= $baseUrl ?>catalog.php"
+                class="<?= $currentPage === 'catalog.php'
+                    ? 'active'
+                    : '' ?>"
+            >
+                Shop
+            </a>
+
+            <a
+                href="<?= $baseUrl ?>category.php"
+                class="<?= $currentPage === 'category.php'
+                    ? 'active'
+                    : '' ?>"
+            >
+                Categories
+            </a>
+
+            <a
+                href="<?= $baseUrl ?>vendor.php"
+                class="<?= $currentPage === 'vendor.php'
+                    ? 'active'
+                    : '' ?>"
+            >
+                Vendors
+            </a>
+
+        </nav>
+
+
+        <!-- =====================================================
+             SEARCH
+        ====================================================== -->
+
+        <form
+            action="<?= $baseUrl ?>search.php"
+            method="GET"
+            class="navbar-search"
+        >
+
+            <span class="search-icon">
+                🔎
+            </span>
+
+            <input
+                type="search"
+                name="q"
+                placeholder="Search products, vendors..."
+                value="<?= htmlspecialchars(
+                    $_GET['q'] ?? '',
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>"
+                autocomplete="off"
+            >
+
+            <button type="submit">
+                Search
+            </button>
+
+        </form>
+
+
+        <!-- =====================================================
+             ACTIONS
+        ====================================================== -->
+
+        <div class="navbar-actions">
+
+
+            <!-- Wishlist -->
+
+            <a
+                href="<?= $baseUrl ?>wishlist.php"
+                class="nav-icon-btn"
+                aria-label="Wishlist"
+                title="Wishlist"
+            >
 
                 <span>
-                    Home
+                    ♡
                 </span>
+
+                <?php if ($wishlistCount > 0): ?>
+
+                    <small class="nav-badge">
+                        <?= $wishlistCount > 99
+                            ? '99+'
+                            : $wishlistCount ?>
+                    </small>
+
+                <?php endif; ?>
 
             </a>
 
 
-            <a
-                href="catalog.php"
-                class="nav-link
-                <?php echo $currentPage === 'catalog.php'
-                    ? 'active'
-                    : ''; ?>">
+            <!-- Cart -->
 
-                <i class="fas fa-store"></i>
+            <a
+                href="<?= $baseUrl ?>cart.php"
+                class="nav-icon-btn"
+                aria-label="Cart"
+                title="Shopping Cart"
+            >
 
                 <span>
-                    Shop
+                    🛒
                 </span>
+
+                <?php if ($cartCount > 0): ?>
+
+                    <small class="nav-badge">
+                        <?= $cartCount > 99
+                            ? '99+'
+                            : $cartCount ?>
+                    </small>
+
+                <?php endif; ?>
 
             </a>
 
 
-            <a
-                href="category.php"
-                class="nav-link
-                <?php echo $currentPage === 'category.php'
-                    ? 'active'
-                    : ''; ?>">
+            <?php if ($isLoggedIn): ?>
 
-                <i class="fas fa-th-large"></i>
+                <!-- USER -->
 
-                <span>
-                    Categories
-                </span>
-
-            </a>
-
-
-            <a
-                href="vendor.php"
-                class="nav-link
-                <?php echo $currentPage === 'vendor.php'
-                    ? 'active'
-                    : ''; ?>">
-
-                <i class="fas fa-users"></i>
-
-                <span>
-                    Vendors
-                </span>
-
-            </a>
-
-
-            <a
-                href="contact.php"
-                class="nav-link
-                <?php echo $currentPage === 'contact.php'
-                    ? 'active'
-                    : ''; ?>">
-
-                <i class="fas fa-envelope"></i>
-
-                <span>
-                    Contact
-                </span>
-
-            </a>
-
-
-            <!-- =====================================
-                 SEARCH
-            ====================================== -->
-
-            <div class="navbar-search">
-
-                <form
-                    action="search.php"
-                    method="GET">
-
-                    <i class="fas fa-search"></i>
-
-                    <input
-                        type="search"
-                        name="q"
-                        placeholder="Search products..."
-                        autocomplete="off">
+                <div class="user-menu">
 
                     <button
-                        type="submit"
-                        aria-label="Search">
+                        type="button"
+                        class="user-menu-button"
+                        id="userMenuButton"
+                    >
 
-                        <i class="fas fa-arrow-right"></i>
+                        <span class="user-avatar">
+                            <?= strtoupper(
+                                substr(
+                                    trim($userName),
+                                    0,
+                                    1
+                                )
+                            ) ?>
+                        </span>
+
+                        <span class="user-menu-name">
+
+                            <?= htmlspecialchars(
+                                $userName,
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
+
+                        </span>
+
+                        <span class="user-chevron">
+                            ▾
+                        </span>
 
                     </button>
 
-                </form>
-
-            </div>
-
-
-            <!-- =====================================
-                 RIGHT SIDE
-            ====================================== -->
-
-            <div class="navbar-actions">
-
-
-                <!-- =================================
-                     WISHLIST
-                ================================== -->
-
-                <a
-                    href="wishlist.php"
-                    class="nav-icon-btn"
-                    title="Wishlist">
-
-                    <i class="fas fa-heart"></i>
-
-                    <?php if ($wishlistCount > 0): ?>
-
-                        <span class="nav-badge wishlist-badge">
-
-                            <?php
-                            echo $wishlistCount;
-                            ?>
-
-                        </span>
-
-                    <?php endif; ?>
-
-                </a>
-
-
-                <!-- =================================
-                     CART
-                ================================== -->
-
-                <a
-                    href="cart.php"
-                    class="nav-icon-btn"
-                    title="Shopping Cart">
-
-                    <i class="fas fa-shopping-cart"></i>
-
-                    <?php if ($cartCount > 0): ?>
-
-                        <span class="nav-badge cart-badge">
-
-                            <?php
-                            echo $cartCount;
-                            ?>
-
-                        </span>
-
-                    <?php endif; ?>
-
-                </a>
-
-
-                <!-- =================================
-                     USER
-                ================================== -->
-
-                <?php if ($isLoggedIn): ?>
-
-
-                    <!-- LOGGED IN USER -->
 
                     <div
-                        class="navbar-user"
-                        id="navbarUser">
+                        class="user-dropdown"
+                        id="userDropdown"
+                    >
 
+                        <div class="dropdown-user-info">
 
-                        <button
-                            type="button"
-                            class="navbar-user-btn"
-                            id="navbarUserBtn">
+                            <span class="dropdown-avatar">
 
-
-                            <?php if (
-                                !empty($userProfileImage)
-                            ): ?>
-
-                                <img
-                                    src="<?php
-                                    echo htmlspecialchars(
-                                        $userProfileImage
-                                    );
-                                    ?>"
-                                    alt="Profile">
-
-                            <?php else: ?>
-
-                                <span class="user-avatar">
-
-                                    <?php
-                                    echo strtoupper(
-                                        substr(
-                                            $userName,
-                                            0,
-                                            1
-                                        )
-                                    );
-                                    ?>
-
-                                </span>
-
-                            <?php endif; ?>
-
-
-                            <span class="user-name">
-
-                                <?php
-                                echo htmlspecialchars(
-                                    $userName
-                                );
-                                ?>
+                                <?= strtoupper(
+                                    substr(
+                                        trim($userName),
+                                        0,
+                                        1
+                                    )
+                                ) ?>
 
                             </span>
 
-
-                            <i
-                                class="fas fa-chevron-down">
-                            </i>
-
-                        </button>
-
-
-                        <!-- USER DROPDOWN -->
-
-                        <div
-                            class="user-dropdown"
-                            id="userDropdown">
-
-
-                            <div
-                                class="user-dropdown-header">
+                            <div>
 
                                 <strong>
-
-                                    <?php
-                                    echo htmlspecialchars(
-                                        $userName
-                                    );
-                                    ?>
-
+                                    <?= htmlspecialchars(
+                                        $userName,
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?>
                                 </strong>
 
                                 <small>
-
-                                    <?php
-                                    echo ucfirst(
-                                        htmlspecialchars(
-                                            $userRole
-                                        )
-                                    );
-                                    ?>
-
+                                    <?= htmlspecialchars(
+                                        ucfirst(
+                                            $userRole ?: 'customer'
+                                        ),
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?>
                                 </small>
 
                             </div>
 
-
-                            <div
-                                class="dropdown-divider">
-                            </div>
-
-
-                            <!-- PROFILE -->
-
-                            <a
-                                href="profile.php">
-
-                                <i class="fas fa-user"></i>
-
-                                My Profile
-
-                            </a>
-
-
-                            <!-- DASHBOARD -->
-
-                            <?php if (
-                                $userRole === 'admin'
-                            ): ?>
-
-                                <a
-                                    href="admin/dashboard.php">
-
-                                    <i
-                                        class="fas fa-chart-line">
-                                    </i>
-
-                                    Admin Dashboard
-
-                                </a>
-
-                            <?php elseif (
-                                $userRole === 'vendor'
-                            ): ?>
-
-                                <a
-                                    href="seller/dashboard.php">
-
-                                    <i
-                                        class="fas fa-store">
-                                    </i>
-
-                                    Seller Dashboard
-
-                                </a>
-
-                            <?php else: ?>
-
-                                <a
-                                    href="dashboard.php">
-
-                                    <i
-                                        class="fas fa-tachometer-alt">
-                                    </i>
-
-                                    Dashboard
-
-                                </a>
-
-                            <?php endif; ?>
-
-
-                            <!-- ORDERS -->
-
-                            <a
-                                href="order.php">
-
-                                <i
-                                    class="fas fa-box">
-                                </i>
-
-                                My Orders
-
-                            </a>
-
-
-                            <!-- WISHLIST -->
-
-                            <a
-                                href="wishlist.php">
-
-                                <i
-                                    class="fas fa-heart">
-                                </i>
-
-                                Wishlist
-
-                            </a>
-
-
-                            <div
-                                class="dropdown-divider">
-                            </div>
-
-
-                            <!-- LOGOUT -->
-
-                            <a
-                                href="auth/logout.php"
-                                class="logout-link">
-
-                                <i
-                                    class="fas fa-sign-out-alt">
-                                </i>
-
-                                Logout
-
-                            </a>
-
                         </div>
+
+
+                        <div class="dropdown-divider"></div>
+
+
+                        <a
+                            href="<?= $baseUrl ?>profile.php"
+                            class="dropdown-link"
+                        >
+                            <span>👤</span>
+                            My Profile
+                        </a>
+
+
+                        <?php if ($userRole === 'customer'): ?>
+
+                            <a
+                                href="<?= $baseUrl ?>order.php"
+                                class="dropdown-link"
+                            >
+                                <span>📦</span>
+                                My Orders
+                            </a>
+
+                            <a
+                                href="<?= $baseUrl ?>wishlist.php"
+                                class="dropdown-link"
+                            >
+                                <span>♡</span>
+                                Wishlist
+                            </a>
+
+                        <?php endif; ?>
+
+
+                        <?php if ($userRole === 'vendor'): ?>
+
+                            <a
+                                href="<?= $baseUrl ?>seller/dashboard.php"
+                                class="dropdown-link"
+                            >
+                                <span>📊</span>
+                                Seller Center
+                            </a>
+
+                        <?php endif; ?>
+
+
+                        <?php if ($userRole === 'admin'): ?>
+
+                            <a
+                                href="<?= $baseUrl ?>admin/dashboard.php"
+                                class="dropdown-link"
+                            >
+                                <span>⚙️</span>
+                                Admin Panel
+                            </a>
+
+                        <?php endif; ?>
+
+
+                        <div class="dropdown-divider"></div>
+
+
+                        <a
+                            href="<?= $baseUrl ?>auth/logout.php"
+                            class="dropdown-link dropdown-danger"
+                        >
+                            <span>↪</span>
+                            Logout
+                        </a>
 
                     </div>
 
+                </div>
 
-                <?php else: ?>
 
+            <?php else: ?>
 
-                    <!-- =================================
-                         GUEST
-                    ================================== -->
+                <!-- AUTH BUTTONS -->
+
+                <div class="auth-buttons">
 
                     <button
                         type="button"
-                        class="navbar-login-btn"
-                        onclick="openLoginModal()">
-
-                        <i class="fas fa-user"></i>
-
-                        <span>
-                            Login
-                        </span>
-
+                        class="btn-login"
+                        data-modal-open="loginModal"
+                    >
+                        Login
                     </button>
 
-
-                    <a
-                        href="auth/register_process.php"
-                        class="navbar-register-btn">
-
+                    <button
+                        type="button"
+                        class="btn-register"
+                        data-modal-open="registerModal"
+                    >
                         Register
+                    </button>
 
-                    </a>
+                </div>
+
+            <?php endif; ?>
 
 
-                <?php endif; ?>
+            <!-- MOBILE MENU -->
 
+            <button
+                type="button"
+                class="mobile-menu-toggle"
+                id="mobileMenuToggle"
+                aria-label="Open menu"
+            >
 
-            </div>
+                <span></span>
+                <span></span>
+                <span></span>
+
+            </button>
 
         </div>
 
     </div>
 
-</nav>
+
+    <!-- =====================================================
+         MOBILE NAVIGATION
+    ====================================================== -->
+
+    <div
+        class="mobile-menu"
+        id="mobileMenu"
+    >
+
+        <div class="mobile-menu-inner">
+
+            <form
+                action="<?= $baseUrl ?>search.php"
+                method="GET"
+                class="mobile-search"
+            >
+
+                <input
+                    type="search"
+                    name="q"
+                    placeholder="Search..."
+                >
+
+                <button type="submit">
+                    🔎
+                </button>
+
+            </form>
 
 
-<!-- =============================================
+            <a href="<?= $baseUrl ?>index.php">
+                Home
+            </a>
+
+            <a href="<?= $baseUrl ?>catalog.php">
+                Shop
+            </a>
+
+            <a href="<?= $baseUrl ?>category.php">
+                Categories
+            </a>
+
+            <a href="<?= $baseUrl ?>vendor.php">
+                Vendors
+            </a>
+
+            <a href="<?= $baseUrl ?>wishlist.php">
+                Wishlist
+            </a>
+
+            <a href="<?= $baseUrl ?>cart.php">
+                Cart
+            </a>
+
+
+            <?php if (!$isLoggedIn): ?>
+
+                <button
+                    type="button"
+                    class="mobile-login-button"
+                    data-modal-open="loginModal"
+                >
+                    Login
+                </button>
+
+                <button
+                    type="button"
+                    class="mobile-register-button"
+                    data-modal-open="registerModal"
+                >
+                    Create Account
+                </button>
+
+            <?php else: ?>
+
+                <a href="<?= $baseUrl ?>profile.php">
+                    My Profile
+                </a>
+
+                <a href="<?= $baseUrl ?>auth/logout.php">
+                    Logout
+                </a>
+
+            <?php endif; ?>
+
+        </div>
+
+    </div>
+
+</header>
+
+
+<!-- =========================================================
      NAVBAR JAVASCRIPT
-================================================= -->
+========================================================== -->
 
 <script>
 
-document.addEventListener(
-    "DOMContentLoaded",
-    function () {
+document.addEventListener('DOMContentLoaded', function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | USER DROPDOWN
+    |--------------------------------------------------------------------------
+    */
+
+    const userButton =
+        document.getElementById('userMenuButton');
+
+    const userDropdown =
+        document.getElementById('userDropdown');
 
 
-        /*
-         * MOBILE MENU
-         */
+    if (userButton && userDropdown) {
 
-        const mobileMenuBtn =
-            document.getElementById(
-                "mobileMenuBtn"
-            );
+        userButton.addEventListener(
+            'click',
+            function (event) {
 
-        const navbarMenu =
-            document.getElementById(
-                "navbarMenu"
-            );
+                event.stopPropagation();
 
-
-        if (
-            mobileMenuBtn &&
-            navbarMenu
-        ) {
-
-            mobileMenuBtn.addEventListener(
-                "click",
-                function () {
-
-                    navbarMenu.classList.toggle(
-                        "active"
-                    );
-
-
-                    const icon =
-                        mobileMenuBtn.querySelector(
-                            "i"
-                        );
-
-
-                    if (
-                        navbarMenu.classList.contains(
-                            "active"
-                        )
-                    ) {
-
-                        icon.classList.remove(
-                            "fa-bars"
-                        );
-
-                        icon.classList.add(
-                            "fa-times"
-                        );
-
-                    } else {
-
-                        icon.classList.remove(
-                            "fa-times"
-                        );
-
-                        icon.classList.add(
-                            "fa-bars"
-                        );
-
-                    }
-
-                }
-            );
-
-        }
-
-
-        /*
-         * USER DROPDOWN
-         */
-
-        const userBtn =
-            document.getElementById(
-                "navbarUserBtn"
-            );
-
-        const userDropdown =
-            document.getElementById(
-                "userDropdown"
-            );
-
-
-        if (
-            userBtn &&
-            userDropdown
-        ) {
-
-            userBtn.addEventListener(
-                "click",
-                function (event) {
-
-                    event.stopPropagation();
-
-                    userDropdown.classList.toggle(
-                        "active"
-                    );
-
-                }
-            );
-
-
-            document.addEventListener(
-                "click",
-                function () {
-
-                    userDropdown.classList.remove(
-                        "active"
-                    );
-
-                }
-            );
-
-        }
-
-
-        /*
-         * CLOSE MOBILE MENU
-         * WHEN LINK IS CLICKED
-         */
-
-        const navLinks =
-            document.querySelectorAll(
-                ".navbar-menu .nav-link"
-            );
-
-
-        navLinks.forEach(
-            function (link) {
-
-                link.addEventListener(
-                    "click",
-                    function () {
-
-                        if (
-                            navbarMenu
-                        ) {
-
-                            navbarMenu.classList.remove(
-                                "active"
-                            );
-
-                        }
-
-
-                        if (
-                            mobileMenuBtn
-                        ) {
-
-                            const icon =
-                                mobileMenuBtn.querySelector(
-                                    "i"
-                                );
-
-                            if (icon) {
-
-                                icon.classList.remove(
-                                    "fa-times"
-                                );
-
-                                icon.classList.add(
-                                    "fa-bars"
-                                );
-
-                            }
-
-                        }
-
-                    }
+                userDropdown.classList.toggle(
+                    'show'
                 );
 
             }
         );
 
 
-        /*
-         * SEARCH INPUT
-         */
+        document.addEventListener(
+            'click',
+            function () {
 
-        const searchInput =
-            document.querySelector(
-                ".navbar-search input"
-            );
+                userDropdown.classList.remove(
+                    'show'
+                );
 
-
-        if (searchInput) {
-
-            searchInput.addEventListener(
-                "keydown",
-                function (event) {
-
-                    if (
-                        event.key === "Escape"
-                    ) {
-
-                        searchInput.value = "";
-
-                        searchInput.blur();
-
-                    }
-
-                }
-            );
-
-        }
+            }
+        );
 
     }
-);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MOBILE MENU
+    |--------------------------------------------------------------------------
+    */
+
+    const mobileToggle =
+        document.getElementById(
+            'mobileMenuToggle'
+        );
+
+    const mobileMenu =
+        document.getElementById(
+            'mobileMenu'
+        );
+
+
+    if (mobileToggle && mobileMenu) {
+
+        mobileToggle.addEventListener(
+            'click',
+            function () {
+
+                mobileToggle.classList.toggle(
+                    'active'
+                );
+
+                mobileMenu.classList.toggle(
+                    'show'
+                );
+
+                document.body.classList.toggle(
+                    'menu-open'
+                );
+
+            }
+        );
+
+    }
+
+});
 
 </script>
