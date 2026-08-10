@@ -1,1234 +1,471 @@
 /* =========================================================
-   HOCHIPOHUB — MODAL.CSS
-   LOGIN + REGISTER MODAL
-   Compatible with current login_modal.php
-   Compatible with current register_modal.php
-   Compatible with current modal.js
-   Gen Z Blue Theme
+HOCHIPOHUB - AUTH MODAL
+FORCE CENTER POPUP
 ========================================================= */
 
-
-/* =========================================================
-   MODAL OVERLAY
-========================================================= */
+/* ––––– OVERLAY ––––– */
 
 .modal-overlay {
-    position: fixed;
-    inset: 0;
+display: none !important;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+position: fixed !important;
+top: 0 !important;
+right: 0 !important;
+bottom: 0 !important;
+left: 0 !important;
+width: 100% !important;
+height: 100% !important;
+padding: 20px !important;
+box-sizing: border-box !important;
+align-items: center !important;
+justify-content: center !important;
+background: rgba(15, 23, 42, 0.78) !important;
+z-index: 2147483647 !important;
 
-    width: 100%;
-    height: 100%;
-
-    padding: 20px;
-
-    box-sizing: border-box;
-
-    background:
-        radial-gradient(
-            circle at 15% 15%,
-            rgba(37, 99, 235, 0.22),
-            transparent 32%
-        ),
-        radial-gradient(
-            circle at 85% 85%,
-            rgba(14, 165, 233, 0.18),
-            transparent 32%
-        ),
-        rgba(2, 6, 23, 0.82);
-
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-
-    opacity: 0;
-    visibility: hidden;
-
-    pointer-events: none;
-
-    transition:
-        opacity 0.25s ease,
-        visibility 0.25s ease;
-
-    z-index: 9999;
 }
 
+/* ––––– SHOW OVERLAY ––––– */
 
-/* =========================================================
-   ACTIVE MODAL
-========================================================= */
+.modal-overlay.show {
+display: flex !important;
 
-.modal-overlay.show,
-.modal-overlay.active,
-.modal-overlay.open {
-    opacity: 1;
-    visibility: visible;
+opacity: 1 !important;
+visibility: visible !important;
+pointer-events: auto !important;
 
-    pointer-events: auto;
 }
 
+/* ––––– MODAL BOX ––––– */
 
-/* =========================================================
-   AUTH MODAL CONTAINER
-========================================================= */
+.modal-overlay .auth-modal {
+display: block !important;
 
-.auth-modal {
-    position: relative;
+position: relative !important;
+width: 100% !important;
+max-width: 460px !important;
+max-height: calc(100vh - 40px) !important;
+margin: auto !important;
+padding: 32px !important;
+box-sizing: border-box !important;
+overflow-y: auto !important;
+background: #ffffff !important;
+border: 1px solid #e2e8f0 !important;
+border-radius: 24px !important;
+box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.40),
+    0 10px 30px rgba(37, 99, 235, 0.20) !important;
+color: #0f172a !important;
+transform: translateY(0) scale(1) !important;
+opacity: 1 !important;
+visibility: visible !important;
 
-    width: 100%;
-    max-width: 460px;
-
-    max-height: 90vh;
-
-    overflow-y: auto;
-    overflow-x: hidden;
-
-    box-sizing: border-box;
-
-    padding: 32px;
-
-    border:
-        1px solid
-        rgba(56, 189, 248, 0.18);
-
-    border-radius: 26px;
-
-    background:
-        linear-gradient(
-            145deg,
-            rgba(15, 23, 42, 0.99),
-            rgba(7, 31, 57, 0.98)
-        );
-
-    color: #f8fafc;
-
-    box-shadow:
-        0 30px 90px
-        rgba(0, 0, 0, 0.60),
-
-        0 0 70px
-        rgba(14, 165, 233, 0.10);
-
-    transform:
-        translateY(20px)
-        scale(0.96);
-
-    opacity: 0;
-
-    transition:
-        transform 0.28s ease,
-        opacity 0.28s ease;
-
-    scrollbar-width: thin;
-    scrollbar-color: #2563eb transparent;
 }
 
+/* ––––– REGISTER ––––– */
 
-/* =========================================================
-   AUTH MODAL OPEN ANIMATION
-========================================================= */
-
-.modal-overlay.show .auth-modal,
-.modal-overlay.active .auth-modal,
-.modal-overlay.open .auth-modal {
-    transform:
-        translateY(0)
-        scale(1);
-
-    opacity: 1;
+.modal-overlay .auth-modal-register {
+max-width: 560px !important;
 }
 
+/* ––––– CLOSE BUTTON ––––– */
 
-/* =========================================================
-   REGISTER MODAL
-========================================================= */
+.modal-overlay .modal-close {
+position: absolute !important;
 
-.auth-modal-register {
-    max-width: 520px;
+top: 14px !important;
+right: 14px !important;
+width: 38px !important;
+height: 38px !important;
+display: flex !important;
+align-items: center !important;
+justify-content: center !important;
+margin: 0 !important;
+padding: 0 !important;
+border: 0 !important;
+border-radius: 50% !important;
+background: #f1f5f9 !important;
+color: #475569 !important;
+font-size: 25px !important;
+line-height: 1 !important;
+cursor: pointer !important;
+z-index: 10 !important;
+
 }
 
-
-/* =========================================================
-   SCROLLBAR
-========================================================= */
-
-.auth-modal::-webkit-scrollbar {
-    width: 5px;
+.modal-overlay .modal-close:hover {
+background: #dbeafe !important;
+color: #2563eb !important;
 }
 
-.auth-modal::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.auth-modal::-webkit-scrollbar-thumb {
-    background:
-        linear-gradient(
-            180deg,
-            #2563eb,
-            #0284c7
-        );
-
-    border-radius: 99px;
-}
-
-
-/* =========================================================
-   CLOSE BUTTON
-========================================================= */
-
-.modal-close {
-    position: absolute;
-
-    top: 18px;
-    right: 18px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    width: 36px;
-    height: 36px;
-
-    padding: 0;
-
-    border:
-        1px solid
-        rgba(148, 163, 184, 0.12);
-
-    border-radius: 12px;
-
-    background:
-        rgba(2, 6, 23, 0.55);
-
-    color: #64748b;
-
-    font-family: inherit;
-
-    font-size: 20px;
-    font-weight: 700;
-
-    line-height: 1;
-
-    cursor: pointer;
-
-    transition:
-        color 0.2s ease,
-        background 0.2s ease,
-        border-color 0.2s ease,
-        transform 0.2s ease;
-}
-
-
-.modal-close:hover {
-    color: #7dd3fc;
-
-    background:
-        rgba(14, 165, 233, 0.12);
-
-    border-color:
-        rgba(56, 189, 248, 0.28);
-
-    transform:
-        rotate(5deg)
-        scale(1.04);
-}
-
-
-.modal-close:active {
-    transform: scale(0.92);
-}
-
-
-/* =========================================================
-   AUTH MODAL HEADER
-========================================================= */
+/* ––––– HEADER ––––– */
 
 .auth-modal-header {
-    text-align: center;
+display: block !important;
 
-    padding:
-        8px
-        25px
-        25px;
+width: 100% !important;
+margin: 0 0 24px !important;
+text-align: center !important;
+
 }
-
-
-/* =========================================================
-   HEADER ICON
-========================================================= */
 
 .auth-modal-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+width: 58px !important;
+height: 58px !important;
 
-    width: 58px;
-    height: 58px;
+display: flex !important;
+align-items: center !important;
+justify-content: center !important;
+margin: 0 auto 12px !important;
+border-radius: 18px !important;
+background:
+    linear-gradient(
+        135deg,
+        #2563eb,
+        #4f46e5
+    ) !important;
+color: #ffffff !important;
+font-size: 27px !important;
+box-shadow:
+    0 10px 25px rgba(37, 99, 235, 0.25) !important;
 
-    margin: 0 auto 15px;
-
-    border:
-        1px solid
-        rgba(56, 189, 248, 0.18);
-
-    border-radius: 18px;
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(37, 99, 235, 0.18),
-            rgba(14, 165, 233, 0.10)
-        );
-
-    box-shadow:
-        0 10px 30px
-        rgba(37, 99, 235, 0.10);
-
-    font-size: 25px;
-
-    user-select: none;
 }
-
-
-/* =========================================================
-   EYEBROW
-========================================================= */
 
 .auth-eyebrow {
-    display: inline-block;
+display: block !important;
 
-    margin-bottom: 8px;
+margin: 0 0 5px !important;
+color: #2563eb !important;
+font-size: 11px !important;
+font-weight: 800 !important;
+letter-spacing: 1.5px !important;
 
-    color: #38bdf8;
-
-    font-size: 9px;
-    font-weight: 950;
-
-    letter-spacing: 2px;
-
-    text-transform: uppercase;
 }
-
-
-/* =========================================================
-   HEADER TITLE
-========================================================= */
 
 .auth-modal-header h2 {
-    margin:
-        0
-        0
-        8px;
+display: block !important;
 
-    color: #f8fafc;
+margin: 0 0 7px !important;
+color: #0f172a !important;
+font-size: 25px !important;
+font-weight: 800 !important;
+line-height: 1.25 !important;
 
-    font-size: 25px;
-    font-weight: 950;
-
-    letter-spacing: -0.8px;
-
-    line-height: 1.2;
 }
-
-
-/* =========================================================
-   HEADER DESCRIPTION
-========================================================= */
 
 .auth-modal-header p {
-    margin: 0;
+display: block !important;
 
-    color: #64748b;
+margin: 0 !important;
+color: #64748b !important;
+font-size: 14px !important;
+line-height: 1.5 !important;
 
-    font-size: 10px;
-
-    line-height: 1.6;
 }
 
-
-/* =========================================================
-   ALERTS
-========================================================= */
+/* ––––– ALERT ––––– */
 
 .auth-alert {
-    margin:
-        0
-        0
-        18px;
+display: block !important;
 
-    padding:
-        12px
-        14px;
+width: 100% !important;
+box-sizing: border-box !important;
+padding: 12px 14px !important;
+margin: 0 0 18px !important;
+border-radius: 12px !important;
+font-size: 13px !important;
+line-height: 1.5 !important;
 
-    border-radius: 12px;
-
-    font-size: 10px;
-
-    line-height: 1.5;
 }
-
-
-/* =========================================================
-   SUCCESS ALERT
-========================================================= */
 
 .auth-alert-success {
-    border:
-        1px solid
-        rgba(34, 197, 94, 0.22);
-
-    background:
-        rgba(34, 197, 94, 0.08);
-
-    color: #86efac;
+background: #ecfdf5 !important;
+border: 1px solid #a7f3d0 !important;
+color: #047857 !important;
 }
-
-
-/* =========================================================
-   ERROR ALERT
-========================================================= */
 
 .auth-alert-error {
-    border:
-        1px solid
-        rgba(239, 68, 68, 0.22);
-
-    background:
-        rgba(239, 68, 68, 0.08);
-
-    color: #fca5a5;
+background: #fef2f2 !important;
+border: 1px solid #fecaca !important;
+color: #b91c1c !important;
 }
 
-
-/* =========================================================
-   AUTH FORM
-========================================================= */
+/* ––––– FORM ––––– */
 
 .auth-form {
-    display: flex;
+display: block !important;
 
-    flex-direction: column;
+width: 100% !important;
+margin: 0 !important;
+padding: 0 !important;
 
-    gap: 16px;
-
-    padding:
-        0
-        4px;
 }
-
-
-/* =========================================================
-   FORM GROUP
-========================================================= */
 
 .form-group {
-    display: flex;
+display: block !important;
 
-    flex-direction: column;
+width: 100% !important;
+margin: 0 0 17px !important;
 
-    gap: 7px;
-
-    min-width: 0;
 }
 
+.form-group label {
+display: block !important;
 
-/* =========================================================
-   LABEL
-========================================================= */
+margin: 0 0 7px !important;
+color: #334155 !important;
+font-size: 13px !important;
+font-weight: 700 !important;
 
-.form-group label,
-.form-label-row label {
-    color: #cbd5e1;
-
-    font-size: 10px;
-    font-weight: 850;
-
-    letter-spacing: 0.15px;
 }
 
+/* ––––– INPUT ––––– */
 
-/* =========================================================
-   LABEL ROW
-========================================================= */
-
-.form-label-row {
-    display: flex;
-
-    align-items: center;
-    justify-content: space-between;
-
-    gap: 10px;
-}
-
-
-/* =========================================================
-   FORM LINK
-========================================================= */
-
-.form-link {
-    color: #38bdf8;
-
-    font-size: 9px;
-    font-weight: 800;
-
-    text-decoration: none;
-
-    transition:
-        color 0.2s ease;
-}
-
-
-.form-link:hover {
-    color: #7dd3fc;
-
-    text-decoration: underline;
-}
-
-
-/* =========================================================
-   INPUT
-========================================================= */
-
-.auth-form input,
+.auth-form input:not(
+[type=“checkbox”]
+):not(
+[type=“hidden”]
+),
 .auth-form select {
-    width: 100%;
+display: block !important;
 
-    min-height: 44px;
+width: 100% !important;
+height: 46px !important;
+min-height: 46px !important;
+margin: 0 !important;
+padding: 0 14px !important;
+box-sizing: border-box !important;
+border: 1px solid #cbd5e1 !important;
+border-radius: 12px !important;
+background: #f8fafc !important;
+color: #0f172a !important;
+font-family: inherit !important;
+font-size: 14px !important;
+outline: none !important;
 
-    box-sizing: border-box;
-
-    padding:
-        11px
-        13px;
-
-    border:
-        1px solid
-        rgba(148, 163, 184, 0.13);
-
-    border-radius: 12px;
-
-    outline: none;
-
-    background:
-        rgba(2, 6, 23, 0.58);
-
-    color: #e2e8f0;
-
-    font-family: inherit;
-
-    font-size: 10px;
-
-    transition:
-        border-color 0.2s ease,
-        background 0.2s ease,
-        box-shadow 0.2s ease,
-        transform 0.2s ease;
 }
 
-
-/* =========================================================
-   INPUT PLACEHOLDER
-========================================================= */
-
-.auth-form input::placeholder {
-    color: #475569;
-}
-
-
-/* =========================================================
-   INPUT HOVER
-========================================================= */
-
-.auth-form input:hover,
-.auth-form select:hover {
-    border-color:
-        rgba(56, 189, 248, 0.24);
-}
-
-
-/* =========================================================
-   INPUT FOCUS
-========================================================= */
-
-.auth-form input:focus,
+.auth-form input:not(
+[type=“checkbox”]
+):not(
+[type=“hidden”]
+):focus,
 .auth-form select:focus {
-    border-color:
-        rgba(56, 189, 248, 0.60);
+background: #ffffff !important;
 
-    background:
-        rgba(2, 6, 23, 0.78);
+border-color: #2563eb !important;
+box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.10) !important;
 
-    box-shadow:
-        0 0 0 3px
-        rgba(14, 165, 233, 0.09);
 }
 
-
-/* =========================================================
-   SELECT
-========================================================= */
-
-.auth-form select {
-    cursor: pointer;
-
-    appearance: none;
-    -webkit-appearance: none;
-
-    padding-right: 38px;
-
-    background-image:
-        linear-gradient(
-            45deg,
-            transparent 50%,
-            #64748b 50%
-        ),
-        linear-gradient(
-            135deg,
-            #64748b 50%,
-            transparent 50%
-        );
-
-    background-position:
-        calc(100% - 17px) 19px,
-        calc(100% - 12px) 19px;
-
-    background-size:
-        5px 5px,
-        5px 5px;
-
-    background-repeat: no-repeat;
-}
-
-
-.auth-form select option {
-    background: #0f172a;
-
-    color: #f8fafc;
-}
-
-
-/* =========================================================
-   TWO COLUMN FORM
-========================================================= */
-
-.form-grid-2 {
-    display: grid;
-
-    grid-template-columns:
-        1fr
-        1fr;
-
-    gap: 12px;
-}
-
-
-/* =========================================================
-   PASSWORD INPUT WRAPPER
-========================================================= */
+/* ––––– PASSWORD ––––– */
 
 .password-input {
-    position: relative;
+position: relative !important;
 
-    width: 100%;
+display: block !important;
+width: 100% !important;
+
 }
-
-
-/* =========================================================
-   PASSWORD INPUT
-========================================================= */
 
 .password-input input {
-    padding-right: 48px;
+padding-right: 48px !important;
 }
-
-
-/* =========================================================
-   PASSWORD TOGGLE
-========================================================= */
 
 .password-toggle {
-    position: absolute;
+position: absolute !important;
 
-    top: 50%;
-    right: 9px;
+top: 50% !important;
+right: 8px !important;
+width: 34px !important;
+height: 34px !important;
+min-width: 34px !important;
+margin: 0 !important;
+padding: 0 !important;
+transform: translateY(-50%) !important;
+border: none !important;
+border-radius: 8px !important;
+background: transparent !important;
+color: #475569 !important;
+font-size: 17px !important;
+cursor: pointer !important;
+z-index: 5 !important;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    width: 32px;
-    height: 32px;
-
-    padding: 0;
-
-    border: 0;
-
-    border-radius: 9px;
-
-    background: transparent;
-
-    color: #64748b;
-
-    font-size: 14px;
-
-    cursor: pointer;
-
-    transform: translateY(-50%);
-
-    transition:
-        color 0.2s ease,
-        background 0.2s ease;
 }
-
 
 .password-toggle:hover {
-    color: #7dd3fc;
-
-    background:
-        rgba(56, 189, 248, 0.08);
+background: #e2e8f0 !important;
 }
 
+/* ––––– TWO COLUMN ––––– */
 
-.password-toggle:active {
-    transform:
-        translateY(-50%)
-        scale(0.92);
+.form-grid-2 {
+display: grid !important;
+
+grid-template-columns: 1fr 1fr !important;
+gap: 14px !important;
+width: 100% !important;
+
 }
 
-
-/* =========================================================
-   CHECKBOX ROW
-========================================================= */
+/* ––––– CHECKBOX ––––– */
 
 .checkbox-row {
-    display: flex;
+display: flex !important;
 
-    align-items: flex-start;
+align-items: flex-start !important;
+gap: 9px !important;
+width: 100% !important;
+margin: 4px 0 18px !important;
+padding: 0 !important;
+color: #64748b !important;
+font-size: 12px !important;
+line-height: 1.5 !important;
+cursor: pointer !important;
 
-    gap: 9px;
-
-    color: #64748b;
-
-    font-size: 9px;
-
-    line-height: 1.5;
-
-    cursor: pointer;
-
-    user-select: none;
 }
 
+.checkbox-row input[type=“checkbox”] {
+width: 16px !important;
+height: 16px !important;
 
-.checkbox-row input {
-    width: 15px;
-    min-width: 15px;
+min-width: 16px !important;
+min-height: 16px !important;
+margin: 1px 0 0 !important;
+padding: 0 !important;
+accent-color: #2563eb !important;
 
-    height: 15px;
-    min-height: 15px;
-
-    margin:
-        1px
-        0
-        0;
-
-    padding: 0;
-
-    accent-color: #2563eb;
-
-    cursor: pointer;
 }
 
-
-.checkbox-row span {
-    display: block;
-}
-
-
-.checkbox-row a {
-    color: #38bdf8;
-
-    font-weight: 800;
-
-    text-decoration: none;
-}
-
-
-.checkbox-row a:hover {
-    color: #7dd3fc;
-
-    text-decoration: underline;
-}
-
-
-/* =========================================================
-   SUBMIT BUTTON
-========================================================= */
+/* ––––– SUBMIT ––––– */
 
 .auth-submit {
-    display: flex;
+display: flex !important;
 
-    align-items: center;
-    justify-content: space-between;
+align-items: center !important;
+justify-content: space-between !important;
+width: 100% !important;
+min-height: 48px !important;
+margin: 0 !important;
+padding: 0 18px !important;
+box-sizing: border-box !important;
+border: none !important;
+border-radius: 13px !important;
+background:
+    linear-gradient(
+        135deg,
+        #2563eb,
+        #4f46e5
+    ) !important;
+color: #ffffff !important;
+font-family: inherit !important;
+font-size: 14px !important;
+font-weight: 800 !important;
+cursor: pointer !important;
+box-shadow:
+    0 8px 20px rgba(37, 99, 235, 0.25) !important;
 
-    width: 100%;
-
-    min-height: 46px;
-
-    margin-top: 2px;
-
-    padding:
-        11px
-        15px
-        11px
-        18px;
-
-    border: 0;
-
-    border-radius: 13px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #2563eb 0%,
-            #0284c7 100%
-        );
-
-    color: #ffffff;
-
-    font-family: inherit;
-
-    font-size: 10px;
-    font-weight: 950;
-
-    letter-spacing: 0.25px;
-
-    cursor: pointer;
-
-    box-shadow:
-        0 12px 28px
-        rgba(37, 99, 235, 0.20);
-
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease,
-        filter 0.2s ease;
 }
-
-
-.auth-submit span:last-child {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    width: 27px;
-    height: 27px;
-
-    border-radius: 8px;
-
-    background:
-        rgba(255, 255, 255, 0.12);
-
-    font-size: 14px;
-
-    transition:
-        transform 0.2s ease,
-        background 0.2s ease;
-}
-
 
 .auth-submit:hover {
-    filter: brightness(1.08);
+transform: translateY(-2px) !important;
 
-    transform: translateY(-2px);
+box-shadow:
+    0 12px 28px rgba(37, 99, 235, 0.32) !important;
 
-    box-shadow:
-        0 16px 34px
-        rgba(37, 99, 235, 0.30);
 }
 
-
-.auth-submit:hover span:last-child {
-    transform: translateX(3px);
-
-    background:
-        rgba(255, 255, 255, 0.18);
-}
-
-
-.auth-submit:active {
-    transform:
-        translateY(0)
-        scale(0.98);
-}
-
-
-/* =========================================================
-   DIVIDER
-========================================================= */
+/* ––––– DIVIDER ––––– */
 
 .auth-divider {
-    display: flex;
+display: flex !important;
 
-    align-items: center;
+align-items: center !important;
+gap: 12px !important;
+margin: 21px 0 17px !important;
+color: #94a3b8 !important;
+font-size: 11px !important;
+font-weight: 700 !important;
 
-    gap: 12px;
-
-    margin:
-        1px
-        0;
 }
-
 
 .auth-divider::before,
 .auth-divider::after {
-    content: "";
+content: “” !important;
 
-    flex: 1;
+flex: 1 !important;
+height: 1px !important;
+background: #e2e8f0 !important;
 
-    height: 1px;
-
-    background:
-        rgba(148, 163, 184, 0.10);
 }
 
-
-.auth-divider span {
-    color: #334155;
-
-    font-size: 8px;
-    font-weight: 900;
-
-    letter-spacing: 1.5px;
-}
-
-
-/* =========================================================
-   LOGIN / REGISTER SWITCH
-========================================================= */
+/* ––––– SWITCH ––––– */
 
 .auth-switch {
-    margin:
-        0
-        0
-        2px;
+display: block !important;
 
-    color: #64748b;
+margin: 0 !important;
+text-align: center !important;
+color: #64748b !important;
+font-size: 13px !important;
 
-    font-size: 9px;
-
-    line-height: 1.6;
-
-    text-align: center;
 }
-
 
 .auth-switch-button {
-    display: inline;
+display: inline !important;
 
-    margin-left: 3px;
+width: auto !important;
+height: auto !important;
+margin: 0 !important;
+padding: 0 !important;
+border: none !important;
+background: transparent !important;
+color: #2563eb !important;
+font-family: inherit !important;
+font-size: 13px !important;
+font-weight: 800 !important;
+cursor: pointer !important;
 
-    padding: 0;
-
-    border: 0;
-
-    background: transparent;
-
-    color: #38bdf8;
-
-    font-family: inherit;
-
-    font-size: inherit;
-    font-weight: 900;
-
-    cursor: pointer;
-
-    transition:
-        color 0.2s ease;
 }
 
-
-.auth-switch-button:hover {
-    color: #7dd3fc;
-
-    text-decoration: underline;
-}
-
-
-/* =========================================================
-   VALIDATION
-========================================================= */
-
-/* Browser validation remains available.
-   No aggressive red border by default. */
-
-/* =========================================================
-   DISABLED SUBMIT
-========================================================= */
-
-.auth-submit:disabled {
-    opacity: 0.5;
-
-    cursor: not-allowed;
-
-    transform: none;
-
-    box-shadow: none;
-
-    filter: none;
-}
-
-
-/* =========================================================
-   BODY LOCK
-========================================================= */
+/* ––––– BODY ––––– */
 
 body.modal-open {
-    overflow: hidden;
+overflow: hidden !important;
 }
 
+/* ––––– SCROLLBAR ––––– */
 
-/* =========================================================
-   FOCUS ACCESSIBILITY
-========================================================= */
-
-.modal-close:focus-visible,
-.password-toggle:focus-visible,
-.auth-submit:focus-visible,
-.auth-switch-button:focus-visible,
-.form-link:focus-visible {
-    outline:
-        2px solid
-        #38bdf8;
-
-    outline-offset: 3px;
+.auth-modal::-webkit-scrollbar {
+width: 6px !important;
 }
 
+.auth-modal::-webkit-scrollbar-thumb {
+background: #cbd5e1 !important;
+border-radius: 10px !important;
+}
 
-/* =========================================================
-   MOBILE
-========================================================= */
+/* ––––– MOBILE ––––– */
 
 @media (max-width: 600px) {
 
-    .modal-overlay {
-        align-items: center;
-
-        padding: 12px;
-    }
-
-
-    .auth-modal {
-        max-width: 100%;
-
-        max-height: 92vh;
-
-        padding: 25px 20px;
-
-        border-radius: 22px;
-    }
-
-
-    .auth-modal-register {
-        max-width: 100%;
-    }
-
-
-    .modal-close {
-        top: 14px;
-        right: 14px;
-
-        width: 33px;
-        height: 33px;
-    }
-
-
-    .auth-modal-header {
-        padding:
-            5px
-            20px
-            20px;
-    }
-
-
-    .auth-modal-icon {
-        width: 52px;
-        height: 52px;
-
-        margin-bottom: 13px;
-
-        border-radius: 16px;
-
-        font-size: 22px;
-    }
-
-
-    .auth-eyebrow {
-        font-size: 8px;
-
-        letter-spacing: 1.7px;
-    }
-
-
-    .auth-modal-header h2 {
-        font-size: 21px;
-    }
-
-
-    .auth-modal-header p {
-        font-size: 9px;
-    }
-
-
-    .auth-form {
-        gap: 14px;
-
-        padding:
-            0
-            2px;
-    }
-
-
-    .form-grid-2 {
-        grid-template-columns: 1fr;
-
-        gap: 14px;
-    }
-
-
-    .auth-form input,
-    .auth-form select {
-        min-height: 43px;
-
-        font-size: 10px;
-    }
-
-
-    .auth-submit {
-        min-height: 45px;
-    }
-
+.modal-overlay {
+    padding: 14px !important;
 }
-
-
-/* =========================================================
-   SMALL MOBILE
-========================================================= */
-
-@media (max-width: 380px) {
-
-    .modal-overlay {
-        padding: 8px;
-    }
-
-
-    .auth-modal {
-        padding:
-            22px
-            16px;
-
-        border-radius: 19px;
-    }
-
-
-    .modal-close {
-        top: 11px;
-        right: 11px;
-
-        width: 31px;
-        height: 31px;
-
-        font-size: 18px;
-    }
-
-
-    .auth-modal-header {
-        padding:
-            4px
-            12px
-            17px;
-    }
-
-
-    .auth-modal-icon {
-        width: 48px;
-        height: 48px;
-
-        margin-bottom: 11px;
-
-        border-radius: 14px;
-
-        font-size: 20px;
-    }
-
-
-    .auth-modal-header h2 {
-        font-size: 19px;
-    }
-
-
-    .auth-modal-header p {
-        font-size: 8px;
-    }
-
-
-    .form-group label,
-    .form-label-row label {
-        font-size: 9px;
-    }
-
-
-    .auth-form input,
-    .auth-form select {
-        min-height: 41px;
-
-        padding:
-            10px
-            11px;
-
-        font-size: 9px;
-    }
-
-
-    .password-input input {
-        padding-right: 44px;
-    }
-
-
-    .auth-submit {
-        min-height: 43px;
-
-        font-size: 9px;
-    }
-
-
-    .checkbox-row {
-        font-size: 8px;
-    }
-
-
-    .auth-switch {
-        font-size: 8px;
-    }
-
+.modal-overlay .auth-modal,
+.modal-overlay .auth-modal-register {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: calc(100vh - 28px) !important;
+    padding: 26px 20px !important;
+    border-radius: 20px !important;
 }
-
-
-/* =========================================================
-   REDUCED MOTION
-========================================================= */
-
-@media (prefers-reduced-motion: reduce) {
-
-    .modal-overlay,
-    .auth-modal,
-    .modal-close,
-    .password-toggle,
-    .auth-submit,
-    .auth-submit span:last-child,
-    .auth-switch-button {
-        transition: none;
-    }
+.form-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+}
+.auth-modal-header h2 {
+    font-size: 22px !important;
+}
 
 }
