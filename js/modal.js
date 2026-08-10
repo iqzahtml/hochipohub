@@ -5,20 +5,24 @@
 | File:
 | js/modal.js
 |
-| Functions:
-| - Open modal
-| - Close modal
+| Handles:
 | - Login modal
 | - Register modal
-| - Close when clicking outside
-| - Close using ESC
-| - Prevent background scrolling
+| - Open / close modal
+| - Switch Login <-> Register
+| - Click outside
+| - ESC key
+| - Body scroll lock
+| - Password visibility
+| - Register password validation
 |--------------------------------------------------------------------------
 */
 
 document.addEventListener("DOMContentLoaded", function () {
 
     initModals();
+    initPasswordToggle();
+    initRegisterValidation();
 
 });
 
@@ -33,14 +37,33 @@ function initModals() {
 
     /*
     |--------------------------------------------------------------------------
-    | FIND MODALS
+    | OPEN BUTTONS
     |--------------------------------------------------------------------------
+    |
+    | Navbar uses:
+    |
+    | data-modal-open="loginModal"
+    | data-modal-open="registerModal"
+    |
     */
 
-    const modals =
-        document.querySelectorAll(
-            ".modal, .auth-modal"
-        );
+    document
+        .querySelectorAll("[data-modal-open]")
+        .forEach(function (button) {
+
+            button.addEventListener("click", function (event) {
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                const modalId =
+                    button.getAttribute("data-modal-open");
+
+                openModal(modalId);
+
+            });
+
+        });
 
 
     /*
@@ -49,33 +72,57 @@ function initModals() {
     |--------------------------------------------------------------------------
     */
 
-    const closeButtons =
-        document.querySelectorAll(
-            ".modal-close, .close-modal, [data-modal-close]"
-        );
+    document
+        .querySelectorAll("[data-modal-close]")
+        .forEach(function (button) {
 
-
-    closeButtons.forEach(function (button) {
-
-        button.addEventListener(
-            "click",
-            function (event) {
+            button.addEventListener("click", function (event) {
 
                 event.preventDefault();
+                event.stopPropagation();
 
-                const modal =
-                    button.closest(
-                        ".modal, .auth-modal"
-                    );
+                const modalId =
+                    button.getAttribute("data-modal-close");
 
-                if (modal) {
-                    closeModal(modal);
-                }
+                closeModal(modalId);
 
-            }
-        );
+            });
 
-    });
+        });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOGIN <-> REGISTER SWITCH
+    |--------------------------------------------------------------------------
+    */
+
+    document
+        .querySelectorAll("[data-modal-switch]")
+        .forEach(function (button) {
+
+            button.addEventListener("click", function (event) {
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                const currentModal =
+                    button.getAttribute("data-modal-switch");
+
+                const targetModal =
+                    button.getAttribute("data-modal-target");
+
+                closeModal(currentModal);
+
+                setTimeout(function () {
+
+                    openModal(targetModal);
+
+                }, 150);
+
+            });
+
+        });
 
 
     /*
@@ -84,199 +131,89 @@ function initModals() {
     |--------------------------------------------------------------------------
     */
 
-    modals.forEach(function (modal) {
+    document
+        .querySelectorAll(".modal-overlay")
+        .forEach(function (overlay) {
 
-        modal.addEventListener(
-            "click",
-            function (event) {
+            overlay.addEventListener("click", function (event) {
 
-                if (
-                    event.target === modal
-                ) {
-                    closeModal(modal);
+                if (event.target === overlay) {
+
+                    closeModal(overlay.id);
+
                 }
 
-            }
-        );
+            });
 
-    });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | LOGIN TRIGGERS
-    |--------------------------------------------------------------------------
-    */
-
-    const loginTriggers =
-        document.querySelectorAll(
-            "[data-modal='login'], .open-login-modal, #openLoginModal"
-        );
-
-
-    loginTriggers.forEach(function (trigger) {
-
-        trigger.addEventListener(
-            "click",
-            function (event) {
-
-                event.preventDefault();
-
-                openModalByName(
-                    "loginModal"
-                );
-
-            }
-        );
-
-    });
+        });
 
 
     /*
     |--------------------------------------------------------------------------
-    | REGISTER TRIGGERS
+    | ESC KEY
     |--------------------------------------------------------------------------
     */
 
-    const registerTriggers =
-        document.querySelectorAll(
-            "[data-modal='register'], .open-register-modal, #openRegisterModal"
-        );
+    document.addEventListener("keydown", function (event) {
 
+        if (event.key === "Escape") {
 
-    registerTriggers.forEach(function (trigger) {
-
-        trigger.addEventListener(
-            "click",
-            function (event) {
-
-                event.preventDefault();
-
-                openModalByName(
-                    "registerModal"
-                );
-
-            }
-        );
-
-    });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | FORGOT PASSWORD
-    |--------------------------------------------------------------------------
-    */
-
-    const forgotTriggers =
-        document.querySelectorAll(
-            "[data-modal='forgot'], .open-forgot-modal, #openForgotModal"
-        );
-
-
-    forgotTriggers.forEach(function (trigger) {
-
-        trigger.addEventListener(
-            "click",
-            function (event) {
-
-                event.preventDefault();
-
-                openModalByName(
-                    "forgotPasswordModal"
-                );
-
-            }
-        );
-
-    });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | SWITCH LOGIN -> REGISTER
-    |--------------------------------------------------------------------------
-    */
-
-    const registerSwitch =
-        document.querySelectorAll(
-            ".switch-to-register, [data-switch='register']"
-        );
-
-
-    registerSwitch.forEach(function (button) {
-
-        button.addEventListener(
-            "click",
-            function (event) {
-
-                event.preventDefault();
-
-                closeAllModals();
-
-                openModalByName(
-                    "registerModal"
-                );
-
-            }
-        );
-
-    });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | SWITCH REGISTER -> LOGIN
-    |--------------------------------------------------------------------------
-    */
-
-    const loginSwitch =
-        document.querySelectorAll(
-            ".switch-to-login, [data-switch='login']"
-        );
-
-
-    loginSwitch.forEach(function (button) {
-
-        button.addEventListener(
-            "click",
-            function (event) {
-
-                event.preventDefault();
-
-                closeAllModals();
-
-                openModalByName(
-                    "loginModal"
-                );
-
-            }
-        );
-
-    });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | ESCAPE KEY
-    |--------------------------------------------------------------------------
-    */
-
-    document.addEventListener(
-        "keydown",
-        function (event) {
-
-            if (
-                event.key === "Escape" ||
-                event.key === "Esc"
-            ) {
-
-                closeAllModals();
-
-            }
+            closeAllModals();
 
         }
-    );
+
+    });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | OLD STYLE TRIGGERS
+    |--------------------------------------------------------------------------
+    | Keep these for compatibility with other pages/buttons.
+    |--------------------------------------------------------------------------
+    */
+
+    document
+        .querySelectorAll(
+            "[data-modal='login'], .open-login-modal, #openLoginModal"
+        )
+        .forEach(function (button) {
+
+            button.addEventListener("click", function (event) {
+
+                event.preventDefault();
+
+                openModal("loginModal");
+
+            });
+
+        });
+
+
+    document
+        .querySelectorAll(
+            "[data-modal='register'], .open-register-modal, #openRegisterModal"
+        )
+        .forEach(function (button) {
+
+            button.addEventListener("click", function (event) {
+
+                event.preventDefault();
+
+                openModal("registerModal");
+
+            });
+
+        });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | URL LOGIN REQUIRED
+    |--------------------------------------------------------------------------
+    */
+
+    checkLoginRequired();
 
 }
 
@@ -287,33 +224,73 @@ function initModals() {
 |--------------------------------------------------------------------------
 */
 
-function openModal(modal) {
+function openModal(modalId) {
+
+    const modal =
+        document.getElementById(modalId);
 
     if (!modal) {
+
+        console.warn(
+            "Modal not found:",
+            modalId
+        );
+
         return;
+
     }
+
 
     /*
     |--------------------------------------------------------------------------
-    | REMOVE HIDDEN STATE
+    | CLOSE OTHER MODALS FIRST
     |--------------------------------------------------------------------------
     */
 
-    modal.classList.add("active");
+    document
+        .querySelectorAll(".modal-overlay")
+        .forEach(function (otherModal) {
 
-    modal.classList.add("show");
+            if (otherModal !== modal) {
 
-    modal.style.display = "flex";
+                otherModal.classList.remove("show");
+                otherModal.classList.remove("active");
+
+                otherModal.setAttribute(
+                    "aria-hidden",
+                    "true"
+                );
+
+            }
+
+        });
+
 
     /*
     |--------------------------------------------------------------------------
-    | PREVENT BODY SCROLL
+    | SHOW MODAL
+    |--------------------------------------------------------------------------
+    */
+
+    modal.classList.add("show");
+    modal.classList.add("active");
+
+    modal.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOCK BODY SCROLL
     |--------------------------------------------------------------------------
     */
 
     document.body.classList.add(
         "modal-open"
     );
+
 
     document.body.style.overflow =
         "hidden";
@@ -327,18 +304,18 @@ function openModal(modal) {
 
     setTimeout(function () {
 
-        const input =
+        const firstInput =
             modal.querySelector(
                 "input:not([type='hidden']), textarea, select"
             );
 
-        if (input) {
+        if (firstInput) {
 
-            input.focus();
+            firstInput.focus();
 
         }
 
-    }, 150);
+    }, 200);
 
 }
 
@@ -349,121 +326,54 @@ function openModal(modal) {
 |--------------------------------------------------------------------------
 */
 
-function closeModal(modal) {
+function closeModal(modalId) {
+
+    const modal =
+        document.getElementById(modalId);
 
     if (!modal) {
+
         return;
+
     }
 
-    modal.classList.remove("active");
+
+    /*
+    |--------------------------------------------------------------------------
+    | HIDE MODAL
+    |--------------------------------------------------------------------------
+    */
 
     modal.classList.remove("show");
+    modal.classList.remove("active");
 
-    /*
-    |--------------------------------------------------------------------------
-    | Allow CSS transition to finish
-    |--------------------------------------------------------------------------
-    */
-
-    setTimeout(function () {
-
-        if (
-            !modal.classList.contains("active") &&
-            !modal.classList.contains("show")
-        ) {
-
-            modal.style.display = "none";
-
-        }
-
-    }, 200);
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | RESTORE BODY SCROLL
-    |--------------------------------------------------------------------------
-    */
-
-    document.body.classList.remove(
-        "modal-open"
+    modal.setAttribute(
+        "aria-hidden",
+        "true"
     );
 
-    document.body.style.overflow = "";
-
 
     /*
     |--------------------------------------------------------------------------
-    | RESET FORM
+    | CHECK OTHER MODALS
     |--------------------------------------------------------------------------
     */
 
-    const form =
-        modal.querySelector("form");
-
-    if (form) {
-
-        /*
-        | Only reset if explicitly allowed.
-        */
-
-        if (
-            form.dataset.resetOnClose ===
-            "true"
-        ) {
-
-            form.reset();
-
-        }
-
-    }
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| OPEN MODAL BY ID / NAME
-|--------------------------------------------------------------------------
-*/
-
-function openModalByName(name) {
-
-    let modal =
-        document.getElementById(name);
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Alternative naming
-    |--------------------------------------------------------------------------
-    */
-
-    if (!modal) {
-
-        modal =
-            document.querySelector(
-                "." + name
-            );
-
-    }
-
-
-    if (!modal) {
-
-        console.warn(
-            "Modal not found:",
-            name
+    const anotherModalOpen =
+        document.querySelector(
+            ".modal-overlay.show"
         );
 
-        return;
+
+    if (!anotherModalOpen) {
+
+        document.body.classList.remove(
+            "modal-open"
+        );
+
+        document.body.style.overflow = "";
 
     }
-
-
-    closeAllModals();
-
-    openModal(modal);
 
 }
 
@@ -476,34 +386,26 @@ function openModalByName(name) {
 
 function closeAllModals() {
 
-    const modals =
-        document.querySelectorAll(
-            ".modal, .auth-modal"
-        );
+    document
+        .querySelectorAll(".modal-overlay")
+        .forEach(function (modal) {
 
+            modal.classList.remove("show");
+            modal.classList.remove("active");
 
-    modals.forEach(function (modal) {
+            modal.setAttribute(
+                "aria-hidden",
+                "true"
+            );
 
-        modal.classList.remove(
-            "active"
-        );
-
-        modal.classList.remove(
-            "show"
-        );
-
-        modal.style.display =
-            "none";
-
-    });
+        });
 
 
     document.body.classList.remove(
         "modal-open"
     );
 
-    document.body.style.overflow =
-        "";
+    document.body.style.overflow = "";
 
 }
 
@@ -516,9 +418,7 @@ function closeAllModals() {
 
 function openLoginModal() {
 
-    openModalByName(
-        "loginModal"
-    );
+    openModal("loginModal");
 
 }
 
@@ -531,9 +431,7 @@ function openLoginModal() {
 
 function openRegisterModal() {
 
-    openModalByName(
-        "registerModal"
-    );
+    openModal("registerModal");
 
 }
 
@@ -546,8 +444,167 @@ function openRegisterModal() {
 
 function openForgotPasswordModal() {
 
-    openModalByName(
-        "forgotPasswordModal"
+    openModal("forgotPasswordModal");
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CLOSE LOGIN
+|--------------------------------------------------------------------------
+*/
+
+function closeLoginModal() {
+
+    closeModal("loginModal");
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CLOSE REGISTER
+|--------------------------------------------------------------------------
+*/
+
+function closeRegisterModal() {
+
+    closeModal("registerModal");
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CLOSE FORGOT PASSWORD
+|--------------------------------------------------------------------------
+*/
+
+function closeForgotPasswordModal() {
+
+    closeModal("forgotPasswordModal");
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PASSWORD TOGGLE
+|--------------------------------------------------------------------------
+*/
+
+function initPasswordToggle() {
+
+    document
+        .querySelectorAll("[data-password-target]")
+        .forEach(function (button) {
+
+            button.addEventListener("click", function (event) {
+
+                event.preventDefault();
+
+                const targetId =
+                    button.getAttribute(
+                        "data-password-target"
+                    );
+
+                const input =
+                    document.getElementById(targetId);
+
+                if (!input) {
+
+                    return;
+
+                }
+
+
+                if (input.type === "password") {
+
+                    input.type = "text";
+
+                    button.textContent = "🙈";
+
+                    button.setAttribute(
+                        "aria-label",
+                        "Hide password"
+                    );
+
+                } else {
+
+                    input.type = "password";
+
+                    button.textContent = "👁";
+
+                    button.setAttribute(
+                        "aria-label",
+                        "Show password"
+                    );
+
+                }
+
+            });
+
+        });
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| REGISTER PASSWORD VALIDATION
+|--------------------------------------------------------------------------
+*/
+
+function initRegisterValidation() {
+
+    const registerForm =
+        document.getElementById(
+            "registerForm"
+        );
+
+    if (!registerForm) {
+
+        return;
+
+    }
+
+
+    registerForm.addEventListener(
+        "submit",
+        function (event) {
+
+            const password =
+                document.getElementById(
+                    "registerPassword"
+                );
+
+            const confirmPassword =
+                document.getElementById(
+                    "registerConfirmPassword"
+                );
+
+
+            if (
+                password &&
+                confirmPassword &&
+                password.value !==
+                confirmPassword.value
+            ) {
+
+                event.preventDefault();
+
+                alert(
+                    "Passwords do not match."
+                );
+
+                confirmPassword.focus();
+
+                return;
+
+            }
+
+        }
     );
 
 }
@@ -555,64 +612,7 @@ function openForgotPasswordModal() {
 
 /*
 |--------------------------------------------------------------------------
-| CLOSE LOGIN MODAL
-|--------------------------------------------------------------------------
-*/
-
-function closeLoginModal() {
-
-    const modal =
-        document.getElementById(
-            "loginModal"
-        );
-
-    closeModal(modal);
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CLOSE REGISTER MODAL
-|--------------------------------------------------------------------------
-*/
-
-function closeRegisterModal() {
-
-    const modal =
-        document.getElementById(
-            "registerModal"
-        );
-
-    closeModal(modal);
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CLOSE FORGOT PASSWORD MODAL
-|--------------------------------------------------------------------------
-*/
-
-function closeForgotPasswordModal() {
-
-    const modal =
-        document.getElementById(
-            "forgotPasswordModal"
-        );
-
-    closeModal(modal);
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| SHOW LOGIN MODAL FROM URL
-|--------------------------------------------------------------------------
-| Example:
-| index.php?login=required
+| CHECK LOGIN REQUIRED
 |--------------------------------------------------------------------------
 */
 
@@ -623,12 +623,27 @@ function checkLoginRequired() {
             window.location.search
         );
 
+
     if (
         params.get("login") ===
         "required"
     ) {
 
-        openLoginModal();
+        openModal("loginModal");
+
+        cleanModalUrl();
+
+    }
+
+
+    if (
+        params.get("register") ===
+        "required"
+    ) {
+
+        openModal("registerModal");
+
+        cleanModalUrl();
 
     }
 
@@ -637,23 +652,7 @@ function checkLoginRequired() {
 
 /*
 |--------------------------------------------------------------------------
-| CHECK URL AFTER PAGE LOAD
-|--------------------------------------------------------------------------
-*/
-
-document.addEventListener(
-    "DOMContentLoaded",
-    function () {
-
-        checkLoginRequired();
-
-    }
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| REMOVE MODAL QUERY PARAMETER
+| CLEAN MODAL URL
 |--------------------------------------------------------------------------
 */
 
@@ -664,17 +663,11 @@ function cleanModalUrl() {
             window.location.href
         );
 
-    url.searchParams.delete(
-        "login"
-    );
 
-    url.searchParams.delete(
-        "register"
-    );
+    url.searchParams.delete("login");
+    url.searchParams.delete("register");
+    url.searchParams.delete("modal");
 
-    url.searchParams.delete(
-        "modal"
-    );
 
     window.history.replaceState(
         {},
@@ -688,7 +681,7 @@ function cleanModalUrl() {
 
 /*
 |--------------------------------------------------------------------------
-| FORM SUBMIT LOADING
+| FORM SUBMIT PROTECTION
 |--------------------------------------------------------------------------
 */
 
@@ -699,28 +692,30 @@ document.addEventListener(
         const form =
             event.target;
 
+
         if (
             !form.closest(
-                ".modal, .auth-modal"
+                ".modal-overlay"
             )
         ) {
+
             return;
+
         }
+
 
         const button =
             form.querySelector(
                 "button[type='submit'], input[type='submit']"
             );
 
+
         if (!button) {
+
             return;
+
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Prevent double submission
-        |--------------------------------------------------------------------------
-        */
 
         if (
             button.dataset.submitting ===
@@ -737,12 +732,6 @@ document.addEventListener(
         button.dataset.submitting =
             "true";
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Preserve original text
-        |--------------------------------------------------------------------------
-        */
 
         if (
             button.tagName ===
@@ -766,7 +755,7 @@ document.addEventListener(
 
 /*
 |--------------------------------------------------------------------------
-| EXPOSE GLOBAL FUNCTIONS
+| GLOBAL FUNCTIONS
 |--------------------------------------------------------------------------
 */
 
@@ -776,11 +765,11 @@ window.openModal =
 window.closeModal =
     closeModal;
 
-window.openModalByName =
-    openModalByName;
-
 window.closeAllModals =
     closeAllModals;
+
+window.openModalByName =
+    openModal;
 
 window.openLoginModal =
     openLoginModal;
