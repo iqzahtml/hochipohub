@@ -8,20 +8,7 @@
 | database/db.php
 |
 | Purpose:
-| Central database connection file.
-|
-| Usage:
-| require_once __DIR__ . '/database/db.php';
-|
-| Then:
-| $db = getDB();
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| LOAD GLOBAL CONFIG
+| Central PDO database connection.
 |--------------------------------------------------------------------------
 */
 
@@ -33,13 +20,9 @@ require_once dirname(__DIR__) . '/config.php';
 | DATABASE INSTANCE
 |--------------------------------------------------------------------------
 |
-| getDB() is already defined in config.php.
-| It creates one PDO connection and reuses it.
+| config.php already provides getDB().
 |
-| Example:
-|
-| $db = getDB();
-|
+| This file simply exposes the PDO connection as $db.
 |--------------------------------------------------------------------------
 */
 
