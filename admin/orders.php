@@ -1,14 +1,8 @@
 <?php
+session_start();
 
-require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/database/db.php';
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_name(SESSION_NAME);
-    session_start();
-}
-
-$db = getDB();
+require_once "../config.php";
+require_once "../database/db.php";
 
 /*
 |--------------------------------------------------------------------------
@@ -16,1389 +10,783 @@ $db = getDB();
 |--------------------------------------------------------------------------
 */
 
-if (empty($_SESSION['user_id'])) {
-    redirect(BASE_URL . 'index.php');
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../index.php");
+    exit;
 }
 
-if (
-    !isset($_SESSION['role']) ||
-    $_SESSION['role'] !== 'admin'
-) {
-    redirect(BASE_URL . 'index.php');
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+    header("Location: ../index.php");
+    exit;
 }
+
+$admin_id = (int) $_SESSION['user_id'];
+
+$message = "";
+$error = "";
 
 /*
 |--------------------------------------------------------------------------
-| FILTERS
+| UPDATE ORDER STATUS
 |--------------------------------------------------------------------------
 */
 
-$search = trim($_GET['search'] ?? '');
-$stockFilter = $_GET['stock'] ?? 'all';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
 
-/*
-|--------------------------------------------------------------------------
-| INVENTORY QUERY
-|--------------------------------------------------------------------------
-|
-| Product inventory is displayed using the products table.
-|
-*/
+    $order_id = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
+    $new_status = isset($_POST['order_status']) ? trim($_POST['order_status']) : '';
 
-$products = [];
+    $allowed_status = [
+        'Pending',
+        'Processing',
+        'Completed',
+        'Cancelled'
+    ];
 
-try {
+    if ($order_id <= 0) {
 
-    $sql = "
-        SELECT
-            p.*
-        FROM products p
-        WHERE 1 = 1
-    ";
+        $error = "Invalid order ID.";
 
-    $params = [];
+    } elseif (!in_array($new_status, $allowed_status, true)) {
 
-    /*
-    |--------------------------------------------------------------------------
-    | SEARCH
-    |--------------------------------------------------------------------------
-    */
+        $error = "Invalid order status.";
 
-    if ($search !== '') {
+    } else {
 
-        $sql .= "
-            AND (
-                p.product_name LIKE :search
-                OR p.product_id LIKE :search
-            )
-        ";
+        if ($new_status === 'Completed') {
 
-        $params[':search'] =
-            '%' . $search . '%';
+            $stmt = $conn->prepare("
+                UPDATE orders
+                SET order_status = ?,
+                    completed_date = NOW()
+                WHERE order_id = ?
+            ");
+
+        } else {
+
+            $stmt = $conn->prepare("
+                UPDATE orders
+                SET order_status = ?,
+                    completed_date = NULL
+                WHERE order_id = ?
+            ");
+        }
+
+        if ($stmt) {
+
+            $stmt->bind_param(
+                "si",
+                $new_status,
+                $order_id
+            );
+
+            if ($stmt->execute()) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | ADMIN LOG
+                |--------------------------------------------------------------------------
+                */
+
+                $action = "Updated order #".$order_id." status to ".$new_status;
+                $target_type = "order";
+
+                $log = $conn->prepare("
+                    INSERT INTO admin_logs
+                    (
+                        admin_id,
+                        action,
+                        target_type,
+                        target_id
+                    )
+                    VALUES (?, ?, ?, ?)
+                ");
+
+                if ($log) {
+
+                    $log->bind_param(
+                        "issi",
+                        $admin_id,
+                        $action,
+                        $target_type,
+                        $order_id
+                    );
+
+                    $log->execute();
+                    $log->close();
+                }
+
+                $message = "Order #".$order_id." status updated successfully.";
+
+            } else {
+
+                $error = "Failed to update order status.";
+            }
+
+            $stmt->close();
+
+        } else {
+
+            $error = "Database error.";
+        }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | STOCK FILTER
-    |--------------------------------------------------------------------------
-    */
-
-    if ($stockFilter === 'out') {
-
-        $sql .= "
-            AND p.stock <= 0
-        ";
-
-    } elseif ($stockFilter === 'low') {
-
-        $sql .= "
-            AND p.stock > 0
-            AND p.stock <= 10
-        ";
-
-    } elseif ($stockFilter === 'available') {
-
-        $sql .= "
-            AND p.stock > 10
-        ";
-    }
-
-    $sql .= "
-        ORDER BY p.stock ASC, p.product_id DESC
-    ";
-
-    $stmt = $db->prepare($sql);
-
-    $stmt->execute($params);
-
-    $products =
-        $stmt->fetchAll();
-
-} catch (Throwable $e) {
-
-    $products = [];
-
-    if (APP_DEBUG) {
-        $inventoryError =
-            $e->getMessage();
-    }
-}
-
-/*
-|--------------------------------------------------------------------------
-| INVENTORY SUMMARY
-|--------------------------------------------------------------------------
-*/
-
-$totalProducts = 0;
-$totalStock = 0;
-$outOfStock = 0;
-$lowStock = 0;
-$stockValue = 0;
-
-try {
-
-    $summaryStmt = $db->query("
-        SELECT
-            COUNT(*) AS total_products,
-            COALESCE(
-                SUM(stock),
-                0
-            ) AS total_stock,
-            COALESCE(
-                SUM(
-                    CASE
-                        WHEN stock <= 0
-                        THEN 1
-                        ELSE 0
-                    END
-                ),
-                0
-            ) AS out_of_stock,
-            COALESCE(
-                SUM(
-                    CASE
-                        WHEN stock > 0
-                        AND stock <= 10
-                        THEN 1
-                        ELSE 0
-                    END
-                ),
-                0
-            ) AS low_stock,
-            COALESCE(
-                SUM(
-                    stock * price
-                ),
-                0
-            ) AS stock_value
-        FROM products
-    ");
-
-    $summary =
-        $summaryStmt->fetch();
-
-    if ($summary) {
-
-        $totalProducts =
-            (int) $summary['total_products'];
-
-        $totalStock =
-            (int) $summary['total_stock'];
-
-        $outOfStock =
-            (int) $summary['out_of_stock'];
-
-        $lowStock =
-            (int) $summary['low_stock'];
-
-        $stockValue =
-            (float) $summary['stock_value'];
-    }
-
-} catch (Throwable $e) {
-
-    $totalProducts = 0;
-    $totalStock = 0;
-    $outOfStock = 0;
-    $lowStock = 0;
-    $stockValue = 0;
 }
 
 /*
 |--------------------------------------------------------------------------
-| PAGE URL
+| ORDER DETAILS
 |--------------------------------------------------------------------------
 */
 
-$currentQuery = '';
+$selected_order = null;
+$order_items = [];
+$vendor_orders = [];
 
-if ($search !== '') {
-    $currentQuery .=
-        '&search=' .
-        urlencode($search);
+if (isset($_GET['view'])) {
+
+    $view_order_id = (int) $_GET['view'];
+
+    if ($view_order_id > 0) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN ORDER
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt = $conn->prepare("
+            SELECT
+                o.order_id,
+                o.customer_id,
+                o.order_date,
+                o.total_amount,
+                o.delivery_method,
+                o.delivery_address,
+                o.tracking_number,
+                o.order_status,
+                o.completed_date,
+
+                u.name AS customer_name,
+                u.email AS customer_email,
+                u.phone AS customer_phone
+
+            FROM orders o
+
+            INNER JOIN users u
+                ON o.customer_id = u.user_id
+
+            WHERE o.order_id = ?
+        ");
+
+        if ($stmt) {
+
+            $stmt->bind_param(
+                "i",
+                $view_order_id
+            );
+
+            $stmt->execute();
+
+            $result = $stmt->get_result();
+
+            $selected_order = $result->fetch_assoc();
+
+            $stmt->close();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ORDER ITEMS
+        |--------------------------------------------------------------------------
+        */
+
+        if ($selected_order) {
+
+            $stmt = $conn->prepare("
+                SELECT
+                    od.order_detail_id,
+                    od.product_id,
+                    od.quantity,
+                    od.unit_price,
+                    od.subtotal,
+
+                    p.product_name,
+                    p.image,
+
+                    v.vendor_id,
+                    v.business_name
+
+                FROM order_details od
+
+                INNER JOIN products p
+                    ON od.product_id = p.product_id
+
+                INNER JOIN vendors v
+                    ON p.vendor_id = v.vendor_id
+
+                WHERE od.order_id = ?
+
+                ORDER BY od.order_detail_id ASC
+            ");
+
+            if ($stmt) {
+
+                $stmt->bind_param(
+                    "i",
+                    $view_order_id
+                );
+
+                $stmt->execute();
+
+                $result = $stmt->get_result();
+
+                while ($row = $result->fetch_assoc()) {
+                    $order_items[] = $row;
+                }
+
+                $stmt->close();
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | VENDOR ORDERS
+            |--------------------------------------------------------------------------
+            */
+
+            $stmt = $conn->prepare("
+                SELECT
+                    vo.vendor_order_id,
+                    vo.vendor_id,
+                    vo.subtotal,
+                    vo.delivery_fee,
+                    vo.vendor_status,
+                    vo.tracking_number,
+                    vo.created_at,
+                    vo.completed_at,
+
+                    v.business_name
+
+                FROM vendor_orders vo
+
+                INNER JOIN vendors v
+                    ON vo.vendor_id = v.vendor_id
+
+                WHERE vo.order_id = ?
+
+                ORDER BY vo.vendor_order_id ASC
+            ");
+
+            if ($stmt) {
+
+                $stmt->bind_param(
+                    "i",
+                    $view_order_id
+                );
+
+                $stmt->execute();
+
+                $result = $stmt->get_result();
+
+                while ($row = $result->fetch_assoc()) {
+                    $vendor_orders[] = $row;
+                }
+
+                $stmt->close();
+            }
+        }
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| FETCH ALL ORDERS
+|--------------------------------------------------------------------------
+*/
+
+$orders = [];
+
+$sql = "
+    SELECT
+        o.order_id,
+        o.customer_id,
+        o.order_date,
+        o.total_amount,
+        o.delivery_method,
+        o.delivery_address,
+        o.tracking_number,
+        o.order_status,
+        o.completed_date,
+
+        u.name AS customer_name,
+        u.email AS customer_email,
+
+        COALESCE(
+            (
+                SELECT p.payment_status
+                FROM payments p
+                WHERE p.order_id = o.order_id
+                ORDER BY p.payment_id DESC
+                LIMIT 1
+            ),
+            'Pending'
+        ) AS payment_status,
+
+        COALESCE(
+            (
+                SELECT COUNT(*)
+                FROM order_details od
+                WHERE od.order_id = o.order_id
+            ),
+            0
+        ) AS total_items,
+
+        COALESCE(
+            (
+                SELECT COUNT(*)
+                FROM vendor_orders vo
+                WHERE vo.order_id = o.order_id
+            ),
+            0
+        ) AS vendor_count
+
+    FROM orders o
+
+    INNER JOIN users u
+        ON o.customer_id = u.user_id
+
+    ORDER BY o.order_date DESC
+";
+
+$result = $conn->query($sql);
+
+if ($result) {
+
+    while ($row = $result->fetch_assoc()) {
+        $orders[] = $row;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| STATISTICS
+|--------------------------------------------------------------------------
+*/
+
+$total_orders = count($orders);
+
+$pending_orders = 0;
+$processing_orders = 0;
+$completed_orders = 0;
+$cancelled_orders = 0;
+
+foreach ($orders as $order) {
+
+    switch ($order['order_status']) {
+
+        case 'Pending':
+            $pending_orders++;
+            break;
+
+        case 'Processing':
+            $processing_orders++;
+            break;
+
+        case 'Completed':
+            $completed_orders++;
+            break;
+
+        case 'Cancelled':
+            $cancelled_orders++;
+            break;
+    }
+}
+
+function e($value)
+{
+    return htmlspecialchars(
+        (string) $value,
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
+
+function money($value)
+{
+    return "RM " . number_format(
+        (float) $value,
+        2
+    );
 }
 
 ?>
-<!DOCTYPE html>
 
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
 
     <meta charset="UTF-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
-    <title>
-        Inventory Management |
-        <?= e(APP_NAME) ?>
-    </title>
+    <title>Manage Orders | HochipoHub Admin</title>
 
-    <link
-        rel="stylesheet"
-        href="<?= BASE_URL ?>css/style.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="<?= BASE_URL ?>css/admin.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="<?= BASE_URL ?>css/product.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="<?= BASE_URL ?>css/responsive.css"
-    >
-
-    <style>
-
-        .inventory-page {
-            min-height: 100vh;
-            padding: 35px 4%;
-            background:
-                radial-gradient(
-                    circle at 8% 5%,
-                    rgba(37,99,235,.12),
-                    transparent 28%
-                ),
-                radial-gradient(
-                    circle at 90% 12%,
-                    rgba(14,165,233,.10),
-                    transparent 25%
-                ),
-                #f8fbff;
-        }
-
-        .inventory-container {
-            max-width: 1450px;
-            margin: auto;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | HERO
-        |--------------------------------------------------------------------------
-        */
-
-        .inventory-hero {
-            position: relative;
-            overflow: hidden;
-            padding: 32px;
-            margin-bottom: 24px;
-            border-radius: 28px;
-            background:
-                linear-gradient(
-                    135deg,
-                    #071f4d,
-                    #1d4ed8 55%,
-                    #0284c7
-                );
-            color: white;
-            box-shadow:
-                0 25px 60px
-                rgba(29,78,216,.22);
-        }
-
-        .inventory-hero::before {
-            content: "";
-            position: absolute;
-            width: 350px;
-            height: 350px;
-            top: -190px;
-            right: -80px;
-            border-radius: 50%;
-            background:
-                rgba(255,255,255,.08);
-        }
-
-        .inventory-hero::after {
-            content: "";
-            position: absolute;
-            width: 180px;
-            height: 180px;
-            bottom: -120px;
-            right: 250px;
-            border-radius: 50%;
-            background:
-                rgba(255,255,255,.05);
-        }
-
-        .hero-content {
-            position: relative;
-            z-index: 2;
-        }
-
-        .hero-kicker {
-            margin-bottom: 8px;
-            color:
-                rgba(255,255,255,.65);
-            font-size: 10px;
-            font-weight: 950;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
-        .inventory-hero h1 {
-            margin: 0 0 8px;
-            font-size: clamp(
-                28px,
-                5vw,
-                44px
-            );
-            font-weight: 950;
-        }
-
-        .inventory-hero p {
-            max-width: 720px;
-            margin: 0;
-            color:
-                rgba(255,255,255,.76);
-            font-size: 12px;
-            line-height: 1.7;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | SUMMARY
-        |--------------------------------------------------------------------------
-        */
-
-        .summary-grid {
-            display: grid;
-            grid-template-columns:
-                repeat(4, 1fr);
-            gap: 15px;
-            margin-bottom: 22px;
-        }
-
-        .summary-card {
-            position: relative;
-            overflow: hidden;
-            padding: 21px;
-            border:
-                1px solid #dbeafe;
-            border-radius: 20px;
-            background: white;
-            box-shadow:
-                0 12px 35px
-                rgba(15,23,42,.05);
-        }
-
-        .summary-card::after {
-            content: "";
-            position: absolute;
-            width: 80px;
-            height: 80px;
-            right: -35px;
-            bottom: -35px;
-            border-radius: 50%;
-            background:
-                rgba(37,99,235,.06);
-        }
-
-        .summary-label {
-            margin-bottom: 9px;
-            color: #64748b;
-            font-size: 9px;
-            font-weight: 900;
-            letter-spacing: .5px;
-            text-transform: uppercase;
-        }
-
-        .summary-value {
-            color: #0f172a;
-            font-size: 27px;
-            font-weight: 950;
-        }
-
-        .summary-value.blue {
-            color: #2563eb;
-        }
-
-        .summary-value.orange {
-            color: #d97706;
-        }
-
-        .summary-value.red {
-            color: #dc2626;
-        }
-
-        .summary-note {
-            margin-top: 5px;
-            color: #94a3b8;
-            font-size: 8px;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | MAIN PANEL
-        |--------------------------------------------------------------------------
-        */
-
-        .inventory-panel {
-            overflow: hidden;
-            border:
-                1px solid #dbeafe;
-            border-radius: 22px;
-            background: white;
-            box-shadow:
-                0 12px 35px
-                rgba(15,23,42,.05);
-        }
-
-        .panel-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-            padding: 20px 22px;
-            border-bottom:
-                1px solid #eff6ff;
-        }
-
-        .panel-title h2 {
-            margin: 0 0 4px;
-            color: #0f172a;
-            font-size: 15px;
-            font-weight: 950;
-        }
-
-        .panel-title p {
-            margin: 0;
-            color: #94a3b8;
-            font-size: 9px;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | SEARCH
-        |--------------------------------------------------------------------------
-        */
-
-        .filter-area {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 15px 22px;
-            border-bottom:
-                1px solid #eff6ff;
-            background: #fbfdff;
-        }
-
-        .search-form {
-            display: flex;
-            flex: 1;
-            max-width: 500px;
-            gap: 8px;
-        }
-
-        .search-input {
-            flex: 1;
-            min-width: 0;
-            padding: 12px 14px;
-            border:
-                1px solid #dbeafe;
-            border-radius: 12px;
-            outline: none;
-            background: white;
-            color: #0f172a;
-            font-size: 10px;
-        }
-
-        .search-input:focus {
-            border-color:
-                #2563eb;
-            box-shadow:
-                0 0 0 4px
-                rgba(37,99,235,.07);
-        }
-
-        .search-btn {
-            padding: 12px 16px;
-            border: 0;
-            border-radius: 12px;
-            cursor: pointer;
-            background:
-                #2563eb;
-            color: white;
-            font-size: 9px;
-            font-weight: 900;
-        }
-
-        .clear-btn {
-            display: inline-flex;
-            align-items: center;
-            padding: 12px;
-            border:
-                1px solid #dbeafe;
-            border-radius: 12px;
-            background: white;
-            color: #64748b;
-            text-decoration: none;
-            font-size: 9px;
-            font-weight: 900;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | FILTER TABS
-        |--------------------------------------------------------------------------
-        */
-
-        .filter-tabs {
-            display: flex;
-            gap: 7px;
-            padding: 0 22px 18px;
-            background: #fbfdff;
-        }
-
-        .filter-tab {
-            padding: 8px 12px;
-            border:
-                1px solid #dbeafe;
-            border-radius: 999px;
-            background: white;
-            color: #64748b;
-            text-decoration: none;
-            font-size: 8px;
-            font-weight: 900;
-            transition: .2s ease;
-        }
-
-        .filter-tab:hover {
-            border-color:
-                #93c5fd;
-            color: #2563eb;
-        }
-
-        .filter-tab.active {
-            border-color:
-                #2563eb;
-            background:
-                #2563eb;
-            color: white;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | TABLE
-        |--------------------------------------------------------------------------
-        */
-
-        .table-wrap {
-            overflow-x: auto;
-        }
-
-        .inventory-table {
-            width: 100%;
-            min-width: 850px;
-            border-collapse: collapse;
-        }
-
-        .inventory-table th {
-            padding:
-                13px 16px;
-            border-bottom:
-                1px solid #e2e8f0;
-            background: #f8fbff;
-            color: #64748b;
-            font-size: 8px;
-            font-weight: 950;
-            text-align: left;
-            text-transform: uppercase;
-            letter-spacing: .4px;
-        }
-
-        .inventory-table td {
-            padding:
-                14px 16px;
-            border-bottom:
-                1px solid #f1f5f9;
-            color: #334155;
-            font-size: 9px;
-            vertical-align: middle;
-        }
-
-        .inventory-table tbody tr {
-            transition: .15s ease;
-        }
-
-        .inventory-table tbody tr:hover {
-            background:
-                #f8fbff;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | PRODUCT
-        |--------------------------------------------------------------------------
-        */
-
-        .product-cell {
-            display: flex;
-            align-items: center;
-            gap: 11px;
-            min-width: 220px;
-        }
-
-        .product-image {
-            width: 48px;
-            height: 48px;
-            flex-shrink: 0;
-            overflow: hidden;
-            border-radius: 12px;
-            border:
-                1px solid #dbeafe;
-            background:
-                #eff6ff;
-        }
-
-        .product-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .product-info strong {
-            display: block;
-            margin-bottom: 4px;
-            color: #0f172a;
-            font-size: 10px;
-            font-weight: 950;
-        }
-
-        .product-info span {
-            color: #94a3b8;
-            font-size: 8px;
-        }
-
-        .price {
-            color: #1d4ed8;
-            font-weight: 950;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | STOCK
-        |--------------------------------------------------------------------------
-        */
-
-        .stock-number {
-            color: #0f172a;
-            font-size: 14px;
-            font-weight: 950;
-        }
-
-        .stock-badge {
-            display: inline-block;
-            margin-top: 4px;
-            padding: 5px 8px;
-            border-radius: 999px;
-            font-size: 7px;
-            font-weight: 950;
-            text-transform: uppercase;
-        }
-
-        .stock-badge.available {
-            background:
-                #dcfce7;
-            color:
-                #166534;
-        }
-
-        .stock-badge.low {
-            background:
-                #fef3c7;
-            color:
-                #92400e;
-        }
-
-        .stock-badge.out {
-            background:
-                #fee2e2;
-            color:
-                #991b1b;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | STOCK BAR
-        |--------------------------------------------------------------------------
-        */
-
-        .stock-progress {
-            width: 100px;
-            height: 6px;
-            overflow: hidden;
-            margin-top: 7px;
-            border-radius: 999px;
-            background:
-                #e2e8f0;
-        }
-
-        .stock-progress span {
-            display: block;
-            height: 100%;
-            border-radius: 999px;
-        }
-
-        .progress-good {
-            background:
-                #22c55e;
-        }
-
-        .progress-low {
-            background:
-                #f59e0b;
-        }
-
-        .progress-out {
-            background:
-                #ef4444;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | EMPTY
-        |--------------------------------------------------------------------------
-        */
-
-        .empty-state {
-            padding: 60px 20px;
-            text-align: center;
-        }
-
-        .empty-icon {
-            margin-bottom: 12px;
-            font-size: 38px;
-        }
-
-        .empty-state strong {
-            display: block;
-            margin-bottom: 6px;
-            color: #334155;
-            font-size: 12px;
-            font-weight: 950;
-        }
-
-        .empty-state span {
-            color: #94a3b8;
-            font-size: 9px;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | RESPONSIVE
-        |--------------------------------------------------------------------------
-        */
-
-        @media (max-width: 1050px) {
-
-            .summary-grid {
-                grid-template-columns:
-                    repeat(2, 1fr);
-            }
-
-        }
-
-        @media (max-width: 700px) {
-
-            .inventory-page {
-                padding: 25px 15px;
-            }
-
-            .inventory-hero {
-                padding: 25px 20px;
-            }
-
-            .summary-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .panel-top {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-
-            .filter-area {
-                align-items: stretch;
-                flex-direction: column;
-            }
-
-            .search-form {
-                max-width: none;
-            }
-
-            .filter-tabs {
-                overflow-x: auto;
-            }
-
-        }
-
-    </style>
+    <link rel="stylesheet"
+          href="../css/admin.css">
 
 </head>
 
 <body>
 
-<?php
-require_once dirname(__DIR__) . '/includes/navbar.php';
-?>
+<div class="admin-layout">
 
-<main class="inventory-page">
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
 
-    <div class="inventory-container">
+    <aside class="admin-sidebar">
 
-        <!-- HERO -->
+        <div class="admin-logo">
+            <h2>Hochipo<span>Hub</span></h2>
+            <p>ADMIN PANEL</p>
+        </div>
 
-        <section class="inventory-hero">
+        <nav>
 
-            <div class="hero-content">
+            <a href="dashboard.php">
+                Dashboard
+            </a>
 
-                <div class="hero-kicker">
-                    HochipoHub Admin
-                </div>
+            <a href="products.php">
+                Products
+            </a>
 
-                <h1>
-                    Inventory Control
-                </h1>
+            <a href="users.php">
+                Users
+            </a>
+
+            <a href="vendors.php">
+                Vendors
+            </a>
+
+            <a href="orders.php"
+               class="active">
+                Orders
+            </a>
+
+            <a href="payments.php">
+                Payments
+            </a>
+
+            <a href="commission.php">
+                Commission
+            </a>
+
+            <a href="reviews.php">
+                Reviews
+            </a>
+
+            <a href="settings.php">
+                Settings
+            </a>
+
+        </nav>
+
+        <div class="admin-sidebar-bottom">
+
+            <a href="../auth/logout.php">
+                Logout
+            </a>
+
+        </div>
+
+    </aside>
+
+
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
+
+    <main class="admin-main">
+
+        <header class="admin-header">
+
+            <div>
+
+                <h1>Orders</h1>
 
                 <p>
-                    Monitor product stock across
-                    the marketplace and quickly
-                    identify products that need
-                    attention.
+                    Manage and monitor customer orders.
                 </p>
 
             </div>
 
+        </header>
+
+
+        <!-- =================================================
+             MESSAGE
+        ================================================== -->
+
+        <?php if ($message): ?>
+
+            <div class="admin-alert success">
+                <?= e($message) ?>
+            </div>
+
+        <?php endif; ?>
+
+
+        <?php if ($error): ?>
+
+            <div class="admin-alert error">
+                <?= e($error) ?>
+            </div>
+
+        <?php endif; ?>
+
+
+        <!-- =================================================
+             STATISTICS
+        ================================================== -->
+
+        <section class="admin-stats">
+
+            <div class="stat-card">
+
+                <span>Total Orders</span>
+
+                <strong>
+                    <?= $total_orders ?>
+                </strong>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <span>Pending</span>
+
+                <strong>
+                    <?= $pending_orders ?>
+                </strong>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <span>Processing</span>
+
+                <strong>
+                    <?= $processing_orders ?>
+                </strong>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <span>Completed</span>
+
+                <strong>
+                    <?= $completed_orders ?>
+                </strong>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <span>Cancelled</span>
+
+                <strong>
+                    <?= $cancelled_orders ?>
+                </strong>
+
+            </div>
+
         </section>
 
 
-        <!-- SUMMARY -->
+        <!-- =================================================
+             ORDER DETAILS
+        ================================================== -->
 
-        <section class="summary-grid">
+        <?php if ($selected_order): ?>
 
-            <div class="summary-card">
+            <section class="admin-card">
 
-                <div class="summary-label">
-                    Total Products
-                </div>
+                <div class="card-header">
 
-                <div class="summary-value blue">
-                    <?= number_format(
-                        $totalProducts
-                    ) ?>
-                </div>
+                    <div>
 
-                <div class="summary-note">
-                    Active marketplace products
-                </div>
+                        <h2>
+                            Order #<?= e($selected_order['order_id']) ?>
+                        </h2>
 
-            </div>
+                        <p>
+                            <?= e($selected_order['order_date']) ?>
+                        </p>
 
-
-            <div class="summary-card">
-
-                <div class="summary-label">
-                    Total Stock
-                </div>
-
-                <div class="summary-value">
-                    <?= number_format(
-                        $totalStock
-                    ) ?>
-                </div>
-
-                <div class="summary-note">
-                    Units currently listed
-                </div>
-
-            </div>
-
-
-            <div class="summary-card">
-
-                <div class="summary-label">
-                    Low Stock
-                </div>
-
-                <div class="summary-value orange">
-                    <?= number_format(
-                        $lowStock
-                    ) ?>
-                </div>
-
-                <div class="summary-note">
-                    1–10 units remaining
-                </div>
-
-            </div>
-
-
-            <div class="summary-card">
-
-                <div class="summary-label">
-                    Out of Stock
-                </div>
-
-                <div class="summary-value red">
-                    <?= number_format(
-                        $outOfStock
-                    ) ?>
-                </div>
-
-                <div class="summary-note">
-                    Products requiring restock
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- INVENTORY -->
-
-        <section class="inventory-panel">
-
-            <div class="panel-top">
-
-                <div class="panel-title">
-
-                    <h2>
-                        Product Inventory
-                    </h2>
-
-                    <p>
-                        Manage and monitor
-                        marketplace stock levels.
-                    </p>
-
-                </div>
-
-            </div>
-
-
-            <!-- SEARCH -->
-
-            <div class="filter-area">
-
-                <form
-                    method="GET"
-                    class="search-form"
-                >
-
-                    <input
-                        type="text"
-                        name="search"
-                        class="search-input"
-                        placeholder="Search product..."
-                        value="<?= e(
-                            $search
-                        ) ?>"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="stock"
-                        value="<?= e(
-                            $stockFilter
-                        ) ?>"
-                    >
-
-                    <button
-                        type="submit"
-                        class="search-btn"
-                    >
-                        SEARCH
-                    </button>
-
-                </form>
-
-
-                <?php if (
-                    $search !== ''
-                ): ?>
-
-                    <a
-                        href="<?= BASE_URL ?>admin/inventory.php"
-                        class="clear-btn"
-                    >
-                        Clear
-                    </a>
-
-                <?php endif; ?>
-
-            </div>
-
-
-            <!-- FILTERS -->
-
-            <div class="filter-tabs">
-
-                <a
-                    href="?stock=all<?= $currentQuery ?>"
-                    class="filter-tab
-                    <?= $stockFilter === 'all'
-                        ? 'active'
-                        : '' ?>"
-                >
-                    All Products
-                </a>
-
-                <a
-                    href="?stock=available<?= $currentQuery ?>"
-                    class="filter-tab
-                    <?= $stockFilter === 'available'
-                        ? 'active'
-                        : '' ?>"
-                >
-                    Available
-                </a>
-
-                <a
-                    href="?stock=low<?= $currentQuery ?>"
-                    class="filter-tab
-                    <?= $stockFilter === 'low'
-                        ? 'active'
-                        : '' ?>"
-                >
-                    Low Stock
-                </a>
-
-                <a
-                    href="?stock=out<?= $currentQuery ?>"
-                    class="filter-tab
-                    <?= $stockFilter === 'out'
-                        ? 'active'
-                        : '' ?>"
-                >
-                    Out of Stock
-                </a>
-
-            </div>
-
-
-            <?php if (
-                isset($inventoryError)
-                &&
-                $inventoryError !== ''
-            ): ?>
-
-                <div
-                    style="
-                        margin:20px;
-                        padding:15px;
-                        border-radius:12px;
-                        background:#fef2f2;
-                        border:1px solid #fecaca;
-                        color:#991b1b;
-                        font-size:10px;
-                    "
-                >
-                    <?= e(
-                        $inventoryError
-                    ) ?>
-                </div>
-
-            <?php endif; ?>
-
-
-            <?php if (
-                empty($products)
-            ): ?>
-
-                <div class="empty-state">
-
-                    <div class="empty-icon">
-                        📦
                     </div>
 
-                    <strong>
-                        No products found
-                    </strong>
-
-                    <span>
-                        There are no products matching
-                        the current inventory filter.
-                    </span>
+                    <a href="orders.php"
+                       class="admin-btn secondary">
+                        Back
+                    </a>
 
                 </div>
 
-            <?php else: ?>
 
-                <div class="table-wrap">
+                <div class="order-info-grid">
 
-                    <table
-                        class="inventory-table"
-                    >
+                    <div>
+
+                        <h3>Customer</h3>
+
+                        <p>
+                            <?= e($selected_order['customer_name']) ?>
+                        </p>
+
+                        <p>
+                            <?= e($selected_order['customer_email']) ?>
+                        </p>
+
+                        <p>
+                            <?= e($selected_order['customer_phone']) ?>
+                        </p>
+
+                    </div>
+
+
+                    <div>
+
+                        <h3>Delivery</h3>
+
+                        <p>
+                            <?= e($selected_order['delivery_method']) ?>
+                        </p>
+
+                        <?php if (!empty($selected_order['delivery_address'])): ?>
+
+                            <p>
+                                <?= nl2br(
+                                    e($selected_order['delivery_address'])
+                                ) ?>
+                            </p>
+
+                        <?php endif; ?>
+
+                    </div>
+
+
+                    <div>
+
+                        <h3>Order Status</h3>
+
+                        <span class="status-badge">
+                            <?= e($selected_order['order_status']) ?>
+                        </span>
+
+                    </div>
+
+
+                    <div>
+
+                        <h3>Total</h3>
+
+                        <strong>
+                            <?= money($selected_order['total_amount']) ?>
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ORDER ITEMS -->
+
+                <h3 class="section-title">
+                    Order Items
+                </h3>
+
+                <div class="admin-table-wrapper">
+
+                    <table class="admin-table">
 
                         <thead>
 
-                            <tr>
+                        <tr>
 
-                                <th>
-                                    Product
-                                </th>
+                            <th>Product</th>
 
-                                <th>
-                                    Price
-                                </th>
+                            <th>Vendor</th>
 
-                                <th>
-                                    Stock
-                                </th>
+                            <th>Quantity</th>
 
-                                <th>
-                                    Stock Level
-                                </th>
+                            <th>Unit Price</th>
 
-                                <th>
-                                    Status
-                                </th>
+                            <th>Subtotal</th>
 
-                            </tr>
+                        </tr>
 
                         </thead>
 
                         <tbody>
 
-                            <?php foreach (
-                                $products
-                                as $product
-                            ): ?>
+                        <?php if (empty($order_items)): ?>
 
-                                <?php
+                            <tr>
 
-                                $stock =
-                                    (int) (
-                                        $product['stock']
-                                        ?? 0
-                                    );
+                                <td colspan="5">
+                                    No order items found.
+                                </td>
 
-                                $price =
-                                    (float) (
-                                        $product['price']
-                                        ?? 0
-                                    );
+                            </tr>
 
-                                /*
-                                |--------------------------------------------------------------------------
-                                | Product image
-                                |--------------------------------------------------------------------------
-                                */
+                        <?php else: ?>
 
-                                $image =
-                                    $product['image']
-                                    ?? $product[
-                                        'product_image'
-                                    ]
-                                    ?? '';
-
-                                $imageUrl =
-                                    productImageUrl(
-                                        $image
-                                    );
-
-                                /*
-                                |--------------------------------------------------------------------------
-                                | Stock status
-                                |--------------------------------------------------------------------------
-                                */
-
-                                if (
-                                    $stock <= 0
-                                ) {
-
-                                    $stockStatus =
-                                        'out';
-
-                                    $stockLabel =
-                                        'Out of Stock';
-
-                                } elseif (
-                                    $stock <= 10
-                                ) {
-
-                                    $stockStatus =
-                                        'low';
-
-                                    $stockLabel =
-                                        'Low Stock';
-
-                                } else {
-
-                                    $stockStatus =
-                                        'available';
-
-                                    $stockLabel =
-                                        'Available';
-                                }
-
-                                /*
-                                |--------------------------------------------------------------------------
-                                | Progress
-                                |--------------------------------------------------------------------------
-                                */
-
-                                $progress =
-                                    min(
-                                        100,
-                                        max(
-                                            4,
-                                            $stock
-                                        )
-                                    );
-
-                                ?>
+                            <?php foreach ($order_items as $item): ?>
 
                                 <tr>
 
-                                    <!-- PRODUCT -->
-
                                     <td>
-
-                                        <div
-                                            class="product-cell"
-                                        >
-
-                                            <div
-                                                class="product-image"
-                                            >
-
-                                                <img
-                                                    src="<?= e(
-                                                        $imageUrl
-                                                    ) ?>"
-                                                    alt="<?= e(
-                                                        $product[
-                                                            'product_name'
-                                                        ]
-                                                        ?? 'Product'
-                                                    ) ?>"
-                                                    onerror="
-                                                        this.src='<?= e(
-                                                            productImageUrl(
-                                                                ''
-                                                            )
-                                                        ) ?>';
-                                                    "
-                                                >
-
-                                            </div>
-
-
-                                            <div
-                                                class="product-info"
-                                            >
-
-                                                <strong>
-                                                    <?= e(
-                                                        $product[
-                                                            'product_name'
-                                                        ]
-                                                        ?? 'Unnamed Product'
-                                                    ) ?>
-                                                </strong>
-
-                                                <span>
-                                                    Product ID:
-                                                    #<?= e(
-                                                        $product[
-                                                            'product_id'
-                                                        ]
-                                                        ?? '-'
-                                                    ) ?>
-                                                </span>
-
-                                            </div>
-
-                                        </div>
-
+                                        <?= e(
+                                            $item['product_name']
+                                        ) ?>
                                     </td>
 
-
-                                    <!-- PRICE -->
-
                                     <td>
-
-                                        <span
-                                            class="price"
-                                        >
-                                            <?= formatPrice(
-                                                $price
-                                            ) ?>
-                                        </span>
-
+                                        <?= e(
+                                            $item['business_name']
+                                        ) ?>
                                     </td>
 
-
-                                    <!-- STOCK NUMBER -->
-
                                     <td>
-
-                                        <div
-                                            class="stock-number"
-                                        >
-                                            <?= number_format(
-                                                $stock
-                                            ) ?>
-                                        </div>
-
+                                        <?= e(
+                                            $item['quantity']
+                                        ) ?>
                                     </td>
 
-
-                                    <!-- PROGRESS -->
-
                                     <td>
-
-                                        <div
-                                            class="stock-progress"
-                                        >
-
-                                            <span
-                                                class="progress-<?= e(
-                                                    $stockStatus
-                                                ) ?>"
-                                                style="
-                                                    width:
-                                                    <?= $progress ?>%;
-                                                "
-                                            ></span>
-
-                                        </div>
-
+                                        <?= money(
+                                            $item['unit_price']
+                                        ) ?>
                                     </td>
 
-
-                                    <!-- STATUS -->
-
                                     <td>
-
-                                        <span
-                                            class="stock-badge
-                                            <?= e(
-                                                $stockStatus
-                                            ) ?>"
-                                        >
-                                            <?= e(
-                                                $stockLabel
-                                            ) ?>
-                                        </span>
-
+                                        <?= money(
+                                            $item['subtotal']
+                                        ) ?>
                                     </td>
 
                                 </tr>
 
                             <?php endforeach; ?>
+
+                        <?php endif; ?>
 
                         </tbody>
 
@@ -1406,17 +794,317 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
                 </div>
 
-            <?php endif; ?>
+
+                <!-- VENDOR ORDERS -->
+
+                <h3 class="section-title">
+                    Vendor Sub-orders
+                </h3>
+
+                <div class="admin-table-wrapper">
+
+                    <table class="admin-table">
+
+                        <thead>
+
+                        <tr>
+
+                            <th>Vendor</th>
+
+                            <th>Subtotal</th>
+
+                            <th>Delivery Fee</th>
+
+                            <th>Status</th>
+
+                            <th>Tracking</th>
+
+                        </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                        <?php if (empty($vendor_orders)): ?>
+
+                            <tr>
+
+                                <td colspan="5">
+                                    No vendor orders found.
+                                </td>
+
+                            </tr>
+
+                        <?php else: ?>
+
+                            <?php foreach ($vendor_orders as $vo): ?>
+
+                                <tr>
+
+                                    <td>
+                                        <?= e(
+                                            $vo['business_name']
+                                        ) ?>
+                                    </td>
+
+                                    <td>
+                                        <?= money(
+                                            $vo['subtotal']
+                                        ) ?>
+                                    </td>
+
+                                    <td>
+                                        <?= money(
+                                            $vo['delivery_fee']
+                                        ) ?>
+                                    </td>
+
+                                    <td>
+                                        <span class="status-badge">
+                                            <?= e(
+                                                $vo['vendor_status']
+                                            ) ?>
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <?= e(
+                                            $vo['tracking_number']
+                                                ?: '-'
+                                        ) ?>
+                                    </td>
+
+                                </tr>
+
+                            <?php endforeach; ?>
+
+                        <?php endif; ?>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        <?php endif; ?>
+
+
+        <!-- =================================================
+             ALL ORDERS
+        ================================================== -->
+
+        <section class="admin-card">
+
+            <div class="card-header">
+
+                <div>
+
+                    <h2>All Orders</h2>
+
+                    <p>
+                        Customer orders and payment information.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="admin-table-wrapper">
+
+                <table class="admin-table">
+
+                    <thead>
+
+                    <tr>
+
+                        <th>Order ID</th>
+
+                        <th>Customer</th>
+
+                        <th>Date</th>
+
+                        <th>Items</th>
+
+                        <th>Vendors</th>
+
+                        <th>Total</th>
+
+                        <th>Payment</th>
+
+                        <th>Status</th>
+
+                        <th>Action</th>
+
+                    </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                    <?php if (empty($orders)): ?>
+
+                        <tr>
+
+                            <td colspan="9">
+                                No orders found.
+                            </td>
+
+                        </tr>
+
+                    <?php else: ?>
+
+                        <?php foreach ($orders as $order): ?>
+
+                            <tr>
+
+                                <td>
+                                    #<?= e(
+                                        $order['order_id']
+                                    ) ?>
+                                </td>
+
+
+                                <td>
+
+                                    <strong>
+                                        <?= e(
+                                            $order['customer_name']
+                                        ) ?>
+                                    </strong>
+
+                                    <small>
+                                        <?= e(
+                                            $order['customer_email']
+                                        ) ?>
+                                    </small>
+
+                                </td>
+
+
+                                <td>
+                                    <?= e(
+                                        $order['order_date']
+                                    ) ?>
+                                </td>
+
+
+                                <td>
+                                    <?= e(
+                                        $order['total_items']
+                                    ) ?>
+                                </td>
+
+
+                                <td>
+                                    <?= e(
+                                        $order['vendor_count']
+                                    ) ?>
+                                </td>
+
+
+                                <td>
+                                    <strong>
+                                        <?= money(
+                                            $order['total_amount']
+                                        ) ?>
+                                    </strong>
+                                </td>
+
+
+                                <td>
+
+                                    <span class="status-badge">
+
+                                        <?= e(
+                                            $order['payment_status']
+                                        ) ?>
+
+                                    </span>
+
+                                </td>
+
+
+                                <td>
+
+                                    <form method="POST">
+
+                                        <input type="hidden"
+                                               name="order_id"
+                                               value="<?= e(
+                                                   $order['order_id']
+                                               ) ?>">
+
+                                        <select name="order_status"
+                                                onchange="this.form.submit()">
+
+                                            <?php
+                                            foreach (
+                                                [
+                                                    'Pending',
+                                                    'Processing',
+                                                    'Completed',
+                                                    'Cancelled'
+                                                ] as $status
+                                            ):
+                                            ?>
+
+                                                <option
+                                                    value="<?= e($status) ?>"
+                                                    <?= $order['order_status'] === $status
+                                                        ? 'selected'
+                                                        : '' ?>>
+
+                                                    <?= e($status) ?>
+
+                                                </option>
+
+                                            <?php endforeach; ?>
+
+                                        </select>
+
+                                        <input type="hidden"
+                                               name="update_status"
+                                               value="1">
+
+                                    </form>
+
+                                </td>
+
+
+                                <td>
+
+                                    <a href="orders.php?view=<?= e(
+                                        $order['order_id']
+                                    ) ?>"
+                                       class="admin-btn small">
+
+                                        View
+
+                                    </a>
+
+                                </td>
+
+                            </tr>
+
+                        <?php endforeach; ?>
+
+                    <?php endif; ?>
+
+                    </tbody>
+
+                </table>
+
+            </div>
 
         </section>
 
-    </div>
+    </main>
 
-</main>
-
-<?php
-require_once dirname(__DIR__) . '/includes/footer.php';
-?>
+</div>
 
 </body>
 
