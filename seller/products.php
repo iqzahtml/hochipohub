@@ -1,4 +1,5 @@
 <?php
+
 require_once '../database/db.php';
 require_once '../includes/session.php';
 
@@ -11,19 +12,24 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'vendor') {
+if (
+    !isset($_SESSION['role']) ||
+    $_SESSION['role'] !== 'vendor'
+) {
     header("Location: ../dashboard.php");
     exit;
 }
 
 $user_id = (int) $_SESSION['user_id'];
 
+
 /*
 |--------------------------------------------------------------------------
 | GET VENDOR
 |--------------------------------------------------------------------------
 */
-$stmt = $conn->prepare("
+
+$stmt = $db->prepare("
     SELECT
         vendor_id,
         business_name,
@@ -33,13 +39,9 @@ $stmt = $conn->prepare("
     LIMIT 1
 ");
 
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
+$stmt->execute([$user_id]);
 
-$result = $stmt->get_result();
-$vendor = $result->fetch_assoc();
-
-$stmt->close();
+$vendor = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$vendor) {
     header("Location: setup_profile.php");
@@ -48,11 +50,13 @@ if (!$vendor) {
 
 $vendor_id = (int) $vendor['vendor_id'];
 
+
 /*
 |--------------------------------------------------------------------------
 | SEARCH
 |--------------------------------------------------------------------------
 */
+
 $search = trim($_GET['search'] ?? '');
 
 $status_filter = trim($_GET['status'] ?? '');
@@ -70,199 +74,113 @@ if (
     $status_filter = '';
 }
 
+
 /*
 |--------------------------------------------------------------------------
 | PRODUCTS QUERY
 |--------------------------------------------------------------------------
 */
+
 $products = [];
 
-if ($search !== '' && $status_filter !== '') {
+$sql = "
+    SELECT
+        p.product_id,
+        p.product_name,
+        p.description,
+        p.price,
+        p.stock_quantity,
+        p.image,
+        p.status,
+        p.created_at,
+        p.updated_at,
 
-    $search_value = '%' . $search . '%';
+        c.category_name,
 
-    $stmt = $conn->prepare("
-        SELECT
-            p.product_id,
-            p.product_name,
-            p.description,
-            p.price,
-            p.stock_quantity,
-            p.image,
-            p.status,
-            p.created_at,
-            p.updated_at,
+        COALESCE(
+            i.quantity,
+            p.stock_quantity
+        ) AS inventory_quantity
 
-            c.category_name,
+    FROM products p
 
-            COALESCE(i.quantity, p.stock_quantity) AS inventory_quantity
+    INNER JOIN categories c
+        ON p.category_id = c.category_id
 
-        FROM products p
+    LEFT JOIN inventory i
+        ON p.product_id = i.product_id
 
-        INNER JOIN categories c
-            ON p.category_id = c.category_id
+    WHERE p.vendor_id = ?
+";
 
-        LEFT JOIN inventory i
-            ON p.product_id = i.product_id
+$params = [$vendor_id];
 
-        WHERE p.vendor_id = ?
 
-        AND p.status = ?
+/*
+|--------------------------------------------------------------------------
+| SEARCH FILTER
+|--------------------------------------------------------------------------
+*/
 
+if ($search !== '') {
+
+    $sql .= "
         AND (
             p.product_name LIKE ?
             OR p.description LIKE ?
         )
-
-        ORDER BY p.created_at DESC
-    ");
-
-    $stmt->bind_param(
-        "isss",
-        $vendor_id,
-        $status_filter,
-        $search_value,
-        $search_value
-    );
-
-} elseif ($search !== '') {
+    ";
 
     $search_value = '%' . $search . '%';
 
-    $stmt = $conn->prepare("
-        SELECT
-            p.product_id,
-            p.product_name,
-            p.description,
-            p.price,
-            p.stock_quantity,
-            p.image,
-            p.status,
-            p.created_at,
-            p.updated_at,
+    $params[] = $search_value;
+    $params[] = $search_value;
+}
 
-            c.category_name,
 
-            COALESCE(i.quantity, p.stock_quantity) AS inventory_quantity
+/*
+|--------------------------------------------------------------------------
+| STATUS FILTER
+|--------------------------------------------------------------------------
+*/
 
-        FROM products p
+if ($status_filter !== '') {
 
-        INNER JOIN categories c
-            ON p.category_id = c.category_id
-
-        LEFT JOIN inventory i
-            ON p.product_id = i.product_id
-
-        WHERE p.vendor_id = ?
-
-        AND (
-            p.product_name LIKE ?
-            OR p.description LIKE ?
-        )
-
-        ORDER BY p.created_at DESC
-    ");
-
-    $stmt->bind_param(
-        "iss",
-        $vendor_id,
-        $search_value,
-        $search_value
-    );
-
-} elseif ($status_filter !== '') {
-
-    $stmt = $conn->prepare("
-        SELECT
-            p.product_id,
-            p.product_name,
-            p.description,
-            p.price,
-            p.stock_quantity,
-            p.image,
-            p.status,
-            p.created_at,
-            p.updated_at,
-
-            c.category_name,
-
-            COALESCE(i.quantity, p.stock_quantity) AS inventory_quantity
-
-        FROM products p
-
-        INNER JOIN categories c
-            ON p.category_id = c.category_id
-
-        LEFT JOIN inventory i
-            ON p.product_id = i.product_id
-
-        WHERE p.vendor_id = ?
-
+    $sql .= "
         AND p.status = ?
+    ";
 
-        ORDER BY p.created_at DESC
-    ");
-
-    $stmt->bind_param(
-        "is",
-        $vendor_id,
-        $status_filter
-    );
-
-} else {
-
-    $stmt = $conn->prepare("
-        SELECT
-            p.product_id,
-            p.product_name,
-            p.description,
-            p.price,
-            p.stock_quantity,
-            p.image,
-            p.status,
-            p.created_at,
-            p.updated_at,
-
-            c.category_name,
-
-            COALESCE(i.quantity, p.stock_quantity) AS inventory_quantity
-
-        FROM products p
-
-        INNER JOIN categories c
-            ON p.category_id = c.category_id
-
-        LEFT JOIN inventory i
-            ON p.product_id = i.product_id
-
-        WHERE p.vendor_id = ?
-
-        ORDER BY p.created_at DESC
-    ");
-
-    $stmt->bind_param(
-        "i",
-        $vendor_id
-    );
+    $params[] = $status_filter;
 }
 
-$stmt->execute();
 
-$result = $stmt->get_result();
+/*
+|--------------------------------------------------------------------------
+| ORDER
+|--------------------------------------------------------------------------
+*/
 
-while ($row = $result->fetch_assoc()) {
-    $products[] = $row;
-}
+$sql .= "
+    ORDER BY p.created_at DESC
+";
 
-$stmt->close();
+
+$stmt = $db->prepare($sql);
+
+$stmt->execute($params);
+
+$products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 
 /*
 |--------------------------------------------------------------------------
 | PRODUCT COUNTS
 |--------------------------------------------------------------------------
 */
-$count_stmt = $conn->prepare("
+
+$count_stmt = $db->prepare("
     SELECT
+
         COUNT(*) AS total_products,
 
         SUM(
@@ -294,20 +212,13 @@ $count_stmt = $conn->prepare("
     WHERE vendor_id = ?
 ");
 
-$count_stmt->bind_param(
-    "i",
-    $vendor_id
-);
+$count_stmt->execute([$vendor_id]);
 
-$count_stmt->execute();
-
-$count_result = $count_stmt->get_result();
-$counts = $count_result->fetch_assoc();
-
-$count_stmt->close();
+$counts = $count_stmt->fetch(PDO::FETCH_ASSOC);
 
 ?>
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
@@ -319,7 +230,9 @@ $count_stmt->close();
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>My Products | Seller | HochipoHub</title>
+    <title>
+        My Products | Seller | HochipoHub
+    </title>
 
     <link
         rel="stylesheet"
@@ -465,43 +378,46 @@ $count_stmt->close();
                 <span>Total Products</span>
 
                 <strong>
-                    <?= (int)(
+                    <?= (int) (
                         $counts['total_products'] ?? 0
                     ) ?>
                 </strong>
 
             </div>
 
+
             <div class="stat-card">
 
                 <span>Available</span>
 
                 <strong>
-                    <?= (int)(
+                    <?= (int) (
                         $counts['available_products'] ?? 0
                     ) ?>
                 </strong>
 
             </div>
 
+
             <div class="stat-card">
 
                 <span>Out of Stock</span>
 
                 <strong>
-                    <?= (int)(
+                    <?= (int) (
                         $counts['out_of_stock'] ?? 0
                     ) ?>
                 </strong>
 
             </div>
 
+
             <div class="stat-card">
 
                 <span>Hidden</span>
 
                 <strong>
-                    <?= (int)(
+                    <?= (int) (
                         $counts['hidden_products'] ?? 0
                     ) ?>
                 </strong>
@@ -591,8 +507,12 @@ $count_stmt->close();
                             <?php if (!empty($product['image'])): ?>
 
                                 <img
-                                    src="../uploads/products/<?= htmlspecialchars($product['image']) ?>"
-                                    alt="<?= htmlspecialchars($product['product_name']) ?>"
+                                    src="../uploads/products/<?= htmlspecialchars(
+                                        $product['image']
+                                    ) ?>"
+                                    alt="<?= htmlspecialchars(
+                                        $product['product_name']
+                                    ) ?>"
                                 >
 
                             <?php else: ?>
@@ -644,7 +564,7 @@ $count_stmt->close();
 
                                 RM
                                 <?= number_format(
-                                    (float)$product['price'],
+                                    (float) $product['price'],
                                     2
                                 ) ?>
 
@@ -656,8 +576,8 @@ $count_stmt->close();
                                 Stock:
 
                                 <strong>
-                                    <?= (int)(
-                                        $product['inventory_quantity']
+                                    <?= (int) (
+                                        $product['inventory_quantity'] ?? 0
                                     ) ?>
                                 </strong>
 
@@ -676,14 +596,14 @@ $count_stmt->close();
                             <div class="product-actions">
 
                                 <a
-                                    href="edit_product.php?id=<?= (int)$product['product_id'] ?>"
+                                    href="edit_product.php?id=<?= (int) $product['product_id'] ?>"
                                     class="btn btn-primary"
                                 >
                                     Edit
                                 </a>
 
                                 <a
-                                    href="delete_product.php?id=<?= (int)$product['product_id'] ?>"
+                                    href="delete_product.php?id=<?= (int) $product['product_id'] ?>"
                                     class="btn btn-danger"
                                     onclick="return confirm('Are you sure you want to delete this product?');"
                                 >
@@ -700,6 +620,7 @@ $count_stmt->close();
 
             </div>
 
+
         <?php endif; ?>
 
     </main>
@@ -709,4 +630,5 @@ $count_stmt->close();
 <?php include '../includes/footer.php'; ?>
 
 </body>
+
 </html>
