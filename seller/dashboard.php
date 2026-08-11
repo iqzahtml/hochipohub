@@ -1,4 +1,5 @@
 <?php
+
 /**
  * =========================================================
  * HOCHIPOHUB
@@ -15,7 +16,7 @@ require_once __DIR__ . '/../includes/functions.php';
 
 /*
 |--------------------------------------------------------------------------
-| Security - Vendor Only
+| SECURITY - VENDOR ONLY
 |--------------------------------------------------------------------------
 */
 
@@ -24,36 +25,62 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| CHECK LOGIN
+|--------------------------------------------------------------------------
+*/
+
 if (!isset($_SESSION['user_id'])) {
 
-    header("Location: ../index.php");
+    header('Location: ../index.php');
     exit;
-
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| CHECK VENDOR ROLE
+|--------------------------------------------------------------------------
+*/
 
 if (
     !isset($_SESSION['role']) ||
     $_SESSION['role'] !== 'vendor'
 ) {
 
-    header("Location: ../dashboard.php");
+    header('Location: ../dashboard.php');
     exit;
-
 }
 
 
-$userId =
-    (int) $_SESSION['user_id'];
+$userId = (int) $_SESSION['user_id'];
 
 
 /*
 |--------------------------------------------------------------------------
-| Get Vendor
+| DATABASE
+|--------------------------------------------------------------------------
+|
+| database/db.php already creates:
+|
+| $db = getDB();
+|
+*/
+
+if (!isset($db) || !($db instanceof PDO)) {
+
+    die('Database connection is not available.');
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET VENDOR
 |--------------------------------------------------------------------------
 */
 
-$vendorStmt = $conn->prepare("
+$vendorStmt = $db->prepare("
     SELECT
         v.vendor_id,
         v.business_name,
@@ -67,6 +94,7 @@ $vendorStmt = $conn->prepare("
         u.name,
         u.email,
         u.phone
+
     FROM vendors v
 
     INNER JOIN users u
@@ -77,50 +105,40 @@ $vendorStmt = $conn->prepare("
     LIMIT 1
 ");
 
-$vendorStmt->bind_param(
-    "i",
+$vendorStmt->execute([
     $userId
-);
+]);
 
-$vendorStmt->execute();
-
-$vendorResult =
-    $vendorStmt->get_result();
-
-$vendor =
-    $vendorResult->fetch_assoc();
-
-$vendorStmt->close();
+$vendor = $vendorStmt->fetch(PDO::FETCH_ASSOC);
 
 
 if (!$vendor) {
 
     die(
-        "Vendor profile not found. Please complete your vendor setup."
+        'Vendor profile not found. ' .
+        'Please make sure this user has a record in the vendors table.'
     );
-
 }
 
 
-$vendorId =
-    (int) $vendor['vendor_id'];
+$vendorId = (int) $vendor['vendor_id'];
 
 
 /*
 |--------------------------------------------------------------------------
-| Product Statistics
+| PRODUCT STATISTICS
 |--------------------------------------------------------------------------
 */
 
 $productStats = [
-    'total' => 0,
-    'available' => 0,
+    'total'        => 0,
+    'available'    => 0,
     'out_of_stock' => 0,
-    'hidden' => 0
+    'hidden'       => 0
 ];
 
 
-$productStatsStmt = $conn->prepare("
+$productStatsStmt = $db->prepare("
     SELECT
 
         COUNT(*) AS total,
@@ -154,57 +172,48 @@ $productStatsStmt = $conn->prepare("
     WHERE vendor_id = ?
 ");
 
-$productStatsStmt->bind_param(
-    "i",
+$productStatsStmt->execute([
     $vendorId
-);
-
-$productStatsStmt->execute();
-
-$productStatsResult =
-    $productStatsStmt->get_result();
+]);
 
 $productStatsData =
-    $productStatsResult->fetch_assoc();
-
-$productStatsStmt->close();
+    $productStatsStmt->fetch(PDO::FETCH_ASSOC);
 
 
 if ($productStatsData) {
 
     $productStats['total'] =
-        (int) $productStatsData['total'];
+        (int) ($productStatsData['total'] ?? 0);
 
     $productStats['available'] =
-        (int) $productStatsData['available'];
+        (int) ($productStatsData['available'] ?? 0);
 
     $productStats['out_of_stock'] =
-        (int) $productStatsData['out_of_stock'];
+        (int) ($productStatsData['out_of_stock'] ?? 0);
 
     $productStats['hidden'] =
-        (int) $productStatsData['hidden'];
-
+        (int) ($productStatsData['hidden'] ?? 0);
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Vendor Order Statistics
+| VENDOR ORDER STATISTICS
 |--------------------------------------------------------------------------
 */
 
 $orderStats = [
-    'total' => 0,
-    'pending' => 0,
-    'processing' => 0,
-    'ready' => 0,
-    'shipped' => 0,
+    'total'     => 0,
+    'pending'   => 0,
+    'processing'=> 0,
+    'ready'     => 0,
+    'shipped'   => 0,
     'completed' => 0,
     'cancelled' => 0
 ];
 
 
-$orderStatsStmt = $conn->prepare("
+$orderStatsStmt = $db->prepare("
     SELECT
 
         COUNT(*) AS total,
@@ -262,53 +271,53 @@ $orderStatsStmt = $conn->prepare("
     WHERE vendor_id = ?
 ");
 
-$orderStatsStmt->bind_param(
-    "i",
+$orderStatsStmt->execute([
     $vendorId
-);
-
-$orderStatsStmt->execute();
-
-$orderStatsResult =
-    $orderStatsStmt->get_result();
+]);
 
 $orderStatsData =
-    $orderStatsResult->fetch_assoc();
-
-$orderStatsStmt->close();
+    $orderStatsStmt->fetch(PDO::FETCH_ASSOC);
 
 
 if ($orderStatsData) {
 
-    foreach (
-        $orderStats as $key => $value
-    ) {
+    $orderStats['total'] =
+        (int) ($orderStatsData['total'] ?? 0);
 
-        $orderStats[$key] =
-            (int) (
-                $orderStatsData[$key]
-                ?? 0
-            );
+    $orderStats['pending'] =
+        (int) ($orderStatsData['pending'] ?? 0);
 
-    }
+    $orderStats['processing'] =
+        (int) ($orderStatsData['processing'] ?? 0);
 
+    $orderStats['ready'] =
+        (int) ($orderStatsData['ready'] ?? 0);
+
+    $orderStats['shipped'] =
+        (int) ($orderStatsData['shipped'] ?? 0);
+
+    $orderStats['completed'] =
+        (int) ($orderStatsData['completed'] ?? 0);
+
+    $orderStats['cancelled'] =
+        (int) ($orderStatsData['cancelled'] ?? 0);
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Sales Statistics
+| SALES STATISTICS
 |--------------------------------------------------------------------------
 */
 
 $salesStats = [
-    'total_sales' => 0,
+    'total_sales'     => 0,
     'completed_sales' => 0,
-    'pending_sales' => 0
+    'pending_sales'   => 0
 ];
 
 
-$salesStmt = $conn->prepare("
+$salesStmt = $db->prepare("
     SELECT
 
         COALESCE(
@@ -348,50 +357,41 @@ $salesStmt = $conn->prepare("
     WHERE vendor_id = ?
 ");
 
-$salesStmt->bind_param(
-    "i",
+$salesStmt->execute([
     $vendorId
-);
-
-$salesStmt->execute();
-
-$salesResult =
-    $salesStmt->get_result();
+]);
 
 $salesData =
-    $salesResult->fetch_assoc();
-
-$salesStmt->close();
+    $salesStmt->fetch(PDO::FETCH_ASSOC);
 
 
 if ($salesData) {
 
     $salesStats['total_sales'] =
-        (float) $salesData['total_sales'];
+        (float) ($salesData['total_sales'] ?? 0);
 
     $salesStats['completed_sales'] =
-        (float) $salesData['completed_sales'];
+        (float) ($salesData['completed_sales'] ?? 0);
 
     $salesStats['pending_sales'] =
-        (float) $salesData['pending_sales'];
-
+        (float) ($salesData['pending_sales'] ?? 0);
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Inventory Statistics
+| INVENTORY STATISTICS
 |--------------------------------------------------------------------------
 */
 
 $inventoryStats = [
-    'total_stock' => 0,
-    'low_stock' => 0,
-    'out_of_stock' => 0
+    'total_stock'   => 0,
+    'low_stock'     => 0,
+    'out_of_stock'  => 0
 ];
 
 
-$inventoryStmt = $conn->prepare("
+$inventoryStmt = $db->prepare("
     SELECT
 
         COALESCE(
@@ -399,20 +399,26 @@ $inventoryStmt = $conn->prepare("
             0
         ) AS total_stock,
 
-        SUM(
-            CASE
-                WHEN i.quantity BETWEEN 1 AND 5
-                THEN 1
-                ELSE 0
-            END
+        COALESCE(
+            SUM(
+                CASE
+                    WHEN i.quantity BETWEEN 1 AND 5
+                    THEN 1
+                    ELSE 0
+                END
+            ),
+            0
         ) AS low_stock,
 
-        SUM(
-            CASE
-                WHEN i.quantity = 0
-                THEN 1
-                ELSE 0
-            END
+        COALESCE(
+            SUM(
+                CASE
+                    WHEN i.quantity = 0
+                    THEN 1
+                    ELSE 0
+                END
+            ),
+            0
         ) AS out_of_stock
 
     FROM inventory i
@@ -423,60 +429,45 @@ $inventoryStmt = $conn->prepare("
     WHERE p.vendor_id = ?
 ");
 
-$inventoryStmt->bind_param(
-    "i",
+$inventoryStmt->execute([
     $vendorId
-);
-
-$inventoryStmt->execute();
-
-$inventoryResult =
-    $inventoryStmt->get_result();
+]);
 
 $inventoryData =
-    $inventoryResult->fetch_assoc();
-
-$inventoryStmt->close();
+    $inventoryStmt->fetch(PDO::FETCH_ASSOC);
 
 
 if ($inventoryData) {
 
     $inventoryStats['total_stock'] =
-        (int) $inventoryData['total_stock'];
+        (int) ($inventoryData['total_stock'] ?? 0);
 
     $inventoryStats['low_stock'] =
-        (int) $inventoryData['low_stock'];
+        (int) ($inventoryData['low_stock'] ?? 0);
 
     $inventoryStats['out_of_stock'] =
-        (int) $inventoryData['out_of_stock'];
-
+        (int) ($inventoryData['out_of_stock'] ?? 0);
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Recent Vendor Orders
+| RECENT VENDOR ORDERS
 |--------------------------------------------------------------------------
 */
 
 $recentOrders = [];
 
 
-$recentOrdersStmt = $conn->prepare("
+$recentOrdersStmt = $db->prepare("
     SELECT
 
         vo.vendor_order_id,
-
         vo.order_id,
-
         vo.subtotal,
-
         vo.delivery_fee,
-
         vo.vendor_status,
-
         vo.tracking_number,
-
         vo.created_at,
 
         o.order_date,
@@ -498,53 +489,31 @@ $recentOrdersStmt = $conn->prepare("
     LIMIT 8
 ");
 
-
-$recentOrdersStmt->bind_param(
-    "i",
+$recentOrdersStmt->execute([
     $vendorId
-);
+]);
 
-$recentOrdersStmt->execute();
-
-$recentOrdersResult =
-    $recentOrdersStmt->get_result();
-
-
-while (
-    $row =
-    $recentOrdersResult->fetch_assoc()
-) {
-
-    $recentOrders[] = $row;
-
-}
-
-
-$recentOrdersStmt->close();
+$recentOrders =
+    $recentOrdersStmt->fetchAll(PDO::FETCH_ASSOC);
 
 
 /*
 |--------------------------------------------------------------------------
-| Recent Products
+| RECENT PRODUCTS
 |--------------------------------------------------------------------------
 */
 
 $recentProducts = [];
 
 
-$recentProductsStmt = $conn->prepare("
+$recentProductsStmt = $db->prepare("
     SELECT
 
         p.product_id,
-
         p.product_name,
-
         p.price,
-
         p.stock_quantity,
-
         p.image,
-
         p.status,
 
         c.category_name
@@ -561,39 +530,21 @@ $recentProductsStmt = $conn->prepare("
     LIMIT 6
 ");
 
-
-$recentProductsStmt->bind_param(
-    "i",
+$recentProductsStmt->execute([
     $vendorId
-);
+]);
 
-$recentProductsStmt->execute();
-
-$recentProductsResult =
-    $recentProductsStmt->get_result();
-
-
-while (
-    $row =
-    $recentProductsResult->fetch_assoc()
-) {
-
-    $recentProducts[] = $row;
-
-}
-
-
-$recentProductsStmt->close();
+$recentProducts =
+    $recentProductsStmt->fetchAll(PDO::FETCH_ASSOC);
 
 
 /*
 |--------------------------------------------------------------------------
-| Page
+| PAGE TITLE
 |--------------------------------------------------------------------------
 */
 
-$pageTitle =
-    "Seller Dashboard - HochipoHub";
+$pageTitle = 'Seller Dashboard - HochipoHub';
 
 ?>
 <!DOCTYPE html>
@@ -610,9 +561,7 @@ $pageTitle =
     >
 
     <title>
-        <?php
-        echo htmlspecialchars($pageTitle);
-        ?>
+        <?php echo htmlspecialchars($pageTitle); ?>
     </title>
 
 
@@ -644,16 +593,14 @@ $pageTitle =
 
 <?php
 
-if (
-    file_exists(
-        dirname(__DIR__) .
-        '/includes/vendor_sidebar.php'
-    )
-) {
+$sidebarFile =
+    dirname(__DIR__) .
+    '/includes/vendor_sidebar.php';
 
-    include
-        dirname(__DIR__) .
-        '/includes/vendor_sidebar.php';
+
+if (file_exists($sidebarFile)) {
+
+    include $sidebarFile;
 
 }
 
@@ -683,12 +630,19 @@ if (
             </span>
 
             <h1>
+
                 Welcome back,
+
                 <?php
+
                 echo htmlspecialchars(
                     $vendor['business_name']
                 );
-                ?> 👋
+
+                ?>
+
+                👋
+
             </h1>
 
             <p>
@@ -725,28 +679,34 @@ if (
             border-radius:16px;
 
             <?php
+
             if (
-                $vendor['approval_status']
-                === 'Approved'
+                $vendor['approval_status'] === 'Approved'
             ) {
+
                 echo '
                     background:#dcfce7;
                     color:#166534;
                 ';
+
             } elseif (
-                $vendor['approval_status']
-                === 'Pending'
+                $vendor['approval_status'] === 'Pending'
             ) {
+
                 echo '
                     background:#fef3c7;
                     color:#92400e;
                 ';
+
             } else {
+
                 echo '
                     background:#fee2e2;
                     color:#991b1b;
                 ';
+
             }
+
             ?>
         "
     >
@@ -756,9 +716,11 @@ if (
         </strong>
 
         <?php
+
         echo htmlspecialchars(
             $vendor['approval_status']
         );
+
         ?>
 
     </div>
@@ -911,13 +873,18 @@ if (
             </small>
 
             <h2>
+
                 RM
+
                 <?php
+
                 echo number_format(
                     $salesStats['total_sales'],
                     2
                 );
+
                 ?>
+
             </h2>
 
         </div>
@@ -939,13 +906,18 @@ if (
             </small>
 
             <h2>
+
                 RM
+
                 <?php
+
                 echo number_format(
                     $salesStats['completed_sales'],
                     2
                 );
+
                 ?>
+
             </h2>
 
         </div>
@@ -967,13 +939,18 @@ if (
             </small>
 
             <h2>
+
                 RM
+
                 <?php
+
                 echo number_format(
                     $salesStats['pending_sales'],
                     2
                 );
+
                 ?>
+
             </h2>
 
         </div>
@@ -1043,68 +1020,92 @@ if (
         >
 
             <div>
+
                 <strong>
                     <?php
                     echo $orderStats['pending'];
                     ?>
                 </strong>
+
                 <br>
+
                 Pending
+
             </div>
 
 
             <div>
+
                 <strong>
                     <?php
                     echo $orderStats['processing'];
                     ?>
                 </strong>
+
                 <br>
+
                 Processing
+
             </div>
 
 
             <div>
+
                 <strong>
                     <?php
                     echo $orderStats['ready'];
                     ?>
                 </strong>
+
                 <br>
+
                 Ready
+
             </div>
 
 
             <div>
+
                 <strong>
                     <?php
                     echo $orderStats['shipped'];
                     ?>
                 </strong>
+
                 <br>
+
                 Shipped
+
             </div>
 
 
             <div>
+
                 <strong>
                     <?php
                     echo $orderStats['completed'];
                     ?>
                 </strong>
+
                 <br>
+
                 Completed
+
             </div>
 
 
             <div>
+
                 <strong>
                     <?php
                     echo $orderStats['cancelled'];
                     ?>
                 </strong>
+
                 <br>
+
                 Cancelled
+
             </div>
 
         </div>
@@ -1161,9 +1162,13 @@ if (
                 <strong
                     style="color:#f59e0b;"
                 >
+
                     <?php
+
                     echo $inventoryStats['low_stock'];
+
                     ?>
+
                 </strong>
 
                 <br>
@@ -1178,9 +1183,13 @@ if (
                 <strong
                     style="color:#dc2626;"
                 >
+
                     <?php
+
                     echo $inventoryStats['out_of_stock'];
+
                     ?>
+
                 </strong>
 
                 <br>
@@ -1292,9 +1301,7 @@ if (
 
             <tbody>
 
-                <?php if (
-                    empty($recentOrders)
-                ): ?>
+                <?php if (empty($recentOrders)): ?>
 
                     <tr>
 
@@ -1306,12 +1313,15 @@ if (
                                 color:#64748b;
                             "
                         >
+
                             No orders yet.
+
                         </td>
 
                     </tr>
 
                 <?php else: ?>
+
 
                     <?php foreach (
                         $recentOrders
@@ -1327,11 +1337,16 @@ if (
                                         1px solid #e2e8f0;
                                 "
                             >
+
                                 #
+
                                 <?php
+
                                 echo (int)
                                     $order['order_id'];
+
                                 ?>
+
                             </td>
 
 
@@ -1342,11 +1357,15 @@ if (
                                         1px solid #e2e8f0;
                                 "
                             >
+
                                 <?php
+
                                 echo htmlspecialchars(
                                     $order['customer_name']
                                 );
+
                                 ?>
+
                             </td>
 
 
@@ -1357,14 +1376,19 @@ if (
                                         1px solid #e2e8f0;
                                 "
                             >
+
                                 RM
+
                                 <?php
+
                                 echo number_format(
                                     (float)
                                     $order['subtotal'],
                                     2
                                 );
+
                                 ?>
+
                             </td>
 
 
@@ -1377,9 +1401,11 @@ if (
                             >
 
                                 <?php
+
                                 echo htmlspecialchars(
                                     $order['vendor_status']
                                 );
+
                                 ?>
 
                             </td>
@@ -1439,9 +1465,7 @@ if (
         </div>
 
 
-        <?php if (
-            empty($recentProducts)
-        ): ?>
+        <?php if (empty($recentProducts)): ?>
 
             <p>
                 You have not added any products yet.
@@ -1489,7 +1513,7 @@ if (
                         <?php
 
                         $productImage =
-                            $product['image']
+                            !empty($product['image'])
                             ? '../uploads/products/' .
                               $product['image']
                             : '../image/logo.jpg';
@@ -1525,9 +1549,11 @@ if (
                             <h3>
 
                                 <?php
+
                                 echo htmlspecialchars(
                                     $product['product_name']
                                 );
+
                                 ?>
 
                             </h3>
@@ -1540,10 +1566,12 @@ if (
                             >
 
                                 <?php
+
                                 echo htmlspecialchars(
                                     $product['category_name']
                                     ?? 'Uncategorized'
                                 );
+
                                 ?>
 
                             </p>
@@ -1556,12 +1584,15 @@ if (
                             >
 
                                 RM
+
                                 <?php
+
                                 echo number_format(
                                     (float)
                                     $product['price'],
                                     2
                                 );
+
                                 ?>
 
                             </strong>
@@ -1570,11 +1601,12 @@ if (
                             <p>
 
                                 Stock:
+
                                 <?php
+
                                 echo (int)
-                                    $product[
-                                        'stock_quantity'
-                                    ];
+                                    $product['stock_quantity'];
+
                                 ?>
 
                             </p>
@@ -1583,9 +1615,11 @@ if (
                             <span>
 
                                 <?php
+
                                 echo htmlspecialchars(
                                     $product['status']
                                 );
+
                                 ?>
 
                             </span>
