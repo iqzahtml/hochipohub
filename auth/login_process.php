@@ -8,13 +8,10 @@
 |     auth/login_process.php
 |
 | Purpose:
-| - Process customer/vendor/admin login
-| - Create login session
-| - Store correct user role
-| - Redirect user based on role
+|     Authenticate customer / vendor / admin
+|     and redirect according to role.
 |--------------------------------------------------------------------------
 */
-
 
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/includes/session.php';
@@ -43,10 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 |--------------------------------------------------------------------------
 */
 
-$email =
-    trim(
-        $_POST['email'] ?? ''
-    );
+$email = trim(
+    $_POST['email'] ?? ''
+);
 
 $password =
     $_POST['password'] ?? '';
@@ -131,18 +127,15 @@ try {
             phone,
             password,
             profile_image,
-            role,
-            status
+            role
         FROM users
         WHERE email = ?
         LIMIT 1
     ");
 
-
     $stmt->execute([
         $email
     ]);
-
 
     $user =
         $stmt->fetch(PDO::FETCH_ASSOC);
@@ -172,7 +165,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | PASSWORD CHECK
+    | VERIFY PASSWORD
     |--------------------------------------------------------------------------
     */
 
@@ -200,61 +193,17 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | ACCOUNT STATUS
+    | GET ROLE
     |--------------------------------------------------------------------------
     */
 
-    $status =
-        strtolower(
-            trim(
-                (string) (
-                    $user['status'] ?? 'active'
-                )
+    $role = strtolower(
+        trim(
+            (string) (
+                $user['role'] ?? ''
             )
-        );
-
-
-    if (
-        in_array(
-            $status,
-            [
-                'inactive',
-                'blocked',
-                'suspended',
-                'disabled'
-            ],
-            true
         )
-    ) {
-
-        $_SESSION['login_error'] =
-            'Your account is currently inactive.';
-
-        $_SESSION['login_email'] =
-            $email;
-
-        redirect(
-            BASE_URL . 'index.php?login=1'
-        );
-
-        exit;
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | ROLE
-    |--------------------------------------------------------------------------
-    */
-
-    $role =
-        strtolower(
-            trim(
-                (string) (
-                    $user['role'] ?? ''
-                )
-            )
-        );
+    );
 
 
     /*
@@ -298,129 +247,45 @@ try {
     |--------------------------------------------------------------------------
     |
     | IMPORTANT:
-    | Vendor dashboard checks:
+    | We explicitly set BOTH:
     |
-    | $_SESSION['role'] === 'vendor'
+    | $_SESSION['role']
+    | $_SESSION['user_role']
     |
-    | Therefore we MUST store role here.
-    |--------------------------------------------------------------------------
+    | because your vendor dashboard checks:
+    |
+    | $_SESSION['role']
+    |
     */
 
     session_regenerate_id(true);
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | BASIC USER SESSION
-    |--------------------------------------------------------------------------
-    */
-
-    $_SESSION['logged_in'] =
-        true;
-
+    $_SESSION['logged_in'] = true;
 
     $_SESSION['user_id'] =
         (int) $user['user_id'];
 
-
     $_SESSION['user_name'] =
         $user['name'] ?? '';
-
 
     $_SESSION['user_email'] =
         $user['email'] ?? '';
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | IMPORTANT ROLE SESSION
-    |--------------------------------------------------------------------------
-    */
-
     $_SESSION['role'] =
         $role;
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | COMPATIBILITY WITH OLD CODE
-    |--------------------------------------------------------------------------
-    */
 
     $_SESSION['user_role'] =
         $role;
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | USER STATUS
-    |--------------------------------------------------------------------------
-    */
-
-    $_SESSION['status'] =
-        $status;
-
-
-    $_SESSION['user_status'] =
-        $status;
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | LOGIN INFORMATION
-    |--------------------------------------------------------------------------
-    */
+    $_SESSION['remember_me'] =
+        $remember;
 
     $_SESSION['login_time'] =
         time();
 
-
     $_SESSION['last_activity'] =
         time();
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | REMEMBER ME
-    |--------------------------------------------------------------------------
-    */
-
-    $_SESSION['remember_me'] =
-        $remember;
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | MFA
-    |--------------------------------------------------------------------------
-    */
-
-    $_SESSION['mfa_enabled'] =
-        !empty(
-            $user['mfa_enabled']
-            ?? false
-        );
-
-
-    $_SESSION['mfa_verified'] =
-        false;
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | ACTIVITY
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        function_exists(
-            'updateSessionActivity'
-        )
-    ) {
-
-        updateSessionActivity();
-
-    }
 
 
     /*
@@ -437,83 +302,75 @@ try {
 
     /*
     |--------------------------------------------------------------------------
+    | UPDATE ACTIVITY
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        function_exists(
+            'updateSessionActivity'
+        )
+    ) {
+
+        updateSessionActivity();
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
     | REDIRECT BY ROLE
     |--------------------------------------------------------------------------
     */
 
-    switch ($role) {
+    if ($role === 'admin') {
 
+        redirect(
+            BASE_URL .
+            'admin/dashboard.php'
+        );
 
-        /*
-        |--------------------------------------------------------------------------
-        | ADMIN
-        |--------------------------------------------------------------------------
-        */
-
-        case 'admin':
-
-            redirect(
-                BASE_URL .
-                'admin/dashboard.php'
-            );
-
-            exit;
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | VENDOR
-        |--------------------------------------------------------------------------
-        |
-        | IMPORTANT:
-        | Vendor goes to seller/dashboard.php
-        |--------------------------------------------------------------------------
-        */
-
-        case 'vendor':
-
-            redirect(
-                BASE_URL .
-                'seller/dashboard.php'
-            );
-
-            exit;
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CUSTOMER
-        |--------------------------------------------------------------------------
-        */
-
-        case 'customer':
-
-            redirect(
-                BASE_URL .
-                'dashboard.php'
-            );
-
-            exit;
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | UNKNOWN
-        |--------------------------------------------------------------------------
-        */
-
-        default:
-
-            $_SESSION['login_error'] =
-                'Unable to determine account type.';
-
-            redirect(
-                BASE_URL .
-                'index.php?login=1'
-            );
-
-            exit;
+        exit;
     }
+
+
+    if ($role === 'vendor') {
+
+        redirect(
+            BASE_URL .
+            'seller/dashboard.php'
+        );
+
+        exit;
+    }
+
+
+    if ($role === 'customer') {
+
+        redirect(
+            BASE_URL .
+            'dashboard.php'
+        );
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FALLBACK
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION['login_error'] =
+        'Unable to determine account type.';
+
+    redirect(
+        BASE_URL .
+        'index.php?login=1'
+    );
+
+    exit;
 
 
 } catch (PDOException $e) {
@@ -537,8 +394,9 @@ try {
     } else {
 
         $_SESSION['login_error'] =
-            'Something went wrong while logging in. '
-            . 'Please try again later.';
+            'Something went wrong while logging in. ' .
+            'Please try again later.';
+
     }
 
 
