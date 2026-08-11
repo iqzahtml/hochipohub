@@ -8,8 +8,10 @@
 |     auth/login_process.php
 |
 | Purpose:
-|     Authenticate customer / vendor / admin
-|     and redirect according to role.
+| - Process login
+| - Verify email/password
+| - Create session
+| - Redirect user based on role
 |--------------------------------------------------------------------------
 */
 
@@ -247,45 +249,36 @@ try {
     |--------------------------------------------------------------------------
     |
     | IMPORTANT:
-    | We explicitly set BOTH:
-    |
-    | $_SESSION['role']
-    | $_SESSION['user_role']
-    |
-    | because your vendor dashboard checks:
-    |
-    | $_SESSION['role']
+    | session.php uses createLoginSession()
     |
     */
 
-    session_regenerate_id(true);
+    if (
+        !createLoginSession($user)
+    ) {
+
+        $_SESSION['login_error'] =
+            'Unable to create login session.';
+
+        $_SESSION['login_email'] =
+            $email;
+
+        redirect(
+            BASE_URL . 'index.php?login=1'
+        );
+
+        exit;
+    }
 
 
-    $_SESSION['logged_in'] = true;
-
-    $_SESSION['user_id'] =
-        (int) $user['user_id'];
-
-    $_SESSION['user_name'] =
-        $user['name'] ?? '';
-
-    $_SESSION['user_email'] =
-        $user['email'] ?? '';
-
-    $_SESSION['role'] =
-        $role;
-
-    $_SESSION['user_role'] =
-        $role;
+    /*
+    |--------------------------------------------------------------------------
+    | REMEMBER ME
+    |--------------------------------------------------------------------------
+    */
 
     $_SESSION['remember_me'] =
         $remember;
-
-    $_SESSION['login_time'] =
-        time();
-
-    $_SESSION['last_activity'] =
-        time();
 
 
     /*
@@ -302,24 +295,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | UPDATE ACTIVITY
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        function_exists(
-            'updateSessionActivity'
-        )
-    ) {
-
-        updateSessionActivity();
-
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | REDIRECT BY ROLE
+    | REDIRECT BASED ON ROLE
     |--------------------------------------------------------------------------
     */
 
@@ -362,19 +338,14 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    $_SESSION['login_error'] =
-        'Unable to determine account type.';
-
     redirect(
-        BASE_URL .
-        'index.php?login=1'
+        BASE_URL . 'index.php'
     );
 
     exit;
 
 
 } catch (PDOException $e) {
-
 
     /*
     |--------------------------------------------------------------------------
@@ -394,9 +365,8 @@ try {
     } else {
 
         $_SESSION['login_error'] =
-            'Something went wrong while logging in. ' .
-            'Please try again later.';
-
+            'Something went wrong while logging in. '
+            . 'Please try again later.';
     }
 
 
