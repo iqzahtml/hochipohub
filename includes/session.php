@@ -280,12 +280,15 @@ if (!function_exists('createLoginSession')) {
         |--------------------------------------------------------------------------
         | config.php checks $_SESSION['role'].
         |
-        | Therefore role MUST be stored here.
+        | Normalize the role value to avoid case mismatch.
         |--------------------------------------------------------------------------
         */
 
-        $_SESSION['role'] =
-            $user['role'] ?? 'customer';
+        $_SESSION['role'] = strtolower(
+            trim(
+                (string) ($user['role'] ?? 'customer')
+            )
+        );
 
         /*
         |--------------------------------------------------------------------------
