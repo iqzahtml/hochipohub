@@ -4,6 +4,15 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - REGISTER PROCESS
 |--------------------------------------------------------------------------
+| File:
+| auth/register_process.php
+|
+| Purpose:
+| - Register customer
+| - Register vendor
+| - Insert vendor profile
+| - Store correct role
+|--------------------------------------------------------------------------
 */
 
 require_once dirname(__DIR__) . '/config.php';
@@ -13,7 +22,7 @@ require_once dirname(__DIR__) . '/includes/functions.php';
 
 /*
 |--------------------------------------------------------------------------
-| ONLY POST
+| ONLY POST REQUEST
 |--------------------------------------------------------------------------
 */
 
@@ -33,65 +42,56 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 |--------------------------------------------------------------------------
 */
 
-$name =
+$name = trim(
+    $_POST['name'] ?? ''
+);
+
+$email = trim(
+    $_POST['email'] ?? ''
+);
+
+$phone = trim(
+    $_POST['phone'] ?? ''
+);
+
+$role = strtolower(
     trim(
-        $_POST['name'] ?? ''
-    );
+        $_POST['role'] ?? 'customer'
+    )
+);
 
-$email =
-    trim(
-        $_POST['email'] ?? ''
-    );
+$password = $_POST['password'] ?? '';
 
-$phone =
-    trim(
-        $_POST['phone'] ?? ''
-    );
+$confirmPassword = $_POST['confirm_password'] ?? '';
 
-$role =
-    strtolower(
-        trim(
-            $_POST['role'] ?? 'customer'
-        )
-    );
-
-$password =
-    $_POST['password'] ?? '';
-
-$confirmPassword =
-    $_POST['confirm_password'] ?? '';
-
-$terms =
+$terms = (
     isset($_POST['terms']) &&
-    $_POST['terms'] === '1';
+    $_POST['terms'] === '1'
+);
 
 
 /*
 |--------------------------------------------------------------------------
-| SAVE OLD DATA
+| KEEP OLD FORM DATA
 |--------------------------------------------------------------------------
 */
 
 $_SESSION['register_old'] = [
 
-    'name' =>
-        $name,
+    'name' => $name,
 
-    'email' =>
-        $email,
+    'email' => $email,
 
-    'phone' =>
-        $phone,
+    'phone' => $phone,
 
-    'role' =>
-        $role
+    'role' => $role
 
 ];
 
 
 /*
 |--------------------------------------------------------------------------
-| NAME
+| VALIDATE NAME
 |--------------------------------------------------------------------------
 */
 
@@ -114,7 +114,7 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| EMAIL
+| VALIDATE EMAIL
 |--------------------------------------------------------------------------
 */
 
@@ -139,7 +139,7 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| PHONE
+| VALIDATE PHONE
 |--------------------------------------------------------------------------
 */
 
@@ -156,12 +156,11 @@ if ($phone === '') {
 }
 
 
-$cleanPhone =
-    preg_replace(
-        '/[\s\-\(\)]/',
-        '',
-        $phone
-    );
+$cleanPhone = preg_replace(
+    '/[\s\-\(\)]/',
+    '',
+    $phone
+);
 
 
 if (
@@ -185,7 +184,11 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| ROLE
+| VALIDATE ROLE
+|--------------------------------------------------------------------------
+|
+| Customer atau Vendor sahaja.
+| Admin tidak boleh register melalui form biasa.
 |--------------------------------------------------------------------------
 */
 
@@ -216,7 +219,7 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| PASSWORD
+| VALIDATE PASSWORD
 |--------------------------------------------------------------------------
 */
 
@@ -293,18 +296,16 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    $stmt =
-        $db->prepare("
-            SELECT user_id
-            FROM users
-            WHERE email = ?
-            LIMIT 1
-        ");
+    $stmt = $db->prepare("
+        SELECT user_id
+        FROM users
+        WHERE email = ?
+        LIMIT 1
+    ");
 
     $stmt->execute([
         $email
     ]);
-
 
     if ($stmt->fetch()) {
 
@@ -325,18 +326,16 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    $stmt =
-        $db->prepare("
-            SELECT user_id
-            FROM users
-            WHERE phone = ?
-            LIMIT 1
-        ");
+    $stmt = $db->prepare("
+        SELECT user_id
+        FROM users
+        WHERE phone = ?
+        LIMIT 1
+    ");
 
     $stmt->execute([
         $cleanPhone
     ]);
-
 
     if ($stmt->fetch()) {
 
@@ -357,11 +356,10 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    $passwordHash =
-        password_hash(
-            $password,
-            PASSWORD_DEFAULT
-        );
+    $passwordHash = password_hash(
+        $password,
+        PASSWORD_DEFAULT
+    );
 
 
     if ($passwordHash === false) {
@@ -392,108 +390,133 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    $stmt =
-        $db->prepare("
-            INSERT INTO users
+    $stmt = $db->prepare("
+        INSERT INTO users
+        (
+            name,
+            email,
+            phone,
+            password,
+            role
+        )
+        VALUES
+        (
+            ?,
+            ?,
+            ?,
+            ?,
+            ?
+        )
+    ");
+
+    $stmt->execute([
+        $name,
+        $email,
+        $cleanPhone,
+        $passwordHash,
+        $role
+    ]);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | GET NEW USER ID
+    |--------------------------------------------------------------------------
+    */
+
+    $userId = (int) $db->lastInsertId();
+
+
+    if ($userId <= 0) {
+
+        throw new Exception(
+            'Unable to create user account.'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VENDOR REGISTRATION
+    |--------------------------------------------------------------------------
+    |
+    | Kalau role = vendor,
+    | create vendor record.
+    |--------------------------------------------------------------------------
+    */
+
+    if ($role === 'vendor') {
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK VENDOR TABLE
+        |--------------------------------------------------------------------------
+        */
+
+        $checkVendorTable = $db->query("
+            SHOW TABLES LIKE 'vendors'
+        ");
+
+
+        if (
+            !$checkVendorTable ||
+            !$checkVendorTable->fetchColumn()
+        ) {
+
+            throw new Exception(
+                'The vendors table does not exist.'
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | INSERT VENDOR
+        |--------------------------------------------------------------------------
+        */
+
+        $vendorStmt = $db->prepare("
+            INSERT INTO vendors
             (
-                name,
-                email,
-                phone,
-                password,
-                role
+                user_id,
+                business_name,
+                approval_status
             )
             VALUES
             (
-                ?,
-                ?,
                 ?,
                 ?,
                 ?
             )
         ");
 
-    $stmt->execute([
 
-        $name,
-        $email,
-        $cleanPhone,
-        $passwordHash,
-        $role
+        $vendorStmt->execute([
+            $userId,
+            $name,
+            'Pending'
+        ]);
 
-    ]);
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | NEW USER ID
-    |--------------------------------------------------------------------------
-    */
-
-    $userId =
-        (int) $db->lastInsertId();
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | VENDOR
-    |--------------------------------------------------------------------------
-    |
-    | Only execute if your vendors table exists.
-    |
-    */
-
-    if ($role === 'vendor') {
 
         /*
         |--------------------------------------------------------------------------
-        | Check vendors table
+        | CHECK INSERT
         |--------------------------------------------------------------------------
         */
 
-        try {
+        if ($vendorStmt->rowCount() !== 1) {
 
-            $stmt =
-                $db->prepare("
-                    INSERT INTO vendors
-                    (
-                        user_id,
-                        business_name,
-                        approval_status
-                    )
-                    VALUES
-                    (
-                        ?,
-                        ?,
-                        'Pending'
-                    )
-                ");
-
-            $stmt->execute([
-
-                $userId,
-                $name
-
-            ]);
-
-        } catch (PDOException $vendorError) {
-
-            /*
-            |--------------------------------------------------------------------------
-            | If vendor table structure is different,
-            | rollback the whole registration.
-            |--------------------------------------------------------------------------
-            */
-
-            throw $vendorError;
-
+            throw new Exception(
+                'Vendor profile could not be created.'
+            );
         }
-
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | COMMIT
+    | COMMIT DATABASE
     |--------------------------------------------------------------------------
     */
 
@@ -502,7 +525,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CLEAR OLD DATA
+    | CLEAR OLD FORM DATA
     |--------------------------------------------------------------------------
     */
 
@@ -513,7 +536,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | SUCCESS
+    | SUCCESS MESSAGE
     |--------------------------------------------------------------------------
     */
 
@@ -524,7 +547,17 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | REDIRECT LOGIN MODAL
+    | SAVE LOGIN EMAIL
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION['login_email'] =
+        $email;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | REDIRECT TO LOGIN
     |--------------------------------------------------------------------------
     */
 
@@ -535,7 +568,8 @@ try {
     exit;
 
 
-} catch (PDOException $e) {
+} catch (Throwable $e) {
+
 
     /*
     |--------------------------------------------------------------------------
@@ -550,13 +584,12 @@ try {
     ) {
 
         $db->rollBack();
-
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | ERROR
+    | DEBUG ERROR
     |--------------------------------------------------------------------------
     */
 
@@ -566,7 +599,7 @@ try {
     ) {
 
         $_SESSION['register_error'] =
-            'Database error: ' .
+            'Registration error: ' .
             $e->getMessage();
 
     } else {
@@ -574,7 +607,6 @@ try {
         $_SESSION['register_error'] =
             'Something went wrong while creating your account. '
             . 'Please try again later.';
-
     }
 
 
@@ -585,8 +617,7 @@ try {
     */
 
     redirect(
-        BASE_URL .
-        'index.php?register=1'
+        BASE_URL . 'index.php?register=1'
     );
 
     exit;
