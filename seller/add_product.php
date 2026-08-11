@@ -7,7 +7,6 @@
  * =========================================================
  */
 
-require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../database/db.php';
 require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/functions.php';
@@ -15,13 +14,20 @@ require_once __DIR__ . '/../includes/functions.php';
 
 /*
 |--------------------------------------------------------------------------
-| Security - Vendor Only
+| SESSION
 |--------------------------------------------------------------------------
 */
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| SECURITY - VENDOR ONLY
+|--------------------------------------------------------------------------
+*/
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../index.php");
@@ -45,11 +51,24 @@ $success = "";
 
 /*
 |--------------------------------------------------------------------------
-| Get Vendor Information
+| DEFAULT FORM VALUES
 |--------------------------------------------------------------------------
 */
 
-$vendorStmt = $conn->prepare("
+$productName = '';
+$description = '';
+$price = '';
+$stockQuantity = '';
+$categoryId = 0;
+
+
+/*
+|--------------------------------------------------------------------------
+| GET VENDOR INFORMATION
+|--------------------------------------------------------------------------
+*/
+
+$vendorStmt = $db->prepare("
     SELECT
         vendor_id,
         business_name,
@@ -59,24 +78,23 @@ $vendorStmt = $conn->prepare("
     LIMIT 1
 ");
 
-$vendorStmt->bind_param("i", $userId);
-$vendorStmt->execute();
+$vendorStmt->execute([
+    $userId
+]);
 
-$vendorResult = $vendorStmt->get_result();
-
-$vendor = $vendorResult->fetch_assoc();
-
-$vendorStmt->close();
+$vendor = $vendorStmt->fetch(PDO::FETCH_ASSOC);
 
 
 if (!$vendor) {
+
     $errors[] = "Vendor profile was not found.";
+
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Check Vendor Approval
+| CHECK VENDOR APPROVAL
 |--------------------------------------------------------------------------
 */
 
@@ -93,13 +111,13 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| Get Categories
+| GET CATEGORIES
 |--------------------------------------------------------------------------
 */
 
 $categories = [];
 
-$categoryQuery = $conn->query("
+$categoryStmt = $db->prepare("
     SELECT
         category_id,
         category_name
@@ -107,18 +125,14 @@ $categoryQuery = $conn->query("
     ORDER BY category_name ASC
 ");
 
-if ($categoryQuery) {
+$categoryStmt->execute();
 
-    while ($row = $categoryQuery->fetch_assoc()) {
-        $categories[] = $row;
-    }
-
-}
+$categories = $categoryStmt->fetchAll(PDO::FETCH_ASSOC);
 
 
 /*
 |--------------------------------------------------------------------------
-| Add Product
+| ADD PRODUCT
 |--------------------------------------------------------------------------
 */
 
@@ -127,28 +141,46 @@ if (
     empty($errors)
 ) {
 
-    $productName = trim($_POST['product_name'] ?? '');
+    /*
+    |--------------------------------------------------------------------------
+    | GET FORM DATA
+    |--------------------------------------------------------------------------
+    */
 
-    $description = trim($_POST['description'] ?? '');
+    $productName = trim(
+        $_POST['product_name'] ?? ''
+    );
 
-    $price = trim($_POST['price'] ?? '');
+    $description = trim(
+        $_POST['description'] ?? ''
+    );
 
-    $stockQuantity = trim($_POST['stock_quantity'] ?? '');
+    $price = trim(
+        $_POST['price'] ?? ''
+    );
 
-    $categoryId = (int) ($_POST['category_id'] ?? 0);
+    $stockQuantity = trim(
+        $_POST['stock_quantity'] ?? ''
+    );
+
+    $categoryId = (int) (
+        $_POST['category_id'] ?? 0
+    );
 
 
     /*
     |--------------------------------------------------------------------------
-    | Validation
+    | VALIDATION
     |--------------------------------------------------------------------------
     */
 
     if ($productName === '') {
 
-        $errors[] = "Product name is required.";
+        $errors[] =
+            "Product name is required.";
 
     }
+
 
     if (strlen($productName) > 150) {
 
@@ -166,7 +198,10 @@ if (
     }
 
 
-    if ($price === '' || !is_numeric($price)) {
+    if (
+        $price === '' ||
+        !is_numeric($price)
+    ) {
 
         $errors[] =
             "Please enter a valid product price.";
@@ -193,30 +228,26 @@ if (
 
     /*
     |--------------------------------------------------------------------------
-    | Check Category
+    | CHECK CATEGORY EXISTS
     |--------------------------------------------------------------------------
     */
 
     if ($categoryId > 0) {
 
-        $categoryCheck = $conn->prepare("
-            SELECT category_id
+        $categoryCheck = $db->prepare("
+            SELECT
+                category_id
             FROM categories
             WHERE category_id = ?
             LIMIT 1
         ");
 
-        $categoryCheck->bind_param(
-            "i",
+        $categoryCheck->execute([
             $categoryId
-        );
-
-        $categoryCheck->execute();
+        ]);
 
         $categoryExists =
-            $categoryCheck->get_result()->num_rows > 0;
-
-        $categoryCheck->close();
+            $categoryCheck->fetch(PDO::FETCH_ASSOC);
 
 
         if (!$categoryExists) {
@@ -231,11 +262,13 @@ if (
 
     /*
     |--------------------------------------------------------------------------
-    | Product Image
+    | PRODUCT IMAGE
     |--------------------------------------------------------------------------
     */
 
     $imageName = null;
+    $targetPath = null;
+
 
     if (
         isset($_FILES['product_image']) &&
@@ -245,12 +278,24 @@ if (
         $file = $_FILES['product_image'];
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK UPLOAD ERROR
+        |--------------------------------------------------------------------------
+        */
+
         if ($file['error'] !== UPLOAD_ERR_OK) {
 
             $errors[] =
                 "There was a problem uploading the product image.";
 
         } else {
+
+            /*
+            |--------------------------------------------------------------------------
+            | ALLOWED MIME TYPES
+            |--------------------------------------------------------------------------
+            */
 
             $allowedTypes = [
                 'image/jpeg',
@@ -261,13 +306,11 @@ if (
             $maxSize = 5 * 1024 * 1024;
 
 
-            if (!in_array($file['type'], $allowedTypes, true)) {
-
-                $errors[] =
-                    "Only JPG, PNG and WEBP images are allowed.";
-
-            }
-
+            /*
+            |--------------------------------------------------------------------------
+            | FILE SIZE
+            |--------------------------------------------------------------------------
+            */
 
             if ($file['size'] > $maxSize) {
 
@@ -279,7 +322,7 @@ if (
 
             /*
             |--------------------------------------------------------------------------
-            | More Reliable MIME Check
+            | MIME CHECK
             |--------------------------------------------------------------------------
             */
 
@@ -289,7 +332,9 @@ if (
                     new finfo(FILEINFO_MIME_TYPE);
 
                 $realMime =
-                    $finfo->file($file['tmp_name']);
+                    $finfo->file(
+                        $file['tmp_name']
+                    );
 
 
                 if (
@@ -301,7 +346,7 @@ if (
                 ) {
 
                     $errors[] =
-                        "Invalid image file.";
+                        "Only JPG, PNG and WEBP images are allowed.";
 
                 }
 
@@ -310,25 +355,27 @@ if (
 
             /*
             |--------------------------------------------------------------------------
-            | Generate Safe Filename
+            | GENERATE SAFE FILE NAME
             |--------------------------------------------------------------------------
             */
 
             if (empty($errors)) {
 
+                $extensionMap = [
+                    'image/jpeg' => 'jpg',
+                    'image/png'  => 'png',
+                    'image/webp' => 'webp'
+                ];
+
                 $extension =
-                    strtolower(
-                        pathinfo(
-                            $file['name'],
-                            PATHINFO_EXTENSION
-                        )
-                    );
+                    $extensionMap[$realMime];
+
 
                 $imageName =
                     'product_' .
                     $vendor['vendor_id'] .
                     '_' .
-                    uniqid('', true) .
+                    bin2hex(random_bytes(8)) .
                     '.' .
                     $extension;
 
@@ -341,19 +388,14 @@ if (
 
     /*
     |--------------------------------------------------------------------------
-    | Insert Product
+    | INSERT PRODUCT
     |--------------------------------------------------------------------------
     */
 
     if (empty($errors)) {
 
         $priceValue =
-            number_format(
-                (float) $price,
-                2,
-                '.',
-                ''
-            );
+            (float) $price;
 
         $stockValue =
             (int) $stockQuantity;
@@ -361,47 +403,55 @@ if (
 
         /*
         |--------------------------------------------------------------------------
-        | Product Status
+        | PRODUCT STATUS
         |--------------------------------------------------------------------------
         */
 
         $productStatus =
             $stockValue > 0
-            ? 'Available'
-            : 'Out of Stock';
+                ? 'Available'
+                : 'Out of Stock';
 
 
         /*
         |--------------------------------------------------------------------------
-        | Upload Directory
+        | UPLOAD DIRECTORY
         |--------------------------------------------------------------------------
         */
 
         $uploadDirectory =
-            dirname(__DIR__) .
-            '/uploads/products/';
+            __DIR__ .
+            '/../uploads/products/';
 
 
         if (!is_dir($uploadDirectory)) {
 
-            mkdir(
-                $uploadDirectory,
-                0755,
-                true
-            );
+            if (
+                !mkdir(
+                    $uploadDirectory,
+                    0755,
+                    true
+                )
+            ) {
+
+                $errors[] =
+                    "Unable to create product upload directory.";
+
+            }
 
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | Move Image
+        | MOVE IMAGE
         |--------------------------------------------------------------------------
         */
 
-        $imageUploaded = false;
-
-        if ($imageName !== null) {
+        if (
+            empty($errors) &&
+            $imageName !== null
+        ) {
 
             $targetPath =
                 $uploadDirectory .
@@ -420,10 +470,6 @@ if (
 
                 $imageName = null;
 
-            } else {
-
-                $imageUploaded = true;
-
             }
 
         }
@@ -431,23 +477,30 @@ if (
 
         /*
         |--------------------------------------------------------------------------
-        | Database Transaction
+        | DATABASE TRANSACTION
         |--------------------------------------------------------------------------
         */
 
         if (empty($errors)) {
 
-            $conn->begin_transaction();
-
             try {
 
                 /*
-                --------------------------------------------------------------
-                | Insert Product
-                --------------------------------------------------------------
+                |--------------------------------------------------------------------------
+                | START TRANSACTION
+                |--------------------------------------------------------------------------
                 */
 
-                $productStmt = $conn->prepare("
+                $db->beginTransaction();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | INSERT PRODUCT
+                |--------------------------------------------------------------------------
+                */
+
+                $productStmt = $db->prepare("
                     INSERT INTO products (
                         vendor_id,
                         category_id,
@@ -462,9 +515,8 @@ if (
                 ");
 
 
-                $productStmt->bind_param(
-                    "iissdiss",
-                    $vendor['vendor_id'],
+                $productStmt->execute([
+                    (int) $vendor['vendor_id'],
                     $categoryId,
                     $productName,
                     $description,
@@ -472,32 +524,26 @@ if (
                     $stockValue,
                     $imageName,
                     $productStatus
-                );
-
-
-                if (!$productStmt->execute()) {
-
-                    throw new Exception(
-                        "Failed to create product."
-                    );
-
-                }
-
-
-                $productId =
-                    $conn->insert_id;
-
-
-                $productStmt->close();
+                ]);
 
 
                 /*
-                --------------------------------------------------------------
-                | Insert Inventory
-                --------------------------------------------------------------
+                |--------------------------------------------------------------------------
+                | GET PRODUCT ID
+                |--------------------------------------------------------------------------
                 */
 
-                $inventoryStmt = $conn->prepare("
+                $productId =
+                    (int) $db->lastInsertId();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | INSERT INVENTORY
+                |--------------------------------------------------------------------------
+                */
+
+                $inventoryStmt = $db->prepare("
                     INSERT INTO inventory (
                         product_id,
                         quantity
@@ -506,42 +552,35 @@ if (
                 ");
 
 
-                $inventoryStmt->bind_param(
-                    "ii",
+                $inventoryStmt->execute([
                     $productId,
                     $stockValue
-                );
-
-
-                if (!$inventoryStmt->execute()) {
-
-                    throw new Exception(
-                        "Failed to create inventory record."
-                    );
-
-                }
-
-
-                $inventoryStmt->close();
+                ]);
 
 
                 /*
-                --------------------------------------------------------------
-                | Commit
-                --------------------------------------------------------------
+                |--------------------------------------------------------------------------
+                | COMMIT
+                |--------------------------------------------------------------------------
                 */
 
-                $conn->commit();
+                $db->commit();
 
+
+                /*
+                |--------------------------------------------------------------------------
+                | SUCCESS
+                |--------------------------------------------------------------------------
+                */
 
                 $success =
                     "Product added successfully.";
 
 
                 /*
-                --------------------------------------------------------------
-                | Clear Form
-                --------------------------------------------------------------
+                |--------------------------------------------------------------------------
+                | CLEAR FORM
+                |--------------------------------------------------------------------------
                 */
 
                 $productName = '';
@@ -551,20 +590,28 @@ if (
                 $categoryId = 0;
 
 
-            } catch (Exception $e) {
+            } catch (PDOException $e) {
 
-                $conn->rollback();
+                /*
+                |--------------------------------------------------------------------------
+                | ROLLBACK
+                |--------------------------------------------------------------------------
+                */
+
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
 
 
                 /*
-                --------------------------------------------------------------
-                | Remove uploaded image if DB failed
-                --------------------------------------------------------------
+                |--------------------------------------------------------------------------
+                | REMOVE UPLOADED IMAGE
+                |--------------------------------------------------------------------------
                 */
 
                 if (
                     $imageName !== null &&
-                    isset($targetPath) &&
+                    $targetPath !== null &&
                     file_exists($targetPath)
                 ) {
 
@@ -573,8 +620,21 @@ if (
                 }
 
 
+                /*
+                |--------------------------------------------------------------------------
+                | ERROR
+                |--------------------------------------------------------------------------
+                */
+
                 $errors[] =
                     "Unable to add product. Please try again.";
+
+                /*
+                | For debugging during development, you can temporarily use:
+                |
+                | $errors[] = $e->getMessage();
+                |
+                */
 
             }
 
@@ -587,11 +647,12 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| Page Variables
+| PAGE VARIABLES
 |--------------------------------------------------------------------------
 */
 
-$pageTitle = "Add Product - HochipoHub";
+$pageTitle =
+    "Add Product - HochipoHub";
 
 ?>
 <!DOCTYPE html>
@@ -639,13 +700,13 @@ $pageTitle = "Add Product - HochipoHub";
 
 <?php
 
-if (file_exists(
-    dirname(__DIR__) .
-    '/includes/vendor_sidebar.php'
-)) {
+$sidebarPath =
+    __DIR__ .
+    '/../includes/vendor_sidebar.php';
 
-    include dirname(__DIR__) .
-        '/includes/vendor_sidebar.php';
+if (file_exists($sidebarPath)) {
+
+    include $sidebarPath;
 
 }
 
@@ -842,6 +903,7 @@ if (file_exists(
                     <option value="">
                         Select Category
                     </option>
+
 
                     <?php foreach (
                         $categories
