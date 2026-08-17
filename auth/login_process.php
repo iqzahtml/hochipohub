@@ -1,62 +1,23 @@
 <?php
 
-/*
-|--------------------------------------------------------------------------
-| HOCHIPOHUB - LOGIN PROCESS
-|--------------------------------------------------------------------------
-| Login for:
-| - Customer
-| - Vendor
-| - Admin
-|
-| Admin accounts are NOT registered through the frontend.
-| Admin must already exist in the users table.
-|--------------------------------------------------------------------------
-*/
-
 require_once dirname(__DIR__) . '/config.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| ONLY ALLOW POST
-|--------------------------------------------------------------------------
-*/
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php'
+    redirect(
+        BASE_URL . 'index.php'
     );
-
-    exit;
 }
-
-
-/*
-|--------------------------------------------------------------------------
-| GET FORM DATA
-|--------------------------------------------------------------------------
-*/
 
 $email = trim(
     $_POST['email'] ?? ''
 );
 
 $password = $_POST['password'] ?? '';
-
-
-/*
-|--------------------------------------------------------------------------
-| VALIDATE INPUT
-|--------------------------------------------------------------------------
-*/
 
 if ($email === '' || $password === '') {
 
@@ -66,50 +27,14 @@ if ($email === '' || $password === '') {
     $_SESSION['login_email'] =
         $email;
 
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php?login=1'
+    redirect(
+        BASE_URL . 'index.php?login=1'
     );
-
-    exit;
 }
-
-
-/*
-|--------------------------------------------------------------------------
-| VALIDATE EMAIL FORMAT
-|--------------------------------------------------------------------------
-*/
-
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-
-    $_SESSION['login_error'] =
-        'Please enter a valid email address.';
-
-    $_SESSION['login_email'] =
-        $email;
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php?login=1'
-    );
-
-    exit;
-}
-
 
 try {
 
-    /*
-    |--------------------------------------------------------------------------
-    | DATABASE
-    |--------------------------------------------------------------------------
-    */
-
     $db = getDB();
-
 
     /*
     |--------------------------------------------------------------------------
@@ -126,7 +51,7 @@ try {
             role,
             status
         FROM users
-        WHERE email = ?
+        WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
         LIMIT 1
     ");
 
@@ -139,25 +64,21 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | INVALID LOGIN
+    | USER NOT FOUND
     |--------------------------------------------------------------------------
     */
 
     if (!$user) {
 
         $_SESSION['login_error'] =
-            'Invalid email or password.';
+            'Email not found in database.';
 
         $_SESSION['login_email'] =
             $email;
 
-        header(
-            'Location: ' .
-            BASE_URL .
-            'index.php?login=1'
+        redirect(
+            BASE_URL . 'index.php?login=1'
         );
-
-        exit;
     }
 
 
@@ -168,6 +89,7 @@ try {
     */
 
     if (
+        empty($user['password']) ||
         !password_verify(
             $password,
             $user['password']
@@ -175,34 +97,31 @@ try {
     ) {
 
         $_SESSION['login_error'] =
-            'Invalid email or password.';
+            'Password does not match the password stored for this account.';
 
         $_SESSION['login_email'] =
             $email;
 
-        header(
-            'Location: ' .
-            BASE_URL .
-            'index.php?login=1'
+        redirect(
+            BASE_URL . 'index.php?login=1'
         );
-
-        exit;
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | CHECK ACCOUNT STATUS
+    | CHECK STATUS
     |--------------------------------------------------------------------------
     */
 
-    $status = strtolower(
-        trim(
-            (string) ($user['status'] ?? 'active')
-        )
-    );
-
-    if ($status !== 'active') {
+    if (
+        isset($user['status']) &&
+        strtolower(
+            trim(
+                (string) $user['status']
+            )
+        ) !== 'active'
+    ) {
 
         $_SESSION['login_error'] =
             'Your account is not active.';
@@ -210,19 +129,15 @@ try {
         $_SESSION['login_email'] =
             $email;
 
-        header(
-            'Location: ' .
-            BASE_URL .
-            'index.php?login=1'
+        redirect(
+            BASE_URL . 'index.php?login=1'
         );
-
-        exit;
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | CHECK ROLE
+    | VALIDATE ROLE
     |--------------------------------------------------------------------------
     */
 
@@ -232,47 +147,43 @@ try {
         )
     );
 
-    $allowedRoles = [
-        'admin',
-        'vendor',
-        'customer'
-    ];
-
-    if (!in_array($role, $allowedRoles, true)) {
+    if (
+        !in_array(
+            $role,
+            [
+                'admin',
+                'vendor',
+                'customer'
+            ],
+            true
+        )
+    ) {
 
         $_SESSION['login_error'] =
             'Invalid account role.';
 
-        $_SESSION['login_email'] =
-            $email;
-
-        header(
-            'Location: ' .
-            BASE_URL .
-            'index.php?login=1'
+        redirect(
+            BASE_URL . 'index.php?login=1'
         );
-
-        exit;
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | REGENERATE SESSION
+    | LOGIN SUCCESS
     |--------------------------------------------------------------------------
     */
 
     session_regenerate_id(true);
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | STORE LOGIN SESSION
-    |--------------------------------------------------------------------------
-    */
-
     $_SESSION['user_id'] =
         (int) $user['user_id'];
+
+    $_SESSION['user_name'] =
+        $user['name'];
+
+    $_SESSION['user_email'] =
+        $user['email'];
 
     $_SESSION['name'] =
         $user['name'];
@@ -283,113 +194,65 @@ try {
     $_SESSION['role'] =
         $role;
 
+    $_SESSION['user_role'] =
+        $role;
+
+    $_SESSION['status'] =
+        $user['status'] ?? 'active';
+
+    $_SESSION['user_status'] =
+        $_SESSION['status'];
+
+    $_SESSION['logged_in'] =
+        true;
+
+    $_SESSION['login_time'] =
+        time();
+
+    $_SESSION['last_activity'] =
+        time();
+
 
     /*
     |--------------------------------------------------------------------------
-    | CLEAR OLD LOGIN DATA
+    | REDIRECT
     |--------------------------------------------------------------------------
     */
 
-    unset(
-        $_SESSION['login_error'],
-        $_SESSION['login_email']
-    );
+    if ($role === 'admin') {
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | REDIRECT BASED ON ROLE
-    |--------------------------------------------------------------------------
-    */
-
-    switch ($role) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | ADMIN
-        |--------------------------------------------------------------------------
-        */
-
-        case 'admin':
-
-            header(
-                'Location: ' .
-                BASE_URL .
-                'admin/dashboard.php'
-            );
-
-            exit;
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | VENDOR
-        |--------------------------------------------------------------------------
-        */
-
-        case 'vendor':
-
-            header(
-                'Location: ' .
-                BASE_URL .
-                'seller/dashboard.php'
-            );
-
-            exit;
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CUSTOMER
-        |--------------------------------------------------------------------------
-        */
-
-        case 'customer':
-
-            header(
-                'Location: ' .
-                BASE_URL .
-                'dashboard.php'
-            );
-
-            exit;
+        redirect(
+            BASE_URL . 'admin/dashboard.php'
+        );
     }
+
+    if ($role === 'vendor') {
+
+        redirect(
+            BASE_URL . 'seller/dashboard.php'
+        );
+    }
+
+    redirect(
+        BASE_URL . 'dashboard.php'
+    );
 
 
 } catch (Throwable $e) {
 
     /*
     |--------------------------------------------------------------------------
-    | DATABASE / SYSTEM ERROR
+    | DEBUG
     |--------------------------------------------------------------------------
     */
 
     $_SESSION['login_error'] =
-        'Unable to login at the moment. Please try again.';
+        'Login error: ' . $e->getMessage();
 
     $_SESSION['login_email'] =
         $email;
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | DEVELOPMENT DEBUG
-    |--------------------------------------------------------------------------
-    */
-
-    if (defined('APP_DEBUG') && APP_DEBUG === true) {
-
-        $_SESSION['login_error'] =
-            'Login error: ' .
-            $e->getMessage();
-    }
-
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php?login=1'
+    redirect(
+        BASE_URL . 'index.php?login=1'
     );
-
-    exit;
 }
