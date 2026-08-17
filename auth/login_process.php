@@ -1,10 +1,30 @@
 <?php
 
-require_once dirname(__DIR__) . '/config.php';
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - LOGIN PROCESS
+|--------------------------------------------------------------------------
+| File:
+| auth/login_process.php
+|
+| Purpose:
+| - Process user login
+| - Verify email and password
+| - Check account status
+| - Create secure login session
+| - Redirect user according to role
+|--------------------------------------------------------------------------
+*/
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/includes/session.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| ONLY ALLOW POST
+|--------------------------------------------------------------------------
+*/
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
@@ -13,28 +33,51 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     );
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| GET FORM DATA
+|--------------------------------------------------------------------------
+*/
+
 $email = trim(
     $_POST['email'] ?? ''
 );
 
-$password = $_POST['password'] ?? '';
+$password =
+    $_POST['password'] ?? '';
 
-if ($email === '' || $password === '') {
+
+/*
+|--------------------------------------------------------------------------
+| VALIDATE INPUT
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $email === '' ||
+    $password === ''
+) {
 
     $_SESSION['login_error'] =
         'Email and password are required.';
-
-    $_SESSION['login_email'] =
-        $email;
 
     redirect(
         BASE_URL . 'index.php?login=1'
     );
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE
+|--------------------------------------------------------------------------
+*/
+
 try {
 
-    $db = getDB();
+    $pdo = getDB();
+
 
     /*
     |--------------------------------------------------------------------------
@@ -42,7 +85,7 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    $stmt = $db->prepare("
+    $stmt = $pdo->prepare("
         SELECT
             user_id,
             name,
@@ -51,7 +94,7 @@ try {
             role,
             status
         FROM users
-        WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
+        WHERE email = ?
         LIMIT 1
     ");
 
@@ -59,7 +102,9 @@ try {
         $email
     ]);
 
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $user = $stmt->fetch(
+        PDO::FETCH_ASSOC
+    );
 
 
     /*
@@ -71,7 +116,7 @@ try {
     if (!$user) {
 
         $_SESSION['login_error'] =
-            'Email not found in database.';
+            'Invalid email or password.';
 
         $_SESSION['login_email'] =
             $email;
@@ -84,12 +129,11 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CHECK PASSWORD
+    | VERIFY PASSWORD
     |--------------------------------------------------------------------------
     */
 
     if (
-        empty($user['password']) ||
         !password_verify(
             $password,
             $user['password']
@@ -97,7 +141,7 @@ try {
     ) {
 
         $_SESSION['login_error'] =
-            'Password does not match the password stored for this account.';
+            'Invalid email or password.';
 
         $_SESSION['login_email'] =
             $email;
@@ -110,18 +154,20 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CHECK STATUS
+    | CHECK ACCOUNT STATUS
     |--------------------------------------------------------------------------
     */
 
-    if (
-        isset($user['status']) &&
-        strtolower(
-            trim(
-                (string) $user['status']
+    $status = strtolower(
+        trim(
+            (string) (
+                $user['status']
+                ?? 'active'
             )
-        ) !== 'active'
-    ) {
+        )
+    );
+
+    if ($status !== 'active') {
 
         $_SESSION['login_error'] =
             'Your account is not active.';
@@ -137,15 +183,25 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | VALIDATE ROLE
+    | NORMALIZE ROLE
     |--------------------------------------------------------------------------
     */
 
     $role = strtolower(
         trim(
-            (string) $user['role']
+            (string) (
+                $user['role']
+                ?? ''
+            )
         )
     );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATE ROLE
+    |--------------------------------------------------------------------------
+    */
 
     if (
         !in_array(
@@ -160,7 +216,7 @@ try {
     ) {
 
         $_SESSION['login_error'] =
-            'Invalid account role.';
+            'Invalid user role.';
 
         redirect(
             BASE_URL . 'index.php?login=1'
@@ -170,11 +226,18 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | LOGIN SUCCESS
+    | REGENERATE SESSION ID
     |--------------------------------------------------------------------------
     */
 
     session_regenerate_id(true);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CREATE LOGIN SESSION
+    |--------------------------------------------------------------------------
+    */
 
     $_SESSION['user_id'] =
         (int) $user['user_id'];
@@ -185,11 +248,24 @@ try {
     $_SESSION['user_email'] =
         $user['email'];
 
+    /*
+    |--------------------------------------------------------------------------
+    | COMPATIBILITY SESSION VALUES
+    |--------------------------------------------------------------------------
+    */
+
     $_SESSION['name'] =
         $user['name'];
 
     $_SESSION['email'] =
         $user['email'];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ROLE
+    |--------------------------------------------------------------------------
+    */
 
     $_SESSION['role'] =
         $role;
@@ -197,11 +273,25 @@ try {
     $_SESSION['user_role'] =
         $role;
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATUS
+    |--------------------------------------------------------------------------
+    */
+
     $_SESSION['status'] =
-        $user['status'] ?? 'active';
+        $status;
 
     $_SESSION['user_status'] =
-        $_SESSION['status'];
+        $status;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOGIN INFORMATION
+    |--------------------------------------------------------------------------
+    */
 
     $_SESSION['logged_in'] =
         true;
@@ -215,7 +305,20 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | REDIRECT
+    | CLEAR LOGIN ERRORS
+    |--------------------------------------------------------------------------
+    */
+
+    unset(
+        $_SESSION['login_error'],
+        $_SESSION['error'],
+        $_SESSION['login_email']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | REDIRECT BY ROLE
     |--------------------------------------------------------------------------
     */
 
@@ -226,6 +329,7 @@ try {
         );
     }
 
+
     if ($role === 'vendor') {
 
         redirect(
@@ -233,8 +337,26 @@ try {
         );
     }
 
+
+    if ($role === 'customer') {
+
+        redirect(
+            BASE_URL . 'dashboard.php'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FALLBACK
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION['login_error'] =
+        'Unable to determine your account role.';
+
     redirect(
-        BASE_URL . 'dashboard.php'
+        BASE_URL . 'index.php?login=1'
     );
 
 
@@ -242,15 +364,24 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | DEBUG
+    | LOG REAL ERROR
+    |--------------------------------------------------------------------------
+    */
+
+    error_log(
+        'HochipoHub Login Error: '
+        . $e->getMessage()
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | USER-FRIENDLY ERROR
     |--------------------------------------------------------------------------
     */
 
     $_SESSION['login_error'] =
-        'Login error: ' . $e->getMessage();
-
-    $_SESSION['login_email'] =
-        $email;
+        'Unable to login right now. Please try again.';
 
     redirect(
         BASE_URL . 'index.php?login=1'
