@@ -2254,156 +2254,435 @@ button {
 
 
 /* =========================================================
-   FOOTER
+   HOCHIPOHUB - PREMIUM FOOTER
 ========================================================= */
 
 .site-footer {
+    position: relative;
 
-    margin-top: 0;
+    width: 100%;
 
-    padding:
-        55px 0 25px;
-
-    color:
-        #cbd5e1;
+    margin-top: 60px;
 
     background:
         linear-gradient(
             135deg,
-            #0f172a,
-            #172554
+            #0b1735 0%,
+            #111f42 45%,
+            #172554 100%
         );
+
+    color: #ffffff;
+
+    overflow: hidden;
+
+    border-top:
+        1px solid rgba(255, 255, 255, 0.08);
 }
 
+
+/* =========================================================
+   BACKGROUND GLOW
+========================================================= */
+
+.footer-glow {
+    position: absolute;
+
+    border-radius: 50%;
+
+    pointer-events: none;
+
+    filter: blur(5px);
+}
+
+
+.footer-glow-1 {
+    width: 300px;
+    height: 300px;
+
+    top: -180px;
+    left: -100px;
+
+    background:
+        rgba(37, 99, 235, 0.15);
+}
+
+
+.footer-glow-2 {
+    width: 250px;
+    height: 250px;
+
+    right: -100px;
+    bottom: -160px;
+
+    background:
+        rgba(79, 70, 229, 0.14);
+}
+
+
+/* =========================================================
+   FOOTER CONTAINER
+========================================================= */
 
 .footer-container {
+    position: relative;
 
-    width:
-        min(
-            1200px,
-            calc(100% - 40px)
-        );
+    z-index: 2;
 
-    margin:
-        0 auto;
-}
+    width: 100%;
 
+    max-width: 1200px;
 
-.footer-grid {
+    margin: 0 auto;
+
+    padding: 65px 35px 55px;
 
     display: grid;
 
     grid-template-columns:
-        2fr 1fr 1fr 1fr;
+        2fr 1fr;
 
-    gap: 40px;
+    gap: 100px;
+
+    align-items: start;
 }
 
 
+/* =========================================================
+   BRAND
+========================================================= */
+
 .footer-brand {
+    max-width: 500px;
+}
 
-    margin-bottom: 12px;
 
-    color: white;
+.footer-logo {
+    display: inline-block;
 
-    font-family:
-        'Poppins',
-        sans-serif;
+    margin-bottom: 15px;
 
-    font-size: 22px;
+    color: #ffffff;
+
+    font-size: 31px;
+
+    font-weight: 900;
+
+    letter-spacing: -1px;
+
+    text-decoration: none;
+
+    transition:
+        transform 0.2s ease;
+}
+
+
+.footer-logo:hover {
+    transform: translateY(-2px);
+}
+
+
+.footer-logo span {
+    color: #60a5fa;
+}
+
+
+.footer-description {
+    max-width: 430px;
+
+    margin: 0;
+
+    color: #a9b8d2;
+
+    font-size: 14px;
+
+    line-height: 1.8;
+}
+
+
+.footer-line {
+    width: 55px;
+
+    height: 3px;
+
+    margin: 22px 0 14px;
+
+    border-radius: 10px;
+
+    background:
+        linear-gradient(
+            90deg,
+            #2563eb,
+            #60a5fa
+        );
+}
+
+
+.footer-tagline {
+    margin: 0;
+
+    color: #7183a3;
+
+    font-size: 12px;
+
+    font-style: italic;
+}
+
+
+/* =========================================================
+   QUICK LINKS
+========================================================= */
+
+.footer-column h3 {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    margin: 3px 0 22px;
+
+    color: #ffffff;
+
+    font-size: 17px;
 
     font-weight: 800;
 }
 
 
-.footer-brand span {
+.footer-heading-line {
+    display: inline-block;
 
-    color:
-        var(--blue-400);
+    width: 4px;
+
+    height: 20px;
+
+    border-radius: 5px;
+
+    background:
+        linear-gradient(
+            180deg,
+            #60a5fa,
+            #2563eb
+        );
 }
 
 
-.footer-description {
+/* =========================================================
+   LINKS
+========================================================= */
 
-    max-width:
-        360px;
+.footer-links {
+    display: flex;
 
-    color:
-        #94a3b8;
+    flex-direction: column;
 
-    font-size:
-        13px;
-
-    line-height:
-        1.8;
+    gap: 5px;
 }
 
 
-.footer-column h4 {
+.footer-links a {
+    display: flex;
 
-    margin-bottom:
-        15px;
+    align-items: center;
 
-    color:
-        white;
+    gap: 12px;
 
-    font-size:
-        13px;
+    width: fit-content;
 
-    font-weight:
-        800;
-}
+    padding: 8px 10px;
 
+    margin-left: -10px;
 
-.footer-column a {
+    border-radius: 9px;
 
-    display:
-        block;
+    color: #aebbd2;
 
-    margin-bottom:
-        9px;
+    text-decoration: none;
 
-    color:
-        #94a3b8;
-
-    font-size:
-        12px;
+    font-size: 14px;
 
     transition:
-        var(--transition);
+        color 0.2s ease,
+        background 0.2s ease,
+        transform 0.2s ease;
 }
 
 
-.footer-column a:hover {
+.footer-links a:hover {
+    color: #ffffff;
 
-    color:
-        var(--blue-300);
+    background:
+        rgba(255, 255, 255, 0.07);
 
-    transform:
-        translateX(3px);
+    transform: translateX(5px);
 }
 
+
+/* =========================================================
+   LINK ICON
+========================================================= */
+
+.footer-link-icon {
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 28px;
+    height: 28px;
+
+    border-radius: 8px;
+
+    background:
+        rgba(96, 165, 250, 0.10);
+
+    color: #60a5fa;
+
+    font-size: 14px;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
+}
+
+
+.footer-links a:hover .footer-link-icon {
+    background: #2563eb;
+
+    color: #ffffff;
+}
+
+
+/* =========================================================
+   FOOTER BOTTOM
+========================================================= */
 
 .footer-bottom {
+    position: relative;
 
-    margin-top:
-        35px;
-
-    padding-top:
-        20px;
+    z-index: 2;
 
     border-top:
-        1px solid
-        rgba(255,255,255,0.10);
+        1px solid rgba(255, 255, 255, 0.08);
+}
 
-    color:
-        #64748b;
 
-    font-size:
-        11px;
+.footer-bottom-inner {
+    width: 100%;
 
-    text-align:
-        center;
+    max-width: 1200px;
+
+    margin: 0 auto;
+
+    padding: 20px 35px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 20px;
+}
+
+
+.footer-bottom p {
+    margin: 0;
+
+    color: #7183a3;
+
+    font-size: 12px;
+}
+
+
+.footer-bottom strong {
+    color: #94a3c5;
+}
+
+
+.footer-made span {
+    color: #60a5fa;
+
+    font-size: 14px;
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (max-width: 800px) {
+
+    .footer-container {
+        grid-template-columns: 1fr 1fr;
+
+        gap: 50px;
+
+        padding:
+            50px 25px 45px;
+    }
+
+
+    .footer-bottom-inner {
+        padding:
+            18px 25px;
+    }
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 600px) {
+
+    .site-footer {
+        margin-top: 40px;
+    }
+
+
+    .footer-container {
+        grid-template-columns: 1fr;
+
+        gap: 35px;
+
+        padding:
+            45px 22px 40px;
+    }
+
+
+    .footer-brand {
+        max-width: 100%;
+    }
+
+
+    .footer-logo {
+        font-size: 27px;
+    }
+
+
+    .footer-description {
+        font-size: 13px;
+    }
+
+
+    .footer-bottom-inner {
+        flex-direction: column;
+
+        justify-content: center;
+
+        text-align: center;
+
+        padding:
+            18px 20px;
+    }
+
+
+    .footer-links a {
+        font-size: 13px;
+    }
 }
 
 
