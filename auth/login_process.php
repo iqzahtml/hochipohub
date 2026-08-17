@@ -4,6 +4,14 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - LOGIN PROCESS
 |--------------------------------------------------------------------------
+| Login for:
+| - Customer
+| - Vendor
+| - Admin
+|
+| Admin accounts are NOT registered through the frontend.
+| Admin must already exist in the users table.
+|--------------------------------------------------------------------------
 */
 
 require_once dirname(__DIR__) . '/config.php';
@@ -15,7 +23,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 /*
 |--------------------------------------------------------------------------
-| ONLY POST
+| ONLY ALLOW POST
 |--------------------------------------------------------------------------
 */
 
@@ -41,23 +49,46 @@ $email = trim(
     $_POST['email'] ?? ''
 );
 
-$password =
-    $_POST['password'] ?? '';
+$password = $_POST['password'] ?? '';
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATION
+| VALIDATE INPUT
 |--------------------------------------------------------------------------
 */
 
-if (
-    $email === '' ||
-    $password === ''
-) {
+if ($email === '' || $password === '') {
 
-    $_SESSION['error'] =
+    $_SESSION['login_error'] =
         'Email and password are required.';
+
+    $_SESSION['login_email'] =
+        $email;
+
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?login=1'
+    );
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| VALIDATE EMAIL FORMAT
+|--------------------------------------------------------------------------
+*/
+
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+
+    $_SESSION['login_error'] =
+        'Please enter a valid email address.';
+
+    $_SESSION['login_email'] =
+        $email;
 
     header(
         'Location: ' .
@@ -82,7 +113,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | GET USER
+    | FIND USER
     |--------------------------------------------------------------------------
     */
 
@@ -103,21 +134,22 @@ try {
         $email
     ]);
 
-    $user = $stmt->fetch(
-        PDO::FETCH_ASSOC
-    );
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 
     /*
     |--------------------------------------------------------------------------
-    | USER NOT FOUND
+    | INVALID LOGIN
     |--------------------------------------------------------------------------
     */
 
     if (!$user) {
 
-        $_SESSION['error'] =
+        $_SESSION['login_error'] =
             'Invalid email or password.';
+
+        $_SESSION['login_email'] =
+            $email;
 
         header(
             'Location: ' .
@@ -142,8 +174,11 @@ try {
         )
     ) {
 
-        $_SESSION['error'] =
+        $_SESSION['login_error'] =
             'Invalid email or password.';
+
+        $_SESSION['login_email'] =
+            $email;
 
         header(
             'Location: ' .
@@ -157,19 +192,23 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CHECK STATUS
+    | CHECK ACCOUNT STATUS
     |--------------------------------------------------------------------------
     */
 
-    if (
-        isset($user['status']) &&
-        strtolower(
-            trim($user['status'])
-        ) !== 'active'
-    ) {
+    $status = strtolower(
+        trim(
+            (string) ($user['status'] ?? 'active')
+        )
+    );
 
-        $_SESSION['error'] =
+    if ($status !== 'active') {
+
+        $_SESSION['login_error'] =
             'Your account is not active.';
+
+        $_SESSION['login_email'] =
+            $email;
 
         header(
             'Location: ' .
@@ -183,12 +222,54 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | LOGIN SUCCESS
+    | CHECK ROLE
+    |--------------------------------------------------------------------------
+    */
+
+    $role = strtolower(
+        trim(
+            (string) $user['role']
+        )
+    );
+
+    $allowedRoles = [
+        'admin',
+        'vendor',
+        'customer'
+    ];
+
+    if (!in_array($role, $allowedRoles, true)) {
+
+        $_SESSION['login_error'] =
+            'Invalid account role.';
+
+        $_SESSION['login_email'] =
+            $email;
+
+        header(
+            'Location: ' .
+            BASE_URL .
+            'index.php?login=1'
+        );
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | REGENERATE SESSION
     |--------------------------------------------------------------------------
     */
 
     session_regenerate_id(true);
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | STORE LOGIN SESSION
+    |--------------------------------------------------------------------------
+    */
 
     $_SESSION['user_id'] =
         (int) $user['user_id'];
@@ -200,18 +281,34 @@ try {
         $user['email'];
 
     $_SESSION['role'] =
-        strtolower(
-            trim($user['role'])
-        );
+        $role;
 
 
     /*
     |--------------------------------------------------------------------------
-    | REDIRECT BY ROLE
+    | CLEAR OLD LOGIN DATA
     |--------------------------------------------------------------------------
     */
 
-    switch ($_SESSION['role']) {
+    unset(
+        $_SESSION['login_error'],
+        $_SESSION['login_email']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | REDIRECT BASED ON ROLE
+    |--------------------------------------------------------------------------
+    */
+
+    switch ($role) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | ADMIN
+        |--------------------------------------------------------------------------
+        */
 
         case 'admin':
 
@@ -224,6 +321,12 @@ try {
             exit;
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | VENDOR
+        |--------------------------------------------------------------------------
+        */
+
         case 'vendor':
 
             header(
@@ -235,6 +338,12 @@ try {
             exit;
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | CUSTOMER
+        |--------------------------------------------------------------------------
+        */
+
         case 'customer':
 
             header(
@@ -244,35 +353,37 @@ try {
             );
 
             exit;
-
-
-        default:
-
-            session_unset();
-
-            session_destroy();
-
-            session_start();
-
-            $_SESSION['error'] =
-                'Invalid user role.';
-
-            header(
-                'Location: ' .
-                BASE_URL .
-                'index.php?login=1'
-            );
-
-            exit;
-
     }
 
 
 } catch (Throwable $e) {
 
-    $_SESSION['error'] =
-        'Login error: ' .
-        $e->getMessage();
+    /*
+    |--------------------------------------------------------------------------
+    | DATABASE / SYSTEM ERROR
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION['login_error'] =
+        'Unable to login at the moment. Please try again.';
+
+    $_SESSION['login_email'] =
+        $email;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DEVELOPMENT DEBUG
+    |--------------------------------------------------------------------------
+    */
+
+    if (defined('APP_DEBUG') && APP_DEBUG === true) {
+
+        $_SESSION['login_error'] =
+            'Login error: ' .
+            $e->getMessage();
+    }
+
 
     header(
         'Location: ' .
@@ -281,5 +392,4 @@ try {
     );
 
     exit;
-
 }
