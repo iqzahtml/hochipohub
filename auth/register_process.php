@@ -4,20 +4,13 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - REGISTER PROCESS
 |--------------------------------------------------------------------------
-| File:
-| auth/register_process.php
-|
-| Purpose:
-| - Register customer
-| - Register vendor
-| - Insert vendor profile
-| - Store correct role
-|--------------------------------------------------------------------------
 */
 
 require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/includes/session.php';
-require_once dirname(__DIR__) . '/includes/functions.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 
 /*
@@ -28,8 +21,8 @@ require_once dirname(__DIR__) . '/includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
-    redirect(
-        BASE_URL . 'index.php'
+    header(
+        'Location: ' . BASE_URL . 'index.php'
     );
 
     exit;
@@ -42,17 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 |--------------------------------------------------------------------------
 */
 
-$name = trim(
-    $_POST['name'] ?? ''
-);
+$name = trim($_POST['name'] ?? '');
 
-$email = trim(
-    $_POST['email'] ?? ''
-);
+$email = trim($_POST['email'] ?? '');
 
-$phone = trim(
-    $_POST['phone'] ?? ''
-);
+$phone = trim($_POST['phone'] ?? '');
 
 $role = strtolower(
     trim(
@@ -62,30 +49,23 @@ $role = strtolower(
 
 $password = $_POST['password'] ?? '';
 
-$confirmPassword = $_POST['confirm_password'] ?? '';
+$confirmPassword =
+    $_POST['confirm_password'] ?? '';
 
-$terms = (
-    isset($_POST['terms']) &&
-    $_POST['terms'] === '1'
-);
+$terms = isset($_POST['terms']);
 
 
 /*
 |--------------------------------------------------------------------------
-| KEEP OLD FORM DATA
+| KEEP OLD DATA
 |--------------------------------------------------------------------------
 */
 
 $_SESSION['register_old'] = [
-
     'name' => $name,
-
     'email' => $email,
-
     'phone' => $phone,
-
     'role' => $role
-
 ];
 
 
@@ -95,17 +75,15 @@ $_SESSION['register_old'] = [
 |--------------------------------------------------------------------------
 */
 
-if (
-    $name === '' ||
-    mb_strlen($name) < 2 ||
-    mb_strlen($name) > 100
-) {
+if ($name === '') {
 
     $_SESSION['register_error'] =
-        'Please enter a valid full name.';
+        'Name is required.';
 
-    redirect(
-        BASE_URL . 'index.php?register=1'
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?register=1'
     );
 
     exit;
@@ -129,8 +107,10 @@ if (
     $_SESSION['register_error'] =
         'Please enter a valid email address.';
 
-    redirect(
-        BASE_URL . 'index.php?register=1'
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?register=1'
     );
 
     exit;
@@ -143,39 +123,21 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if ($phone === '') {
-
-    $_SESSION['register_error'] =
-        'Please enter your phone number.';
-
-    redirect(
-        BASE_URL . 'index.php?register=1'
-    );
-
-    exit;
-}
-
-
 $cleanPhone = preg_replace(
     '/[\s\-\(\)]/',
     '',
     $phone
 );
 
-
-if (
-    $cleanPhone === null ||
-    !preg_match(
-        '/^\+?[0-9]{9,15}$/',
-        $cleanPhone
-    )
-) {
+if ($cleanPhone === '') {
 
     $_SESSION['register_error'] =
-        'Please enter a valid phone number.';
+        'Phone number is required.';
 
-    redirect(
-        BASE_URL . 'index.php?register=1'
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?register=1'
     );
 
     exit;
@@ -186,17 +148,12 @@ if (
 |--------------------------------------------------------------------------
 | VALIDATE ROLE
 |--------------------------------------------------------------------------
-|
-| Customer atau Vendor sahaja.
-| Admin tidak boleh register melalui form biasa.
-|--------------------------------------------------------------------------
 */
 
 $allowedRoles = [
     'customer',
     'vendor'
 ];
-
 
 if (
     !in_array(
@@ -207,10 +164,12 @@ if (
 ) {
 
     $_SESSION['register_error'] =
-        'Invalid account type selected.';
+        'Invalid account type.';
 
-    redirect(
-        BASE_URL . 'index.php?register=1'
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?register=1'
     );
 
     exit;
@@ -223,16 +182,15 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if (
-    $password === '' ||
-    strlen($password) < 6
-) {
+if (strlen($password) < 6) {
 
     $_SESSION['register_error'] =
         'Password must contain at least 6 characters.';
 
-    redirect(
-        BASE_URL . 'index.php?register=1'
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?register=1'
     );
 
     exit;
@@ -245,15 +203,15 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if (
-    $password !== $confirmPassword
-) {
+if ($password !== $confirmPassword) {
 
     $_SESSION['register_error'] =
         'Passwords do not match.';
 
-    redirect(
-        BASE_URL . 'index.php?register=1'
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?register=1'
     );
 
     exit;
@@ -271,8 +229,10 @@ if (!$terms) {
     $_SESSION['register_error'] =
         'You must agree to the terms and conditions.';
 
-    redirect(
-        BASE_URL . 'index.php?register=1'
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?register=1'
     );
 
     exit;
@@ -281,7 +241,7 @@ if (!$terms) {
 
 /*
 |--------------------------------------------------------------------------
-| DATABASE
+| DATABASE REGISTER
 |--------------------------------------------------------------------------
 */
 
@@ -310,10 +270,12 @@ try {
     if ($stmt->fetch()) {
 
         $_SESSION['register_error'] =
-            'An account with this email already exists.';
+            'This email is already registered.';
 
-        redirect(
-            BASE_URL . 'index.php?register=1'
+        header(
+            'Location: ' .
+            BASE_URL .
+            'index.php?register=1'
         );
 
         exit;
@@ -340,10 +302,12 @@ try {
     if ($stmt->fetch()) {
 
         $_SESSION['register_error'] =
-            'An account with this phone number already exists.';
+            'This phone number is already registered.';
 
-        redirect(
-            BASE_URL . 'index.php?register=1'
+        header(
+            'Location: ' .
+            BASE_URL .
+            'index.php?register=1'
         );
 
         exit;
@@ -352,7 +316,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | PASSWORD HASH
+    | HASH PASSWORD
     |--------------------------------------------------------------------------
     */
 
@@ -360,19 +324,6 @@ try {
         $password,
         PASSWORD_DEFAULT
     );
-
-
-    if ($passwordHash === false) {
-
-        $_SESSION['register_error'] =
-            'Unable to secure your password.';
-
-        redirect(
-            BASE_URL . 'index.php?register=1'
-        );
-
-        exit;
-    }
 
 
     /*
@@ -388,6 +339,9 @@ try {
     |--------------------------------------------------------------------------
     | INSERT USER
     |--------------------------------------------------------------------------
+    |
+    | Ikut database users awak.
+    |--------------------------------------------------------------------------
     */
 
     $stmt = $db->prepare("
@@ -397,84 +351,61 @@ try {
             email,
             phone,
             password,
-            role
+            role,
+            status
         )
         VALUES
         (
-            ?,
-            ?,
-            ?,
-            ?,
-            ?
+            :name,
+            :email,
+            :phone,
+            :password,
+            :role,
+            'active'
         )
     ");
 
+
     $stmt->execute([
-        $name,
-        $email,
-        $cleanPhone,
-        $passwordHash,
-        $role
+
+        ':name' => $name,
+
+        ':email' => $email,
+
+        ':phone' => $cleanPhone,
+
+        ':password' => $passwordHash,
+
+        ':role' => $role
+
     ]);
 
 
     /*
     |--------------------------------------------------------------------------
-    | GET NEW USER ID
+    | GET USER ID
     |--------------------------------------------------------------------------
     */
 
-    $userId = (int) $db->lastInsertId();
+    $userId = (int)
+        $db->lastInsertId();
 
 
     if ($userId <= 0) {
 
         throw new Exception(
-            'Unable to create user account.'
+            'Failed to create user.'
         );
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | VENDOR REGISTRATION
-    |--------------------------------------------------------------------------
-    |
-    | Kalau role = vendor,
-    | create vendor record.
+    | VENDOR PROFILE
     |--------------------------------------------------------------------------
     */
 
     if ($role === 'vendor') {
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CHECK VENDOR TABLE
-        |--------------------------------------------------------------------------
-        */
-
-        $checkVendorTable = $db->query("
-            SHOW TABLES LIKE 'vendors'
-        ");
-
-
-        if (
-            !$checkVendorTable ||
-            !$checkVendorTable->fetchColumn()
-        ) {
-
-            throw new Exception(
-                'The vendors table does not exist.'
-            );
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | INSERT VENDOR
-        |--------------------------------------------------------------------------
-        */
 
         $vendorStmt = $db->prepare("
             INSERT INTO vendors
@@ -491,32 +422,18 @@ try {
             )
         ");
 
-
         $vendorStmt->execute([
             $userId,
             $name,
             'Pending'
         ]);
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | CHECK INSERT
-        |--------------------------------------------------------------------------
-        */
-
-        if ($vendorStmt->rowCount() !== 1) {
-
-            throw new Exception(
-                'Vendor profile could not be created.'
-            );
-        }
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | COMMIT DATABASE
+    | COMMIT
     |--------------------------------------------------------------------------
     */
 
@@ -525,7 +442,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CLEAR OLD FORM DATA
+    | CLEAR OLD DATA
     |--------------------------------------------------------------------------
     */
 
@@ -536,33 +453,21 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | SUCCESS MESSAGE
+    | SUCCESS
     |--------------------------------------------------------------------------
     */
 
     $_SESSION['login_success'] =
-        'Account created successfully. '
-        . 'You can now login.';
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | SAVE LOGIN EMAIL
-    |--------------------------------------------------------------------------
-    */
+        'Account created successfully. Please login.';
 
     $_SESSION['login_email'] =
         $email;
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | REDIRECT TO LOGIN
-    |--------------------------------------------------------------------------
-    */
-
-    redirect(
-        BASE_URL . 'index.php?login=1'
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?login=1'
     );
 
     exit;
@@ -584,41 +489,27 @@ try {
     ) {
 
         $db->rollBack();
+
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | DEBUG ERROR
+    | DEBUG
     |--------------------------------------------------------------------------
     */
 
-    if (
-        defined('APP_DEBUG') &&
-        APP_DEBUG
-    ) {
-
-        $_SESSION['register_error'] =
-            'Registration error: ' .
-            $e->getMessage();
-
-    } else {
-
-        $_SESSION['register_error'] =
-            'Something went wrong while creating your account. '
-            . 'Please try again later.';
-    }
+    $_SESSION['register_error'] =
+        'Registration error: ' .
+        $e->getMessage();
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | REDIRECT
-    |--------------------------------------------------------------------------
-    */
-
-    redirect(
-        BASE_URL . 'index.php?register=1'
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?register=1'
     );
 
     exit;
+
 }
