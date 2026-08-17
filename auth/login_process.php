@@ -2,32 +2,69 @@
 
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/database/db.php';
+require_once dirname(__DIR__) . '/includes/session.php';
+require_once dirname(__DIR__) . '/includes/functions.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: ../index.php");
-    exit;
-}
-
-$email = trim($_POST['email'] ?? '');
-$password = $_POST['password'] ?? '';
-
-if ($email === '' || $password === '') {
-    $_SESSION['error'] = "Email and password are required.";
-    header("Location: ../index.php");
-    exit;
-}
 
 /*
 |--------------------------------------------------------------------------
-| DATABASE
+| ONLY POST REQUEST
 |--------------------------------------------------------------------------
 */
 
-$db = getDB();
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+
+    header('Location: ' . BASE_URL . 'index.php');
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET FORM DATA
+|--------------------------------------------------------------------------
+*/
+
+$email = trim($_POST['email'] ?? '');
+
+$password = $_POST['password'] ?? '';
+
+
+/*
+|--------------------------------------------------------------------------
+| VALIDATION
+|--------------------------------------------------------------------------
+*/
+
+if ($email === '' || $password === '') {
+
+    $_SESSION['error'] =
+        'Email and password are required.';
+
+    header('Location: ' . BASE_URL . 'index.php?login=1');
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE CONNECTION
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    $db = getDB();
+
+} catch (Exception $e) {
+
+    $_SESSION['error'] =
+        'Database connection failed.';
+
+    header('Location: ' . BASE_URL . 'index.php');
+    exit;
+}
+
 
 /*
 |--------------------------------------------------------------------------
@@ -42,21 +79,37 @@ $stmt = $db->prepare("
         email,
         password,
         role,
-        status
+        status,
+        mfa_enabled
     FROM users
     WHERE email = ?
     LIMIT 1
 ");
 
-$stmt->execute([$email]);
+$stmt->execute([
+    $email
+]);
 
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
+$user = $stmt->fetch(
+    PDO::FETCH_ASSOC
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| CHECK USER
+|--------------------------------------------------------------------------
+*/
 
 if (!$user) {
-    $_SESSION['error'] = "Invalid email or password.";
-    header("Location: ../index.php");
+
+    $_SESSION['error'] =
+        'Invalid email or password.';
+
+    header('Location: ' . BASE_URL . 'index.php?login=1');
     exit;
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -64,39 +117,123 @@ if (!$user) {
 |--------------------------------------------------------------------------
 */
 
-if (!password_verify($password, $user['password'])) {
-    $_SESSION['error'] = "Invalid email or password.";
-    header("Location: ../index.php");
+if (
+    !password_verify(
+        $password,
+        $user['password']
+    )
+) {
+
+    $_SESSION['error'] =
+        'Invalid email or password.';
+
+    header('Location: ' . BASE_URL . 'index.php?login=1');
     exit;
 }
 
+
 /*
 |--------------------------------------------------------------------------
-| CHECK USER STATUS
+| CHECK ACCOUNT STATUS
 |--------------------------------------------------------------------------
 */
+
+$status = strtolower(
+    trim(
+        $user['status'] ?? 'active'
+    )
+);
+
+if ($status !== 'active') {
+
+    $_SESSION['error'] =
+        'Your account is not active.';
+
+    header('Location: ' . BASE_URL . 'index.php?login=1');
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| NORMALIZE ROLE
+|--------------------------------------------------------------------------
+*/
+
+$role = strtolower(
+    trim(
+        $user['role'] ?? 'customer'
+    )
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| VALIDATE ROLE
+|--------------------------------------------------------------------------
+*/
+
+$allowedRoles = [
+    'admin',
+    'vendor',
+    'customer'
+];
 
 if (
-    isset($user['status']) &&
-    strtolower($user['status']) !== 'active'
+    !in_array(
+        $role,
+        $allowedRoles,
+        true
+    )
 ) {
-    $_SESSION['error'] = "Your account is not active.";
-    header("Location: ../index.php");
+
+    $_SESSION['error'] =
+        'Invalid user role.';
+
+    header('Location: ' . BASE_URL . 'index.php?login=1');
     exit;
 }
 
+
 /*
 |--------------------------------------------------------------------------
-| LOGIN SUCCESS
+| LOGIN SESSION
 |--------------------------------------------------------------------------
 */
 
-session_regenerate_id(true);
+$user['role'] = $role;
 
-$_SESSION['user_id'] = (int) $user['user_id'];
-$_SESSION['name']    = $user['name'];
-$_SESSION['email']   = $user['email'];
-$_SESSION['role']    = strtolower(trim($user['role']));
+if (!createLoginSession($user)) {
+
+    $_SESSION['error'] =
+        'Unable to create login session.';
+
+    header('Location: ' . BASE_URL . 'index.php?login=1');
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| COMPATIBILITY SESSION
+|--------------------------------------------------------------------------
+*/
+
+$_SESSION['name'] =
+    $user['name'];
+
+$_SESSION['email'] =
+    $user['email'];
+
+$_SESSION['role'] =
+    $role;
+
+$_SESSION['user_role'] =
+    $role;
+
+$_SESSION['status'] =
+    $status;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -104,30 +241,75 @@ $_SESSION['role']    = strtolower(trim($user['role']));
 |--------------------------------------------------------------------------
 */
 
-switch ($_SESSION['role']) {
+switch ($role) {
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN
+    |--------------------------------------------------------------------------
+    */
 
     case 'admin':
 
-        header("Location: ../admin/dashboard.php");
+        header(
+            'Location: ' .
+            BASE_URL .
+            'admin/dashboard.php'
+        );
+
         exit;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VENDOR
+    |--------------------------------------------------------------------------
+    */
 
     case 'vendor':
 
-        header("Location: ../seller/dashboard.php");
+        header(
+            'Location: ' .
+            BASE_URL .
+            'seller/dashboard.php'
+        );
+
         exit;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CUSTOMER
+    |--------------------------------------------------------------------------
+    */
 
     case 'customer':
 
-        header("Location: ../dashboard.php");
+        header(
+            'Location: ' .
+            BASE_URL .
+            'dashboard.php'
+        );
+
         exit;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DEFAULT
+    |--------------------------------------------------------------------------
+    */
 
     default:
 
-        $_SESSION['error'] = "Invalid user role.";
+        $_SESSION['error'] =
+            'Invalid user role.';
 
-        session_unset();
-        session_destroy();
+        header(
+            'Location: ' .
+            BASE_URL .
+            'index.php'
+        );
 
-        header("Location: ../index.php");
         exit;
 }
