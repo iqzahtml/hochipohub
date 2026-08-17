@@ -155,24 +155,26 @@ if (!empty($userName)) {
              ===================================================== -->
 
         <a
-            href="<?= htmlspecialchars(
-                navUrl('index.php'),
-                ENT_QUOTES,
-                'UTF-8'
-            ) ?>"
-            class="brand"
-            aria-label="HochipoHub Home"
-        >
+    href="<?= htmlspecialchars(
+        navUrl('index.php'),
+        ENT_QUOTES,
+        'UTF-8'
+    ) ?>"
+    class="brand"
+    aria-label="HochipoHub Home"
+>
 
-            <span class="brand-mark">
-                H
-            </span>
+    <img
+        src="<?= htmlspecialchars(
+            navUrl('image/logo.jpeg'),
+            ENT_QUOTES,
+            'UTF-8'
+        ) ?>"
+        alt="HochipoHub"
+        class="header-logo"
+    >
 
-            <span class="brand-text">
-                Hochipo<span>Hub</span>
-            </span>
-
-        </a>
+</a>
 
 
         <!-- =====================================================
