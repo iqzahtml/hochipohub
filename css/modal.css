@@ -1,17 +1,14 @@
-/*
-=========================================================
-HOCHIPOHUB - AUTH MODAL
-LOGIN / REGISTER POPUP
-=========================================================
-*/
+/* =========================================================
+   HOCHIPOHUB - GLASSMORPHISM AUTH MODAL
+   Login + Register Modal
+========================================================= */
 
 
 /* =========================================================
-   MODAL OVERLAY
-   ========================================================= */
+   OVERLAY
+========================================================= */
 
 .modal-overlay {
-
     display: none !important;
 
     position: fixed !important;
@@ -31,42 +28,57 @@ LOGIN / REGISTER POPUP
     align-items: center !important;
     justify-content: center !important;
 
-    background: rgba(15, 23, 42, 0.78) !important;
+    background:
+        radial-gradient(
+            circle at 20% 20%,
+            rgba(59, 130, 246, 0.25),
+            transparent 35%
+        ),
+        radial-gradient(
+            circle at 80% 80%,
+            rgba(139, 92, 246, 0.22),
+            transparent 35%
+        ),
+        rgba(2, 6, 23, 0.68) !important;
+
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
 
     z-index: 2147483647 !important;
 
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+
+    transition:
+        opacity 0.25s ease,
+        visibility 0.25s ease !important;
 }
 
 
 /* =========================================================
-   SHOW MODAL
-   ========================================================= */
+   SHOW OVERLAY
+========================================================= */
 
 .modal-overlay.show {
-
     display: flex !important;
 
     opacity: 1 !important;
-
     visibility: visible !important;
-
     pointer-events: auto !important;
-
 }
 
 
 /* =========================================================
-   MODAL BOX
-   ========================================================= */
+   GLASS MODAL BOX
+========================================================= */
 
 .modal-overlay .auth-modal {
-
     display: block !important;
 
     position: relative !important;
 
     width: 100% !important;
-
     max-width: 460px !important;
 
     max-height: calc(100vh - 40px) !important;
@@ -79,71 +91,107 @@ LOGIN / REGISTER POPUP
 
     overflow-y: auto !important;
 
-    background: #ffffff !important;
+    /*
+       GLASS EFFECT
+    */
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.22),
+            rgba(255, 255, 255, 0.08)
+        ) !important;
 
-    border: 1px solid #e2e8f0 !important;
+    backdrop-filter: blur(28px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(160%) !important;
+
+    /*
+       GLASS BORDER
+    */
+    border: 1px solid rgba(255, 255, 255, 0.32) !important;
 
     border-radius: 24px !important;
 
+    /*
+       GLASS SHADOW
+    */
     box-shadow:
-        0 30px 80px rgba(0, 0, 0, 0.40),
-        0 10px 30px rgba(37, 99, 235, 0.20) !important;
+        0 30px 80px rgba(0, 0, 0, 0.45),
+        0 10px 35px rgba(37, 99, 235, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
 
-    color: #0f172a !important;
+    color: #ffffff !important;
 
     transform: translateY(0) scale(1) !important;
 
     opacity: 1 !important;
-
     visibility: visible !important;
-
 }
 
 
 /* =========================================================
    REGISTER MODAL
-   ========================================================= */
+========================================================= */
 
 .modal-overlay .auth-modal-register {
-
     max-width: 560px !important;
+}
 
+
+/* =========================================================
+   GLASS TOP HIGHLIGHT
+========================================================= */
+
+.modal-overlay .auth-modal::before {
+    content: "" !important;
+
+    position: absolute !important;
+
+    top: 0 !important;
+    left: 10% !important;
+
+    width: 80% !important;
+    height: 1px !important;
+
+    background:
+        linear-gradient(
+            90deg,
+            transparent,
+            rgba(255, 255, 255, 0.7),
+            transparent
+        ) !important;
+
+    pointer-events: none !important;
 }
 
 
 /* =========================================================
    CLOSE BUTTON
-   ========================================================= */
+========================================================= */
 
 .modal-overlay .modal-close {
-
     position: absolute !important;
 
     top: 14px !important;
-
     right: 14px !important;
 
     width: 38px !important;
-
     height: 38px !important;
 
     display: flex !important;
 
     align-items: center !important;
-
     justify-content: center !important;
 
     margin: 0 !important;
-
     padding: 0 !important;
 
-    border: 0 !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
 
     border-radius: 50% !important;
 
-    background: #f1f5f9 !important;
+    background: rgba(255, 255, 255, 0.12) !important;
 
-    color: #475569 !important;
+    color: #ffffff !important;
 
     font-size: 25px !important;
 
@@ -153,24 +201,29 @@ LOGIN / REGISTER POPUP
 
     z-index: 10 !important;
 
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease !important;
 }
 
 
 .modal-overlay .modal-close:hover {
+    background: rgba(255, 255, 255, 0.22) !important;
 
-    background: #dbeafe !important;
+    color: #ffffff !important;
 
-    color: #2563eb !important;
-
+    transform: rotate(90deg) !important;
 }
 
 
 /* =========================================================
    HEADER
-   ========================================================= */
+========================================================= */
 
 .auth-modal-header {
-
     display: block !important;
 
     width: 100% !important;
@@ -178,20 +231,20 @@ LOGIN / REGISTER POPUP
     margin: 0 0 24px !important;
 
     text-align: center !important;
-
 }
 
 
+/* =========================================================
+   ICON
+========================================================= */
+
 .auth-modal-icon {
-
     width: 58px !important;
-
     height: 58px !important;
 
     display: flex !important;
 
     align-items: center !important;
-
     justify-content: center !important;
 
     margin: 0 auto 12px !important;
@@ -201,44 +254,51 @@ LOGIN / REGISTER POPUP
     background:
         linear-gradient(
             135deg,
-            #2563eb,
-            #4f46e5
+            rgba(59, 130, 246, 0.85),
+            rgba(99, 102, 241, 0.85)
         ) !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
 
     color: #ffffff !important;
 
     font-size: 27px !important;
 
     box-shadow:
-        0 10px 25px rgba(37, 99, 235, 0.25) !important;
-
+        0 10px 25px rgba(37, 99, 235, 0.30),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
 }
 
 
-.auth-eyebrow {
+/* =========================================================
+   EYEBROW
+========================================================= */
 
+.auth-eyebrow {
     display: block !important;
 
     margin: 0 0 5px !important;
 
-    color: #2563eb !important;
+    color: #93c5fd !important;
 
     font-size: 11px !important;
 
     font-weight: 800 !important;
 
     letter-spacing: 1.5px !important;
-
 }
 
 
-.auth-modal-header h2 {
+/* =========================================================
+   TITLE
+========================================================= */
 
+.auth-modal-header h2 {
     display: block !important;
 
     margin: 0 0 7px !important;
 
-    color: #0f172a !important;
+    color: #ffffff !important;
 
     font-size: 25px !important;
 
@@ -246,30 +306,33 @@ LOGIN / REGISTER POPUP
 
     line-height: 1.25 !important;
 
+    text-shadow:
+        0 2px 12px rgba(0, 0, 0, 0.20) !important;
 }
 
 
-.auth-modal-header p {
+/* =========================================================
+   DESCRIPTION
+========================================================= */
 
+.auth-modal-header p {
     display: block !important;
 
     margin: 0 !important;
 
-    color: #64748b !important;
+    color: rgba(255, 255, 255, 0.72) !important;
 
     font-size: 14px !important;
 
     line-height: 1.5 !important;
-
 }
 
 
 /* =========================================================
    ALERT
-   ========================================================= */
+========================================================= */
 
 .auth-alert {
-
     display: block !important;
 
     width: 100% !important;
@@ -286,37 +349,34 @@ LOGIN / REGISTER POPUP
 
     line-height: 1.5 !important;
 
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
 }
 
 
 .auth-alert-success {
+    background: rgba(16, 185, 129, 0.16) !important;
 
-    background: #ecfdf5 !important;
+    border: 1px solid rgba(110, 231, 183, 0.35) !important;
 
-    border: 1px solid #a7f3d0 !important;
-
-    color: #047857 !important;
-
+    color: #a7f3d0 !important;
 }
 
 
 .auth-alert-error {
+    background: rgba(239, 68, 68, 0.16) !important;
 
-    background: #fef2f2 !important;
+    border: 1px solid rgba(252, 165, 165, 0.35) !important;
 
-    border: 1px solid #fecaca !important;
-
-    color: #b91c1c !important;
-
+    color: #fecaca !important;
 }
 
 
 /* =========================================================
    FORM
-   ========================================================= */
+========================================================= */
 
 .auth-form {
-
     display: block !important;
 
     width: 100% !important;
@@ -324,43 +384,41 @@ LOGIN / REGISTER POPUP
     margin: 0 !important;
 
     padding: 0 !important;
-
 }
 
 
-.form-group {
+/* =========================================================
+   FORM GROUP
+========================================================= */
 
+.form-group {
     display: block !important;
 
     width: 100% !important;
 
     margin: 0 0 17px !important;
-
 }
 
 
 .form-group label {
-
     display: block !important;
 
     margin: 0 0 7px !important;
 
-    color: #334155 !important;
+    color: rgba(255, 255, 255, 0.88) !important;
 
     font-size: 13px !important;
 
     font-weight: 700 !important;
-
 }
 
 
 /* =========================================================
-   INPUT
-   ========================================================= */
+   INPUTS
+========================================================= */
 
 .auth-form input:not([type="checkbox"]):not([type="hidden"]),
 .auth-form select {
-
     display: block !important;
 
     width: 100% !important;
@@ -375,13 +433,14 @@ LOGIN / REGISTER POPUP
 
     box-sizing: border-box !important;
 
-    border: 1px solid #cbd5e1 !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
 
     border-radius: 12px !important;
 
-    background: #f8fafc !important;
+    background:
+        rgba(255, 255, 255, 0.10) !important;
 
-    color: #0f172a !important;
+    color: #ffffff !important;
 
     font-family: inherit !important;
 
@@ -389,60 +448,88 @@ LOGIN / REGISTER POPUP
 
     outline: none !important;
 
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease !important;
 }
 
 
+/* =========================================================
+   INPUT PLACEHOLDER
+========================================================= */
+
+.auth-form input::placeholder {
+    color: rgba(255, 255, 255, 0.50) !important;
+}
+
+
+/* =========================================================
+   INPUT FOCUS
+========================================================= */
+
 .auth-form input:not([type="checkbox"]):not([type="hidden"]):focus,
 .auth-form select:focus {
+    background:
+        rgba(255, 255, 255, 0.16) !important;
 
-    background: #ffffff !important;
-
-    border-color: #2563eb !important;
+    border-color:
+        rgba(147, 197, 253, 0.75) !important;
 
     box-shadow:
-        0 0 0 4px rgba(37, 99, 235, 0.10) !important;
+        0 0 0 4px rgba(59, 130, 246, 0.14),
+        0 8px 25px rgba(0, 0, 0, 0.10) !important;
+}
 
+
+/* =========================================================
+   SELECT
+========================================================= */
+
+.auth-form select option {
+    background: #1e293b !important;
+
+    color: #ffffff !important;
 }
 
 
 /* =========================================================
    PASSWORD
-   ========================================================= */
+========================================================= */
 
 .password-input {
-
     position: relative !important;
 
     display: block !important;
 
     width: 100% !important;
-
 }
 
 
 .password-input input {
-
     padding-right: 48px !important;
-
 }
 
 
-.password-toggle {
+/* =========================================================
+   PASSWORD TOGGLE
+========================================================= */
 
+.password-toggle {
     position: absolute !important;
 
     top: 50% !important;
-
     right: 8px !important;
 
     width: 34px !important;
-
     height: 34px !important;
 
     min-width: 34px !important;
 
     margin: 0 !important;
-
     padding: 0 !important;
 
     transform: translateY(-50%) !important;
@@ -453,30 +540,43 @@ LOGIN / REGISTER POPUP
 
     background: transparent !important;
 
-    color: #475569 !important;
+    color: rgba(255, 255, 255, 0.75) !important;
 
     font-size: 17px !important;
 
     cursor: pointer !important;
 
     z-index: 5 !important;
-
 }
 
 
 .password-toggle:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
 
-    background: #e2e8f0 !important;
-
+    color: #ffffff !important;
 }
 
 
 /* =========================================================
-   FORM LABEL ROW
-   ========================================================= */
+   TWO COLUMN
+========================================================= */
+
+.form-grid-2 {
+    display: grid !important;
+
+    grid-template-columns: 1fr 1fr !important;
+
+    gap: 14px !important;
+
+    width: 100% !important;
+}
+
+
+/* =========================================================
+   LABEL ROW
+========================================================= */
 
 .form-label-row {
-
     display: flex !important;
 
     align-items: center !important;
@@ -486,60 +586,41 @@ LOGIN / REGISTER POPUP
     gap: 10px !important;
 
     margin-bottom: 7px !important;
-
 }
 
 
 .form-label-row label {
-
     margin: 0 !important;
-
-}
-
-
-.form-link {
-
-    color: #2563eb !important;
-
-    font-size: 12px !important;
-
-    font-weight: 700 !important;
-
-    text-decoration: none !important;
-
-}
-
-
-.form-link:hover {
-
-    text-decoration: underline !important;
-
 }
 
 
 /* =========================================================
-   TWO COLUMN
-   ========================================================= */
+   LINKS
+========================================================= */
 
-.form-grid-2 {
+.form-link {
+    color: #93c5fd !important;
 
-    display: grid !important;
+    font-size: 12px !important;
 
-    grid-template-columns: 1fr 1fr !important;
+    text-decoration: none !important;
 
-    gap: 14px !important;
+    transition: color 0.2s ease !important;
+}
 
-    width: 100% !important;
 
+.form-link:hover {
+    color: #dbeafe !important;
+
+    text-decoration: underline !important;
 }
 
 
 /* =========================================================
    CHECKBOX
-   ========================================================= */
+========================================================= */
 
 .checkbox-row {
-
     display: flex !important;
 
     align-items: flex-start !important;
@@ -552,42 +633,48 @@ LOGIN / REGISTER POPUP
 
     padding: 0 !important;
 
-    color: #64748b !important;
+    color: rgba(255, 255, 255, 0.70) !important;
 
     font-size: 12px !important;
 
     line-height: 1.5 !important;
 
     cursor: pointer !important;
-
 }
 
 
 .checkbox-row input[type="checkbox"] {
-
     width: 16px !important;
-
     height: 16px !important;
 
     min-width: 16px !important;
-
     min-height: 16px !important;
 
     margin: 1px 0 0 !important;
 
     padding: 0 !important;
 
-    accent-color: #2563eb !important;
+    accent-color: #60a5fa !important;
+}
 
+
+.checkbox-row a {
+    color: #93c5fd !important;
+
+    text-decoration: none !important;
+}
+
+
+.checkbox-row a:hover {
+    text-decoration: underline !important;
 }
 
 
 /* =========================================================
    SUBMIT BUTTON
-   ========================================================= */
+========================================================= */
 
 .auth-submit {
-
     display: flex !important;
 
     align-items: center !important;
@@ -604,15 +691,15 @@ LOGIN / REGISTER POPUP
 
     box-sizing: border-box !important;
 
-    border: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.20) !important;
 
     border-radius: 13px !important;
 
     background:
         linear-gradient(
             135deg,
-            #2563eb,
-            #4f46e5
+            rgba(37, 99, 235, 0.90),
+            rgba(79, 70, 229, 0.90)
         ) !important;
 
     color: #ffffff !important;
@@ -626,27 +713,34 @@ LOGIN / REGISTER POPUP
     cursor: pointer !important;
 
     box-shadow:
-        0 8px 20px rgba(37, 99, 235, 0.25) !important;
+        0 8px 25px rgba(37, 99, 235, 0.30),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
 
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease !important;
 }
 
 
 .auth-submit:hover {
-
     transform: translateY(-2px) !important;
 
     box-shadow:
-        0 12px 28px rgba(37, 99, 235, 0.32) !important;
+        0 14px 32px rgba(37, 99, 235, 0.40),
+        inset 0 1px 0 rgba(255, 255, 255, 0.30) !important;
+}
 
+
+.auth-submit:active {
+    transform: translateY(0) !important;
 }
 
 
 /* =========================================================
    DIVIDER
-   ========================================================= */
+========================================================= */
 
 .auth-divider {
-
     display: flex !important;
 
     align-items: center !important;
@@ -655,50 +749,45 @@ LOGIN / REGISTER POPUP
 
     margin: 21px 0 17px !important;
 
-    color: #94a3b8 !important;
+    color: rgba(255, 255, 255, 0.45) !important;
 
     font-size: 11px !important;
 
     font-weight: 700 !important;
-
 }
 
 
 .auth-divider::before,
 .auth-divider::after {
+    content: "" !important;
 
-    content: "";
+    flex: 1 !important;
 
-    flex: 1;
+    height: 1px !important;
 
-    height: 1px;
-
-    background: #e2e8f0;
-
+    background:
+        rgba(255, 255, 255, 0.18) !important;
 }
 
 
 /* =========================================================
    SWITCH
-   ========================================================= */
+========================================================= */
 
 .auth-switch {
-
     display: block !important;
 
     margin: 0 !important;
 
     text-align: center !important;
 
-    color: #64748b !important;
+    color: rgba(255, 255, 255, 0.65) !important;
 
     font-size: 13px !important;
-
 }
 
 
 .auth-switch-button {
-
     display: inline !important;
 
     width: auto !important;
@@ -713,7 +802,7 @@ LOGIN / REGISTER POPUP
 
     background: transparent !important;
 
-    color: #2563eb !important;
+    color: #93c5fd !important;
 
     font-family: inherit !important;
 
@@ -722,64 +811,63 @@ LOGIN / REGISTER POPUP
     font-weight: 800 !important;
 
     cursor: pointer !important;
-
 }
 
 
 .auth-switch-button:hover {
+    color: #dbeafe !important;
 
     text-decoration: underline !important;
-
 }
 
 
 /* =========================================================
-   BODY LOCK
-   ========================================================= */
+   BODY WHEN MODAL OPEN
+========================================================= */
 
 body.modal-open {
-
     overflow: hidden !important;
-
 }
 
 
 /* =========================================================
    SCROLLBAR
-   ========================================================= */
+========================================================= */
 
 .auth-modal::-webkit-scrollbar {
-
     width: 6px !important;
+}
 
+
+.auth-modal::-webkit-scrollbar-track {
+    background: transparent !important;
 }
 
 
 .auth-modal::-webkit-scrollbar-thumb {
-
-    background: #cbd5e1 !important;
+    background:
+        rgba(255, 255, 255, 0.25) !important;
 
     border-radius: 10px !important;
-
 }
 
 
 /* =========================================================
    MOBILE
-   ========================================================= */
+========================================================= */
 
 @media (max-width: 600px) {
 
     .modal-overlay {
-
         padding: 14px !important;
 
+        backdrop-filter: blur(6px) !important;
+        -webkit-backdrop-filter: blur(6px) !important;
     }
 
 
     .modal-overlay .auth-modal,
     .modal-overlay .auth-modal-register {
-
         width: 100% !important;
 
         max-width: 100% !important;
@@ -789,23 +877,52 @@ body.modal-open {
         padding: 26px 20px !important;
 
         border-radius: 20px !important;
-
     }
 
 
     .form-grid-2 {
-
         grid-template-columns: 1fr !important;
 
         gap: 0 !important;
-
     }
 
 
     .auth-modal-header h2 {
-
         font-size: 22px !important;
-
     }
 
+
+    .auth-modal-icon {
+        width: 52px !important;
+        height: 52px !important;
+
+        border-radius: 16px !important;
+
+        font-size: 24px !important;
+    }
+
+
+    .modal-overlay .modal-close {
+        top: 10px !important;
+        right: 10px !important;
+
+        width: 34px !important;
+        height: 34px !important;
+
+        font-size: 22px !important;
+    }
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .modal-overlay,
+    .auth-submit,
+    .modal-close {
+        transition: none !important;
+    }
 }
