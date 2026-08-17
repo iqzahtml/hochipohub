@@ -1,4 +1,10 @@
-CREATE DATABASE hochipohub;
+-- =========================================================
+-- HOCHIPOHUB DATABASE
+-- =========================================================
+
+CREATE DATABASE IF NOT EXISTS hochipohub
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
 
 USE hochipohub;
 
@@ -7,19 +13,13 @@ USE hochipohub;
 -- 1. USERS
 -- =========================================================
 
-CREATE TABLE users (
-
+CREATE TABLE IF NOT EXISTS users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
-
     name VARCHAR(100) NOT NULL,
-
     email VARCHAR(100) NOT NULL UNIQUE,
-
     phone VARCHAR(20) UNIQUE,
-
     password VARCHAR(255) NOT NULL,
-
-    profile_image VARCHAR(255),
+    profile_image VARCHAR(255) NULL,
 
     role ENUM(
         'customer',
@@ -32,161 +32,146 @@ CREATE TABLE users (
         'inactive',
         'pending',
         'suspended'
-    ) DEFAULT 'active',
+    ) NOT NULL DEFAULT 'active',
 
-    -- MFA
-    mfa_enabled BOOLEAN DEFAULT TRUE,
+    mfa_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    mfa_code VARCHAR(10) NULL,
+    mfa_expiry DATETIME NULL,
 
-    mfa_code VARCHAR(10),
+    reset_code VARCHAR(10) NULL,
+    reset_expiry DATETIME NULL,
 
-    mfa_expiry DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    -- Password reset
-    reset_code VARCHAR(10),
-
-    reset_expiry DATETIME,
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 2. VENDORS
 -- =========================================================
 
-CREATE TABLE vendors (
-
+CREATE TABLE IF NOT EXISTS vendors (
     vendor_id INT AUTO_INCREMENT PRIMARY KEY,
 
     user_id INT NOT NULL UNIQUE,
 
     business_name VARCHAR(150) NOT NULL,
-
-    business_logo VARCHAR(255),
-
-    business_description TEXT,
-
-    business_address TEXT,
-
-    category VARCHAR(100),
+    business_logo VARCHAR(255) NULL,
+    business_description TEXT NULL,
+    business_address TEXT NULL,
+    category VARCHAR(100) NULL,
 
     delivery_method ENUM(
         'Pickup',
         'Postage',
         'Both'
-    ) DEFAULT 'Both',
+    ) NOT NULL DEFAULT 'Both',
 
     approval_status ENUM(
         'Pending',
         'Approved',
         'Rejected',
         'Suspended'
-    ) DEFAULT 'Pending',
+    ) NOT NULL DEFAULT 'Pending',
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (user_id)
+    CONSTRAINT fk_vendors_user
+        FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 3. CATEGORIES
 -- =========================================================
 
-CREATE TABLE categories (
-
+CREATE TABLE IF NOT EXISTS categories (
     category_id INT AUTO_INCREMENT PRIMARY KEY,
 
     category_name VARCHAR(100) NOT NULL UNIQUE,
 
-    category_image VARCHAR(255),
+    category_image VARCHAR(255) NULL,
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-
-);
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 4. PRODUCTS
 -- =========================================================
 
-CREATE TABLE products (
-
+CREATE TABLE IF NOT EXISTS products (
     product_id INT AUTO_INCREMENT PRIMARY KEY,
 
     vendor_id INT NOT NULL,
-
     category_id INT NOT NULL,
 
     product_name VARCHAR(150) NOT NULL,
+    description TEXT NULL,
 
-    description TEXT,
+    price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 
-    price DECIMAL(10,2) NOT NULL,
+    stock_quantity INT NOT NULL DEFAULT 0,
 
-    stock_quantity INT DEFAULT 0,
-
-    image VARCHAR(255),
+    image VARCHAR(255) NULL,
 
     status ENUM(
         'Available',
         'Out of Stock',
         'Hidden'
-    ) DEFAULT 'Available',
+    ) NOT NULL DEFAULT 'Available',
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (vendor_id)
+    CONSTRAINT fk_products_vendor
+        FOREIGN KEY (vendor_id)
         REFERENCES vendors(vendor_id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (category_id)
+    CONSTRAINT fk_products_category
+        FOREIGN KEY (category_id)
         REFERENCES categories(category_id)
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 5. CART
 -- =========================================================
--- One customer can add products from MANY vendors.
--- Example:
--- Vendor A product + Vendor B product
--- can exist in the same cart.
 
-CREATE TABLE cart (
-
+CREATE TABLE IF NOT EXISTS cart (
     cart_id INT AUTO_INCREMENT PRIMARY KEY,
 
     customer_id INT NOT NULL,
-
     product_id INT NOT NULL,
 
     quantity INT NOT NULL DEFAULT 1,
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (customer_id)
+    CONSTRAINT fk_cart_customer
+        FOREIGN KEY (customer_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (product_id)
+    CONSTRAINT fk_cart_product
+        FOREIGN KEY (product_id)
         REFERENCES products(product_id)
         ON DELETE CASCADE,
 
@@ -194,112 +179,85 @@ CREATE TABLE cart (
         customer_id,
         product_id
     )
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 6. ORDERS
 -- =========================================================
--- This is the MAIN order created during checkout.
---
--- Example:
--- Customer buys from Vendor A + Vendor B.
---
--- One main order is created here.
--- Then vendor_orders will split it by vendor.
 
-CREATE TABLE orders (
-
+CREATE TABLE IF NOT EXISTS orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
 
     customer_id INT NOT NULL,
 
-    order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    order_date DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
 
-    total_amount DECIMAL(10,2) NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 
     delivery_method ENUM(
         'Pickup',
         'Postage'
-    ),
+    ) NULL,
 
-    delivery_address TEXT,
+    delivery_address TEXT NULL,
 
-    tracking_number VARCHAR(100),
+    tracking_number VARCHAR(100) NULL,
 
     order_status ENUM(
         'Pending',
         'Processing',
         'Completed',
         'Cancelled'
-    ) DEFAULT 'Pending',
+    ) NOT NULL DEFAULT 'Pending',
 
-    completed_date DATETIME,
+    completed_date DATETIME NULL,
 
-    FOREIGN KEY (customer_id)
+    CONSTRAINT fk_orders_customer
+        FOREIGN KEY (customer_id)
         REFERENCES users(user_id)
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 7. ORDER DETAILS
 -- =========================================================
--- Stores every product inside the main order.
 
-CREATE TABLE order_details (
-
+CREATE TABLE IF NOT EXISTS order_details (
     order_detail_id INT AUTO_INCREMENT PRIMARY KEY,
 
     order_id INT NOT NULL,
-
     product_id INT NOT NULL,
 
     quantity INT NOT NULL,
 
     unit_price DECIMAL(10,2) NOT NULL,
-
     subtotal DECIMAL(10,2) NOT NULL,
 
-    FOREIGN KEY (order_id)
+    CONSTRAINT fk_order_details_order
+        FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (product_id)
+    CONSTRAINT fk_order_details_product
+        FOREIGN KEY (product_id)
         REFERENCES products(product_id)
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 8. VENDOR ORDERS
 -- =========================================================
--- IMPORTANT FOR MULTI-VENDOR CART
---
--- One customer checkout:
---
--- Order #1001
---      |
---      +-- Vendor A Sub-order
---      |
---      +-- Vendor B Sub-order
---      |
---      +-- Vendor C Sub-order
---
--- Each vendor ONLY sees their own sub-order.
 
-CREATE TABLE vendor_orders (
-
+CREATE TABLE IF NOT EXISTS vendor_orders (
     vendor_order_id INT AUTO_INCREMENT PRIMARY KEY,
 
     order_id INT NOT NULL,
-
     vendor_id INT NOT NULL,
 
     subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-
-    delivery_fee DECIMAL(10,2) DEFAULT 0.00,
+    delivery_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 
     vendor_status ENUM(
         'Pending',
@@ -308,35 +266,35 @@ CREATE TABLE vendor_orders (
         'Shipped',
         'Completed',
         'Cancelled'
-    ) DEFAULT 'Pending',
+    ) NOT NULL DEFAULT 'Pending',
 
-    tracking_number VARCHAR(100),
+    tracking_number VARCHAR(100) NULL,
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    completed_at DATETIME,
+    completed_at DATETIME NULL,
 
-    FOREIGN KEY (order_id)
+    CONSTRAINT fk_vendor_orders_order
+        FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (vendor_id)
+    CONSTRAINT fk_vendor_orders_vendor
+        FOREIGN KEY (vendor_id)
         REFERENCES vendors(vendor_id),
 
     UNIQUE KEY unique_order_vendor (
         order_id,
         vendor_id
     )
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 9. PAYMENTS
 -- =========================================================
 
-CREATE TABLE payments (
-
+CREATE TABLE IF NOT EXISTS payments (
     payment_id INT AUTO_INCREMENT PRIMARY KEY,
 
     order_id INT NOT NULL,
@@ -346,99 +304,95 @@ CREATE TABLE payments (
         'Credit Card',
         'Debit Card',
         'Cash'
-    ),
+    ) NULL,
 
     payment_status ENUM(
         'Pending',
         'Paid',
         'Failed',
         'Refunded'
-    ) DEFAULT 'Pending',
+    ) NOT NULL DEFAULT 'Pending',
 
-    payment_date DATETIME,
+    payment_date DATETIME NULL,
 
-    amount DECIMAL(10,2) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 
-    transaction_reference VARCHAR(100),
+    transaction_reference VARCHAR(100) NULL,
 
-    FOREIGN KEY (order_id)
+    CONSTRAINT fk_payments_order
+        FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 10. REVIEWS
 -- =========================================================
 
-CREATE TABLE reviews (
-
+CREATE TABLE IF NOT EXISTS reviews (
     review_id INT AUTO_INCREMENT PRIMARY KEY,
 
     customer_id INT NOT NULL,
-
     product_id INT NOT NULL,
 
     rating INT NOT NULL,
 
-    review TEXT,
-
-    image VARCHAR(255),
+    review TEXT NULL,
+    image VARCHAR(255) NULL,
 
     status ENUM(
         'Visible',
         'Hidden'
-    ) DEFAULT 'Visible',
+    ) NOT NULL DEFAULT 'Visible',
 
-    review_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    review_date DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (customer_id)
+    CONSTRAINT fk_reviews_customer
+        FOREIGN KEY (customer_id)
         REFERENCES users(user_id),
 
-    FOREIGN KEY (product_id)
+    CONSTRAINT fk_reviews_product
+        FOREIGN KEY (product_id)
         REFERENCES products(product_id),
 
-    CHECK (rating BETWEEN 1 AND 5)
-
-);
+    CONSTRAINT chk_reviews_rating
+        CHECK (rating BETWEEN 1 AND 5)
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 11. INVENTORY
 -- =========================================================
 
-CREATE TABLE inventory (
-
+CREATE TABLE IF NOT EXISTS inventory (
     inventory_id INT AUTO_INCREMENT PRIMARY KEY,
 
     product_id INT NOT NULL UNIQUE,
 
     quantity INT NOT NULL DEFAULT 0,
 
-    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+    last_updated DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (product_id)
+    CONSTRAINT fk_inventory_product
+        FOREIGN KEY (product_id)
         REFERENCES products(product_id)
         ON DELETE CASCADE
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 12. COMMISSION
 -- =========================================================
--- HochipoHub's commission from each vendor order.
 
-CREATE TABLE commission (
-
+CREATE TABLE IF NOT EXISTS commission (
     commission_id INT AUTO_INCREMENT PRIMARY KEY,
 
     vendor_id INT NOT NULL,
-
     order_id INT NOT NULL,
-
-    vendor_order_id INT,
+    vendor_order_id INT NULL,
 
     commission_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00,
 
@@ -447,93 +401,96 @@ CREATE TABLE commission (
     status ENUM(
         'Pending',
         'Paid'
-    ) DEFAULT 'Pending',
+    ) NOT NULL DEFAULT 'Pending',
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (vendor_id)
+    CONSTRAINT fk_commission_vendor
+        FOREIGN KEY (vendor_id)
         REFERENCES vendors(vendor_id),
 
-    FOREIGN KEY (order_id)
+    CONSTRAINT fk_commission_order
+        FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (vendor_order_id)
+    CONSTRAINT fk_commission_vendor_order
+        FOREIGN KEY (vendor_order_id)
         REFERENCES vendor_orders(vendor_order_id)
         ON DELETE SET NULL
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 13. MFA CODE HISTORY
 -- =========================================================
 
-CREATE TABLE mfa_codes (
-
+CREATE TABLE IF NOT EXISTS mfa_codes (
     id INT AUTO_INCREMENT PRIMARY KEY,
 
     user_id INT NOT NULL,
 
     code VARCHAR(10) NOT NULL,
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
 
     expires_at DATETIME NOT NULL,
 
     used_at DATETIME NULL,
 
-    FOREIGN KEY (user_id)
+    CONSTRAINT fk_mfa_codes_user
+        FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 14. PASSWORD RESET HISTORY
 -- =========================================================
 
-CREATE TABLE password_resets (
-
+CREATE TABLE IF NOT EXISTS password_resets (
     reset_id INT AUTO_INCREMENT PRIMARY KEY,
 
     user_id INT NOT NULL,
 
     reset_code VARCHAR(10) NOT NULL,
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
 
     expires_at DATETIME NOT NULL,
 
     used_at DATETIME NULL,
 
-    FOREIGN KEY (user_id)
+    CONSTRAINT fk_password_resets_user
+        FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 15. WISHLIST
 -- =========================================================
 
-CREATE TABLE wishlist (
-
+CREATE TABLE IF NOT EXISTS wishlist (
     wishlist_id INT AUTO_INCREMENT PRIMARY KEY,
 
     user_id INT NOT NULL,
-
     product_id INT NOT NULL,
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (user_id)
+    CONSTRAINT fk_wishlist_user
+        FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (product_id)
+    CONSTRAINT fk_wishlist_product
+        FOREIGN KEY (product_id)
         REFERENCES products(product_id)
         ON DELETE CASCADE,
 
@@ -541,671 +498,140 @@ CREATE TABLE wishlist (
         user_id,
         product_id
     )
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 16. ADMIN LOGS
 -- =========================================================
 
-CREATE TABLE admin_logs (
-
+CREATE TABLE IF NOT EXISTS admin_logs (
     log_id INT AUTO_INCREMENT PRIMARY KEY,
 
     admin_id INT NOT NULL,
 
     action VARCHAR(255) NOT NULL,
 
-    target_type VARCHAR(50),
+    target_type VARCHAR(50) NULL,
 
-    target_id INT,
+    target_id INT NULL,
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (admin_id)
+    CONSTRAINT fk_admin_logs_admin
+        FOREIGN KEY (admin_id)
         REFERENCES users(user_id)
-
-);
+) ENGINE=InnoDB;
 
 
 -- =========================================================
 -- 17. VENDOR APPLICATIONS
 -- =========================================================
 
-CREATE TABLE vendor_applications (
-
+CREATE TABLE IF NOT EXISTS vendor_applications (
     application_id INT AUTO_INCREMENT PRIMARY KEY,
 
     user_id INT NOT NULL,
 
-    business_name VARCHAR(150),
+    business_name VARCHAR(150) NULL,
 
-    reason TEXT,
+    reason TEXT NULL,
 
     status ENUM(
         'Pending',
         'Approved',
         'Rejected'
-    ) DEFAULT 'Pending',
+    ) NOT NULL DEFAULT 'Pending',
 
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL
+        DEFAULT CURRENT_TIMESTAMP,
 
-    reviewed_at DATETIME,
-CREATE DATABASE hochipohub;
-
-USE hochipohub;
-
-
--- =========================================================
--- 1. USERS
--- =========================================================
-
-CREATE TABLE users (
-
-    user_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    name VARCHAR(100) NOT NULL,
-
-    email VARCHAR(100) NOT NULL UNIQUE,
-
-    phone VARCHAR(20) UNIQUE,
-
-    password VARCHAR(255) NOT NULL,
-
-    profile_image VARCHAR(255),
-
-    role ENUM(
-        'customer',
-        'vendor',
-        'admin'
-    ) NOT NULL DEFAULT 'customer',
-
-    status ENUM(
-        'active',
-        'inactive',
-        'pending',
-        'suspended'
-    ) DEFAULT 'active',
-
-    -- MFA
-    mfa_enabled BOOLEAN DEFAULT TRUE,
-
-    mfa_code VARCHAR(10),
-
-    mfa_expiry DATETIME,
-
-    -- Password reset
-    reset_code VARCHAR(10),
-
-    reset_expiry DATETIME,
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP
-
-);
-
-
--- =========================================================
--- 2. VENDORS
--- =========================================================
-
-CREATE TABLE vendors (
-
-    vendor_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    user_id INT NOT NULL UNIQUE,
-
-    business_name VARCHAR(150) NOT NULL,
-
-    business_logo VARCHAR(255),
-
-    business_description TEXT,
-
-    business_address TEXT,
-
-    category VARCHAR(100),
-
-    delivery_method ENUM(
-        'Pickup',
-        'Postage',
-        'Both'
-    ) DEFAULT 'Both',
-
-    approval_status ENUM(
-        'Pending',
-        'Approved',
-        'Rejected',
-        'Suspended'
-    ) DEFAULT 'Pending',
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (user_id)
-        REFERENCES users(user_id)
-        ON DELETE CASCADE
-
-);
-
-
--- =========================================================
--- 3. CATEGORIES
--- =========================================================
-
-CREATE TABLE categories (
-
-    category_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    category_name VARCHAR(100) NOT NULL UNIQUE,
-
-    category_image VARCHAR(255),
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-
-);
-
-
--- =========================================================
--- 4. PRODUCTS
--- =========================================================
-
-CREATE TABLE products (
-
-    product_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    vendor_id INT NOT NULL,
-
-    category_id INT NOT NULL,
-
-    product_name VARCHAR(150) NOT NULL,
-
-    description TEXT,
-
-    price DECIMAL(10,2) NOT NULL,
-
-    stock_quantity INT DEFAULT 0,
-
-    image VARCHAR(255),
-
-    status ENUM(
-        'Available',
-        'Out of Stock',
-        'Hidden'
-    ) DEFAULT 'Available',
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (vendor_id)
-        REFERENCES vendors(vendor_id)
-        ON DELETE CASCADE,
-
-    FOREIGN KEY (category_id)
-        REFERENCES categories(category_id)
-
-);
-
-
--- =========================================================
--- 5. CART
--- =========================================================
--- One customer can add products from MANY vendors.
--- Example:
--- Vendor A product + Vendor B product
--- can exist in the same cart.
-
-CREATE TABLE cart (
-
-    cart_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    customer_id INT NOT NULL,
-
-    product_id INT NOT NULL,
-
-    quantity INT NOT NULL DEFAULT 1,
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (customer_id)
-        REFERENCES users(user_id)
-        ON DELETE CASCADE,
-
-    FOREIGN KEY (product_id)
-        REFERENCES products(product_id)
-        ON DELETE CASCADE,
-
-    UNIQUE KEY unique_customer_product (
-        customer_id,
-        product_id
-    )
-
-);
-
-
--- =========================================================
--- 6. ORDERS
--- =========================================================
--- This is the MAIN order created during checkout.
---
--- Example:
--- Customer buys from Vendor A + Vendor B.
---
--- One main order is created here.
--- Then vendor_orders will split it by vendor.
-
-CREATE TABLE orders (
-
-    order_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    customer_id INT NOT NULL,
-
-    order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    total_amount DECIMAL(10,2) NOT NULL,
-
-    delivery_method ENUM(
-        'Pickup',
-        'Postage'
-    ),
-
-    delivery_address TEXT,
-
-    tracking_number VARCHAR(100),
-
-    order_status ENUM(
-        'Pending',
-        'Processing',
-        'Completed',
-        'Cancelled'
-    ) DEFAULT 'Pending',
-
-    completed_date DATETIME,
-
-    FOREIGN KEY (customer_id)
-        REFERENCES users(user_id)
-
-);
-
-
--- =========================================================
--- 7. ORDER DETAILS
--- =========================================================
--- Stores every product inside the main order.
-
-CREATE TABLE order_details (
-
-    order_detail_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    order_id INT NOT NULL,
-
-    product_id INT NOT NULL,
-
-    quantity INT NOT NULL,
-
-    unit_price DECIMAL(10,2) NOT NULL,
-
-    subtotal DECIMAL(10,2) NOT NULL,
-
-    FOREIGN KEY (order_id)
-        REFERENCES orders(order_id)
-        ON DELETE CASCADE,
-
-    FOREIGN KEY (product_id)
-        REFERENCES products(product_id)
-
-);
-
-
--- =========================================================
--- 8. VENDOR ORDERS
--- =========================================================
--- IMPORTANT FOR MULTI-VENDOR CART
---
--- One customer checkout:
---
--- Order #1001
---      |
---      +-- Vendor A Sub-order
---      |
---      +-- Vendor B Sub-order
---      |
---      +-- Vendor C Sub-order
---
--- Each vendor ONLY sees their own sub-order.
-
-CREATE TABLE vendor_orders (
-
-    vendor_order_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    order_id INT NOT NULL,
-
-    vendor_id INT NOT NULL,
-
-    subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-
-    delivery_fee DECIMAL(10,2) DEFAULT 0.00,
-
-    vendor_status ENUM(
-        'Pending',
-        'Processing',
-        'Ready',
-        'Shipped',
-        'Completed',
-        'Cancelled'
-    ) DEFAULT 'Pending',
-
-    tracking_number VARCHAR(100),
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    completed_at DATETIME,
-
-    FOREIGN KEY (order_id)
-        REFERENCES orders(order_id)
-        ON DELETE CASCADE,
-
-    FOREIGN KEY (vendor_id)
-        REFERENCES vendors(vendor_id),
-
-    UNIQUE KEY unique_order_vendor (
-        order_id,
-        vendor_id
-    )
-
-);
-
-
--- =========================================================
--- 9. PAYMENTS
--- =========================================================
-
-CREATE TABLE payments (
-
-    payment_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    order_id INT NOT NULL,
-
-    payment_method ENUM(
-        'FPX',
-        'Credit Card',
-        'Debit Card',
-        'Cash'
-    ),
-
-    payment_status ENUM(
-        'Pending',
-        'Paid',
-        'Failed',
-        'Refunded'
-    ) DEFAULT 'Pending',
-
-    payment_date DATETIME,
-
-    amount DECIMAL(10,2) NOT NULL,
-
-    transaction_reference VARCHAR(100),
-
-    FOREIGN KEY (order_id)
-        REFERENCES orders(order_id)
-
-);
-
-
--- =========================================================
--- 10. REVIEWS
--- =========================================================
-
-CREATE TABLE reviews (
-
-    review_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    customer_id INT NOT NULL,
-
-    product_id INT NOT NULL,
-
-    rating INT NOT NULL,
-
-    review TEXT,
-
-    image VARCHAR(255),
-
-    status ENUM(
-        'Visible',
-        'Hidden'
-    ) DEFAULT 'Visible',
-
-    review_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (customer_id)
-        REFERENCES users(user_id),
-
-    FOREIGN KEY (product_id)
-        REFERENCES products(product_id),
-
-    CHECK (rating BETWEEN 1 AND 5)
-
-);
-
-
--- =========================================================
--- 11. INVENTORY
--- =========================================================
-
-CREATE TABLE inventory (
-
-    inventory_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    product_id INT NOT NULL UNIQUE,
-
-    quantity INT NOT NULL DEFAULT 0,
-
-    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (product_id)
-        REFERENCES products(product_id)
-        ON DELETE CASCADE
-
-);
-
-
--- =========================================================
--- 12. COMMISSION
--- =========================================================
--- HochipoHub's commission from each vendor order.
-
-CREATE TABLE commission (
-
-    commission_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    vendor_id INT NOT NULL,
-
-    order_id INT NOT NULL,
-
-    vendor_order_id INT,
-
-    commission_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00,
-
-    commission_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-
-    status ENUM(
-        'Pending',
-        'Paid'
-    ) DEFAULT 'Pending',
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (vendor_id)
-        REFERENCES vendors(vendor_id),
-
-    FOREIGN KEY (order_id)
-        REFERENCES orders(order_id)
-        ON DELETE CASCADE,
-
-    FOREIGN KEY (vendor_order_id)
-        REFERENCES vendor_orders(vendor_order_id)
-        ON DELETE SET NULL
-
-);
-
-
--- =========================================================
--- 13. MFA CODE HISTORY
--- =========================================================
-
-CREATE TABLE mfa_codes (
-
-    id INT AUTO_INCREMENT PRIMARY KEY,
-
-    user_id INT NOT NULL,
-
-    code VARCHAR(10) NOT NULL,
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    expires_at DATETIME NOT NULL,
-
-    used_at DATETIME NULL,
-
-    FOREIGN KEY (user_id)
-        REFERENCES users(user_id)
-        ON DELETE CASCADE
-
-);
-
-
--- =========================================================
--- 14. PASSWORD RESET HISTORY
--- =========================================================
-
-CREATE TABLE password_resets (
-
-    reset_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    user_id INT NOT NULL,
-
-    reset_code VARCHAR(10) NOT NULL,
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    expires_at DATETIME NOT NULL,
-
-    used_at DATETIME NULL,
-
-    FOREIGN KEY (user_id)
-        REFERENCES users(user_id)
-        ON DELETE CASCADE
-
-);
-
-
--- =========================================================
--- 15. WISHLIST
--- =========================================================
-
-CREATE TABLE wishlist (
-
-    wishlist_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    user_id INT NOT NULL,
-
-    product_id INT NOT NULL,
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (user_id)
-        REFERENCES users(user_id)
-        ON DELETE CASCADE,
-
-    FOREIGN KEY (product_id)
-        REFERENCES products(product_id)
-        ON DELETE CASCADE,
-
-    UNIQUE KEY unique_wishlist_product (
-        user_id,
-        product_id
-    )
-
-);
-
-
--- =========================================================
--- 16. ADMIN LOGS
--- =========================================================
-
-CREATE TABLE admin_logs (
-
-    log_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    admin_id INT NOT NULL,
-
-    action VARCHAR(255) NOT NULL,
-
-    target_type VARCHAR(50),
-
-    target_id INT,
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (admin_id)
-        REFERENCES users(user_id)
-
-);
-
-
--- =========================================================
--- 17. VENDOR APPLICATIONS
--- =========================================================
-
-CREATE TABLE vendor_applications (
-
-    application_id INT AUTO_INCREMENT PRIMARY KEY,
-
-    user_id INT NOT NULL,
-
-    business_name VARCHAR(150),
-
-    reason TEXT,
-
-    status ENUM(
-        'Pending',
-        'Approved',
-        'Rejected'
-    ) DEFAULT 'Pending',
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    reviewed_at DATETIME,
+    reviewed_at DATETIME NULL,
 
     reviewed_by INT NULL,
 
-    FOREIGN KEY (user_id)
+    CONSTRAINT fk_vendor_applications_user
+        FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (reviewed_by)
+    CONSTRAINT fk_vendor_applications_reviewer
+        FOREIGN KEY (reviewed_by)
         REFERENCES users(user_id)
         ON DELETE SET NULL
+) ENGINE=InnoDB;
 
+
+-- =========================================================
+-- DEFAULT ADMIN ACCOUNT
+-- =========================================================
+--
+-- Email    : admin@hochipohub.com
+-- Password : Admin@123456
+--
+-- IMPORTANT:
+-- Replace the password value below with the hash generated
+-- using PHP password_hash('Admin@123456', PASSWORD_DEFAULT).
+--
+-- =========================================================
+
+INSERT INTO users (
+    name,
+    email,
+    phone,
+    password,
+    role,
+    status,
+    mfa_enabled
+)
+SELECT
+    'HochipoHub Admin',
+    'admin@hochipohub.com',
+    NULL,
+    'REPLACE_WITH_PASSWORD_HASH',
+    'admin',
+    'active',
+    FALSE
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM users
+    WHERE email = 'admin@hochipohub.com'
 );
-    reviewed_by INT NULL,
 
-    FOREIGN KEY (user_id)
-        REFERENCES users(user_id)
-        ON DELETE CASCADE,
 
-    FOREIGN KEY (reviewed_by)
-        REFERENCES users(user_id)
-        ON DELETE SET NULL
+-- =========================================================
+-- DEFAULT CATEGORIES
+-- =========================================================
 
+INSERT INTO categories (category_name)
+SELECT 'Food'
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM categories
+    WHERE category_name = 'Food'
+);
+
+INSERT INTO categories (category_name)
+SELECT 'Beverages'
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM categories
+    WHERE category_name = 'Beverages'
+);
+
+INSERT INTO categories (category_name)
+SELECT 'Desserts'
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM categories
+    WHERE category_name = 'Desserts'
+);
+
+INSERT INTO categories (category_name)
+SELECT 'Snacks'
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM categories
+    WHERE category_name = 'Snacks'
 );
