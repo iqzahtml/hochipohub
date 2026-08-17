@@ -1,80 +1,141 @@
 <?php
 
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/database/db.php';
-require_once __DIR__ . '/includes/session.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+requireLogin();
+
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN CHECK
+| REDIRECT OTHER ROLES
 |--------------------------------------------------------------------------
 */
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: index.php");
+$role = strtolower(
+    trim(
+        $_SESSION['role'] ?? ''
+    )
+);
+
+if ($role === 'admin') {
+
+    header(
+        'Location: ' .
+        BASE_URL .
+        'admin/dashboard.php'
+    );
+
     exit;
 }
 
-/*
-|--------------------------------------------------------------------------
-| CUSTOMER ONLY
-|--------------------------------------------------------------------------
-*/
+if ($role === 'vendor') {
 
-if (
-    !isset($_SESSION['role']) ||
-    $_SESSION['role'] !== 'customer'
-) {
+    header(
+        'Location: ' .
+        BASE_URL .
+        'seller/dashboard.php'
+    );
 
-    if ($_SESSION['role'] === 'admin') {
-        header("Location: admin/dashboard.php");
-        exit;
-    }
-
-    if ($_SESSION['role'] === 'vendor') {
-        header("Location: seller/dashboard.php");
-        exit;
-    }
-
-    header("Location: index.php");
     exit;
 }
 
-$userId = (int) $_SESSION['user_id'];
+if ($role !== 'customer') {
+
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php'
+    );
+
+    exit;
+}
+
 
 /*
 |--------------------------------------------------------------------------
-| GET CUSTOMER INFORMATION
+| DATABASE
 |--------------------------------------------------------------------------
 */
 
 $db = getDB();
+
+$userId = (int)
+    $_SESSION['user_id'];
+
+
+/*
+|--------------------------------------------------------------------------
+| GET USER
+|--------------------------------------------------------------------------
+*/
 
 $stmt = $db->prepare("
     SELECT
         user_id,
         name,
         email,
-        phone
+        phone,
+        profile_image
     FROM users
     WHERE user_id = ?
     LIMIT 1
 ");
 
-$stmt->execute([$userId]);
+$stmt->execute([
+    $userId
+]);
 
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
+$user = $stmt->fetch(
+    PDO::FETCH_ASSOC
+);
+
 
 if (!$user) {
+
+    session_unset();
+
     session_destroy();
 
-    header("Location: index.php");
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php'
+    );
+
     exit;
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| PAGE VARIABLES FOR NAVBAR
+|--------------------------------------------------------------------------
+*/
+
+$isLoggedIn = true;
+
+$userName =
+    $user['name'];
+
+$userRole =
+    'customer';
+
+$currentPage =
+    'dashboard.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| DEFAULT COUNTS
+|--------------------------------------------------------------------------
+*/
+
+$orderCount = 0;
+
+$wishlistCount = 0;
+
+$cartCount = 0;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -82,28 +143,33 @@ if (!$user) {
 |--------------------------------------------------------------------------
 */
 
-$orderCount = 0;
+try {
 
-$stmt = $db->prepare("
-    SELECT COUNT(*) 
-    FROM orders
-    WHERE customer_id = ?
-");
+    $stmt = $db->prepare("
+        SELECT COUNT(*)
+        FROM orders
+        WHERE customer_id = ?
+    ");
 
-$stmt->execute([$userId]);
+    $stmt->execute([
+        $userId
+    ]);
 
-$orderCount = (int) $stmt->fetchColumn();
+    $orderCount =
+        (int) $stmt->fetchColumn();
+
+} catch (Throwable $e) {
+
+    $orderCount = 0;
+
+}
+
 
 /*
 |--------------------------------------------------------------------------
 | GET WISHLIST COUNT
 |--------------------------------------------------------------------------
-|
-| Kalau table wishlist ada.
-|
 */
-
-$wishlistCount = 0;
 
 try {
 
@@ -113,13 +179,45 @@ try {
         WHERE user_id = ?
     ");
 
-    $stmt->execute([$userId]);
+    $stmt->execute([
+        $userId
+    ]);
 
-    $wishlistCount = (int) $stmt->fetchColumn();
+    $wishlistCount =
+        (int) $stmt->fetchColumn();
 
-} catch (PDOException $e) {
+} catch (Throwable $e) {
 
     $wishlistCount = 0;
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET CART COUNT
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    $stmt = $db->prepare("
+        SELECT COUNT(*)
+        FROM cart
+        WHERE user_id = ?
+    ");
+
+    $stmt->execute([
+        $userId
+    ]);
+
+    $cartCount =
+        (int) $stmt->fetchColumn();
+
+} catch (Throwable $e) {
+
+    $cartCount = 0;
+
 }
 
 ?>
@@ -143,35 +241,40 @@ try {
 
     <link
         rel="stylesheet"
-        href="css/style.css"
+        href="<?= e(BASE_URL) ?>css/style.css"
     >
 
     <link
         rel="stylesheet"
-        href="css/dashboard.css"
+        href="<?= e(BASE_URL) ?>css/dashboard.css"
     >
 
     <link
         rel="stylesheet"
-        href="css/responsive.css"
+        href="<?= e(BASE_URL) ?>css/responsive.css"
     >
 
 </head>
 
 <body>
 
-<?php include __DIR__ . '/includes/navbar.php'; ?>
+<?php
+include __DIR__ .
+    '/includes/navbar.php';
+?>
 
 
 <div class="dashboard-layout">
 
     <?php
 
-    if (file_exists(
-        __DIR__ . '/includes/customer_sidebar.php'
-    )) {
+    $sidebar =
+        __DIR__ .
+        '/includes/customer_sidebar.php';
 
-        include __DIR__ . '/includes/customer_sidebar.php';
+    if (file_exists($sidebar)) {
+
+        include $sidebar;
 
     }
 
@@ -186,7 +289,7 @@ try {
 
                 <h1>
                     Welcome,
-                    <?= htmlspecialchars($user['name']) ?>
+                    <?= e($user['name']) ?>
                 </h1>
 
                 <p>
@@ -197,8 +300,6 @@ try {
 
         </div>
 
-
-        <!-- STATISTICS -->
 
         <div class="stats-grid">
 
@@ -231,19 +332,17 @@ try {
             <div class="stat-card">
 
                 <span>
-                    Account
+                    Shopping Cart
                 </span>
 
                 <strong>
-                    Customer
+                    <?= $cartCount ?>
                 </strong>
 
             </div>
 
         </div>
 
-
-        <!-- CUSTOMER MENU -->
 
         <div
             style="
@@ -256,7 +355,7 @@ try {
         >
 
             <a
-                href="catalog.php"
+                href="<?= e(BASE_URL) ?>catalog.php"
                 class="stat-card"
                 style="text-decoration:none;"
             >
@@ -273,7 +372,7 @@ try {
 
 
             <a
-                href="cart.php"
+                href="<?= e(BASE_URL) ?>cart.php"
                 class="stat-card"
                 style="text-decoration:none;"
             >
@@ -290,7 +389,7 @@ try {
 
 
             <a
-                href="order.php"
+                href="<?= e(BASE_URL) ?>order.php"
                 class="stat-card"
                 style="text-decoration:none;"
             >
@@ -307,7 +406,7 @@ try {
 
 
             <a
-                href="wishlist.php"
+                href="<?= e(BASE_URL) ?>wishlist.php"
                 class="stat-card"
                 style="text-decoration:none;"
             >
@@ -324,7 +423,7 @@ try {
 
 
             <a
-                href="profile.php"
+                href="<?= e(BASE_URL) ?>profile.php"
                 class="stat-card"
                 style="text-decoration:none;"
             >
@@ -342,12 +441,10 @@ try {
         </div>
 
 
-        <!-- CUSTOMER INFORMATION -->
-
         <div
             style="
                 margin-top:30px;
-                background:#fff;
+                background:#ffffff;
                 padding:25px;
                 border-radius:16px;
             "
@@ -357,21 +454,39 @@ try {
                 Account Information
             </h2>
 
-            <p>
-                <strong>Name:</strong>
-                <?= htmlspecialchars($user['name']) ?>
-            </p>
 
             <p>
-                <strong>Email:</strong>
-                <?= htmlspecialchars($user['email']) ?>
+
+                <strong>
+                    Name:
+                </strong>
+
+                <?= e($user['name']) ?>
+
             </p>
+
+
+            <p>
+
+                <strong>
+                    Email:
+                </strong>
+
+                <?= e($user['email']) ?>
+
+            </p>
+
 
             <?php if (!empty($user['phone'])): ?>
 
                 <p>
-                    <strong>Phone:</strong>
-                    <?= htmlspecialchars($user['phone']) ?>
+
+                    <strong>
+                        Phone:
+                    </strong>
+
+                    <?= e($user['phone']) ?>
+
                 </p>
 
             <?php endif; ?>
@@ -383,7 +498,19 @@ try {
 </div>
 
 
-<?php include __DIR__ . '/includes/footer.php'; ?>
+<?php
+
+$footer =
+    __DIR__ .
+    '/includes/footer.php';
+
+if (file_exists($footer)) {
+
+    include $footer;
+
+}
+
+?>
 
 </body>
 
