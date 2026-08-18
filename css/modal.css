@@ -502,12 +502,21 @@
 
 .password-input {
     position: relative !important;
+
+    display: block !important;
+
     width: 100% !important;
 }
 
+
 .password-input input {
-    padding-right: 52px !important;
+    padding-right: 48px !important;
 }
+
+
+/* =========================================================
+   PASSWORD TOGGLE
+========================================================= */
 
 .password-toggle {
     position: absolute !important;
@@ -515,12 +524,10 @@
     top: 50% !important;
     right: 8px !important;
 
-    width: 36px !important;
-    height: 36px !important;
+    width: 34px !important;
+    height: 34px !important;
 
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    min-width: 34px !important;
 
     margin: 0 !important;
     padding: 0 !important;
@@ -528,22 +535,27 @@
     transform: translateY(-50%) !important;
 
     border: none !important;
+
     border-radius: 8px !important;
 
     background: transparent !important;
 
-    color: #475569 !important;
+    color: rgba(255, 255, 255, 0.75) !important;
 
     font-size: 17px !important;
 
     cursor: pointer !important;
 
-    z-index: 20 !important;
+    z-index: 5 !important;
 }
 
+
 .password-toggle:hover {
-    background: #e2e8f0 !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+
+    color: #ffffff !important;
 }
+
 
 /* =========================================================
    TWO COLUMN
