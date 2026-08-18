@@ -148,6 +148,9 @@ foreach ($orders as $order) {
 
 
 $pageTitle = 'My Orders';
+$extraCSS = [
+    'order.css'
+];
 
 
 require_once __DIR__ . '/includes/header.php';
