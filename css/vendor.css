@@ -2880,3 +2880,1702 @@
     }
 
 }
+/* =========================================================
+   HOCHIPOHUB — PUBLIC VENDOR PAGE
+   Modern Marketplace Design
+========================================================= */
+
+
+/* =========================================================
+   PUBLIC VENDOR VARIABLES
+========================================================= */
+
+:root {
+
+    --public-bg: #f5f8ff;
+    --public-bg-soft: #eef4ff;
+    --public-white: #ffffff;
+
+    --public-blue: #2563eb;
+    --public-blue-dark: #1d4ed8;
+    --public-blue-light: #60a5fa;
+    --public-cyan: #38bdf8;
+
+    --public-text: #172554;
+    --public-text-soft: #475569;
+    --public-muted: #64748b;
+
+    --public-border: rgba(37, 99, 235, .10);
+
+    --public-shadow:
+        0 15px 45px rgba(30, 64, 175, .08);
+
+    --public-shadow-hover:
+        0 25px 60px rgba(30, 64, 175, .15);
+
+    --public-radius: 22px;
+}
+
+
+/* =========================================================
+   PUBLIC VENDOR PAGE
+========================================================= */
+
+.vendor-page {
+
+    min-height: 100vh;
+
+    padding-bottom: 0;
+
+    color: var(--public-text);
+
+    background:
+
+        radial-gradient(
+            circle at 5% 5%,
+            rgba(96, 165, 250, .16),
+            transparent 25%
+        ),
+
+        radial-gradient(
+            circle at 95% 20%,
+            rgba(56, 189, 248, .12),
+            transparent 25%
+        ),
+
+        linear-gradient(
+            180deg,
+            #f8fbff 0%,
+            #eef5ff 55%,
+            #f8fbff 100%
+        );
+}
+
+
+/* =========================================================
+   COMMON CONTAINER
+========================================================= */
+
+.vendor-content-container {
+
+    width: min(1180px, 90%);
+
+    margin: 0 auto;
+
+}
+
+
+/* =========================================================
+   SMALL LABEL
+========================================================= */
+
+.vendor-page .small-label {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    color: var(--public-blue);
+
+    font-size: 11px;
+
+    font-weight: 900;
+
+    letter-spacing: 1.8px;
+
+    text-transform: uppercase;
+}
+
+
+.vendor-page .small-label::before {
+
+    content: "";
+
+    width: 7px;
+
+    height: 7px;
+
+    border-radius: 50%;
+
+    background: var(--public-cyan);
+
+    box-shadow:
+        0 0 0 5px rgba(56, 189, 248, .10);
+}
+
+
+/* =========================================================
+   HERO
+========================================================= */
+
+.vendor-hero {
+
+    position: relative;
+
+    overflow: hidden;
+
+    padding: 80px 20px 75px;
+
+    background:
+
+        radial-gradient(
+            circle at 85% 15%,
+            rgba(37, 99, 235, .18),
+            transparent 25%
+        ),
+
+        radial-gradient(
+            circle at 10% 80%,
+            rgba(56, 189, 248, .12),
+            transparent 25%
+        ),
+
+        linear-gradient(
+            135deg,
+            #f7faff,
+            #eaf2ff
+        );
+
+    border-bottom:
+        1px solid
+        rgba(37, 99, 235, .07);
+}
+
+
+.vendor-hero::before {
+
+    content: "";
+
+    position: absolute;
+
+    width: 300px;
+
+    height: 300px;
+
+    right: -100px;
+
+    top: -120px;
+
+    border-radius: 50%;
+
+    background:
+        rgba(37, 99, 235, .08);
+
+    filter: blur(5px);
+}
+
+
+.vendor-hero::after {
+
+    content: "";
+
+    position: absolute;
+
+    width: 180px;
+
+    height: 180px;
+
+    left: -70px;
+
+    bottom: -80px;
+
+    border-radius: 50%;
+
+    background:
+        rgba(56, 189, 248, .10);
+
+    filter: blur(4px);
+}
+
+
+.vendor-hero-inner {
+
+    position: relative;
+
+    z-index: 2;
+
+    width: min(1180px, 90%);
+
+    margin: 0 auto;
+}
+
+
+.vendor-hero h1 {
+
+    max-width: 750px;
+
+    margin: 15px 0 12px;
+
+    color: #172554;
+
+    font-size: clamp(
+        42px,
+        6vw,
+        68px
+    );
+
+    line-height: 1.02;
+
+    letter-spacing: -3px;
+
+    font-weight: 950;
+}
+
+
+.vendor-hero h1 span {
+
+    color: var(--public-blue);
+
+}
+
+
+.vendor-hero p {
+
+    max-width: 650px;
+
+    margin: 0;
+
+    color: var(--public-text-soft);
+
+    font-size: 17px;
+
+    line-height: 1.7;
+}
+
+
+/* =========================================================
+   VENDORS SECTION
+========================================================= */
+
+.vendors-section {
+
+    padding: 65px 0 80px;
+}
+
+
+.section-heading {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-end;
+
+    gap: 25px;
+
+    margin-bottom: 28px;
+}
+
+
+.section-heading h2 {
+
+    margin: 8px 0 5px;
+
+    color: #172554;
+
+    font-size: 30px;
+
+    font-weight: 950;
+
+    letter-spacing: -.8px;
+}
+
+
+.section-heading p {
+
+    margin: 0;
+
+    color: var(--public-muted);
+
+    font-size: 14px;
+}
+
+
+.vendor-count {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    padding: 9px 14px;
+
+    border:
+        1px solid
+        rgba(37, 99, 235, .10);
+
+    border-radius: 999px;
+
+    background:
+        rgba(255, 255, 255, .8);
+
+    color: var(--public-blue);
+
+    font-size: 12px;
+
+    font-weight: 850;
+
+    box-shadow:
+        0 5px 20px
+        rgba(30, 64, 175, .06);
+}
+
+
+/* =========================================================
+   VENDOR GRID
+========================================================= */
+
+.vendor-marketplace-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 22px;
+}
+
+
+/* =========================================================
+   VENDOR CARD
+========================================================= */
+
+.vendor-marketplace-card {
+
+    position: relative;
+
+    overflow: hidden;
+
+    display: flex;
+
+    flex-direction: column;
+
+    min-height: 390px;
+
+    border:
+        1px solid
+        rgba(37, 99, 235, .08);
+
+    border-radius: var(--public-radius);
+
+    background:
+        rgba(255, 255, 255, .92);
+
+    box-shadow: var(--public-shadow);
+
+    transition:
+        transform .3s ease,
+        box-shadow .3s ease,
+        border-color .3s ease;
+}
+
+
+.vendor-marketplace-card:hover {
+
+    transform:
+        translateY(-8px);
+
+    border-color:
+        rgba(37, 99, 235, .18);
+
+    box-shadow:
+        var(--public-shadow-hover);
+}
+
+
+/* =========================================================
+   CARD TOP / LOGO
+========================================================= */
+
+.vendor-marketplace-logo {
+
+    position: relative;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    height: 185px;
+
+    overflow: hidden;
+
+    text-decoration: none;
+
+    background:
+
+        radial-gradient(
+            circle at center,
+            rgba(59, 130, 246, .12),
+            transparent 60%
+        ),
+
+        linear-gradient(
+            135deg,
+            #eff6ff,
+            #e0f2fe
+        );
+}
+
+
+.vendor-marketplace-logo::after {
+
+    content: "";
+
+    position: absolute;
+
+    inset: 0;
+
+    background:
+        linear-gradient(
+            180deg,
+            transparent 55%,
+            rgba(15, 23, 42, .06)
+        );
+
+    pointer-events: none;
+}
+
+
+.vendor-marketplace-logo img {
+
+    position: relative;
+
+    z-index: 2;
+
+    width: 110px;
+
+    height: 110px;
+
+    object-fit: contain;
+
+    border-radius: 24px;
+
+    background: #fff;
+
+    padding: 10px;
+
+    box-sizing: border-box;
+
+    box-shadow:
+        0 15px 35px
+        rgba(30, 64, 175, .12);
+
+    transition:
+        transform .3s ease;
+}
+
+
+.vendor-marketplace-card:hover
+.vendor-marketplace-logo img {
+
+    transform:
+        scale(1.06)
+        rotate(-2deg);
+}
+
+
+.vendor-marketplace-placeholder {
+
+    position: relative;
+
+    z-index: 2;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 95px;
+
+    height: 95px;
+
+    border-radius: 24px;
+
+    background: #fff;
+
+    box-shadow:
+        0 15px 35px
+        rgba(30, 64, 175, .10);
+
+    font-size: 40px;
+}
+
+
+/* =========================================================
+   CARD BODY
+========================================================= */
+
+.vendor-marketplace-body {
+
+    display: flex;
+
+    flex: 1;
+
+    flex-direction: column;
+
+    padding: 22px;
+}
+
+
+/* =========================================================
+   APPROVED STATUS
+========================================================= */
+
+.vendor-marketplace-body .vendor-status {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    width: fit-content;
+
+    margin-bottom: 12px;
+
+    padding: 6px 10px;
+
+    border-radius: 999px;
+
+    background:
+        rgba(34, 197, 94, .08);
+
+    color: #16a34a;
+
+    font-size: 9px;
+
+    font-weight: 900;
+
+    letter-spacing: .5px;
+}
+
+
+.vendor-marketplace-body .vendor-status::before {
+
+    display: none;
+}
+
+
+/* =========================================================
+   VENDOR NAME
+========================================================= */
+
+.vendor-marketplace-body h2 {
+
+    margin: 0 0 8px;
+
+    font-size: 21px;
+
+    line-height: 1.2;
+
+    font-weight: 950;
+}
+
+
+.vendor-marketplace-body h2 a {
+
+    color: #172554;
+
+    text-decoration: none;
+
+    transition:
+        color .2s ease;
+}
+
+
+.vendor-marketplace-body h2 a:hover {
+
+    color: var(--public-blue);
+}
+
+
+/* =========================================================
+   CATEGORY
+========================================================= */
+
+.vendor-marketplace-category {
+
+    display: inline-flex;
+
+    width: fit-content;
+
+    margin-bottom: 10px;
+
+    padding: 5px 9px;
+
+    border-radius: 8px;
+
+    background:
+        #eff6ff;
+
+    color:
+        #2563eb;
+
+    font-size: 10px;
+
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   DESCRIPTION
+========================================================= */
+
+.vendor-marketplace-body > p {
+
+    margin: 4px 0 20px;
+
+    color: #64748b;
+
+    font-size: 12px;
+
+    line-height: 1.65;
+}
+
+
+/* =========================================================
+   CARD FOOTER
+========================================================= */
+
+.vendor-marketplace-footer {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 12px;
+
+    margin-top: auto;
+
+    padding-top: 17px;
+
+    border-top:
+        1px solid
+        rgba(15, 23, 42, .06);
+
+    color: #64748b;
+
+    font-size: 11px;
+}
+
+
+.vendor-marketplace-footer > span {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 5px;
+}
+
+
+/* =========================================================
+   VIEW STORE BUTTON
+========================================================= */
+
+.vendor-store-btn {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 10px 14px;
+
+    border-radius: 10px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #3b82f6
+        );
+
+    color: #fff;
+
+    font-size: 10px;
+
+    font-weight: 900;
+
+    text-decoration: none;
+
+    box-shadow:
+        0 8px 20px
+        rgba(37, 99, 235, .18);
+
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease;
+}
+
+
+.vendor-store-btn:hover {
+
+    transform:
+        translateY(-2px);
+
+    box-shadow:
+        0 12px 28px
+        rgba(37, 99, 235, .28);
+
+    color: #fff;
+}
+
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+.vendor-page .vendor-empty {
+
+    padding: 65px 25px;
+
+    border:
+        1px solid
+        rgba(37, 99, 235, .08);
+
+    border-radius: 24px;
+
+    background:
+        rgba(255, 255, 255, .8);
+
+    box-shadow:
+        var(--public-shadow);
+}
+
+
+.vendor-page .vendor-empty-icon {
+
+    width: 75px;
+
+    height: 75px;
+
+    margin: 0 auto 17px;
+
+    border-radius: 22px;
+
+    background:
+        #eff6ff;
+
+    color:
+        #2563eb;
+
+    font-size: 30px;
+}
+
+
+.vendor-page .vendor-empty h2 {
+
+    margin: 10px 0 7px;
+
+    color: #172554;
+
+    font-size: 25px;
+
+    font-weight: 950;
+}
+
+
+.vendor-page .vendor-empty p {
+
+    max-width: 480px;
+
+    margin: 0 auto 20px;
+
+    color: #64748b;
+
+    font-size: 13px;
+
+    line-height: 1.7;
+}
+
+
+/* =========================================================
+   CTA
+========================================================= */
+
+.vendor-cta {
+
+    position: relative;
+
+    overflow: hidden;
+
+    padding: 75px 0;
+
+    background:
+
+        radial-gradient(
+            circle at 85% 20%,
+            rgba(56, 189, 248, .22),
+            transparent 25%
+        ),
+
+        radial-gradient(
+            circle at 10% 90%,
+            rgba(37, 99, 235, .22),
+            transparent 25%
+        ),
+
+        linear-gradient(
+            135deg,
+            #0f2450,
+            #172f68
+        );
+}
+
+
+.vendor-cta::before {
+
+    content: "";
+
+    position: absolute;
+
+    width: 280px;
+
+    height: 280px;
+
+    right: -100px;
+
+    top: -130px;
+
+    border-radius: 50%;
+
+    background:
+        rgba(56, 189, 248, .10);
+
+    filter: blur(5px);
+}
+
+
+.vendor-cta-content {
+
+    position: relative;
+
+    z-index: 2;
+
+    max-width: 720px;
+
+    margin: 0 auto;
+
+    text-align: center;
+}
+
+
+.vendor-cta .small-label {
+
+    color: #7dd3fc;
+}
+
+
+.vendor-cta h2 {
+
+    margin: 12px 0;
+
+    color: #fff;
+
+    font-size: clamp(
+        30px,
+        4vw,
+        44px
+    );
+
+    line-height: 1.1;
+
+    font-weight: 950;
+
+    letter-spacing: -1.5px;
+}
+
+
+.vendor-cta p {
+
+    max-width: 620px;
+
+    margin: 0 auto 25px;
+
+    color: #bfdbfe;
+
+    font-size: 14px;
+
+    line-height: 1.7;
+}
+
+
+.vendor-cta .btn-primary {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    min-height: 45px;
+
+    padding: 0 22px;
+
+    border-radius: 12px;
+
+    background: #fff;
+
+    color: #1d4ed8;
+
+    font-size: 12px;
+
+    font-weight: 900;
+
+    text-decoration: none;
+
+    box-shadow:
+        0 12px 30px
+        rgba(0, 0, 0, .18);
+
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease;
+}
+
+
+.vendor-cta .btn-primary:hover {
+
+    transform:
+        translateY(-3px);
+
+    color: #1d4ed8;
+
+    box-shadow:
+        0 18px 40px
+        rgba(0, 0, 0, .25);
+}
+
+
+/* =========================================================
+   SINGLE VENDOR PAGE
+========================================================= */
+
+.vendor-detail-hero {
+
+    position: relative;
+
+    overflow: hidden;
+
+    padding: 30px 0 60px;
+
+    background:
+
+        radial-gradient(
+            circle at 90% 10%,
+            rgba(37, 99, 235, .15),
+            transparent 28%
+        ),
+
+        linear-gradient(
+            135deg,
+            #f8fbff,
+            #eaf2ff
+        );
+}
+
+
+.vendor-detail-hero-inner {
+
+    width: min(1180px, 90%);
+
+    margin: 0 auto;
+}
+
+
+.vendor-back-link {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    margin-bottom: 35px;
+
+    color: #2563eb;
+
+    font-size: 12px;
+
+    font-weight: 850;
+
+    text-decoration: none;
+}
+
+
+.vendor-back-link:hover {
+
+    color: #1d4ed8;
+
+    text-decoration: underline;
+}
+
+
+.vendor-detail-main {
+
+    display: grid;
+
+    grid-template-columns:
+        180px 1fr;
+
+    align-items: center;
+
+    gap: 35px;
+}
+
+
+/* =========================================================
+   DETAIL LOGO
+========================================================= */
+
+.vendor-detail-logo {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 180px;
+
+    height: 180px;
+
+    overflow: hidden;
+
+    border:
+        1px solid
+        rgba(37, 99, 235, .10);
+
+    border-radius: 35px;
+
+    background: #fff;
+
+    box-shadow:
+        0 25px 55px
+        rgba(30, 64, 175, .12);
+}
+
+
+.vendor-detail-logo img {
+
+    width: 100%;
+
+    height: 100%;
+
+    padding: 18px;
+
+    box-sizing: border-box;
+
+    object-fit: contain;
+}
+
+
+.vendor-logo-placeholder {
+
+    font-size: 65px;
+}
+
+
+/* =========================================================
+   DETAIL INFO
+========================================================= */
+
+.vendor-detail-info h1 {
+
+    margin: 9px 0 10px;
+
+    color: #172554;
+
+    font-size: clamp(
+        34px,
+        5vw,
+        55px
+    );
+
+    line-height: 1;
+
+    letter-spacing: -2px;
+
+    font-weight: 950;
+}
+
+
+.vendor-detail-info p {
+
+    max-width: 720px;
+
+    margin: 14px 0;
+
+    color: #64748b;
+
+    font-size: 14px;
+
+    line-height: 1.8;
+}
+
+
+.vendor-detail-category {
+
+    display: inline-flex;
+
+    padding: 6px 11px;
+
+    border-radius: 999px;
+
+    background:
+        #dbeafe;
+
+    color:
+        #2563eb;
+
+    font-size: 10px;
+
+    font-weight: 900;
+}
+
+
+.vendor-detail-meta {
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 10px;
+
+    margin-top: 20px;
+}
+
+
+.vendor-detail-meta span {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    padding: 9px 12px;
+
+    border:
+        1px solid
+        rgba(37, 99, 235, .08);
+
+    border-radius: 10px;
+
+    background:
+        rgba(255, 255, 255, .75);
+
+    color: #64748b;
+
+    font-size: 10px;
+}
+
+
+.vendor-detail-meta strong {
+
+    color: #334155;
+}
+
+
+/* =========================================================
+   PRODUCTS SECTION
+========================================================= */
+
+.vendor-products-section {
+
+    padding: 70px 0 85px;
+}
+
+
+.vendor-product-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, 1fr);
+
+    gap: 20px;
+}
+
+
+/* =========================================================
+   PRODUCT CARD
+========================================================= */
+
+.vendor-product-card {
+
+    overflow: hidden;
+
+    display: flex;
+
+    flex-direction: column;
+
+    border:
+        1px solid
+        rgba(37, 99, 235, .08);
+
+    border-radius: 20px;
+
+    background: #fff;
+
+    box-shadow:
+        0 10px 35px
+        rgba(30, 64, 175, .07);
+
+    transition:
+        transform .25s ease,
+        box-shadow .25s ease;
+}
+
+
+.vendor-product-card:hover {
+
+    transform:
+        translateY(-6px);
+
+    box-shadow:
+        0 20px 45px
+        rgba(30, 64, 175, .13);
+}
+
+
+.vendor-product-card .vendor-product-image {
+
+    width: 100%;
+
+    height: 205px;
+
+    overflow: hidden;
+
+    border: 0;
+
+    border-radius: 0;
+
+    background:
+        #eff6ff;
+
+    text-decoration: none;
+}
+
+
+.vendor-product-card .vendor-product-image img {
+
+    width: 100%;
+
+    height: 100%;
+
+    object-fit: cover;
+
+    transition:
+        transform .35s ease;
+}
+
+
+.vendor-product-card:hover
+.vendor-product-image img {
+
+    transform:
+        scale(1.06);
+}
+
+
+.vendor-product-placeholder {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 100%;
+
+    height: 100%;
+
+    font-size: 40px;
+}
+
+
+.vendor-product-card
+.vendor-product-info {
+
+    display: flex;
+
+    flex: 1;
+
+    flex-direction: column;
+
+    padding: 18px;
+}
+
+
+.vendor-product-category {
+
+    color: #2563eb;
+
+    font-size: 9px;
+
+    font-weight: 900;
+
+    letter-spacing: .7px;
+
+    text-transform: uppercase;
+}
+
+
+.vendor-product-card h3 {
+
+    margin: 7px 0;
+
+    font-size: 15px;
+
+    line-height: 1.35;
+}
+
+
+.vendor-product-card h3 a {
+
+    color: #172554;
+
+    text-decoration: none;
+}
+
+
+.vendor-product-card h3 a:hover {
+
+    color: #2563eb;
+}
+
+
+.vendor-product-card
+.vendor-product-info > p {
+
+    margin: 0 0 15px;
+
+    color: #64748b;
+
+    font-size: 10px;
+
+    line-height: 1.6;
+}
+
+
+.vendor-product-bottom {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 10px;
+
+    margin-top: auto;
+
+    padding-top: 13px;
+
+    border-top:
+        1px solid
+        rgba(15, 23, 42, .06);
+}
+
+
+.vendor-product-bottom strong {
+
+    color: #2563eb;
+
+    font-size: 15px;
+
+    font-weight: 950;
+}
+
+
+.vendor-view-product {
+
+    color: #2563eb;
+
+    font-size: 10px;
+
+    font-weight: 900;
+
+    text-decoration: none;
+}
+
+
+.vendor-view-product:hover {
+
+    text-decoration: underline;
+}
+
+
+/* =========================================================
+   RESPONSIVE — 1100PX
+========================================================= */
+
+@media (max-width: 1100px) {
+
+    .vendor-marketplace-grid {
+
+        grid-template-columns:
+            repeat(2, 1fr);
+
+    }
+
+
+    .vendor-product-grid {
+
+        grid-template-columns:
+            repeat(3, 1fr);
+
+    }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE — 800PX
+========================================================= */
+
+@media (max-width: 800px) {
+
+    .vendor-hero {
+
+        padding:
+            60px 0;
+    }
+
+
+    .vendor-hero h1 {
+
+        letter-spacing:
+            -2px;
+
+    }
+
+
+    .section-heading {
+
+        align-items:
+            flex-start;
+
+        flex-direction:
+            column;
+
+    }
+
+
+    .vendor-detail-main {
+
+        grid-template-columns:
+            1fr;
+
+        text-align:
+            center;
+
+    }
+
+
+    .vendor-detail-logo {
+
+        margin:
+            0 auto;
+
+    }
+
+
+    .vendor-detail-info p {
+
+        margin-left:
+            auto;
+
+        margin-right:
+            auto;
+
+    }
+
+
+    .vendor-detail-meta {
+
+        justify-content:
+            center;
+
+    }
+
+
+    .vendor-product-grid {
+
+        grid-template-columns:
+            repeat(2, 1fr);
+
+    }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE — 600PX
+========================================================= */
+
+@media (max-width: 600px) {
+
+    .vendor-content-container,
+    .vendor-hero-inner,
+    .vendor-detail-hero-inner {
+
+        width:
+            92%;
+
+    }
+
+
+    .vendor-marketplace-grid {
+
+        grid-template-columns:
+            1fr;
+
+    }
+
+
+    .vendor-product-grid {
+
+        grid-template-columns:
+            1fr;
+
+    }
+
+
+    .vendor-hero h1 {
+
+        font-size:
+            42px;
+
+    }
+
+
+    .vendor-hero p {
+
+        font-size:
+            14px;
+
+    }
+
+
+    .vendors-section,
+    .vendor-products-section {
+
+        padding:
+            45px 0 60px;
+
+    }
+
+
+    .vendor-marketplace-card {
+
+        min-height:
+            auto;
+
+    }
+
+
+    .vendor-marketplace-logo {
+
+        height:
+            200px;
+
+    }
+
+
+    .vendor-cta {
+
+        padding:
+            60px 0;
+
+    }
+
+
+    .vendor-detail-hero {
+
+        padding:
+            25px 0 50px;
+
+    }
+
+
+    .vendor-detail-info h1 {
+
+        font-size:
+            36px;
+
+    }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE — 450PX
+========================================================= */
+
+@media (max-width: 450px) {
+
+    .vendor-hero h1 {
+
+        font-size:
+            36px;
+
+    }
+
+
+    .vendor-marketplace-body {
+
+        padding:
+            18px;
+
+    }
+
+
+    .vendor-marketplace-footer {
+
+        align-items:
+            flex-start;
+
+        flex-direction:
+            column;
+
+    }
+
+
+    .vendor-store-btn {
+
+        width:
+            100%;
+
+        box-sizing:
+            border-box;
+
+    }
+
+
+    .vendor-detail-logo {
+
+        width:
+            145px;
+
+        height:
+            145px;
+
+    }
+
+
+    .vendor-detail-info h1 {
+
+        font-size:
+            31px;
+
+    }
+
+}
