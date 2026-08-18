@@ -6627,3 +6627,367 @@ img {
         height: 42px;
     }
 }
+/* =========================================================
+   HOCHIPOHUB - PROFILE PAGE
+   ========================================================= */
+
+.dashboard-page {
+    min-height: calc(100vh - 90px);
+    background: #f5f8ff;
+    padding: 45px 20px 70px;
+}
+
+.dashboard-container {
+    width: min(1180px, 100%);
+    margin: 0 auto;
+}
+
+/* =========================================================
+   PAGE HEADER
+   ========================================================= */
+
+.dashboard-header {
+    margin-bottom: 30px;
+}
+
+.small-label {
+    display: inline-block;
+    margin-bottom: 8px;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+}
+
+.dashboard-header h1 {
+    margin: 0 0 8px;
+    color: #14213d;
+    font-size: 38px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.dashboard-header p {
+    margin: 0;
+    color: #64748b;
+    font-size: 16px;
+}
+
+/* =========================================================
+   ALERT
+   ========================================================= */
+
+.alert {
+    padding: 14px 18px;
+    margin-bottom: 25px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.alert-success {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #047857;
+}
+
+.alert-danger {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+}
+
+/* =========================================================
+   SECTION CARD
+   ========================================================= */
+
+.dashboard-section {
+    background: #ffffff;
+    border: 1px solid #e6ebf5;
+    border-radius: 20px;
+    padding: 30px;
+    margin-bottom: 25px;
+    box-shadow: 0 8px 30px rgba(20, 33, 61, 0.06);
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 25px;
+}
+
+.section-heading h2 {
+    margin: 0;
+    color: #14213d;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+/* =========================================================
+   PROFILE HEADER
+   ========================================================= */
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    padding-bottom: 25px;
+}
+
+.profile-image-wrapper {
+    width: 100px;
+    height: 100px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    padding: 4px;
+    background: linear-gradient(135deg, #2563eb, #60a5fa);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2);
+}
+
+.profile-image {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 4px solid #ffffff;
+    background: #eef4ff;
+}
+
+.profile-header h2 {
+    margin: 0 0 5px;
+    color: #14213d;
+    font-size: 26px;
+    font-weight: 800;
+}
+
+.profile-header p {
+    margin: 0 0 12px;
+    color: #64748b;
+    font-size: 14px;
+}
+
+/* =========================================================
+   STATUS BADGE
+   ========================================================= */
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.status-success {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.status-warning {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.status-danger {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.status-default {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+/* =========================================================
+   DIVIDER
+   ========================================================= */
+
+.dashboard-section hr {
+    border: 0;
+    border-top: 1px solid #edf0f6;
+    margin: 0 0 28px;
+}
+
+/* =========================================================
+   FORM
+   ========================================================= */
+
+.dashboard-form {
+    max-width: 720px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #1e293b;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.dashboard-form input[type="text"],
+.dashboard-form input[type="email"],
+.dashboard-form input[type="password"] {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 48px;
+    padding: 12px 15px;
+    border: 1px solid #dbe2ee;
+    border-radius: 11px;
+    outline: none;
+    background: #ffffff;
+    color: #1e293b;
+    font-size: 14px;
+    transition: 0.2s ease;
+}
+
+.dashboard-form input[type="text"]:focus,
+.dashboard-form input[type="email"]:focus,
+.dashboard-form input[type="password"]:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.10);
+}
+
+/* =========================================================
+   BUTTON
+   ========================================================= */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 20px;
+    border: 0;
+    border-radius: 11px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.btn-primary {
+    background: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 6px 15px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 9px 20px rgba(37, 99, 235, 0.28);
+}
+
+/* =========================================================
+   CHECKBOX / MFA
+   ========================================================= */
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: fit-content;
+    color: #1e293b;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #2563eb;
+    cursor: pointer;
+}
+
+.form-help {
+    margin: 10px 0 20px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* =========================================================
+   ACCOUNT INFORMATION
+   ========================================================= */
+
+.account-info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+.info-card {
+    padding: 20px;
+    background: #f8faff;
+    border: 1px solid #e6ebf5;
+    border-radius: 15px;
+}
+
+.info-card span {
+    display: block;
+    margin-bottom: 8px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-card strong {
+    display: block;
+    color: #14213d;
+    font-size: 17px;
+    font-weight: 800;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 900px) {
+
+    .account-info-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+}
+
+@media (max-width: 600px) {
+
+    .dashboard-page {
+        padding: 25px 14px 50px;
+    }
+
+    .dashboard-header h1 {
+        font-size: 30px;
+    }
+
+    .dashboard-section {
+        padding: 20px;
+        border-radius: 16px;
+    }
+
+    .profile-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .account-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-form {
+        max-width: 100%;
+    }
+
+}
