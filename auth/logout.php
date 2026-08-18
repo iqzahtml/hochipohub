@@ -6,17 +6,6 @@
 |--------------------------------------------------------------------------
 | File:
 | auth/logout.php
-|
-| Purpose:
-| Destroy the current user session and
-| return the user to the marketplace.
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| LOAD CONFIGURATION
 |--------------------------------------------------------------------------
 */
 
@@ -39,19 +28,12 @@ logoutUser();
 |--------------------------------------------------------------------------
 |
 | logoutUser() destroys the old session.
-| We start a fresh session so a logout message
-| can be stored safely.
+| Start a new session so the logout message
+| can be stored.
 |
 */
 
-if (
-    session_status() === PHP_SESSION_NONE
-) {
-
-    session_name(
-        SESSION_NAME
-    );
-
+if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
@@ -63,13 +45,8 @@ if (
 */
 
 $_SESSION['flash'] = [
-
-    'type' =>
-        'success',
-
-    'message' =>
-        'You have been logged out successfully.'
-
+    'type' => 'success',
+    'message' => 'You have been logged out successfully.'
 ];
 
 
@@ -80,9 +57,7 @@ $_SESSION['flash'] = [
 */
 
 header(
-    'Location: ' .
-    BASE_URL .
-    'index.php'
+    'Location: ' . BASE_URL . 'index.php'
 );
 
 exit;
