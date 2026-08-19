@@ -369,7 +369,7 @@ try {
     */
 
     error_log(
-        'HochipoHub Login Error: '
+        'Hochipohub Login Error: '
         . $e->getMessage()
     );
 
