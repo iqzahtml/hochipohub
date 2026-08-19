@@ -9,38 +9,27 @@
 |
 | Purpose:
 | - Generate OTP
-| - Store OTP in database
+| - Save OTP into database
 | - Send OTP through PHPMailer
-| - Support password reset OTP
+| - Support Password Reset OTP
 | - Support MFA OTP
+| - SHOW ERRORS DIRECTLY
+|
+| IMPORTANT:
+| - This file DOES NOT redirect to homepage when SMTP fails.
+| - SMTP errors are displayed directly for debugging.
 |--------------------------------------------------------------------------
 */
 
 
 /*
 |--------------------------------------------------------------------------
-| LOAD CONFIG
+| LOAD SYSTEM FILES
 |--------------------------------------------------------------------------
 */
 
 require_once dirname(__DIR__) . '/config.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| LOAD SESSION
-|--------------------------------------------------------------------------
-*/
-
 require_once dirname(__DIR__) . '/includes/session.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| LOAD FUNCTIONS
-|--------------------------------------------------------------------------
-*/
-
 require_once dirname(__DIR__) . '/includes/functions.php';
 
 
@@ -56,16 +45,11 @@ $autoloadPath =
 
 if (!file_exists($autoloadPath)) {
 
-    setFlashMessageSafe(
-        'error',
-        'Mailer system is not available. Please make sure the vendor folder and PHPMailer are installed.'
-    );
-
-    redirect(
-        BASE_URL . 'index.php'
+    showOtpError(
+        'PHPMailer Not Found',
+        'The PHPMailer vendor/autoload.php file could not be found.'
     );
 }
-
 
 require_once $autoloadPath;
 
@@ -82,36 +66,49 @@ use PHPMailer\PHPMailer\Exception;
 
 /*
 |--------------------------------------------------------------------------
-| OTP EXPIRY
+| SMTP CONFIGURATION
 |--------------------------------------------------------------------------
 |
-| If config.php already defines OTP_EXPIRY_MINUTES,
-| use that value.
+| IMPORTANT:
 |
-| Otherwise default to 10 minutes.
+| SMTP USERNAME = Gmail account that SENDS the OTP.
+|
+| SMTP PASSWORD = Gmail APP PASSWORD.
+|
+| DO NOT use the user's database email here.
+|
 |--------------------------------------------------------------------------
 */
 
-if (defined('OTP_EXPIRY_MINUTES')) {
+$smtpUsername =
+    'hochipohub941@gmail.com';
 
-    $expiryMinutes =
-        (int) OTP_EXPIRY_MINUTES;
+$smtpPassword =
+    'lhge llhk vzap pujl';
 
-} else {
 
-    $expiryMinutes = 10;
-}
+$smtpHost =
+    'smtp.gmail.com';
+
+$smtpPort =
+    587;
 
 
 /*
 |--------------------------------------------------------------------------
-| SAFETY CHECK
+| CHECK SMTP CONFIGURATION
 |--------------------------------------------------------------------------
 */
 
-if ($expiryMinutes <= 0) {
+if (
+    $smtpUsername === 'hochipohub941@gmail.com' ||
+    $smtpPassword === 'lhge llhk vzap pujl'
+) {
 
-    $expiryMinutes = 10;
+    showOtpError(
+        'SMTP Setup Required',
+        'You have not entered the SMTP sender email and App Password yet.'
+    );
 }
 
 
@@ -133,7 +130,7 @@ $type =
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE REQUEST TYPE
+| VALID OTP TYPE
 |--------------------------------------------------------------------------
 */
 
@@ -145,13 +142,9 @@ if (
     )
 ) {
 
-    setFlashMessageSafe(
-        'error',
-        'Invalid OTP request.'
-    );
-
-    redirect(
-        BASE_URL . 'index.php'
+    showOtpError(
+        'Invalid OTP Request',
+        'The OTP type must be either reset or mfa.'
     );
 }
 
@@ -168,26 +161,9 @@ try {
 
 } catch (Throwable $e) {
 
-    if (
-        defined('APP_DEBUG') &&
-        APP_DEBUG
-    ) {
-
-        die(
-            'Database connection error: '
-            . e(
-                $e->getMessage()
-            )
-        );
-    }
-
-    setFlashMessageSafe(
-        'error',
-        'Unable to connect to database.'
-    );
-
-    redirect(
-        BASE_URL . 'index.php'
+    showOtpError(
+        'Database Connection Error',
+        $e->getMessage()
     );
 }
 
@@ -212,45 +188,15 @@ if ($type === 'reset') {
 
 /*
 |--------------------------------------------------------------------------
-| CHECK OTP SESSION
+| CHECK USER ID
 |--------------------------------------------------------------------------
 */
 
-if (
-    $userId === null ||
-    $userId === ''
-) {
+if ($userId === null || $userId === '') {
 
-    setFlashMessageSafe(
-        'error',
-        'OTP session has expired. Please start the process again.'
-    );
-
-    redirect(
-        BASE_URL . 'index.php'
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CONVERT USER ID
-|--------------------------------------------------------------------------
-*/
-
-$userId =
-    (int) $userId;
-
-
-if ($userId <= 0) {
-
-    setFlashMessageSafe(
-        'error',
-        'Invalid user account.'
-    );
-
-    redirect(
-        BASE_URL . 'index.php'
+    showOtpError(
+        'OTP Session Expired',
+        'No password-reset or MFA user was found in the current session.'
     );
 }
 
@@ -261,16 +207,26 @@ if ($userId <= 0) {
 |--------------------------------------------------------------------------
 */
 
-$user =
-    getUserById(
-        $pdo,
-        $userId
+try {
+
+    $user =
+        getUserById(
+            $pdo,
+            $userId
+        );
+
+} catch (Throwable $e) {
+
+    showOtpError(
+        'Database Error',
+        $e->getMessage()
     );
+}
 
 
 /*
 |--------------------------------------------------------------------------
-| USER NOT FOUND
+| CHECK USER
 |--------------------------------------------------------------------------
 */
 
@@ -286,47 +242,36 @@ if (!$user) {
     }
 
 
-    setFlashMessageSafe(
-        'error',
-        'User account could not be found.'
-    );
-
-    redirect(
-        BASE_URL . 'index.php'
+    showOtpError(
+        'User Not Found',
+        'The user account associated with this OTP request could not be found.'
     );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CHECK EMAIL
+| CHECK USER EMAIL
 |--------------------------------------------------------------------------
 */
 
-$userEmail =
+$recipientEmail =
     trim(
-        (string) (
-            $user['email']
-            ?? ''
-        )
+        $user['email'] ?? ''
     );
 
 
 if (
-    $userEmail === '' ||
+    $recipientEmail === '' ||
     !filter_var(
-        $userEmail,
+        $recipientEmail,
         FILTER_VALIDATE_EMAIL
     )
 ) {
 
-    setFlashMessageSafe(
-        'error',
-        'The email address associated with this account is invalid.'
-    );
-
-    redirect(
-        BASE_URL . 'index.php'
+    showOtpError(
+        'Invalid User Email',
+        'The user account does not have a valid email address.'
     );
 }
 
@@ -335,43 +280,33 @@ if (
 |--------------------------------------------------------------------------
 | GENERATE OTP
 |--------------------------------------------------------------------------
-|
-| 6-digit OTP
-|
-|--------------------------------------------------------------------------
 */
 
-try {
-
-    $otp =
-        str_pad(
-            (string) random_int(
-                0,
-                999999
-            ),
-            6,
-            '0',
-            STR_PAD_LEFT
-        );
-
-} catch (Throwable $e) {
-
-    setFlashMessageSafe(
-        'error',
-        'Unable to generate verification code.'
+$otp =
+    str_pad(
+        (string) random_int(
+            0,
+            999999
+        ),
+        6,
+        '0',
+        STR_PAD_LEFT
     );
-
-    redirect(
-        BASE_URL . 'index.php'
-    );
-}
 
 
 /*
 |--------------------------------------------------------------------------
-| CALCULATE EXPIRY
+| OTP EXPIRY
+|--------------------------------------------------------------------------
+|
+| We intentionally do NOT depend on OTP_EXPIRY_MINUTES
+| because that constant caused your previous error.
+|
 |--------------------------------------------------------------------------
 */
+
+$expiryMinutes = 10;
+
 
 $expiryTimestamp =
     time()
@@ -390,7 +325,7 @@ $expiryDate =
 
 /*
 |--------------------------------------------------------------------------
-| STORE OTP
+| SAVE OTP TO DATABASE
 |--------------------------------------------------------------------------
 */
 
@@ -409,7 +344,7 @@ try {
 
         /*
         |--------------------------------------------------------------------------
-        | INSERT PASSWORD RESET HISTORY
+        | Insert reset history
         |--------------------------------------------------------------------------
         */
 
@@ -439,7 +374,7 @@ try {
 
         /*
         |--------------------------------------------------------------------------
-        | UPDATE USER CURRENT RESET CODE
+        | Update current reset code
         |--------------------------------------------------------------------------
         */
 
@@ -463,6 +398,8 @@ try {
             $userId
         ]);
 
+    }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -470,11 +407,11 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    } else {
+    else {
 
         /*
         |--------------------------------------------------------------------------
-        | INSERT MFA CODE HISTORY
+        | Insert MFA code
         |--------------------------------------------------------------------------
         */
 
@@ -504,7 +441,7 @@ try {
 
         /*
         |--------------------------------------------------------------------------
-        | UPDATE USER CURRENT MFA CODE
+        | Update current MFA code
         |--------------------------------------------------------------------------
         */
 
@@ -539,13 +476,7 @@ try {
     $pdo->commit();
 
 
-} catch (PDOException $e) {
-
-    /*
-    |--------------------------------------------------------------------------
-    | ROLLBACK
-    |--------------------------------------------------------------------------
-    */
+} catch (Throwable $e) {
 
     if (
         $pdo->inTransaction()
@@ -555,42 +486,36 @@ try {
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | DEBUG ERROR
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        defined('APP_DEBUG') &&
-        APP_DEBUG
-    ) {
-
-        die(
-            'OTP database error: '
-            . e(
-                $e->getMessage()
-            )
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | NORMAL ERROR
-    |--------------------------------------------------------------------------
-    */
-
-    setFlashMessageSafe(
-        'error',
-        'Unable to generate OTP. Please try again.'
-    );
-
-
-    redirect(
-        BASE_URL . 'index.php'
+    showOtpError(
+        'OTP Database Error',
+        $e->getMessage()
     );
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| CREATE PHPMailer
+|--------------------------------------------------------------------------
+*/
+
+$mail =
+    new PHPMailer(true);
+
+
+/*
+|--------------------------------------------------------------------------
+| SMTP DEBUGGING
+|--------------------------------------------------------------------------
+|
+| Set to 0 normally.
+|
+| If authentication still fails, change to 2 temporarily.
+|
+|--------------------------------------------------------------------------
+*/
+
+$mail->SMTPDebug = 0;
 
 
 /*
@@ -599,91 +524,39 @@ try {
 |--------------------------------------------------------------------------
 */
 
-$mail =
-    new PHPMailer(true);
-
-
 try {
 
     /*
     |--------------------------------------------------------------------------
-    | SMTP CONFIGURATION
-    |--------------------------------------------------------------------------
-    |
-    | IMPORTANT:
-    |
-    | Gantikan:
-    |
-    | YOUR_EMAIL@gmail.com
-    |
-    | YOUR_APP_PASSWORD
-    |
-    | dengan Gmail dan Gmail App Password sebenar.
-    |
+    | SMTP
     |--------------------------------------------------------------------------
     */
 
     $mail->isSMTP();
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | SMTP HOST
-    |--------------------------------------------------------------------------
-    */
-
     $mail->Host =
-        'smtp.gmail.com';
+        $smtpHost;
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | SMTP AUTH
-    |--------------------------------------------------------------------------
-    */
 
     $mail->SMTPAuth =
         true;
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | SMTP USERNAME
-    |--------------------------------------------------------------------------
-    */
-
     $mail->Username =
-        'YOUR_EMAIL@gmail.com';
+        $smtpUsername;
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | SMTP PASSWORD
-    |--------------------------------------------------------------------------
-    */
 
     $mail->Password =
-        'YOUR_APP_PASSWORD';
+        $smtpPassword;
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | SMTP ENCRYPTION
-    |--------------------------------------------------------------------------
-    */
 
     $mail->SMTPSecure =
         PHPMailer::ENCRYPTION_STARTTLS;
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | SMTP PORT
-    |--------------------------------------------------------------------------
-    */
-
     $mail->Port =
-        587;
+        $smtpPort;
 
 
     /*
@@ -703,7 +576,7 @@ try {
     */
 
     $mail->setFrom(
-        'YOUR_EMAIL@gmail.com',
+        $smtpUsername,
         defined('APP_NAME')
             ? APP_NAME
             : 'HochipoHub'
@@ -717,8 +590,8 @@ try {
     */
 
     $mail->addAddress(
-        $userEmail,
-        $user['name'] ?? ''
+        $recipientEmail,
+        $user['name'] ?? 'User'
     );
 
 
@@ -754,16 +627,6 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | EMAIL SUBJECT
-    |--------------------------------------------------------------------------
-    */
-
-    $mail->Subject =
-        $subject;
-
-
-    /*
-    |--------------------------------------------------------------------------
     | HTML EMAIL
     |--------------------------------------------------------------------------
     */
@@ -771,101 +634,87 @@ try {
     $mail->isHTML(true);
 
 
-    $userName =
-        e(
-            $user['name']
-            ?? 'User'
+    $mail->Subject =
+        $subject;
+
+
+    $safeName =
+        htmlspecialchars(
+            $user['name'] ?? 'User',
+            ENT_QUOTES,
+            'UTF-8'
         );
 
 
-    $safeTitle =
-        e($title);
-
-
-    $safeDescription =
-        e($description);
-
-
     $safeOtp =
-        e($otp);
-
-
-    $safeExpiry =
-        e($expiryMinutes);
-
-
-    $currentYear =
-        date('Y');
+        htmlspecialchars(
+            $otp,
+            ENT_QUOTES,
+            'UTF-8'
+        );
 
 
     $mail->Body = '
 
         <div style="
-            font-family:Arial,Helvetica,sans-serif;
+            font-family:Arial,sans-serif;
             background:#f1f5f9;
-            padding:40px 20px;
+            padding:40px;
         ">
 
             <div style="
                 max-width:560px;
-                margin:0 auto;
+                margin:auto;
                 background:#ffffff;
                 border-radius:18px;
                 padding:35px;
-                box-shadow:0 10px 30px rgba(15,23,42,0.08);
+                box-shadow:
+                    0 10px 30px
+                    rgba(0,0,0,0.08);
             ">
 
                 <h1 style="
                     color:#2563eb;
-                    margin:0 0 5px;
-                    font-size:28px;
+                    margin-bottom:5px;
                 ">
                     HochipoHub
                 </h1>
 
-
-                <h2 style="
-                    color:#0f172a;
-                    margin:20px 0 10px;
-                ">
-                    ' . $safeTitle . '
+                <h2>
+                    ' . htmlspecialchars(
+                        $title,
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) . '
                 </h2>
 
-
-                <p style="
-                    color:#334155;
-                    line-height:1.6;
-                ">
-                    Hi ' . $userName . ',
+                <p>
+                    Hi ' . $safeName . ',
                 </p>
 
-
-                <p style="
-                    color:#334155;
-                    line-height:1.6;
-                ">
-                    ' . $safeDescription . '
+                <p>
+                    ' . htmlspecialchars(
+                        $description,
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) . '
                 </p>
-
 
                 <div style="
                     margin:30px 0;
-                    padding:25px 20px;
+                    padding:20px;
                     background:#eff6ff;
-                    border-radius:14px;
+                    border-radius:12px;
                     text-align:center;
                 ">
 
                     <div style="
                         font-size:13px;
                         color:#64748b;
-                        margin-bottom:10px;
-                        font-weight:bold;
-                        letter-spacing:1px;
+                        margin-bottom:8px;
                     ">
                         YOUR OTP CODE
                     </div>
-
 
                     <strong style="
                         font-size:32px;
@@ -877,54 +726,40 @@ try {
 
                 </div>
 
+                <p>
 
-                <p style="
-                    color:#334155;
-                    line-height:1.6;
-                ">
-
-                    This verification code will expire in
+                    This code will expire in
 
                     <strong>
-                        ' . $safeExpiry . ' minutes
+                        ' . $expiryMinutes . ' minutes
                     </strong>.
 
                 </p>
 
-
                 <p style="
                     color:#64748b;
                     font-size:13px;
-                    line-height:1.6;
                 ">
 
-                    If you did not request this verification
-                    code, you can safely ignore this email.
+                    If you did not request this code,
+                    please ignore this email.
 
                 </p>
 
-
-                <hr style="
-                    border:none;
-                    border-top:1px solid #e2e8f0;
-                    margin:25px 0;
-                ">
-
+                <hr>
 
                 <p style="
                     color:#94a3b8;
                     font-size:12px;
-                    margin:0;
                 ">
 
-                    &copy; ' . $currentYear . ' HochipoHub
+                    © ' . date('Y') . ' HochipoHub
 
                 </p>
 
             </div>
 
         </div>
-
     ';
 
 
@@ -937,18 +772,12 @@ try {
     $mail->AltBody =
         $title
         . "\n\n"
-        . 'Hi '
-        . ($user['name'] ?? 'User')
-        . ",\n\n"
-        . $description
-        . "\n\n"
         . 'Your OTP code is: '
         . $otp
         . "\n\n"
         . 'This code expires in '
         . $expiryMinutes
-        . " minutes.\n\n"
-        . 'If you did not request this code, please ignore this email.';
+        . ' minutes.';
 
 
     /*
@@ -960,11 +789,49 @@ try {
     $mail->send();
 
 
+} catch (Exception $e) {
+
     /*
     |--------------------------------------------------------------------------
-    | SUCCESS MESSAGE
+    | SMTP FAILED
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    | DO NOT REDIRECT TO HOMEPAGE.
+    |
     |--------------------------------------------------------------------------
     */
+
+    $errorMessage =
+        $mail->ErrorInfo;
+
+
+    if (
+        empty($errorMessage)
+    ) {
+
+        $errorMessage =
+            $e->getMessage();
+    }
+
+
+    showSmtpError(
+        $errorMessage,
+        $smtpHost,
+        $smtpPort,
+        $smtpUsername,
+        $recipientEmail
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| EMAIL SUCCESS
+|--------------------------------------------------------------------------
+*/
+
+if ($type === 'reset') {
 
     setFlashMessageSafe(
         'success',
@@ -972,63 +839,676 @@ try {
     );
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | REDIRECT TO VERIFY OTP
-    |--------------------------------------------------------------------------
-    */
+    redirect(
+        BASE_URL .
+        'auth/verify_otp.php?type=reset'
+    );
 
-    if ($type === 'reset') {
-
-        redirect(
-            BASE_URL
-            . 'auth/verify_otp.php?type=reset'
-        );
-
-    } else {
-
-        redirect(
-            BASE_URL
-            . 'auth/verify_otp.php?type=mfa'
-        );
-    }
+}
 
 
-} catch (Exception $e) {
+if ($type === 'mfa') {
 
-    /*
-    |--------------------------------------------------------------------------
-    | EMAIL FAILED
-    |--------------------------------------------------------------------------
-    */
+    setFlashMessageSafe(
+        'success',
+        'A verification code has been sent to your email.'
+    );
 
-    if (
-        defined('APP_DEBUG') &&
-        APP_DEBUG
-    ) {
-
-        setFlashMessageSafe(
-            'error',
-            'Unable to send email: '
-            . $mail->ErrorInfo
-        );
-
-    } else {
-
-        setFlashMessageSafe(
-            'error',
-            'Unable to send verification email. Please try again.'
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | REDIRECT
-    |--------------------------------------------------------------------------
-    */
 
     redirect(
-        BASE_URL . 'index.php'
+        BASE_URL .
+        'auth/verify_otp.php?type=mfa'
     );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ERROR PAGE FUNCTION
+|--------------------------------------------------------------------------
+*/
+
+function showOtpError(
+    $title,
+    $message
+) {
+
+    $safeTitle =
+        htmlspecialchars(
+            (string) $title,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+
+    $safeMessage =
+        htmlspecialchars(
+            (string) $message,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+
+    $backUrl =
+        defined('BASE_URL')
+            ? BASE_URL . 'auth/forgot_password.php'
+            : '../auth/forgot_password.php';
+
+
+    ?>
+
+    <!DOCTYPE html>
+
+    <html lang="en">
+
+    <head>
+
+        <meta charset="UTF-8">
+
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        >
+
+        <title>
+            HochipoHub - Error
+        </title>
+
+        <style>
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+
+                margin: 0;
+
+                min-height: 100vh;
+
+                display: flex;
+
+                align-items: center;
+
+                justify-content: center;
+
+                padding: 20px;
+
+                font-family:
+                    Arial,
+                    Helvetica,
+                    sans-serif;
+
+                background:
+                    linear-gradient(
+                        135deg,
+                        #eff6ff,
+                        #dbeafe
+                    );
+            }
+
+            .container {
+
+                width: 100%;
+
+                max-width: 650px;
+
+                background: #ffffff;
+
+                border-radius: 22px;
+
+                padding: 40px;
+
+                box-shadow:
+                    0 20px 50px
+                    rgba(
+                        15,
+                        23,
+                        42,
+                        0.12
+                    );
+            }
+
+            .icon {
+
+                width: 64px;
+
+                height: 64px;
+
+                display: flex;
+
+                align-items: center;
+
+                justify-content: center;
+
+                border-radius: 18px;
+
+                background: #fee2e2;
+
+                font-size: 30px;
+
+                margin-bottom: 20px;
+            }
+
+            .eyebrow {
+
+                color: #dc2626;
+
+                font-size: 12px;
+
+                font-weight: 700;
+
+                letter-spacing: 2px;
+            }
+
+            h1 {
+
+                color: #0f172a;
+
+                margin:
+                    8px 0 12px;
+
+                font-size: 28px;
+            }
+
+            .description {
+
+                color: #64748b;
+
+                line-height: 1.6;
+            }
+
+            .error-box {
+
+                margin-top: 25px;
+
+                padding: 20px;
+
+                background: #fef2f2;
+
+                border:
+                    1px solid
+                    #fecaca;
+
+                border-radius: 12px;
+            }
+
+            .error-label {
+
+                font-weight: 700;
+
+                color: #991b1b;
+
+                margin-bottom: 10px;
+            }
+
+            pre {
+
+                margin: 0;
+
+                white-space: pre-wrap;
+
+                word-break: break-word;
+
+                font-family:
+                    Consolas,
+                    monospace;
+
+                font-size: 14px;
+
+                color: #7f1d1d;
+
+                line-height: 1.6;
+            }
+
+            a {
+
+                display: inline-block;
+
+                margin-top: 25px;
+
+                padding:
+                    13px 20px;
+
+                background: #2563eb;
+
+                color: #ffffff;
+
+                text-decoration: none;
+
+                border-radius: 10px;
+
+                font-weight: 700;
+            }
+
+            a:hover {
+
+                background: #1d4ed8;
+            }
+
+        </style>
+
+    </head>
+
+    <body>
+
+        <div class="container">
+
+            <div class="icon">
+                ⚠️
+            </div>
+
+            <div class="eyebrow">
+                OTP ERROR
+            </div>
+
+            <h1>
+                <?= $safeTitle ?>
+            </h1>
+
+            <p class="description">
+
+                The OTP process could not be completed.
+
+                The exact error is displayed below
+                so it can be fixed.
+
+            </p>
+
+            <div class="error-box">
+
+                <div class="error-label">
+                    Error Details
+                </div>
+
+                <pre><?= $safeMessage ?></pre>
+
+            </div>
+
+            <a href="<?= htmlspecialchars(
+                $backUrl,
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>">
+
+                ← Back to Forgot Password
+
+            </a>
+
+        </div>
+
+    </body>
+
+    </html>
+
+    <?php
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| SMTP ERROR PAGE
+|--------------------------------------------------------------------------
+*/
+
+function showSmtpError(
+    $errorMessage,
+    $smtpHost,
+    $smtpPort,
+    $smtpUsername,
+    $recipientEmail
+) {
+
+    $safeError =
+        htmlspecialchars(
+            (string) $errorMessage,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+
+    $safeHost =
+        htmlspecialchars(
+            (string) $smtpHost,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+
+    $safeUsername =
+        htmlspecialchars(
+            (string) $smtpUsername,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+
+    $safeRecipient =
+        htmlspecialchars(
+            (string) $recipientEmail,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+
+    $backUrl =
+        defined('BASE_URL')
+            ? BASE_URL . 'auth/forgot_password.php'
+            : '../auth/forgot_password.php';
+
+
+    ?>
+
+    <!DOCTYPE html>
+
+    <html lang="en">
+
+    <head>
+
+        <meta charset="UTF-8">
+
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        >
+
+        <title>
+            HochipoHub - SMTP Error
+        </title>
+
+        <style>
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+
+                margin: 0;
+
+                min-height: 100vh;
+
+                display: flex;
+
+                align-items: center;
+
+                justify-content: center;
+
+                padding: 20px;
+
+                font-family:
+                    Arial,
+                    Helvetica,
+                    sans-serif;
+
+                background:
+                    linear-gradient(
+                        135deg,
+                        #eff6ff,
+                        #dbeafe
+                    );
+            }
+
+            .container {
+
+                width: 100%;
+
+                max-width: 720px;
+
+                background: #ffffff;
+
+                border-radius: 22px;
+
+                padding: 40px;
+
+                box-shadow:
+                    0 20px 50px
+                    rgba(
+                        15,
+                        23,
+                        42,
+                        0.12
+                    );
+            }
+
+            .icon {
+
+                width: 64px;
+
+                height: 64px;
+
+                display: flex;
+
+                align-items: center;
+
+                justify-content: center;
+
+                border-radius: 18px;
+
+                background: #fef3c7;
+
+                font-size: 30px;
+
+                margin-bottom: 20px;
+            }
+
+            .eyebrow {
+
+                color: #d97706;
+
+                font-size: 12px;
+
+                font-weight: 700;
+
+                letter-spacing: 2px;
+            }
+
+            h1 {
+
+                color: #0f172a;
+
+                margin:
+                    8px 0 12px;
+
+                font-size: 28px;
+            }
+
+            .description {
+
+                color: #64748b;
+
+                line-height: 1.6;
+            }
+
+            .error-box {
+
+                margin-top: 25px;
+
+                padding: 20px;
+
+                background: #fef2f2;
+
+                border:
+                    1px solid
+                    #fecaca;
+
+                border-radius: 12px;
+            }
+
+            .error-label {
+
+                color: #991b1b;
+
+                font-weight: 700;
+
+                margin-bottom: 10px;
+            }
+
+            pre {
+
+                margin: 0;
+
+                white-space: pre-wrap;
+
+                word-break: break-word;
+
+                font-family:
+                    Consolas,
+                    monospace;
+
+                font-size: 14px;
+
+                color: #7f1d1d;
+
+                line-height: 1.6;
+            }
+
+            .info-box {
+
+                margin-top: 20px;
+
+                padding: 18px;
+
+                background: #eff6ff;
+
+                border:
+                    1px solid
+                    #bfdbfe;
+
+                border-radius: 12px;
+
+                color: #1e3a8a;
+
+                line-height: 1.8;
+
+                font-size: 14px;
+            }
+
+            .info-box strong {
+
+                color: #1e40af;
+            }
+
+            a {
+
+                display: inline-block;
+
+                margin-top: 25px;
+
+                padding:
+                    13px 20px;
+
+                background: #2563eb;
+
+                color: #ffffff;
+
+                text-decoration: none;
+
+                border-radius: 10px;
+
+                font-weight: 700;
+            }
+
+            a:hover {
+
+                background: #1d4ed8;
+            }
+
+        </style>
+
+    </head>
+
+    <body>
+
+        <div class="container">
+
+            <div class="icon">
+                📧
+            </div>
+
+            <div class="eyebrow">
+                SMTP ERROR
+            </div>
+
+            <h1>
+                OTP Email Could Not Be Sent
+            </h1>
+
+            <p class="description">
+
+                The OTP was generated successfully,
+                but PHPMailer could not send the email.
+
+                The exact SMTP error is shown below.
+
+            </p>
+
+
+            <div class="error-box">
+
+                <div class="error-label">
+                    PHPMailer Error
+                </div>
+
+                <pre><?= $safeError ?></pre>
+
+            </div>
+
+
+            <div class="info-box">
+
+                <strong>
+                    SMTP Host:
+                </strong>
+
+                <?= $safeHost ?>
+
+                <br>
+
+                <strong>
+                    SMTP Port:
+                </strong>
+
+                <?= (int) $smtpPort ?>
+
+                <br>
+
+                <strong>
+                    SMTP Sender:
+                </strong>
+
+                <?= $safeUsername ?>
+
+                <br>
+
+                <strong>
+                    OTP Recipient:
+                </strong>
+
+                <?= $safeRecipient ?>
+
+            </div>
+
+
+            <a href="<?= htmlspecialchars(
+                $backUrl,
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>">
+
+                ← Back to Forgot Password
+
+            </a>
+
+        </div>
+
+    </body>
+
+    </html>
+
+    <?php
+
+    exit;
 }
