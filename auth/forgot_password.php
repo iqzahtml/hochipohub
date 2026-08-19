@@ -4,39 +4,11 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - FORGOT PASSWORD
 |--------------------------------------------------------------------------
-| File:
-|     auth/forgot_password.php
-|
-| Flow:
-|
-| Login
-|   ↓
-| Forgot Password
-|   ↓
-| Enter Email
-|   ↓
-| Send OTP
-|   ↓
-| Verify OTP
-|   ↓
-| Reset Password
-|--------------------------------------------------------------------------
 */
 
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/includes/session.php';
 require_once dirname(__DIR__) . '/includes/functions.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| BASE URL
-|--------------------------------------------------------------------------
-*/
-
-$baseUrl = defined('BASE_URL')
-    ? rtrim(BASE_URL, '/') . '/'
-    : '/hochipohub/';
 
 
 /*
@@ -66,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         redirect(
-            $baseUrl . 'auth/forgot_password.php'
+            BASE_URL . 'auth/forgot_password.php'
         );
     }
 
@@ -79,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         redirect(
-            $baseUrl . 'auth/forgot_password.php'
+            BASE_URL . 'auth/forgot_password.php'
         );
     }
 
@@ -90,142 +62,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     |--------------------------------------------------------------------------
     */
 
-    try {
-
-        $pdo = getDB();
+    $pdo = getDB();
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | FIND USER
-        |--------------------------------------------------------------------------
-        */
+    $stmt = $pdo->prepare("
+        SELECT
+            user_id,
+            name,
+            email,
+            status
+        FROM users
+        WHERE email = ?
+        LIMIT 1
+    ");
 
-        $stmt = $pdo->prepare("
-            SELECT
-                user_id,
-                name,
-                email,
-                status
-            FROM users
-            WHERE email = ?
-            LIMIT 1
-        ");
+    $stmt->execute([
+        $email
+    ]);
 
-        $stmt->execute([
-            $email
-        ]);
-
-        $user = $stmt->fetch(
-            PDO::FETCH_ASSOC
-        );
+    $user = $stmt->fetch(
+        PDO::FETCH_ASSOC
+    );
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | USER NOT FOUND
-        |--------------------------------------------------------------------------
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | USER NOT FOUND
+    |--------------------------------------------------------------------------
+    */
 
-        if (!$user) {
-
-            setFlashMessageSafe(
-                'error',
-                'No account was found with that email address.'
-            );
-
-            redirect(
-                $baseUrl . 'auth/forgot_password.php'
-            );
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CHECK ACCOUNT STATUS
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            isset($user['status']) &&
-            strtolower(
-                trim(
-                    $user['status']
-                )
-            ) !== 'active'
-        ) {
-
-            setFlashMessageSafe(
-                'error',
-                'This account is not active. Please contact support.'
-            );
-
-            redirect(
-                $baseUrl . 'auth/forgot_password.php'
-            );
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | STORE RESET USER
-        |--------------------------------------------------------------------------
-        */
-
-        setResetUser(
-            $user['user_id']
-        );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | STORE EMAIL FOR DISPLAY
-        |--------------------------------------------------------------------------
-        */
-
-        $_SESSION['reset_email'] =
-            $user['email'];
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | REDIRECT TO SEND OTP
-        |--------------------------------------------------------------------------
-        */
-
-        redirect(
-            $baseUrl
-            . 'auth/send_otp.php?type=reset'
-        );
-
-    } catch (PDOException $e) {
-
-        if (defined('APP_DEBUG') && APP_DEBUG) {
-
-            die(
-                'Forgot password database error: '
-                . e(
-                    $e->getMessage()
-                )
-            );
-        }
-
+    if (!$user) {
 
         setFlashMessageSafe(
             'error',
-            'Something went wrong. Please try again.'
+            'No account was found with that email address.'
         );
 
         redirect(
-            $baseUrl . 'auth/forgot_password.php'
+            BASE_URL . 'auth/forgot_password.php'
         );
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CHECK ACCOUNT STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        isset($user['status']) &&
+        strtolower($user['status']) !== 'active'
+    ) {
+
+        setFlashMessageSafe(
+            'error',
+            'This account is not currently active.'
+        );
+
+        redirect(
+            BASE_URL . 'auth/forgot_password.php'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STORE RESET USER
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION['reset_user_id'] =
+        (int) $user['user_id'];
+
+
+    $_SESSION['reset_email'] =
+        $user['email'];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SEND OTP
+    |--------------------------------------------------------------------------
+    */
+
+    redirect(
+        BASE_URL
+        . 'auth/send_otp.php?type=reset'
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| FLASH MESSAGE
+| FLASH
 |--------------------------------------------------------------------------
 */
 
@@ -257,7 +187,6 @@ $flash = getFlashMessage();
             box-sizing: border-box;
         }
 
-
         body {
 
             margin: 0;
@@ -266,14 +195,13 @@ $flash = getFlashMessage();
 
             font-family:
                 Arial,
-                Helvetica,
                 sans-serif;
 
             background:
                 linear-gradient(
                     135deg,
                     #eff6ff,
-                    #eef2ff
+                    #dbeafe
                 );
 
             display: flex;
@@ -294,21 +222,32 @@ $flash = getFlashMessage();
 
             background: #ffffff;
 
-            border-radius: 24px;
+            border-radius: 22px;
 
             padding: 40px;
 
             box-shadow:
-                0 25px 70px
-                rgba(15, 23, 42, 0.15);
+                0 20px 50px
+                rgba(
+                    15,
+                    23,
+                    42,
+                    0.12
+                );
         }
 
 
-        .forgot-icon {
+        .icon {
 
             width: 64px;
 
             height: 64px;
+
+            border-radius: 18px;
+
+            background: #2563eb;
+
+            color: #ffffff;
 
             display: flex;
 
@@ -316,64 +255,41 @@ $flash = getFlashMessage();
 
             justify-content: center;
 
+            font-size: 30px;
+
             margin-bottom: 20px;
-
-            border-radius: 18px;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #2563eb,
-                    #4f46e5
-                );
-
-            color: #ffffff;
-
-            font-size: 28px;
-
-            box-shadow:
-                0 10px 25px
-                rgba(37, 99, 235, 0.25);
         }
 
 
         .eyebrow {
 
-            display: block;
+            font-size: 12px;
 
-            margin-bottom: 7px;
+            font-weight: 700;
 
             color: #2563eb;
 
-            font-size: 11px;
-
-            font-weight: 800;
-
-            letter-spacing: 1.5px;
+            letter-spacing: 2px;
         }
 
 
         h1 {
 
-            margin: 0 0 10px;
+            margin:
+                8px 0
+                10px;
 
             color: #0f172a;
-
-            font-size: 28px;
-
-            font-weight: 800;
         }
 
 
         .description {
 
-            margin: 0 0 25px;
-
             color: #64748b;
 
-            font-size: 14px;
-
             line-height: 1.6;
+
+            margin-bottom: 25px;
         }
 
 
@@ -381,139 +297,83 @@ $flash = getFlashMessage();
 
             padding: 13px 15px;
 
+            border-radius: 10px;
+
             margin-bottom: 20px;
 
-            border-radius: 12px;
-
-            font-size: 13px;
-
-            line-height: 1.5;
-        }
-
-
-        .alert.error {
-
             background: #fef2f2;
-
-            border:
-                1px solid
-                #fecaca;
 
             color: #b91c1c;
         }
 
 
-        .alert.success {
-
-            background: #ecfdf5;
-
-            border:
-                1px solid
-                #a7f3d0;
-
-            color: #047857;
-        }
-
-
         .form-group {
 
-            margin-bottom: 18px;
+            margin-bottom: 20px;
         }
 
 
-        .form-group label {
+        label {
 
             display: block;
 
-            margin-bottom: 8px;
+            font-weight: 700;
 
             color: #334155;
 
-            font-size: 13px;
-
-            font-weight: 700;
+            margin-bottom: 8px;
         }
 
 
-        .form-group input {
+        input {
 
             width: 100%;
 
-            height: 48px;
-
-            padding: 0 14px;
+            padding: 15px;
 
             border:
-                1px solid
-                #cbd5e1;
+                2px solid
+                #dbeafe;
 
             border-radius: 12px;
 
-            background: #f8fafc;
-
-            color: #0f172a;
-
-            font-size: 14px;
+            font-size: 15px;
 
             outline: none;
-
-            transition: 0.2s ease;
         }
 
 
-        .form-group input:focus {
-
-            background: #ffffff;
+        input:focus {
 
             border-color: #2563eb;
-
-            box-shadow:
-                0 0 0 4px
-                rgba(37, 99, 235, 0.10);
         }
 
 
-        .submit-button {
+        button {
 
             width: 100%;
 
-            min-height: 48px;
-
             border: none;
 
-            border-radius: 13px;
+            padding: 16px;
 
-            background:
-                linear-gradient(
-                    135deg,
-                    #2563eb,
-                    #4f46e5
-                );
+            border-radius: 12px;
+
+            background: #2563eb;
 
             color: #ffffff;
 
-            font-size: 14px;
+            font-size: 15px;
 
-            font-weight: 800;
+            font-weight: 700;
 
             cursor: pointer;
-
-            box-shadow:
-                0 8px 20px
-                rgba(37, 99, 235, 0.25);
-
-            transition: 0.2s ease;
         }
 
 
-        .submit-button:hover {
+        button:hover {
 
-            transform:
-                translateY(-2px);
-
-            box-shadow:
-                0 12px 28px
-                rgba(37, 99, 235, 0.32);
+            background: #1d4ed8;
         }
 
 
@@ -521,39 +381,15 @@ $flash = getFlashMessage();
 
             display: block;
 
-            margin-top: 20px;
-
             text-align: center;
+
+            margin-top: 20px;
 
             color: #2563eb;
 
-            font-size: 13px;
-
-            font-weight: 700;
-
             text-decoration: none;
-        }
 
-
-        .back-link:hover {
-
-            text-decoration: underline;
-        }
-
-
-        @media (max-width: 600px) {
-
-            .forgot-container {
-
-                padding: 28px 22px;
-
-                border-radius: 20px;
-            }
-
-            h1 {
-
-                font-size: 24px;
-            }
+            font-weight: 600;
         }
 
     </style>
@@ -567,45 +403,34 @@ $flash = getFlashMessage();
 <div class="forgot-container">
 
 
-    <div class="forgot-icon">
-
+    <div class="icon">
         🔐
-
     </div>
 
 
     <span class="eyebrow">
-
-        ACCOUNT RECOVERY
-
+        PASSWORD RESET
     </span>
 
 
     <h1>
-
-        Forgot Password?
-
+        Forgot Your Password?
     </h1>
 
 
     <p class="description">
 
-        Enter the email address connected
+        Enter the email address registered
         to your HochipoHub account.
         We'll send you a 6-digit verification
-        code to reset your password.
+        code.
 
     </p>
 
 
     <?php if ($flash): ?>
 
-        <div
-            class="alert <?= $flash['type'] === 'error'
-                ? 'error'
-                : 'success'
-            ?>"
-        >
+        <div class="alert">
 
             <?= e(
                 $flash['message']
@@ -618,24 +443,18 @@ $flash = getFlashMessage();
 
     <form
         method="POST"
-        action="<?= e(
-            $baseUrl . 'auth/forgot_password.php'
-        ) ?>"
+        action=""
     >
-
 
         <div class="form-group">
 
-            <label for="forgotEmail">
-
+            <label for="email">
                 Email Address
-
             </label>
-
 
             <input
                 type="email"
-                id="forgotEmail"
+                id="email"
                 name="email"
                 placeholder="you@example.com"
                 autocomplete="email"
@@ -645,24 +464,19 @@ $flash = getFlashMessage();
         </div>
 
 
-        <button
-            type="submit"
-            class="submit-button"
-        >
+        <button type="submit">
 
-            SEND VERIFICATION CODE →
+            SEND VERIFICATION CODE
 
         </button>
-
 
     </form>
 
 
     <a
-        href="<?= e($baseUrl . 'index.php') ?>"
+        href="<?= BASE_URL ?>index.php"
         class="back-link"
     >
-
         ← Back to Login
 
     </a>
