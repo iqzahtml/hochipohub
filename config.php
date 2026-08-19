@@ -6,12 +6,6 @@
 |--------------------------------------------------------------------------
 | File:
 | config.php
-|
-| Purpose:
-| - Database configuration
-| - PDO connection
-| - Application configuration
-| - Helper function for database access
 |--------------------------------------------------------------------------
 */
 
@@ -23,6 +17,7 @@
 */
 
 if (session_status() === PHP_SESSION_NONE) {
+
     session_start();
 }
 
@@ -34,9 +29,13 @@ if (session_status() === PHP_SESSION_NONE) {
 */
 
 define('DB_HOST', 'localhost');
+
 define('DB_NAME', 'hochipohub');
+
 define('DB_USER', 'root');
+
 define('DB_PASS', '');
+
 define('DB_CHARSET', 'utf8mb4');
 
 
@@ -46,11 +45,92 @@ define('DB_CHARSET', 'utf8mb4');
 |--------------------------------------------------------------------------
 */
 
-define('SITE_NAME', 'HochipoHub');
+define(
+    'SITE_NAME',
+    'HochipoHub'
+);
+
+define(
+    'APP_NAME',
+    'HochipoHub'
+);
 
 define(
     'BASE_URL',
     'http://localhost/hochipoHub/'
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| SMTP CONFIGURATION
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+|
+| SMTP_USERNAME
+| = Gmail account used by HochipoHub to SEND emails.
+|
+| SMTP_PASSWORD
+| = Gmail APP PASSWORD.
+|
+| It is NOT the normal Gmail password.
+|
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'SMTP_HOST',
+    'smtp.gmail.com'
+);
+
+define(
+    'SMTP_PORT',
+    587
+);
+
+define(
+    'SMTP_USERNAME',
+    'hochipohub941@gmail.com'
+);
+
+define(
+    'SMTP_PASSWORD',
+    'lhgellhkvzappujl'
+);
+
+define(
+    'SMTP_FROM_EMAIL',
+    'hochipohub941@gmail.com'
+);
+
+define(
+    'SMTP_FROM_NAME',
+    'HochipoHub'
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| OTP CONFIGURATION
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'OTP_EXPIRY_MINUTES',
+    10
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| DEBUG
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'APP_DEBUG',
+    true
 );
 
 
@@ -90,15 +170,14 @@ define(
 
 /*
 |--------------------------------------------------------------------------
-| DEFAULT COMMISSION RATE
-|--------------------------------------------------------------------------
-|
-| 5% default commission.
-| Admin can still manage commission records from admin panel.
+| DEFAULT COMMISSION
 |--------------------------------------------------------------------------
 */
 
-define('DEFAULT_COMMISSION_RATE', 5.00);
+define(
+    'DEFAULT_COMMISSION_RATE',
+    5.00
+);
 
 
 /*
@@ -112,12 +191,19 @@ function getDB()
     static $db = null;
 
     if ($db instanceof PDO) {
+
         return $db;
     }
 
-    $dsn = 'mysql:host=' . DB_HOST .
-           ';dbname=' . DB_NAME .
-           ';charset=' . DB_CHARSET;
+
+    $dsn =
+        'mysql:host='
+        . DB_HOST
+        . ';dbname='
+        . DB_NAME
+        . ';charset='
+        . DB_CHARSET;
+
 
     try {
 
@@ -137,12 +223,27 @@ function getDB()
             ]
         );
 
+
         return $db;
+
 
     } catch (PDOException $e) {
 
+        if (APP_DEBUG) {
+
+            die(
+                'Database connection failed: '
+                . htmlspecialchars(
+                    $e->getMessage(),
+                    ENT_QUOTES,
+                    'UTF-8'
+                )
+            );
+        }
+
+
         die(
-            'Database connection failed. Please check your database configuration.'
+            'Database connection failed.'
         );
     }
 }
@@ -150,42 +251,53 @@ function getDB()
 
 /*
 |--------------------------------------------------------------------------
-| SECURITY / ESCAPE HELPER
+| ESCAPE OUTPUT
 |--------------------------------------------------------------------------
 */
 
-function e($value)
-{
-    return htmlspecialchars(
-        (string) $value,
-        ENT_QUOTES,
-        'UTF-8'
-    );
+if (!function_exists('e')) {
+
+    function e($value)
+    {
+        return htmlspecialchars(
+            (string) $value,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| REDIRECT HELPER
+| REDIRECT
 |--------------------------------------------------------------------------
 */
 
-function redirect($url)
-{
-    header('Location: ' . $url);
-    exit;
+if (!function_exists('redirect')) {
+
+    function redirect($url)
+    {
+        header(
+            'Location: ' . $url
+        );
+
+        exit;
+    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN CHECK
+| LOGIN
 |--------------------------------------------------------------------------
 */
 
 function isLoggedIn()
 {
-    return isset($_SESSION['user_id']);
+    return isset(
+        $_SESSION['user_id']
+    );
 }
 
 
@@ -197,7 +309,8 @@ function isLoggedIn()
 
 function currentUserId()
 {
-    return $_SESSION['user_id'] ?? null;
+    return $_SESSION['user_id']
+        ?? null;
 }
 
 
@@ -209,7 +322,8 @@ function currentUserId()
 
 function currentUserRole()
 {
-    return $_SESSION['role'] ?? null;
+    return $_SESSION['role']
+        ?? null;
 }
 
 
@@ -222,7 +336,8 @@ function currentUserRole()
 function hasRole($role)
 {
     return (
-        isset($_SESSION['role']) &&
+        isset($_SESSION['role'])
+        &&
         $_SESSION['role'] === $role
     );
 }
@@ -230,7 +345,7 @@ function hasRole($role)
 
 /*
 |--------------------------------------------------------------------------
-| ADMIN CHECK
+| ADMIN
 |--------------------------------------------------------------------------
 */
 
@@ -242,7 +357,7 @@ function isAdmin()
 
 /*
 |--------------------------------------------------------------------------
-| VENDOR CHECK
+| VENDOR
 |--------------------------------------------------------------------------
 */
 
@@ -254,7 +369,7 @@ function isVendor()
 
 /*
 |--------------------------------------------------------------------------
-| CUSTOMER CHECK
+| CUSTOMER
 |--------------------------------------------------------------------------
 */
 
@@ -356,10 +471,16 @@ function requireCustomer()
 |--------------------------------------------------------------------------
 */
 
-if (!isset($_SESSION['csrf_token'])) {
+if (
+    empty(
+        $_SESSION['csrf_token']
+    )
+) {
 
     $_SESSION['csrf_token'] =
-        bin2hex(random_bytes(32));
+        bin2hex(
+            random_bytes(32)
+        );
 }
 
 
@@ -384,7 +505,12 @@ function csrfToken()
 function verifyCsrfToken($token)
 {
     return (
-        isset($_SESSION['csrf_token']) &&
+        isset(
+            $_SESSION['csrf_token']
+        )
+        &&
+        is_string($token)
+        &&
         hash_equals(
             $_SESSION['csrf_token'],
             $token
@@ -395,34 +521,45 @@ function verifyCsrfToken($token)
 
 /*
 |--------------------------------------------------------------------------
-| FLASH MESSAGE
+| FLASH
 |--------------------------------------------------------------------------
 */
 
-function setFlash($type, $message)
-{
+function setFlash(
+    $type,
+    $message
+) {
+
     $_SESSION['flash'] = [
-        'type' => $type,
-        'message' => $message
+        'type' =>
+            $type,
+
+        'message' =>
+            $message
     ];
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| GET FLASH MESSAGE
-|--------------------------------------------------------------------------
-*/
-
 function getFlash()
 {
-    if (!isset($_SESSION['flash'])) {
+    if (
+        !isset(
+            $_SESSION['flash']
+        )
+    ) {
+
         return null;
     }
 
-    $flash = $_SESSION['flash'];
 
-    unset($_SESSION['flash']);
+    $flash =
+        $_SESSION['flash'];
+
+
+    unset(
+        $_SESSION['flash']
+    );
+
 
     return $flash;
 }
@@ -430,11 +567,16 @@ function getFlash()
 
 /*
 |--------------------------------------------------------------------------
-| CREATE UPLOAD DIRECTORIES
+| UPLOAD DIRECTORIES
 |--------------------------------------------------------------------------
 */
 
-if (!is_dir(PRODUCT_UPLOAD_PATH)) {
+if (
+    !is_dir(
+        PRODUCT_UPLOAD_PATH
+    )
+) {
+
     @mkdir(
         PRODUCT_UPLOAD_PATH,
         0777,
@@ -442,10 +584,18 @@ if (!is_dir(PRODUCT_UPLOAD_PATH)) {
     );
 }
 
-if (!is_dir(VENDOR_UPLOAD_PATH)) {
+
+if (
+    !is_dir(
+        VENDOR_UPLOAD_PATH
+    )
+) {
+
     @mkdir(
         VENDOR_UPLOAD_PATH,
         0777,
         true
     );
 }
+
+?>
