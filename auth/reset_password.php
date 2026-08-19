@@ -10,6 +10,7 @@
 | Purpose:
 | - Allow user to create a new password
 | - Only accessible after successful OTP verification
+| - Show success popup after password is changed
 |--------------------------------------------------------------------------
 */
 
@@ -28,10 +29,6 @@ require_once dirname(__DIR__) . '/includes/functions.php';
 /*
 |--------------------------------------------------------------------------
 | APPLICATION NAME
-|--------------------------------------------------------------------------
-|
-| Your config.php uses SITE_NAME, not APP_NAME.
-|
 |--------------------------------------------------------------------------
 */
 
@@ -71,11 +68,6 @@ if ($resetUserId === null) {
 /*
 |--------------------------------------------------------------------------
 | CHECK OTP VERIFICATION
-|--------------------------------------------------------------------------
-|
-| User must successfully verify OTP before
-| being allowed to change password.
-|
 |--------------------------------------------------------------------------
 */
 
@@ -141,20 +133,24 @@ if (!$user) {
 
 /*
 |--------------------------------------------------------------------------
-| FLASH MESSAGE
+| SUCCESS STATE
+|--------------------------------------------------------------------------
+|
+| This variable controls whether the success screen
+| should be displayed after password reset.
 |--------------------------------------------------------------------------
 */
 
-$flash = null;
+$passwordResetSuccess = false;
 
-if (function_exists('getFlashMessage')) {
 
-    $flash = getFlashMessage();
+/*
+|--------------------------------------------------------------------------
+| ERROR MESSAGE
+|--------------------------------------------------------------------------
+*/
 
-} elseif (function_exists('getFlash')) {
-
-    $flash = getFlash();
-}
+$errorMessage = '';
 
 
 /*
@@ -182,33 +178,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /*
     |--------------------------------------------------------------------------
-    | TRIM PASSWORD
-    |--------------------------------------------------------------------------
-    |
-    | We DON'T trim passwords because spaces can technically
-    | be part of a password.
-    |
-    |--------------------------------------------------------------------------
-    */
-
-
-    /*
-    |--------------------------------------------------------------------------
     | VALIDATE PASSWORD
     |--------------------------------------------------------------------------
     */
 
     if ($password === '') {
 
-        setFlashMessageSafe(
-            'error',
-            'Please enter your new password.'
-        );
+        $errorMessage =
+            'Please enter your new password.';
 
-        redirect(
-            BASE_URL
-            . 'auth/reset_password.php'
-        );
     }
 
 
@@ -218,17 +196,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     |--------------------------------------------------------------------------
     */
 
-    if (strlen($password) < 6) {
+    elseif (strlen($password) < 6) {
 
-        setFlashMessageSafe(
-            'error',
-            'Password must contain at least 6 characters.'
-        );
+        $errorMessage =
+            'Password must contain at least 6 characters.';
 
-        redirect(
-            BASE_URL
-            . 'auth/reset_password.php'
-        );
     }
 
 
@@ -238,195 +210,145 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     |--------------------------------------------------------------------------
     */
 
-    if ($password !== $confirmPassword) {
+    elseif ($password !== $confirmPassword) {
 
-        setFlashMessageSafe(
-            'error',
-            'Passwords do not match.'
-        );
+        $errorMessage =
+            'Passwords do not match.';
 
-        redirect(
-            BASE_URL
-            . 'auth/reset_password.php'
-        );
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | HASH PASSWORD
+    | UPDATE PASSWORD
     |--------------------------------------------------------------------------
     */
 
-    $hashedPassword =
-        password_hash(
-            $password,
-            PASSWORD_DEFAULT
-        );
+    if ($errorMessage === '') {
+
+        $hashedPassword =
+            password_hash(
+                $password,
+                PASSWORD_DEFAULT
+            );
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | UPDATE DATABASE
-    |--------------------------------------------------------------------------
-    */
-
-    try {
-
-        $pdo->beginTransaction();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | UPDATE USER PASSWORD
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $pdo->prepare("
-            UPDATE users
-
-            SET
-                password = ?,
-                reset_code = NULL,
-                reset_expiry = NULL,
-                updated_at = CURRENT_TIMESTAMP
-
-            WHERE user_id = ?
-
-            LIMIT 1
-        ");
-
-
-        $stmt->execute([
-            $hashedPassword,
-            (int) $resetUserId
-        ]);
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CHECK UPDATE
-        |--------------------------------------------------------------------------
-        */
-
-        if ($stmt->rowCount() === 0) {
+        try {
 
             /*
-            | It is possible that the password is technically
-            | unchanged, but the user still exists.
-            |
-            | So we don't treat this as a fatal error.
+            |--------------------------------------------------------------------------
+            | START TRANSACTION
+            |--------------------------------------------------------------------------
             */
-        }
+
+            $pdo->beginTransaction();
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | COMMIT
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE USER PASSWORD
+            |--------------------------------------------------------------------------
+            */
 
-        $pdo->commit();
+            $stmt = $pdo->prepare("
+                UPDATE users
 
+                SET
+                    password = ?,
+                    reset_code = NULL,
+                    reset_expiry = NULL,
+                    updated_at = CURRENT_TIMESTAMP
 
-        /*
-        |--------------------------------------------------------------------------
-        | CLEAR RESET SESSION
-        |--------------------------------------------------------------------------
-        */
+                WHERE user_id = ?
 
-        clearResetUser();
-
-
-        unset(
-            $_SESSION['password_reset_verified']
-        );
+                LIMIT 1
+            ");
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | SUCCESS MESSAGE
-        |--------------------------------------------------------------------------
-        */
-
-        setFlashMessageSafe(
-            'success',
-            'Password reset successfully. You can now login with your new password.'
-        );
+            $stmt->execute([
+                $hashedPassword,
+                (int) $resetUserId
+            ]);
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | GO TO LOGIN
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | COMMIT
+            |--------------------------------------------------------------------------
+            */
 
-        redirect(
-            BASE_URL . 'index.php'
-        );
+            $pdo->commit();
 
 
-    } catch (PDOException $e) {
+            /*
+            |--------------------------------------------------------------------------
+            | CLEAR RESET SESSION
+            |--------------------------------------------------------------------------
+            */
 
-        /*
-        |--------------------------------------------------------------------------
-        | ROLLBACK
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $pdo->inTransaction()
-        ) {
-
-            $pdo->rollBack();
-        }
+            clearResetUser();
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | DEBUG MODE
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            defined('APP_DEBUG')
-            &&
-            APP_DEBUG
-        ) {
-
-            die(
-                'Password reset database error: '
-                .
-                e(
-                    $e->getMessage()
-                )
+            unset(
+                $_SESSION['password_reset_verified']
             );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | PASSWORD RESET SUCCESS
+            |--------------------------------------------------------------------------
+            */
+
+            $passwordResetSuccess = true;
+
+
+        } catch (PDOException $e) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | ROLLBACK
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $pdo->inTransaction()
+            ) {
+
+                $pdo->rollBack();
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | DEBUG ERROR
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                defined('APP_DEBUG')
+                &&
+                APP_DEBUG
+            ) {
+
+                $errorMessage =
+                    'Password reset database error: '
+                    .
+                    $e->getMessage();
+
+            } else {
+
+                $errorMessage =
+                    'Unable to reset your password. Please try again.';
+            }
         }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | NORMAL ERROR
-        |--------------------------------------------------------------------------
-        */
-
-        setFlashMessageSafe(
-            'error',
-            'Unable to reset your password. Please try again.'
-        );
-
-
-        redirect(
-            BASE_URL
-            . 'auth/reset_password.php'
-        );
     }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| GET FLASH MESSAGE
+| FLASH MESSAGE
 |--------------------------------------------------------------------------
 */
 
@@ -497,6 +419,12 @@ if (function_exists('getFlashMessage')) {
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN CONTAINER
+        |--------------------------------------------------------------------------
+        */
+
         .reset-container {
 
             width: 100%;
@@ -519,6 +447,12 @@ if (function_exists('getFlashMessage')) {
                 );
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | ICON
+        |--------------------------------------------------------------------------
+        */
 
         .reset-icon {
 
@@ -543,6 +477,12 @@ if (function_exists('getFlashMessage')) {
             margin-bottom: 22px;
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | TEXT
+        |--------------------------------------------------------------------------
+        */
 
         .eyebrow {
 
@@ -577,6 +517,12 @@ if (function_exists('getFlashMessage')) {
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | ALERT
+        |--------------------------------------------------------------------------
+        */
+
         .alert {
 
             padding: 14px;
@@ -588,10 +534,6 @@ if (function_exists('getFlashMessage')) {
             font-size: 14px;
 
             line-height: 1.5;
-        }
-
-
-        .alert.error {
 
             background: #fef2f2;
 
@@ -599,13 +541,11 @@ if (function_exists('getFlashMessage')) {
         }
 
 
-        .alert.success {
-
-            background: #ecfdf5;
-
-            color: #047857;
-        }
-
+        /*
+        |--------------------------------------------------------------------------
+        | FORM
+        |--------------------------------------------------------------------------
+        */
 
         .form-group {
 
@@ -673,7 +613,13 @@ if (function_exists('getFlashMessage')) {
         }
 
 
-        button {
+        /*
+        |--------------------------------------------------------------------------
+        | BUTTON
+        |--------------------------------------------------------------------------
+        */
+
+        .reset-button {
 
             width: 100%;
 
@@ -698,11 +644,17 @@ if (function_exists('getFlashMessage')) {
         }
 
 
-        button:hover {
+        .reset-button:hover {
 
             background: #1d4ed8;
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | BACK LINK
+        |--------------------------------------------------------------------------
+        */
 
         .back-link {
 
@@ -726,6 +678,12 @@ if (function_exists('getFlashMessage')) {
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | SECURITY NOTE
+        |--------------------------------------------------------------------------
+        */
+
         .security-note {
 
             margin-top: 25px;
@@ -743,6 +701,211 @@ if (function_exists('getFlashMessage')) {
             line-height: 1.5;
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUCCESS OVERLAY
+        |--------------------------------------------------------------------------
+        */
+
+        .success-overlay {
+
+            position: fixed;
+
+            inset: 0;
+
+            background:
+                rgba(
+                    15,
+                    23,
+                    42,
+                    0.55
+                );
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            padding: 20px;
+
+            z-index: 9999;
+
+            animation:
+                fadeIn 0.25s ease;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUCCESS MODAL
+        |--------------------------------------------------------------------------
+        */
+
+        .success-modal {
+
+            width: 100%;
+
+            max-width: 430px;
+
+            background: #ffffff;
+
+            border-radius: 24px;
+
+            padding: 40px 32px;
+
+            text-align: center;
+
+            box-shadow:
+                0 25px 70px
+                rgba(
+                    15,
+                    23,
+                    42,
+                    0.25
+                );
+
+            animation:
+                popupIn 0.3s ease;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUCCESS ICON
+        |--------------------------------------------------------------------------
+        */
+
+        .success-icon {
+
+            width: 76px;
+
+            height: 76px;
+
+            margin:
+                0 auto 20px;
+
+            border-radius: 50%;
+
+            background: #dcfce7;
+
+            color: #16a34a;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            font-size: 38px;
+
+            font-weight: 700;
+        }
+
+
+        .success-modal h2 {
+
+            margin:
+                0 0 10px;
+
+            color: #0f172a;
+
+            font-size: 25px;
+        }
+
+
+        .success-modal p {
+
+            margin:
+                0 0 25px;
+
+            color: #64748b;
+
+            line-height: 1.6;
+
+            font-size: 15px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | LOGIN BUTTON
+        |--------------------------------------------------------------------------
+        */
+
+        .login-button {
+
+            display: block;
+
+            width: 100%;
+
+            padding: 15px;
+
+            border-radius: 12px;
+
+            background: #2563eb;
+
+            color: #ffffff;
+
+            text-decoration: none;
+
+            font-size: 15px;
+
+            font-weight: 700;
+
+            transition:
+                background 0.2s;
+        }
+
+
+        .login-button:hover {
+
+            background: #1d4ed8;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ANIMATION
+        |--------------------------------------------------------------------------
+        */
+
+        @keyframes fadeIn {
+
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+
+        }
+
+
+        @keyframes popupIn {
+
+            from {
+
+                opacity: 0;
+
+                transform:
+                    translateY(20px)
+                    scale(0.96);
+            }
+
+            to {
+
+                opacity: 1;
+
+                transform:
+                    translateY(0)
+                    scale(1);
+            }
+
+        }
+
     </style>
 
 </head>
@@ -751,156 +914,234 @@ if (function_exists('getFlashMessage')) {
 <body>
 
 
-<div class="reset-container">
+<?php if ($passwordResetSuccess): ?>
+
+    <!--
+    |--------------------------------------------------------------------------
+    | SUCCESS POPUP
+    |--------------------------------------------------------------------------
+    -->
+
+    <div class="success-overlay">
 
 
-    <div class="reset-icon">
-
-        🔐
-
-    </div>
+        <div class="success-modal">
 
 
-    <span class="eyebrow">
+            <div class="success-icon">
 
-        PASSWORD RESET
-
-    </span>
-
-
-    <h1>
-
-        Create New Password
-
-    </h1>
-
-
-    <p class="description">
-
-        Your verification code has been
-        successfully verified.
-
-        Create a new password for your
-        HochipoHub account below.
-
-    </p>
-
-
-    <?php if ($flash): ?>
-
-        <div
-            class="alert <?= (
-                ($flash['type'] ?? '') === 'error'
-            )
-                ? 'error'
-                : 'success'
-            ?>"
-        >
-
-            <?= e(
-                $flash['message']
-                ?? ''
-            ) ?>
-
-        </div>
-
-    <?php endif; ?>
-
-
-    <form
-        method="POST"
-        action="<?= e(
-            BASE_URL
-            . 'auth/reset_password.php'
-        ) ?>"
-    >
-
-
-        <div class="form-group">
-
-            <label for="password">
-
-                New Password
-
-            </label>
-
-
-            <input
-                type="password"
-                id="password"
-                name="password"
-                placeholder="Enter your new password"
-                minlength="6"
-                autocomplete="new-password"
-                required
-            >
-
-
-            <div class="password-hint">
-
-                Minimum 6 characters.
+                ✓
 
             </div>
 
-        </div>
+
+            <h2>
+
+                Password Changed Successfully!
+
+            </h2>
 
 
-        <div class="form-group">
+            <p>
 
-            <label for="confirm_password">
+                Your HochipoHub password has been
+                successfully updated.
 
-                Confirm New Password
+                You can now use your new password
+                to log in to your account.
 
-            </label>
+            </p>
 
 
-            <input
-                type="password"
-                id="confirm_password"
-                name="confirm_password"
-                placeholder="Re-enter your new password"
-                minlength="6"
-                autocomplete="new-password"
-                required
+            <a
+                href="<?= e(
+                    BASE_URL . 'index.php'
+                ) ?>"
+                class="login-button"
             >
 
+                BACK TO LOGIN
+
+            </a>
+
+
         </div>
 
-
-        <button
-            type="submit"
-        >
-
-            RESET PASSWORD
-
-        </button>
-
-
-    </form>
-
-
-    <a
-        href="<?= e(
-            BASE_URL
-            . 'index.php'
-        ) ?>"
-        class="back-link"
-    >
-
-        ← Back to Login
-
-    </a>
-
-
-    <div class="security-note">
-
-        🔒 Your password is securely encrypted
-        before being stored.
 
     </div>
 
+<?php endif; ?>
 
-</div>
+
+<?php if (!$passwordResetSuccess): ?>
+
+
+    <div class="reset-container">
+
+
+        <div class="reset-icon">
+
+            🔐
+
+        </div>
+
+
+        <span class="eyebrow">
+
+            PASSWORD RESET
+
+        </span>
+
+
+        <h1>
+
+            Create New Password
+
+        </h1>
+
+
+        <p class="description">
+
+            Your verification code has been
+            successfully verified.
+
+            Create a new password for your
+            HochipoHub account below.
+
+        </p>
+
+
+        <?php if ($errorMessage !== ''): ?>
+
+            <div class="alert">
+
+                <?= e(
+                    $errorMessage
+                ) ?>
+
+            </div>
+
+        <?php endif; ?>
+
+
+        <?php if ($flash): ?>
+
+            <div class="alert">
+
+                <?= e(
+                    $flash['message']
+                    ?? ''
+                ) ?>
+
+            </div>
+
+        <?php endif; ?>
+
+
+        <form
+            method="POST"
+            action="<?= e(
+                BASE_URL
+                . 'auth/reset_password.php'
+            ) ?>"
+        >
+
+
+            <div class="form-group">
+
+
+                <label
+                    for="password"
+                >
+
+                    New Password
+
+                </label>
+
+
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your new password"
+                    minlength="6"
+                    autocomplete="new-password"
+                    required
+                >
+
+
+                <div class="password-hint">
+
+                    Minimum 6 characters.
+
+                </div>
+
+
+            </div>
+
+
+            <div class="form-group">
+
+
+                <label
+                    for="confirm_password"
+                >
+
+                    Confirm New Password
+
+                </label>
+
+
+                <input
+                    type="password"
+                    id="confirm_password"
+                    name="confirm_password"
+                    placeholder="Re-enter your new password"
+                    minlength="6"
+                    autocomplete="new-password"
+                    required
+                >
+
+
+            </div>
+
+
+            <button
+                type="submit"
+                class="reset-button"
+            >
+
+                RESET PASSWORD
+
+            </button>
+
+
+        </form>
+
+
+        <a
+            href="<?= e(
+                BASE_URL . 'index.php'
+            ) ?>"
+            class="back-link"
+        >
+
+            ← Back to Login
+
+        </a>
+
+
+        <div class="security-note">
+
+            🔒 Your password is securely encrypted
+            before being stored.
+
+        </div>
+
+
+    </div>
+
+<?php endif; ?>
 
 
 </body>
