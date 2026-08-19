@@ -12,25 +12,9 @@
 | - Manage session timeout
 | - Store login session
 | - Manage MFA session
-| - Logout
-| - Flash message
+| - Manage password reset session
+| - Flash messages
 | - CSRF helper
-|
-| IMPORTANT:
-| Authentication functions such as:
-|     isLoggedIn()
-|     hasRole()
-|     isAdmin()
-|     isVendor()
-|     isCustomer()
-|     requireLogin()
-|     requireAdmin()
-|     requireVendor()
-|     requireCustomer()
-|
-| are already defined in config.php.
-|
-| Therefore this file DOES NOT redeclare them.
 |--------------------------------------------------------------------------
 */
 
@@ -100,6 +84,7 @@ if (
     }
 
     session_destroy();
+
 
     /*
     |--------------------------------------------------------------------------
@@ -179,17 +164,6 @@ if (!function_exists('getUserEmail')) {
 /*
 |--------------------------------------------------------------------------
 | GET USER ROLE
-|--------------------------------------------------------------------------
-|
-| config.php uses:
-|
-| $_SESSION['role']
-|
-| Older session code may use:
-|
-| $_SESSION['user_role']
-|
-| We support BOTH.
 |--------------------------------------------------------------------------
 */
 
@@ -274,25 +248,26 @@ if (!function_exists('createLoginSession')) {
         $_SESSION['user_email'] =
             $user['email'] ?? '';
 
+
         /*
         |--------------------------------------------------------------------------
-        | IMPORTANT
-        |--------------------------------------------------------------------------
-        | config.php checks $_SESSION['role'].
-        |
-        | Normalize the role value to avoid case mismatch.
+        | ROLE
         |--------------------------------------------------------------------------
         */
 
         $_SESSION['role'] = strtolower(
             trim(
-                (string) ($user['role'] ?? 'customer')
+                (string) (
+                    $user['role']
+                    ?? 'customer'
+                )
             )
         );
 
+
         /*
         |--------------------------------------------------------------------------
-        | Keep compatibility with old code
+        | Compatibility
         |--------------------------------------------------------------------------
         */
 
@@ -302,7 +277,7 @@ if (!function_exists('createLoginSession')) {
 
         /*
         |--------------------------------------------------------------------------
-        | User status
+        | USER STATUS
         |--------------------------------------------------------------------------
         */
 
@@ -315,7 +290,7 @@ if (!function_exists('createLoginSession')) {
 
         /*
         |--------------------------------------------------------------------------
-        | Login information
+        | LOGIN INFORMATION
         |--------------------------------------------------------------------------
         */
 
@@ -325,7 +300,8 @@ if (!function_exists('createLoginSession')) {
         $_SESSION['last_activity'] =
             time();
 
-        $_SESSION['logged_in'] = true;
+        $_SESSION['logged_in'] =
+            true;
 
 
         /*
@@ -337,7 +313,8 @@ if (!function_exists('createLoginSession')) {
         $_SESSION['mfa_enabled'] =
             !empty($user['mfa_enabled']);
 
-        $_SESSION['mfa_verified'] = false;
+        $_SESSION['mfa_verified'] =
+            false;
 
 
         return true;
@@ -352,14 +329,96 @@ if (!function_exists('createLoginSession')) {
 */
 
 
+/*
+|--------------------------------------------------------------------------
+| SET MFA PENDING USER
+|--------------------------------------------------------------------------
+|
+| Used when login requires OTP verification.
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('setMfaPendingUser')) {
+
+    function setMfaPendingUser($userId)
+    {
+
+        $_SESSION['mfa_pending_user'] =
+            (int) $userId;
+
+        return true;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET MFA PENDING USER
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('getMfaPendingUser')) {
+
+    function getMfaPendingUser()
+    {
+
+        if (
+            empty(
+                $_SESSION['mfa_pending_user']
+            )
+        ) {
+
+            return null;
+        }
+
+
+        return (int)
+            $_SESSION['mfa_pending_user'];
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CLEAR MFA PENDING USER
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('clearMfaPendingUser')) {
+
+    function clearMfaPendingUser()
+    {
+
+        unset(
+            $_SESSION['mfa_pending_user']
+        );
+
+        return true;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| MARK MFA VERIFIED
+|--------------------------------------------------------------------------
+*/
+
 if (!function_exists('markMfaVerified')) {
 
     function markMfaVerified()
     {
-        $_SESSION['mfa_verified'] = true;
+        $_SESSION['mfa_verified'] =
+            true;
     }
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| CHECK MFA VERIFIED
+|--------------------------------------------------------------------------
+*/
 
 if (!function_exists('isMfaVerified')) {
 
@@ -372,6 +431,12 @@ if (!function_exists('isMfaVerified')) {
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| CHECK MFA REQUIREMENT
+|--------------------------------------------------------------------------
+*/
+
 if (!function_exists('requiresMfa')) {
 
     function requiresMfa()
@@ -382,6 +447,89 @@ if (!function_exists('requiresMfa')) {
             !empty($_SESSION['mfa_enabled']) &&
             !isMfaVerified()
         );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PASSWORD RESET SESSION
+|--------------------------------------------------------------------------
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| SET RESET USER
+|--------------------------------------------------------------------------
+|
+| Stores the user ID temporarily during
+| the password reset process.
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('setResetUser')) {
+
+    function setResetUser($userId)
+    {
+
+        $_SESSION['reset_user_id'] =
+            (int) $userId;
+
+        return true;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET RESET USER
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('getResetUser')) {
+
+    function getResetUser()
+    {
+
+        if (
+            empty(
+                $_SESSION['reset_user_id']
+            )
+        ) {
+
+            return null;
+        }
+
+
+        return (int)
+            $_SESSION['reset_user_id'];
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CLEAR RESET USER
+|--------------------------------------------------------------------------
+|
+| Called after password has been successfully
+| changed or reset flow expires.
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('clearResetUser')) {
+
+    function clearResetUser()
+    {
+
+        unset(
+            $_SESSION['reset_user_id'],
+            $_SESSION['reset_email'],
+            $_SESSION['password_reset_verified']
+        );
+
+        return true;
     }
 }
 
@@ -446,6 +594,7 @@ if (!function_exists('logoutUser')) {
 |--------------------------------------------------------------------------
 */
 
+
 if (!function_exists('setFlashMessage')) {
 
     function setFlashMessage(
@@ -461,6 +610,12 @@ if (!function_exists('setFlashMessage')) {
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| GET FLASH MESSAGE
+|--------------------------------------------------------------------------
+*/
+
 if (!function_exists('getFlashMessage')) {
 
     function getFlashMessage()
@@ -475,12 +630,15 @@ if (!function_exists('getFlashMessage')) {
             return null;
         }
 
+
         $message =
             $_SESSION['flash_message'];
+
 
         unset(
             $_SESSION['flash_message']
         );
+
 
         return $message;
     }
@@ -489,15 +647,30 @@ if (!function_exists('getFlashMessage')) {
 
 /*
 |--------------------------------------------------------------------------
-| FLASH MESSAGE COMPATIBILITY
+| SAFE FLASH MESSAGE
 |--------------------------------------------------------------------------
 |
-| Some pages may use setFlash() / getFlash()
-| from config.php.
+| Some authentication files use:
 |
-| These functions are already provided there.
+| setFlashMessageSafe()
+|
+| Keep this as a compatibility wrapper.
 |--------------------------------------------------------------------------
 */
+
+if (!function_exists('setFlashMessageSafe')) {
+
+    function setFlashMessageSafe(
+        $type,
+        $message
+    ) {
+
+        setFlashMessage(
+            $type,
+            $message
+        );
+    }
+}
 
 
 /*
@@ -528,11 +701,13 @@ if (!function_exists('getLoginRedirect')) {
                     'redirect_after_login'
                 ];
 
+
             unset(
                 $_SESSION[
                     'redirect_after_login'
                 ]
             );
+
 
             return $redirect;
         }
@@ -540,7 +715,7 @@ if (!function_exists('getLoginRedirect')) {
 
         /*
         |--------------------------------------------------------------------------
-        | Admin
+        | ADMIN
         |--------------------------------------------------------------------------
         */
 
@@ -557,7 +732,7 @@ if (!function_exists('getLoginRedirect')) {
 
         /*
         |--------------------------------------------------------------------------
-        | Vendor
+        | VENDOR
         |--------------------------------------------------------------------------
         */
 
@@ -574,7 +749,7 @@ if (!function_exists('getLoginRedirect')) {
 
         /*
         |--------------------------------------------------------------------------
-        | Customer
+        | CUSTOMER
         |--------------------------------------------------------------------------
         */
 
@@ -658,10 +833,8 @@ if (!function_exists('sessionValue')) {
 | csrfToken()
 | verifyCsrfToken()
 |
-| So we DON'T redeclare verifyCsrfToken().
-|
-| We only provide generateCsrfToken() for compatibility
-| with older pages.
+| We only provide generateCsrfToken()
+| for compatibility with older pages.
 |--------------------------------------------------------------------------
 */
 
@@ -681,6 +854,7 @@ if (!function_exists('generateCsrfToken')) {
                     random_bytes(32)
                 );
         }
+
 
         return $_SESSION['csrf_token'];
     }
