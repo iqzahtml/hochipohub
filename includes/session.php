@@ -11,12 +11,10 @@
 | - Start PHP session
 | - Session timeout
 | - Login session
+| - MFA session
 | - Password reset session
-| - MFA pending session
-| - MFA verification
-| - Logout
 | - Flash messages
-| - CSRF helper
+| - CSRF compatibility
 |--------------------------------------------------------------------------
 */
 
@@ -29,10 +27,9 @@
 
 if (session_status() === PHP_SESSION_NONE) {
 
-    $secure = (
+    $secure =
         isset($_SERVER['HTTPS']) &&
-        $_SERVER['HTTPS'] !== 'off'
-    );
+        $_SERVER['HTTPS'] !== 'off';
 
     session_set_cookie_params([
         'lifetime' => 0,
@@ -61,6 +58,7 @@ if (
 
     $_SESSION = [];
 
+
     if (ini_get('session.use_cookies')) {
 
         $params =
@@ -77,11 +75,13 @@ if (
         );
     }
 
+
     session_destroy();
+
 
     /*
     |--------------------------------------------------------------------------
-    | START NEW SESSION
+    | Start fresh session
     |--------------------------------------------------------------------------
     */
 
@@ -122,6 +122,21 @@ if (!function_exists('getUserId')) {
 
 /*
 |--------------------------------------------------------------------------
+| GET CURRENT USER ID
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('getCurrentUserId')) {
+
+    function getCurrentUserId()
+    {
+        return $_SESSION['user_id'] ?? null;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | GET USER NAME
 |--------------------------------------------------------------------------
 */
@@ -130,7 +145,8 @@ if (!function_exists('getUserName')) {
 
     function getUserName()
     {
-        return $_SESSION['user_name']
+        return
+            $_SESSION['user_name']
             ?? $_SESSION['name']
             ?? '';
     }
@@ -147,7 +163,8 @@ if (!function_exists('getUserEmail')) {
 
     function getUserEmail()
     {
-        return $_SESSION['user_email']
+        return
+            $_SESSION['user_email']
             ?? $_SESSION['email']
             ?? '';
     }
@@ -164,7 +181,26 @@ if (!function_exists('getUserRole')) {
 
     function getUserRole()
     {
-        return $_SESSION['role']
+        return
+            $_SESSION['role']
+            ?? $_SESSION['user_role']
+            ?? '';
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET CURRENT USER ROLE
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('getCurrentUserRole')) {
+
+    function getCurrentUserRole()
+    {
+        return
+            $_SESSION['role']
             ?? $_SESSION['user_role']
             ?? '';
     }
@@ -181,7 +217,8 @@ if (!function_exists('getUserStatus')) {
 
     function getUserStatus()
     {
-        return $_SESSION['status']
+        return
+            $_SESSION['status']
             ?? $_SESSION['user_status']
             ?? 'active';
     }
@@ -190,7 +227,7 @@ if (!function_exists('getUserStatus')) {
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN SESSION
+| CREATE LOGIN SESSION
 |--------------------------------------------------------------------------
 */
 
@@ -198,12 +235,6 @@ if (!function_exists('createLoginSession')) {
 
     function createLoginSession($user)
     {
-
-        /*
-        |--------------------------------------------------------------------------
-        | VALIDATE USER
-        |--------------------------------------------------------------------------
-        */
 
         if (
             !isset($user['user_id']) ||
@@ -216,7 +247,7 @@ if (!function_exists('createLoginSession')) {
 
         /*
         |--------------------------------------------------------------------------
-        | REGENERATE SESSION ID
+        | Regenerate session ID
         |--------------------------------------------------------------------------
         */
 
@@ -248,17 +279,12 @@ if (!function_exists('createLoginSession')) {
         $_SESSION['role'] =
             strtolower(
                 trim(
-                    (string)
-                    ($user['role'] ?? 'customer')
+                    (string) (
+                        $user['role']
+                        ?? 'customer'
+                    )
                 )
             );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | OLD ROLE COMPATIBILITY
-        |--------------------------------------------------------------------------
-        */
 
         $_SESSION['user_role'] =
             $_SESSION['role'];
@@ -315,9 +341,106 @@ if (!function_exists('createLoginSession')) {
 
 /*
 |--------------------------------------------------------------------------
-| MFA
+| LOGIN USER
+|--------------------------------------------------------------------------
+|
+| verify_otp.php uses:
+|
+| loginUser($user)
+|
 |--------------------------------------------------------------------------
 */
+
+if (!function_exists('loginUser')) {
+
+    function loginUser($user)
+    {
+        return createLoginSession($user);
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| MFA SESSION
+|--------------------------------------------------------------------------
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| SET MFA PENDING USER
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('setMfaPendingUser')) {
+
+    function setMfaPendingUser($userId)
+    {
+
+        $_SESSION['mfa_pending_user'] =
+            (int) $userId;
+
+        return true;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET MFA PENDING USER
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('getMfaPendingUser')) {
+
+    function getMfaPendingUser()
+    {
+
+        if (
+            !isset(
+                $_SESSION['mfa_pending_user']
+            )
+        ) {
+
+            return null;
+        }
+
+
+        $userId =
+            (int) $_SESSION['mfa_pending_user'];
+
+
+        if ($userId <= 0) {
+
+            return null;
+        }
+
+
+        return $userId;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CLEAR MFA PENDING USER
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('clearMfaPendingUser')) {
+
+    function clearMfaPendingUser()
+    {
+
+        unset(
+            $_SESSION['mfa_pending_user']
+        );
+
+
+        return true;
+    }
+}
 
 
 /*
@@ -330,8 +453,10 @@ if (!function_exists('markMfaVerified')) {
 
     function markMfaVerified()
     {
+
         $_SESSION['mfa_verified'] =
             true;
+
 
         return true;
     }
@@ -348,6 +473,7 @@ if (!function_exists('isMfaVerified')) {
 
     function isMfaVerified()
     {
+
         return !empty(
             $_SESSION['mfa_verified']
         );
@@ -357,7 +483,7 @@ if (!function_exists('isMfaVerified')) {
 
 /*
 |--------------------------------------------------------------------------
-| CHECK MFA REQUIRED
+| CHECK MFA REQUIREMENT
 |--------------------------------------------------------------------------
 */
 
@@ -383,73 +509,7 @@ if (!function_exists('requiresMfa')) {
 
 /*
 |--------------------------------------------------------------------------
-| MFA PENDING USER
-|--------------------------------------------------------------------------
-|
-| Used by login_process.php
-| before MFA verification.
-|--------------------------------------------------------------------------
-*/
-
-
-if (!function_exists('setMfaPendingUser')) {
-
-    function setMfaPendingUser($userId)
-    {
-
-        $_SESSION['mfa_pending_user'] =
-            (int) $userId;
-
-        return true;
-    }
-}
-
-
-if (!function_exists('getMfaPendingUser')) {
-
-    function getMfaPendingUser()
-    {
-
-        if (
-            !isset(
-                $_SESSION['mfa_pending_user']
-            )
-        ) {
-
-            return null;
-        }
-
-        return (int)
-            $_SESSION['mfa_pending_user'];
-    }
-}
-
-
-if (!function_exists('clearMfaPendingUser')) {
-
-    function clearMfaPendingUser()
-    {
-
-        unset(
-            $_SESSION['mfa_pending_user']
-        );
-
-        return true;
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
 | PASSWORD RESET SESSION
-|--------------------------------------------------------------------------
-|
-| Used by:
-|
-| forgot_password.php
-| send_otp.php
-| verify_otp.php
-| reset_password.php
 |--------------------------------------------------------------------------
 */
 
@@ -465,8 +525,30 @@ if (!function_exists('setResetUser')) {
     function setResetUser($userId)
     {
 
-        $_SESSION['reset_user_id'] =
+        $userId =
             (int) $userId;
+
+
+        if ($userId <= 0) {
+
+            return false;
+        }
+
+
+        $_SESSION['reset_user_id'] =
+            $userId;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Reset has not been verified yet
+        |--------------------------------------------------------------------------
+        */
+
+        $_SESSION[
+            'password_reset_verified'
+        ] = false;
+
 
         return true;
     }
@@ -493,8 +575,18 @@ if (!function_exists('getResetUser')) {
             return null;
         }
 
-        return (int)
-            $_SESSION['reset_user_id'];
+
+        $userId =
+            (int) $_SESSION['reset_user_id'];
+
+
+        if ($userId <= 0) {
+
+            return null;
+        }
+
+
+        return $userId;
     }
 }
 
@@ -511,12 +603,68 @@ if (!function_exists('clearResetUser')) {
     {
 
         unset(
-            $_SESSION['reset_user_id'],
-            $_SESSION['reset_email'],
-            $_SESSION['password_reset_verified']
+            $_SESSION['reset_user_id']
         );
 
+        unset(
+            $_SESSION['reset_email']
+        );
+
+        unset(
+            $_SESSION[
+                'password_reset_verified'
+            ]
+        );
+
+
         return true;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| MARK PASSWORD RESET VERIFIED
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('markPasswordResetVerified')) {
+
+    function markPasswordResetVerified()
+    {
+
+        $_SESSION[
+            'password_reset_verified'
+        ] = true;
+
+
+        return true;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CHECK PASSWORD RESET VERIFIED
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('isPasswordResetVerified')) {
+
+    function isPasswordResetVerified()
+    {
+
+        return (
+            isset(
+                $_SESSION[
+                    'password_reset_verified'
+                ]
+            )
+            &&
+            $_SESSION[
+                'password_reset_verified'
+            ] === true
+        );
     }
 }
 
@@ -532,27 +680,18 @@ if (!function_exists('logoutUser')) {
     function logoutUser()
     {
 
-        /*
-        |--------------------------------------------------------------------------
-        | CLEAR SESSION
-        |--------------------------------------------------------------------------
-        */
-
         $_SESSION = [];
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | REMOVE SESSION COOKIE
-        |--------------------------------------------------------------------------
-        */
-
         if (
-            ini_get('session.use_cookies')
+            ini_get(
+                'session.use_cookies'
+            )
         ) {
 
             $params =
                 session_get_cookie_params();
+
 
             setcookie(
                 session_name(),
@@ -566,13 +705,10 @@ if (!function_exists('logoutUser')) {
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | DESTROY SESSION
-        |--------------------------------------------------------------------------
-        */
-
         session_destroy();
+
+
+        return true;
     }
 }
 
@@ -584,17 +720,31 @@ if (!function_exists('logoutUser')) {
 */
 
 
+/*
+|--------------------------------------------------------------------------
+| SET FLASH MESSAGE
+|--------------------------------------------------------------------------
+*/
+
 if (!function_exists('setFlashMessage')) {
 
     function setFlashMessage(
         $type,
         $message
-    ) {
+    )
+    {
 
-        $_SESSION['flash_message'] = [
-            'type' => $type,
-            'message' => $message
+        $_SESSION[
+            'flash_message'
+        ] = [
+
+            'type' =>
+                (string) $type,
+
+            'message' =>
+                (string) $message
         ];
+
 
         return true;
     }
@@ -606,9 +756,11 @@ if (!function_exists('setFlashMessage')) {
 | SAFE FLASH MESSAGE
 |--------------------------------------------------------------------------
 |
-| Some existing pages use:
+| Used by:
 |
-| setFlashMessageSafe()
+| send_otp.php
+| verify_otp.php
+| reset_password.php
 |
 |--------------------------------------------------------------------------
 */
@@ -618,7 +770,8 @@ if (!function_exists('setFlashMessageSafe')) {
     function setFlashMessageSafe(
         $type,
         $message
-    ) {
+    )
+    {
 
         return setFlashMessage(
             $type,
@@ -641,7 +794,9 @@ if (!function_exists('getFlashMessage')) {
 
         if (
             !isset(
-                $_SESSION['flash_message']
+                $_SESSION[
+                    'flash_message'
+                ]
             )
         ) {
 
@@ -650,11 +805,15 @@ if (!function_exists('getFlashMessage')) {
 
 
         $message =
-            $_SESSION['flash_message'];
+            $_SESSION[
+                'flash_message'
+            ];
 
 
         unset(
-            $_SESSION['flash_message']
+            $_SESSION[
+                'flash_message'
+            ]
         );
 
 
@@ -676,13 +835,15 @@ if (!function_exists('getLoginRedirect')) {
 
         /*
         |--------------------------------------------------------------------------
-        | PREVIOUSLY REQUESTED PAGE
+        | Previously requested page
         |--------------------------------------------------------------------------
         */
 
         if (
             isset(
-                $_SESSION['redirect_after_login']
+                $_SESSION[
+                    'redirect_after_login'
+                ]
             )
         ) {
 
@@ -716,7 +877,8 @@ if (!function_exists('getLoginRedirect')) {
             ) === 'admin'
         ) {
 
-            return 'admin/dashboard.php';
+            return
+                'admin/dashboard.php';
         }
 
 
@@ -733,7 +895,8 @@ if (!function_exists('getLoginRedirect')) {
             ) === 'vendor'
         ) {
 
-            return 'seller/dashboard.php';
+            return
+                'seller/dashboard.php';
         }
 
 
@@ -743,7 +906,8 @@ if (!function_exists('getLoginRedirect')) {
         |--------------------------------------------------------------------------
         */
 
-        return 'dashboard.php';
+        return
+            'dashboard.php';
     }
 }
 
@@ -761,52 +925,38 @@ if (!function_exists('redirectByRole')) {
 
         $role =
             $_SESSION['role']
-            ??
-            $_SESSION['user_role']
-            ??
-            '';
+            ?? $_SESSION['user_role']
+            ?? '';
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | ADMIN
-        |--------------------------------------------------------------------------
-        */
 
         if ($role === 'admin') {
 
             header(
-                'Location: admin/dashboard.php'
+                'Location: ' .
+                BASE_URL .
+                'admin/dashboard.php'
             );
 
             exit;
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | VENDOR
-        |--------------------------------------------------------------------------
-        */
 
         if ($role === 'vendor') {
 
             header(
-                'Location: seller/dashboard.php'
+                'Location: ' .
+                BASE_URL .
+                'seller/dashboard.php'
             );
 
             exit;
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | CUSTOMER
-        |--------------------------------------------------------------------------
-        */
-
         header(
-            'Location: dashboard.php'
+            'Location: ' .
+            BASE_URL .
+            'dashboard.php'
         );
 
         exit;
@@ -825,9 +975,11 @@ if (!function_exists('sessionValue')) {
     function sessionValue(
         $key,
         $default = null
-    ) {
+    )
+    {
 
-        return $_SESSION[$key]
+        return
+            $_SESSION[$key]
             ?? $default;
     }
 }
@@ -836,15 +988,6 @@ if (!function_exists('sessionValue')) {
 /*
 |--------------------------------------------------------------------------
 | CSRF TOKEN
-|--------------------------------------------------------------------------
-|
-| config.php normally provides:
-|
-| csrfToken()
-| verifyCsrfToken()
-|
-| We only provide generateCsrfToken()
-| if it doesn't already exist.
 |--------------------------------------------------------------------------
 */
 
@@ -855,18 +998,25 @@ if (!function_exists('generateCsrfToken')) {
 
         if (
             empty(
-                $_SESSION['csrf_token']
+                $_SESSION[
+                    'csrf_token'
+                ]
             )
         ) {
 
-            $_SESSION['csrf_token'] =
+            $_SESSION[
+                'csrf_token'
+            ] =
                 bin2hex(
                     random_bytes(32)
                 );
         }
 
 
-        return $_SESSION['csrf_token'];
+        return
+            $_SESSION[
+                'csrf_token'
+            ];
     }
 }
 
@@ -885,5 +1035,12 @@ if (
 
     generateCsrfToken();
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| END SESSION
+|--------------------------------------------------------------------------
+*/
 
 ?>
