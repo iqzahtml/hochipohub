@@ -4,33 +4,101 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - FORGOT PASSWORD
 |--------------------------------------------------------------------------
+| File:
+| auth/forgot_password.php
+|
+| Purpose:
+| 1. Ask user for email
+| 2. Find account
+| 3. Save reset user ID into session
+| 4. Redirect to send_otp.php
+|
+| FLOW:
+|
+| forgot_password.php
+|        ↓
+| send_otp.php?type=reset
+|        ↓
+| verify_otp.php?type=reset
+|        ↓
+| reset_password.php
+|--------------------------------------------------------------------------
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| LOAD CONFIG
+|--------------------------------------------------------------------------
 */
 
 require_once dirname(__DIR__) . '/config.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| LOAD SESSION
+|--------------------------------------------------------------------------
+*/
+
 require_once dirname(__DIR__) . '/includes/session.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| LOAD FUNCTIONS
+|--------------------------------------------------------------------------
+*/
+
 require_once dirname(__DIR__) . '/includes/functions.php';
 
 
 /*
 |--------------------------------------------------------------------------
-| FLASH MESSAGE
+| DATABASE
 |--------------------------------------------------------------------------
 */
 
-$flash = getFlashMessage();
+$pdo = getDB();
 
 
 /*
 |--------------------------------------------------------------------------
-| HANDLE FORM
+| BASE URL
 |--------------------------------------------------------------------------
 */
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$baseUrl =
+    defined('BASE_URL')
+        ? rtrim(
+            BASE_URL,
+            '/'
+        ) . '/'
+        : '/hochipoHub/';
 
-    $email = trim(
-        $_POST['email'] ?? ''
-    );
+
+/*
+|--------------------------------------------------------------------------
+| HANDLE POST
+|--------------------------------------------------------------------------
+*/
+
+if (
+    ($_SERVER['REQUEST_METHOD'] ?? 'GET')
+    === 'POST'
+) {
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | GET EMAIL
+    |--------------------------------------------------------------------------
+    */
+
+    $email =
+        trim(
+            $_POST['email'] ?? ''
+        );
 
 
     /*
@@ -46,8 +114,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'Please enter your email address.'
         );
 
+
         redirect(
-            BASE_URL . 'auth/forgot_password.php'
+            $baseUrl .
+            'auth/forgot_password.php'
         );
     }
 
@@ -64,39 +134,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'Please enter a valid email address.'
         );
 
+
         redirect(
-            BASE_URL . 'auth/forgot_password.php'
+            $baseUrl .
+            'auth/forgot_password.php'
         );
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | DATABASE
+    | FIND USER
     |--------------------------------------------------------------------------
     */
 
     try {
 
-        $pdo = getDB();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | FIND USER
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $pdo->prepare("
-            SELECT
-                user_id,
-                name,
-                email,
-                status
-            FROM users
-            WHERE email = ?
-            LIMIT 1
-        ");
+        $stmt =
+            $pdo->prepare("
+                SELECT
+                    user_id,
+                    name,
+                    email,
+                    role,
+                    status
+                FROM users
+                WHERE email = ?
+                LIMIT 1
+            ");
 
 
         $stmt->execute([
@@ -104,88 +169,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
 
 
-        $user = $stmt->fetch(
-            PDO::FETCH_ASSOC
-        );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | USER NOT FOUND
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$user) {
-
-            setFlashMessage(
-                'error',
-                'No account was found with that email address.'
+        $user =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
             );
-
-            redirect(
-                BASE_URL . 'auth/forgot_password.php'
-            );
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CHECK STATUS
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            isset($user['status']) &&
-            strtolower(
-                trim(
-                    (string) $user['status']
-                )
-            ) !== 'active'
-        ) {
-
-            setFlashMessage(
-                'error',
-                'This account is not currently active.'
-            );
-
-            redirect(
-                BASE_URL . 'auth/forgot_password.php'
-            );
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | SAVE RESET USER
-        |--------------------------------------------------------------------------
-        */
-
-        setResetUser(
-            $user['user_id']
-        );
-
-
-        $_SESSION['reset_email'] =
-            $user['email'];
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | SEND OTP
-        |--------------------------------------------------------------------------
-        */
-
-        redirect(
-            BASE_URL .
-            'auth/send_otp.php?type=reset'
-        );
 
 
     } catch (PDOException $e) {
 
         /*
         |--------------------------------------------------------------------------
-        | DEBUG
+        | DEBUG MODE
         |--------------------------------------------------------------------------
         */
 
@@ -205,18 +199,158 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         setFlashMessage(
             'error',
-            'Something went wrong. Please try again.'
+            'Unable to process your request. Please try again.'
         );
 
 
         redirect(
-            BASE_URL . 'auth/forgot_password.php'
+            $baseUrl .
+            'auth/forgot_password.php'
         );
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | USER NOT FOUND
+    |--------------------------------------------------------------------------
+    */
+
+    if (!$user) {
+
+        setFlashMessage(
+            'error',
+            'No account was found with that email address.'
+        );
+
+
+        redirect(
+            $baseUrl .
+            'auth/forgot_password.php'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CHECK ACCOUNT STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        isset(
+            $user['status']
+        )
+        &&
+        strtolower(
+            trim(
+                (string)
+                $user['status']
+            )
+        ) !== 'active'
+    ) {
+
+        setFlashMessage(
+            'error',
+            'This account is not active. Please contact support.'
+        );
+
+
+        redirect(
+            $baseUrl .
+            'auth/forgot_password.php'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SAVE RESET USER
+    |--------------------------------------------------------------------------
+    |
+    | send_otp.php calls:
+    |
+    | getResetUser()
+    |
+    | getResetUser() reads:
+    |
+    | $_SESSION['reset_user_id']
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    $resetSaved =
+        setResetUser(
+            $user['user_id']
+        );
+
+
+    if (!$resetSaved) {
+
+        setFlashMessage(
+            'error',
+            'Unable to start password reset. Please try again.'
+        );
+
+
+        redirect(
+            $baseUrl .
+            'auth/forgot_password.php'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STORE EMAIL
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION[
+        'reset_email'
+    ] =
+        $user['email'];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | REDIRECT TO SEND OTP
+    |--------------------------------------------------------------------------
+    */
+
+    redirect(
+        $baseUrl .
+        'auth/send_otp.php?type=reset'
+    );
 }
 
-?>
 
+/*
+|--------------------------------------------------------------------------
+| GET FLASH MESSAGE
+|--------------------------------------------------------------------------
+*/
+
+$flash = null;
+
+if (
+    function_exists(
+        'getFlashMessage'
+    )
+) {
+
+    $flash =
+        getFlashMessage();
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PAGE
+|--------------------------------------------------------------------------
+*/
+
+?>
 
 <!DOCTYPE html>
 
@@ -226,14 +360,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <meta charset="UTF-8">
 
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
 
+
     <title>
         Forgot Password -
-        <?= e(APP_NAME) ?>
+        <?= e(
+            defined('APP_NAME')
+                ? APP_NAME
+                : 'HochipoHub'
+        ) ?>
     </title>
 
 
@@ -303,9 +443,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             border-radius: 18px;
 
-            background: #2563eb;
+            background:
+                #2563eb;
 
-            color: white;
+            color:
+                #ffffff;
 
             display: flex;
 
@@ -315,31 +457,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             font-size: 30px;
 
-            margin-bottom: 20px;
+            margin-bottom: 22px;
         }
 
 
         .eyebrow {
 
-            display: block;
-
             font-size: 12px;
 
             font-weight: 700;
 
-            color: #2563eb;
+            color:
+                #2563eb;
 
             letter-spacing: 2px;
-
-            margin-bottom: 8px;
         }
 
 
         h1 {
 
-            margin: 0 0 12px;
+            margin:
+                8px 0 10px;
 
-            color: #0f172a;
+            color:
+                #0f172a;
 
             font-size: 30px;
         }
@@ -347,7 +488,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .description {
 
-            color: #64748b;
+            color:
+                #64748b;
 
             line-height: 1.6;
 
@@ -357,35 +499,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .alert {
 
-            padding: 14px 16px;
+            padding: 14px;
 
-            border-radius: 12px;
+            border-radius: 10px;
 
             margin-bottom: 20px;
 
             font-size: 14px;
+
+            line-height: 1.5;
         }
 
 
-        .alert-error {
+        .alert.error {
 
-            background: #fef2f2;
+            background:
+                #fef2f2;
 
-            color: #b91c1c;
-
-            border:
-                1px solid #fecaca;
+            color:
+                #b91c1c;
         }
 
 
-        .alert-success {
+        .alert.success {
 
-            background: #ecfdf5;
+            background:
+                #ecfdf5;
 
-            color: #047857;
+            color:
+                #047857;
+        }
 
-            border:
-                1px solid #a7f3d0;
+
+        .form-group {
+
+            margin-bottom: 20px;
         }
 
 
@@ -399,18 +547,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             font-weight: 700;
 
-            color: #334155;
+            color:
+                #334155;
         }
 
 
-        input {
+        input[type="email"] {
 
             width: 100%;
 
-            padding: 15px 16px;
+            padding: 15px;
 
             border:
-                2px solid #dbeafe;
+                2px solid
+                #dbeafe;
 
             border-radius: 12px;
 
@@ -418,26 +568,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             outline: none;
 
-            margin-bottom: 18px;
+            transition:
+                border-color
+                0.2s;
         }
 
 
-        input:focus {
+        input[type="email"]:focus {
 
-            border-color: #2563eb;
-
-            box-shadow:
-                0 0 0 4px
-                rgba(
-                    37,
-                    99,
-                    235,
-                    0.10
-                );
+            border-color:
+                #2563eb;
         }
 
 
-        .submit-button {
+        button {
 
             width: 100%;
 
@@ -447,21 +591,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             border-radius: 12px;
 
-            background: #2563eb;
+            background:
+                #2563eb;
 
-            color: #ffffff;
+            color:
+                #ffffff;
 
             font-size: 15px;
 
             font-weight: 700;
 
             cursor: pointer;
+
+            transition:
+                background
+                0.2s;
         }
 
 
-        .submit-button:hover {
+        button:hover {
 
-            background: #1d4ed8;
+            background:
+                #1d4ed8;
         }
 
 
@@ -471,21 +622,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             text-align: center;
 
-            margin-top: 22px;
+            margin-top: 20px;
 
-            color: #2563eb;
+            color:
+                #2563eb;
 
             text-decoration: none;
 
             font-size: 14px;
-
-            font-weight: 600;
         }
 
 
         .back-link:hover {
 
-            text-decoration: underline;
+            text-decoration:
+                underline;
         }
 
     </style>
@@ -499,45 +650,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="forgot-container">
 
 
+    <!-- ICON -->
+
     <div class="forgot-icon">
+
         🔐
+
     </div>
 
 
+    <!-- EYEBROW -->
+
     <span class="eyebrow">
+
         PASSWORD RESET
+
     </span>
 
 
+    <!-- TITLE -->
+
     <h1>
+
         Forgot Your Password?
+
     </h1>
 
+
+    <!-- DESCRIPTION -->
 
     <p class="description">
 
         Enter the email address associated
         with your HochipoHub account.
-        We'll send you a 6-digit verification
-        code to reset your password.
+        We'll send you a verification code
+        to reset your password.
 
     </p>
 
+
+    <!-- FLASH MESSAGE -->
 
     <?php if ($flash): ?>
 
         <div
             class="
                 alert
-                <?= $flash['type'] === 'error'
-                    ? 'alert-error'
-                    : 'alert-success'
+                <?= (
+                    ($flash['type'] ?? '')
+                    === 'error'
+                )
+                    ? 'error'
+                    : 'success'
                 ?>
             "
         >
 
             <?= e(
                 $flash['message']
+                ?? ''
             ) ?>
 
         </div>
@@ -545,44 +716,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php endif; ?>
 
 
+    <!-- FORGOT PASSWORD FORM -->
+
     <form
         method="POST"
         action="<?= e(
-            BASE_URL .
+            $baseUrl .
             'auth/forgot_password.php'
         ) ?>"
     >
 
-        <label for="email">
-            Email Address
-        </label>
+
+        <div class="form-group">
 
 
-        <input
-            type="email"
-            id="email"
-            name="email"
-            placeholder="you@example.com"
-            autocomplete="email"
-            required
-        >
+            <label
+                for="email"
+            >
+
+                Email Address
+
+            </label>
+
+
+            <input
+                type="email"
+                id="email"
+                name="email"
+                placeholder="you@example.com"
+                autocomplete="email"
+                required
+            >
+
+
+        </div>
 
 
         <button
             type="submit"
-            class="submit-button"
         >
 
             SEND VERIFICATION CODE
 
         </button>
 
+
     </form>
 
 
+    <!-- BACK TO LOGIN -->
+
     <a
         href="<?= e(
-            BASE_URL . 'index.php'
+            $baseUrl .
+            'index.php'
         ) ?>"
         class="back-link"
     >
