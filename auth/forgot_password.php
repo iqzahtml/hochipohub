@@ -6,51 +6,17 @@
 |--------------------------------------------------------------------------
 | File:
 | auth/forgot_password.php
-|
-| Purpose:
-| 1. Ask user for email
-| 2. Find account
-| 3. Save reset user ID into session
-| 4. Redirect to send_otp.php
-|
-| FLOW:
-|
-| forgot_password.php
-|        ↓
-| send_otp.php?type=reset
-|        ↓
-| verify_otp.php?type=reset
-|        ↓
-| reset_password.php
 |--------------------------------------------------------------------------
 */
 
-
-/*
-|--------------------------------------------------------------------------
-| LOAD CONFIG
-|--------------------------------------------------------------------------
-*/
 
 require_once dirname(__DIR__) . '/config.php';
 
+require_once dirname(__DIR__) .
+    '/includes/session.php';
 
-/*
-|--------------------------------------------------------------------------
-| LOAD SESSION
-|--------------------------------------------------------------------------
-*/
-
-require_once dirname(__DIR__) . '/includes/session.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| LOAD FUNCTIONS
-|--------------------------------------------------------------------------
-*/
-
-require_once dirname(__DIR__) . '/includes/functions.php';
+require_once dirname(__DIR__) .
+    '/includes/functions.php';
 
 
 /*
@@ -64,40 +30,31 @@ $pdo = getDB();
 
 /*
 |--------------------------------------------------------------------------
-| BASE URL
+| FLASH MESSAGE
 |--------------------------------------------------------------------------
 */
 
-$baseUrl =
-    defined('BASE_URL')
-        ? rtrim(
-            BASE_URL,
-            '/'
-        ) . '/'
-        : '/hochipoHub/';
+$flash =
+    getFlashMessageSafe();
 
 
 /*
 |--------------------------------------------------------------------------
-| HANDLE POST
+| HANDLE FORM
 |--------------------------------------------------------------------------
 */
 
 if (
     ($_SERVER['REQUEST_METHOD'] ?? 'GET')
-    === 'POST'
+    ===
+    'POST'
 ) {
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | GET EMAIL
-    |--------------------------------------------------------------------------
-    */
 
     $email =
         trim(
-            $_POST['email'] ?? ''
+            $_POST['email']
+            ??
+            ''
         );
 
 
@@ -107,248 +64,170 @@ if (
     |--------------------------------------------------------------------------
     */
 
-    if ($email === '') {
+    if (
+        $email === ''
+    ) {
 
-        setFlashMessage(
+        setFlashMessageSafe(
             'error',
             'Please enter your email address.'
         );
 
-
-        redirect(
-            $baseUrl .
-            'auth/forgot_password.php'
-        );
-    }
-
-
-    if (
+    } elseif (
         !filter_var(
             $email,
             FILTER_VALIDATE_EMAIL
         )
     ) {
 
-        setFlashMessage(
+        setFlashMessageSafe(
             'error',
             'Please enter a valid email address.'
         );
 
+    } else {
 
-        redirect(
-            $baseUrl .
-            'auth/forgot_password.php'
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | FIND USER
-    |--------------------------------------------------------------------------
-    */
-
-    try {
-
-        $stmt =
-            $pdo->prepare("
-                SELECT
-                    user_id,
-                    name,
-                    email,
-                    role,
-                    status
-                FROM users
-                WHERE email = ?
-                LIMIT 1
-            ");
-
-
-        $stmt->execute([
-            $email
-        ]);
-
-
-        $user =
-            $stmt->fetch(
-                PDO::FETCH_ASSOC
-            );
-
-
-    } catch (PDOException $e) {
 
         /*
         |--------------------------------------------------------------------------
-        | DEBUG MODE
+        | FIND USER
+        |--------------------------------------------------------------------------
+        */
+
+        try {
+
+            $stmt =
+                $pdo->prepare("
+                    SELECT
+                        user_id,
+                        name,
+                        email,
+                        status
+                    FROM users
+                    WHERE email = ?
+                    LIMIT 1
+                ");
+
+
+            $stmt->execute([
+                $email
+            ]);
+
+
+            $user =
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
+
+
+        } catch (
+            PDOException $e
+        ) {
+
+            if (APP_DEBUG) {
+
+                die(
+                    '<h3>Database Error</h3>'
+                    .
+                    e(
+                        $e->getMessage()
+                    )
+                );
+            }
+
+
+            setFlashMessageSafe(
+                'error',
+                'Unable to start password reset.'
+            );
+
+
+            $user = null;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | USER NOT FOUND
         |--------------------------------------------------------------------------
         */
 
         if (
-            defined('APP_DEBUG') &&
-            APP_DEBUG
+            $user === false
+            ||
+            $user === null
         ) {
 
-            die(
-                'Forgot password database error: '
-                . e(
-                    $e->getMessage()
-                )
+            setFlashMessageSafe(
+                'error',
+                'No account was found with that email address.'
             );
+
+        } else {
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ACCOUNT STATUS
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                isset(
+                    $user['status']
+                )
+                &&
+                strtolower(
+                    $user['status']
+                )
+                !==
+                'active'
+            ) {
+
+                setFlashMessageSafe(
+                    'error',
+                    'This account is not active. Please contact support.'
+                );
+
+            } else {
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | STORE RESET USER
+                |--------------------------------------------------------------------------
+                */
+
+                setResetUser(
+                    $user['user_id']
+                );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | REDIRECT TO SEND OTP
+                |--------------------------------------------------------------------------
+                */
+
+                redirect(
+                    BASE_URL
+                    .
+                    'auth/send_otp.php?type=reset'
+                );
+            }
         }
-
-
-        setFlashMessage(
-            'error',
-            'Unable to process your request. Please try again.'
-        );
-
-
-        redirect(
-            $baseUrl .
-            'auth/forgot_password.php'
-        );
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | USER NOT FOUND
+    | GET FLASH AGAIN
     |--------------------------------------------------------------------------
     */
-
-    if (!$user) {
-
-        setFlashMessage(
-            'error',
-            'No account was found with that email address.'
-        );
-
-
-        redirect(
-            $baseUrl .
-            'auth/forgot_password.php'
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CHECK ACCOUNT STATUS
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        isset(
-            $user['status']
-        )
-        &&
-        strtolower(
-            trim(
-                (string)
-                $user['status']
-            )
-        ) !== 'active'
-    ) {
-
-        setFlashMessage(
-            'error',
-            'This account is not active. Please contact support.'
-        );
-
-
-        redirect(
-            $baseUrl .
-            'auth/forgot_password.php'
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | SAVE RESET USER
-    |--------------------------------------------------------------------------
-    |
-    | send_otp.php calls:
-    |
-    | getResetUser()
-    |
-    | getResetUser() reads:
-    |
-    | $_SESSION['reset_user_id']
-    |
-    |--------------------------------------------------------------------------
-    */
-
-    $resetSaved =
-        setResetUser(
-            $user['user_id']
-        );
-
-
-    if (!$resetSaved) {
-
-        setFlashMessage(
-            'error',
-            'Unable to start password reset. Please try again.'
-        );
-
-
-        redirect(
-            $baseUrl .
-            'auth/forgot_password.php'
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | STORE EMAIL
-    |--------------------------------------------------------------------------
-    */
-
-    $_SESSION[
-        'reset_email'
-    ] =
-        $user['email'];
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | REDIRECT TO SEND OTP
-    |--------------------------------------------------------------------------
-    */
-
-    redirect(
-        $baseUrl .
-        'auth/send_otp.php?type=reset'
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| GET FLASH MESSAGE
-|--------------------------------------------------------------------------
-*/
-
-$flash = null;
-
-if (
-    function_exists(
-        'getFlashMessage'
-    )
-) {
 
     $flash =
-        getFlashMessage();
+        getFlashMessageSafe();
 }
-
-
-/*
-|--------------------------------------------------------------------------
-| PAGE
-|--------------------------------------------------------------------------
-*/
 
 ?>
 
@@ -360,20 +239,13 @@ if (
 
     <meta charset="UTF-8">
 
-
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
 
-
     <title>
-        Forgot Password -
-        <?= e(
-            defined('APP_NAME')
-                ? APP_NAME
-                : 'HochipoHub'
-        ) ?>
+        Forgot Password - HochipoHub
     </title>
 
 
@@ -443,11 +315,9 @@ if (
 
             border-radius: 18px;
 
-            background:
-                #2563eb;
+            background: #2563eb;
 
-            color:
-                #ffffff;
+            color: #ffffff;
 
             display: flex;
 
@@ -467,8 +337,7 @@ if (
 
             font-weight: 700;
 
-            color:
-                #2563eb;
+            color: #2563eb;
 
             letter-spacing: 2px;
         }
@@ -479,8 +348,7 @@ if (
             margin:
                 8px 0 10px;
 
-            color:
-                #0f172a;
+            color: #0f172a;
 
             font-size: 30px;
         }
@@ -488,8 +356,7 @@ if (
 
         .description {
 
-            color:
-                #64748b;
+            color: #64748b;
 
             line-height: 1.6;
 
@@ -506,28 +373,22 @@ if (
             margin-bottom: 20px;
 
             font-size: 14px;
-
-            line-height: 1.5;
         }
 
 
         .alert.error {
 
-            background:
-                #fef2f2;
+            background: #fef2f2;
 
-            color:
-                #b91c1c;
+            color: #b91c1c;
         }
 
 
         .alert.success {
 
-            background:
-                #ecfdf5;
+            background: #ecfdf5;
 
-            color:
-                #047857;
+            color: #047857;
         }
 
 
@@ -547,8 +408,7 @@ if (
 
             font-weight: 700;
 
-            color:
-                #334155;
+            color: #334155;
         }
 
 
@@ -559,18 +419,13 @@ if (
             padding: 15px;
 
             border:
-                2px solid
-                #dbeafe;
+                2px solid #dbeafe;
 
             border-radius: 12px;
 
             font-size: 15px;
 
             outline: none;
-
-            transition:
-                border-color
-                0.2s;
         }
 
 
@@ -594,18 +449,13 @@ if (
             background:
                 #2563eb;
 
-            color:
-                #ffffff;
+            color: #ffffff;
 
             font-size: 15px;
 
             font-weight: 700;
 
             cursor: pointer;
-
-            transition:
-                background
-                0.2s;
         }
 
 
@@ -624,19 +474,11 @@ if (
 
             margin-top: 20px;
 
-            color:
-                #2563eb;
+            color: #2563eb;
 
             text-decoration: none;
 
             font-size: 14px;
-        }
-
-
-        .back-link:hover {
-
-            text-decoration:
-                underline;
         }
 
     </style>
@@ -650,16 +492,12 @@ if (
 <div class="forgot-container">
 
 
-    <!-- ICON -->
-
     <div class="forgot-icon">
 
         🔐
 
     </div>
 
-
-    <!-- EYEBROW -->
 
     <span class="eyebrow">
 
@@ -668,16 +506,12 @@ if (
     </span>
 
 
-    <!-- TITLE -->
-
     <h1>
 
         Forgot Your Password?
 
     </h1>
 
-
-    <!-- DESCRIPTION -->
 
     <p class="description">
 
@@ -689,26 +523,20 @@ if (
     </p>
 
 
-    <!-- FLASH MESSAGE -->
-
     <?php if ($flash): ?>
 
         <div
-            class="
-                alert
-                <?= (
-                    ($flash['type'] ?? '')
-                    === 'error'
-                )
-                    ? 'error'
-                    : 'success'
-                ?>
-            "
+            class="alert
+            <?= e(
+                $flash['type']
+                === 'success'
+                ? 'success'
+                : 'error'
+            ) ?>"
         >
 
             <?= e(
                 $flash['message']
-                ?? ''
             ) ?>
 
         </div>
@@ -716,23 +544,14 @@ if (
     <?php endif; ?>
 
 
-    <!-- FORGOT PASSWORD FORM -->
-
     <form
         method="POST"
-        action="<?= e(
-            $baseUrl .
-            'auth/forgot_password.php'
-        ) ?>"
+        action=""
     >
-
 
         <div class="form-group">
 
-
-            <label
-                for="email"
-            >
+            <label for="email">
 
                 Email Address
 
@@ -748,7 +567,6 @@ if (
                 required
             >
 
-
         </div>
 
 
@@ -760,16 +578,12 @@ if (
 
         </button>
 
-
     </form>
 
 
-    <!-- BACK TO LOGIN -->
-
     <a
         href="<?= e(
-            $baseUrl .
-            'index.php'
+            BASE_URL . 'index.php'
         ) ?>"
         class="back-link"
     >
