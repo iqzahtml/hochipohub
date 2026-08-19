@@ -5,34 +5,21 @@
 | HOCHIPOHUB - FORGOT PASSWORD
 |--------------------------------------------------------------------------
 | File:
-| auth/forgot_password.php
-|
-| Purpose:
-| Handle password reset request.
+|     auth/forgot_password.php
 |
 | Flow:
+|
+| Login
+|   ↓
 | Forgot Password
-|      ↓
+|   ↓
 | Enter Email
-|      ↓
-| Check User
-|      ↓
-| Generate OTP
-|      ↓
-| Store OTP temporarily
-|      ↓
+|   ↓
 | Send OTP
-|      ↓
+|   ↓
 | Verify OTP
-|      ↓
+|   ↓
 | Reset Password
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| LOAD CONFIGURATION
 |--------------------------------------------------------------------------
 */
 
@@ -43,40 +30,25 @@ require_once dirname(__DIR__) . '/includes/functions.php';
 
 /*
 |--------------------------------------------------------------------------
-| REQUIRE GUEST
+| BASE URL
 |--------------------------------------------------------------------------
-|
-| Logged-in users do not need password recovery.
-|
 */
 
-if (isLoggedIn()) {
-
-    redirect(
-        BASE_URL . 'dashboard.php'
-    );
-}
+$baseUrl = defined('BASE_URL')
+    ? rtrim(BASE_URL, '/') . '/'
+    : '/hochipohub/';
 
 
 /*
 |--------------------------------------------------------------------------
-| HANDLE FORM SUBMISSION
+| HANDLE FORM
 |--------------------------------------------------------------------------
 */
 
-if (
-    $_SERVER['REQUEST_METHOD'] === 'POST'
-) {
-
-    /*
-    |--------------------------------------------------------------------------
-    | GET EMAIL
-    |--------------------------------------------------------------------------
-    */
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $email = trim(
-        $_POST['email']
-        ?? ''
+        $_POST['email'] ?? ''
     );
 
 
@@ -86,23 +58,28 @@ if (
     |--------------------------------------------------------------------------
     */
 
-    if (
-        $email === ''
-        ||
-        !filter_var(
-            $email,
-            FILTER_VALIDATE_EMAIL
-        )
-    ) {
+    if ($email === '') {
 
-        $_SESSION['forgot_error'] =
-            'Please enter a valid email address.';
-
-        $_SESSION['forgot_email'] =
-            $email;
+        setFlashMessageSafe(
+            'error',
+            'Please enter your email address.'
+        );
 
         redirect(
-            BASE_URL . 'index.php?forgot=1'
+            $baseUrl . 'auth/forgot_password.php'
+        );
+    }
+
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+
+        setFlashMessageSafe(
+            'error',
+            'Please enter a valid email address.'
+        );
+
+        redirect(
+            $baseUrl . 'auth/forgot_password.php'
         );
     }
 
@@ -115,7 +92,7 @@ if (
 
     try {
 
-        $db = getDB();
+        $pdo = getDB();
 
 
         /*
@@ -124,7 +101,7 @@ if (
         |--------------------------------------------------------------------------
         */
 
-        $stmt = $db->prepare("
+        $stmt = $pdo->prepare("
             SELECT
                 user_id,
                 name,
@@ -139,28 +116,26 @@ if (
             $email
         ]);
 
-        $user =
-            $stmt->fetch();
+        $user = $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
 
 
         /*
         |--------------------------------------------------------------------------
         | USER NOT FOUND
         |--------------------------------------------------------------------------
-        |
-        | We do not reveal whether an email exists.
-        | This prevents email/account enumeration.
-        |
         */
 
         if (!$user) {
 
-            $_SESSION['forgot_success'] =
-                'If an account exists with this email, '
-                . 'a verification code will be sent.';
+            setFlashMessageSafe(
+                'error',
+                'No account was found with that email address.'
+            );
 
             redirect(
-                BASE_URL . 'index.php?forgot=1'
+                $baseUrl . 'auth/forgot_password.php'
             );
         }
 
@@ -172,103 +147,44 @@ if (
         */
 
         if (
-            isset($user['status'])
-            &&
+            isset($user['status']) &&
             strtolower(
-                (string) $user['status']
+                trim(
+                    $user['status']
+                )
             ) !== 'active'
         ) {
 
-            $_SESSION['forgot_error'] =
-                'This account is currently unavailable.';
+            setFlashMessageSafe(
+                'error',
+                'This account is not active. Please contact support.'
+            );
 
             redirect(
-                BASE_URL . 'index.php?forgot=1'
+                $baseUrl . 'auth/forgot_password.php'
             );
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | GENERATE OTP
+        | STORE RESET USER
         |--------------------------------------------------------------------------
-        |
-        | 6-digit numeric OTP.
-        |
         */
 
-        $otp = (string) random_int(
-            100000,
-            999999
+        setResetUser(
+            $user['user_id']
         );
 
 
         /*
         |--------------------------------------------------------------------------
-        | OTP EXPIRY
+        | STORE EMAIL FOR DISPLAY
         |--------------------------------------------------------------------------
         */
-
-        $otpExpiry =
-            time()
-            +
-            (
-                OTP_EXPIRY_MINUTES
-                *
-                60
-            );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | STORE RESET INFORMATION
-        |--------------------------------------------------------------------------
-        */
-
-        $_SESSION['reset_user_id'] =
-            (int) $user['user_id'];
 
         $_SESSION['reset_email'] =
             $user['email'];
-
-        $_SESSION['reset_name'] =
-            $user['name'];
-
-        $_SESSION['reset_otp'] =
-            password_hash(
-                $otp,
-                PASSWORD_DEFAULT
-            );
-
-        $_SESSION['reset_otp_expires'] =
-            $otpExpiry;
-
-        $_SESSION['reset_otp_attempts'] =
-            0;
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CLEAR OLD RESET STATE
-        |--------------------------------------------------------------------------
-        */
-
-        unset(
-            $_SESSION['reset_verified']
-        );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | PREPARE OTP FOR EMAIL
-        |--------------------------------------------------------------------------
-        |
-        | send_otp.php will use these session values.
-        |
-        */
-
-        $_SESSION['otp_code_for_mail'] =
-            $otp;
 
 
         /*
@@ -278,36 +194,30 @@ if (
         */
 
         redirect(
-            BASE_URL . 'auth/send_otp.php'
+            $baseUrl
+            . 'auth/send_otp.php?type=reset'
         );
 
+    } catch (PDOException $e) {
 
-    } catch (
-        PDOException $e
-    ) {
+        if (defined('APP_DEBUG') && APP_DEBUG) {
 
-        /*
-        |--------------------------------------------------------------------------
-        | DEVELOPMENT ERROR
-        |--------------------------------------------------------------------------
-        */
-
-        if (APP_DEBUG) {
-
-            $_SESSION['forgot_error'] =
-                'Database error: '
-                . $e->getMessage();
-
-        } else {
-
-            $_SESSION['forgot_error'] =
-                'Something went wrong. '
-                . 'Please try again later.';
+            die(
+                'Forgot password database error: '
+                . e(
+                    $e->getMessage()
+                )
+            );
         }
 
 
+        setFlashMessageSafe(
+            'error',
+            'Something went wrong. Please try again.'
+        );
+
         redirect(
-            BASE_URL . 'index.php?forgot=1'
+            $baseUrl . 'auth/forgot_password.php'
         );
     }
 }
@@ -315,14 +225,452 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| DIRECT ACCESS
+| FLASH MESSAGE
 |--------------------------------------------------------------------------
-|
-| If user opens this PHP file directly without POST,
-| send them back to the forgot-password interface.
-|
 */
 
-redirect(
-    BASE_URL . 'index.php?forgot=1'
-);
+$flash = getFlashMessage();
+
+?>
+
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Forgot Password - <?= e(APP_NAME) ?>
+    </title>
+
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+
+        body {
+
+            margin: 0;
+
+            min-height: 100vh;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #eff6ff,
+                    #eef2ff
+                );
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            padding: 20px;
+        }
+
+
+        .forgot-container {
+
+            width: 100%;
+
+            max-width: 460px;
+
+            background: #ffffff;
+
+            border-radius: 24px;
+
+            padding: 40px;
+
+            box-shadow:
+                0 25px 70px
+                rgba(15, 23, 42, 0.15);
+        }
+
+
+        .forgot-icon {
+
+            width: 64px;
+
+            height: 64px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            margin-bottom: 20px;
+
+            border-radius: 18px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #4f46e5
+                );
+
+            color: #ffffff;
+
+            font-size: 28px;
+
+            box-shadow:
+                0 10px 25px
+                rgba(37, 99, 235, 0.25);
+        }
+
+
+        .eyebrow {
+
+            display: block;
+
+            margin-bottom: 7px;
+
+            color: #2563eb;
+
+            font-size: 11px;
+
+            font-weight: 800;
+
+            letter-spacing: 1.5px;
+        }
+
+
+        h1 {
+
+            margin: 0 0 10px;
+
+            color: #0f172a;
+
+            font-size: 28px;
+
+            font-weight: 800;
+        }
+
+
+        .description {
+
+            margin: 0 0 25px;
+
+            color: #64748b;
+
+            font-size: 14px;
+
+            line-height: 1.6;
+        }
+
+
+        .alert {
+
+            padding: 13px 15px;
+
+            margin-bottom: 20px;
+
+            border-radius: 12px;
+
+            font-size: 13px;
+
+            line-height: 1.5;
+        }
+
+
+        .alert.error {
+
+            background: #fef2f2;
+
+            border:
+                1px solid
+                #fecaca;
+
+            color: #b91c1c;
+        }
+
+
+        .alert.success {
+
+            background: #ecfdf5;
+
+            border:
+                1px solid
+                #a7f3d0;
+
+            color: #047857;
+        }
+
+
+        .form-group {
+
+            margin-bottom: 18px;
+        }
+
+
+        .form-group label {
+
+            display: block;
+
+            margin-bottom: 8px;
+
+            color: #334155;
+
+            font-size: 13px;
+
+            font-weight: 700;
+        }
+
+
+        .form-group input {
+
+            width: 100%;
+
+            height: 48px;
+
+            padding: 0 14px;
+
+            border:
+                1px solid
+                #cbd5e1;
+
+            border-radius: 12px;
+
+            background: #f8fafc;
+
+            color: #0f172a;
+
+            font-size: 14px;
+
+            outline: none;
+
+            transition: 0.2s ease;
+        }
+
+
+        .form-group input:focus {
+
+            background: #ffffff;
+
+            border-color: #2563eb;
+
+            box-shadow:
+                0 0 0 4px
+                rgba(37, 99, 235, 0.10);
+        }
+
+
+        .submit-button {
+
+            width: 100%;
+
+            min-height: 48px;
+
+            border: none;
+
+            border-radius: 13px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #4f46e5
+                );
+
+            color: #ffffff;
+
+            font-size: 14px;
+
+            font-weight: 800;
+
+            cursor: pointer;
+
+            box-shadow:
+                0 8px 20px
+                rgba(37, 99, 235, 0.25);
+
+            transition: 0.2s ease;
+        }
+
+
+        .submit-button:hover {
+
+            transform:
+                translateY(-2px);
+
+            box-shadow:
+                0 12px 28px
+                rgba(37, 99, 235, 0.32);
+        }
+
+
+        .back-link {
+
+            display: block;
+
+            margin-top: 20px;
+
+            text-align: center;
+
+            color: #2563eb;
+
+            font-size: 13px;
+
+            font-weight: 700;
+
+            text-decoration: none;
+        }
+
+
+        .back-link:hover {
+
+            text-decoration: underline;
+        }
+
+
+        @media (max-width: 600px) {
+
+            .forgot-container {
+
+                padding: 28px 22px;
+
+                border-radius: 20px;
+            }
+
+            h1 {
+
+                font-size: 24px;
+            }
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<div class="forgot-container">
+
+
+    <div class="forgot-icon">
+
+        🔐
+
+    </div>
+
+
+    <span class="eyebrow">
+
+        ACCOUNT RECOVERY
+
+    </span>
+
+
+    <h1>
+
+        Forgot Password?
+
+    </h1>
+
+
+    <p class="description">
+
+        Enter the email address connected
+        to your HochipoHub account.
+        We'll send you a 6-digit verification
+        code to reset your password.
+
+    </p>
+
+
+    <?php if ($flash): ?>
+
+        <div
+            class="alert <?= $flash['type'] === 'error'
+                ? 'error'
+                : 'success'
+            ?>"
+        >
+
+            <?= e(
+                $flash['message']
+            ) ?>
+
+        </div>
+
+    <?php endif; ?>
+
+
+    <form
+        method="POST"
+        action="<?= e(
+            $baseUrl . 'auth/forgot_password.php'
+        ) ?>"
+    >
+
+
+        <div class="form-group">
+
+            <label for="forgotEmail">
+
+                Email Address
+
+            </label>
+
+
+            <input
+                type="email"
+                id="forgotEmail"
+                name="email"
+                placeholder="you@example.com"
+                autocomplete="email"
+                required
+            >
+
+        </div>
+
+
+        <button
+            type="submit"
+            class="submit-button"
+        >
+
+            SEND VERIFICATION CODE →
+
+        </button>
+
+
+    </form>
+
+
+    <a
+        href="<?= e($baseUrl . 'index.php') ?>"
+        class="back-link"
+    >
+
+        ← Back to Login
+
+    </a>
+
+
+</div>
+
+
+</body>
+
+</html>
