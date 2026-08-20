@@ -6,161 +6,94 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $currentPage = basename($_SERVER['PHP_SELF'] ?? '');
 
-$sidebarBaseUrl = defined('BASE_URL')
-    ? rtrim(BASE_URL, '/') . '/'
-    : '/hochipohub/';
-
 ?>
 
 <aside class="dashboard-sidebar">
 
-    <!-- SIDEBAR BRAND -->
-    <div class="sidebar-brand">
+    <div class="sidebar-header">
 
-        <div class="sidebar-brand-icon">
-            H
-        </div>
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-icon">H</div>
 
-        <div>
-            <strong>HochipoHub</strong>
-            <span>Customer Center</span>
+            <div>
+                <h2>HochipoHub</h2>
+                <span>Customer</span>
+            </div>
         </div>
 
     </div>
 
 
-    <!-- NAVIGATION -->
     <nav class="sidebar-menu">
 
-
         <a
-            href="<?= htmlspecialchars($sidebarBaseUrl . 'dashboard.php') ?>"
+            href="dashboard.php"
             class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>"
         >
-            <span class="sidebar-icon">⌂</span>
-
-            <span class="sidebar-text">
-                Dashboard
-            </span>
+            <span>🏠</span>
+            <span>Dashboard</span>
         </a>
 
 
         <a
-            href="<?= htmlspecialchars($sidebarBaseUrl . 'catalog.php') ?>"
-            class="<?= in_array(
-                $currentPage,
-                ['catalog.php', 'product.php', 'product_details.php']
-            ) ? 'active' : '' ?>"
+            href="catalog.php"
+            class="<?= $currentPage === 'catalog.php' ? 'active' : '' ?>"
         >
-            <span class="sidebar-icon">🛍</span>
-
-            <span class="sidebar-text">
-                Browse Products
-            </span>
+            <span>🛍️</span>
+            <span>Browse Products</span>
         </a>
 
 
         <a
-            href="<?= htmlspecialchars($sidebarBaseUrl . 'cart.php') ?>"
+            href="cart.php"
             class="<?= $currentPage === 'cart.php' ? 'active' : '' ?>"
         >
-            <span class="sidebar-icon">🛒</span>
-
-            <span class="sidebar-text">
-                Cart
-            </span>
-
-            <?php if (!empty($cartCount)): ?>
-
-                <span class="sidebar-badge">
-                    <?= $cartCount > 99 ? '99+' : (int)$cartCount ?>
-                </span>
-
-            <?php endif; ?>
-
+            <span>🛒</span>
+            <span>Cart</span>
         </a>
 
 
         <a
-            href="<?= htmlspecialchars($sidebarBaseUrl . 'wishlist.php') ?>"
+            href="wishlist.php"
             class="<?= $currentPage === 'wishlist.php' ? 'active' : '' ?>"
         >
-            <span class="sidebar-icon">♡</span>
-
-            <span class="sidebar-text">
-                Wishlist
-            </span>
-
-            <?php if (!empty($wishlistCount)): ?>
-
-                <span class="sidebar-badge">
-                    <?= $wishlistCount > 99 ? '99+' : (int)$wishlistCount ?>
-                </span>
-
-            <?php endif; ?>
-
+            <span>❤️</span>
+            <span>Wishlist</span>
         </a>
 
 
         <a
-            href="<?= htmlspecialchars($sidebarBaseUrl . 'order.php') ?>"
+            href="order.php"
             class="<?= $currentPage === 'order.php' ? 'active' : '' ?>"
         >
-            <span class="sidebar-icon">📦</span>
-
-            <span class="sidebar-text">
-                My Orders
-            </span>
+            <span>📦</span>
+            <span>My Orders</span>
         </a>
 
 
         <a
-            href="<?= htmlspecialchars($sidebarBaseUrl . 'profile.php') ?>"
+            href="profile.php"
             class="<?= $currentPage === 'profile.php' ? 'active' : '' ?>"
         >
-            <span class="sidebar-icon">♙</span>
+            <span>👤</span>
+            <span>My Profile</span>
+        </a>
 
-            <span class="sidebar-text">
-                My Profile
-            </span>
+
+        <a href="index.php">
+            <span>🏠</span>
+            <span>Home</span>
         </a>
 
 
         <a
-            href="<?= htmlspecialchars($sidebarBaseUrl . 'index.php') ?>"
-            class="<?= $currentPage === 'index.php' ? 'active' : '' ?>"
-        >
-            <span class="sidebar-icon">⌂</span>
-
-            <span class="sidebar-text">
-                Home
-            </span>
-        </a>
-
-
-    </nav>
-
-
-    <!-- SIDEBAR FOOTER -->
-    <div class="sidebar-footer">
-
-        <a
-            href="<?= htmlspecialchars(
-                $sidebarBaseUrl . 'auth/logout.php'
-            ) ?>"
+            href="auth/logout.php"
             class="sidebar-logout"
         >
-
-            <span class="sidebar-icon">
-                ↪
-            </span>
-
-            <span>
-                Logout
-            </span>
-
+            <span>🚪</span>
+            <span>Logout</span>
         </a>
 
-    </div>
+    </nav>
 
 </aside>
