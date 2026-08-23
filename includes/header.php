@@ -494,4 +494,7 @@ $allJS = array_unique($allJS);
          MAIN CONTENT
          ===================================================== -->
 
-    
+    <main
+        id="main-content"
+        class="site-main"
+    >
