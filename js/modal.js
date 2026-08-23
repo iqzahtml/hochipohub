@@ -1,6 +1,6 @@
 /*
 =========================================================
-HOCHIPOHUB - MODAL JAVASCRIPT
+HOCHIPO HUB - MODAL JAVASCRIPT
 LOGIN / REGISTER POPUP
 =========================================================
 */
@@ -385,7 +385,9 @@ LOGIN / REGISTER POPUP
 
 
         /*
-        Close other modals
+        =====================================================
+        CLOSE OTHER MODALS
+        =====================================================
         */
 
         document
@@ -409,7 +411,9 @@ LOGIN / REGISTER POPUP
 
 
         /*
-        Open selected modal
+        =====================================================
+        OPEN SELECTED MODAL
+        =====================================================
         */
 
         modal.classList.add(
@@ -424,7 +428,9 @@ LOGIN / REGISTER POPUP
 
 
         /*
-        Lock body scrolling
+        =====================================================
+        LOCK BODY SCROLLING
+        =====================================================
         */
 
         document.body.classList.add(
@@ -437,7 +443,9 @@ LOGIN / REGISTER POPUP
 
 
         /*
-        Focus first input
+        =====================================================
+        FOCUS FIRST INPUT
+        =====================================================
         */
 
         setTimeout(
@@ -497,7 +505,9 @@ LOGIN / REGISTER POPUP
 
 
         /*
-        Unlock body when no modal is open
+        =====================================================
+        UNLOCK BODY WHEN NO MODAL IS OPEN
+        =====================================================
         */
 
         if (
@@ -561,6 +571,80 @@ LOGIN / REGISTER POPUP
 
     /*
     =========================================================
+    OPEN LOGIN AFTER SUCCESSFUL REGISTRATION
+    =========================================================
+    */
+
+    function openLoginAfterRegister() {
+
+        const urlParams =
+            new URLSearchParams(
+                window.location.search
+            );
+
+
+        const loginParam =
+            urlParams.get("login");
+
+
+        /*
+        =====================================================
+        CHECK ?login=1
+        =====================================================
+        */
+
+        if (
+            loginParam === "1"
+        ) {
+
+            console.log(
+                "Opening login modal after registration"
+            );
+
+
+            /*
+            =================================================
+            OPEN LOGIN MODAL
+            =================================================
+            */
+
+            openModal(
+                "loginModal"
+            );
+
+
+            /*
+            =================================================
+            REMOVE ?login=1 FROM URL
+            =================================================
+
+            Example:
+
+            Before:
+            index.php?login=1
+
+            After:
+            index.php
+            =================================================
+            */
+
+            const cleanUrl =
+                window.location.pathname;
+
+
+            window.history.replaceState(
+                {},
+                document.title,
+                cleanUrl
+            );
+
+        }
+
+    }
+
+
+    /*
+    =========================================================
     GLOBAL FUNCTIONS
     =========================================================
     */
@@ -590,12 +674,20 @@ LOGIN / REGISTER POPUP
 
         document.addEventListener(
             "DOMContentLoaded",
-            initializeModals
+            function () {
+
+                initializeModals();
+
+                openLoginAfterRegister();
+
+            }
         );
 
     } else {
 
         initializeModals();
+
+        openLoginAfterRegister();
 
     }
 
