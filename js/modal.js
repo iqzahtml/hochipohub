@@ -1,697 +1,605 @@
 /*
-=========================================================
-HOCHIPOHUB - MODAL JAVASCRIPT
-LOGIN / REGISTER POPUP
-=========================================================
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - MODAL JAVASCRIPT
+|--------------------------------------------------------------------------
+| File:
+| js/modal.js
+|
+| Functions:
+| - Open login modal
+| - Open register modal
+| - Switch modal
+| - Close modal
+| - Password show/hide
+| - Auto login popup support
+|--------------------------------------------------------------------------
 */
 
 (function () {
 
-    "use strict";
+    'use strict';
 
 
     /*
-    =========================================================
-    INITIALIZE
-    =========================================================
+    |--------------------------------------------------------------------------
+    | PAGE READY
+    |--------------------------------------------------------------------------
     */
 
-    function initializeModals() {
-
-        console.log(
-            "HochipoHub modal.js loaded"
-        );
+    document.addEventListener(
+        'DOMContentLoaded',
+        function () {
 
 
-        /*
-        =====================================================
-        OPEN BUTTONS
-        =====================================================
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | GET MODALS
+            |--------------------------------------------------------------------------
+            */
 
-        const openButtons =
-            document.querySelectorAll(
-                "[data-modal-open]"
-            );
-
-
-        openButtons.forEach(
-            function (button) {
-
-                button.addEventListener(
-                    "click",
-                    function (event) {
-
-                        event.preventDefault();
-
-                        event.stopPropagation();
-
-
-                        const modalId =
-                            button.getAttribute(
-                                "data-modal-open"
-                            );
-
-
-                        openModal(
-                            modalId
-                        );
-
-                    }
+            const loginModal =
+                document.getElementById(
+                    'loginModal'
                 );
 
-            }
-        );
-
-
-        /*
-        =====================================================
-        CLOSE BUTTONS
-        =====================================================
-        */
-
-        const closeButtons =
-            document.querySelectorAll(
-                "[data-modal-close]"
-            );
-
-
-        closeButtons.forEach(
-            function (button) {
-
-                button.addEventListener(
-                    "click",
-                    function (event) {
-
-                        event.preventDefault();
-
-                        event.stopPropagation();
-
-
-                        const modalId =
-                            button.getAttribute(
-                                "data-modal-close"
-                            );
-
-
-                        closeModal(
-                            modalId
-                        );
-
-                    }
+            const registerModal =
+                document.getElementById(
+                    'registerModal'
                 );
 
-            }
-        );
+
+            /*
+            |--------------------------------------------------------------------------
+            | OPEN MODAL
+            |--------------------------------------------------------------------------
+            */
+
+            function openModal(modal) {
+
+                if (!modal) {
+                    return;
+                }
 
 
-        /*
-        =====================================================
-        SWITCH MODALS
-        =====================================================
-        */
-
-        const switchButtons =
-            document.querySelectorAll(
-                "[data-modal-switch]"
-            );
-
-
-        switchButtons.forEach(
-            function (button) {
-
-                button.addEventListener(
-                    "click",
-                    function (event) {
-
-                        event.preventDefault();
-
-                        event.stopPropagation();
-
-
-                        const currentModal =
-                            button.getAttribute(
-                                "data-modal-switch"
-                            );
-
-
-                        const targetModal =
-                            button.getAttribute(
-                                "data-modal-target"
-                            );
-
-
-                        closeModal(
-                            currentModal
-                        );
-
-
-                        setTimeout(
-                            function () {
-
-                                openModal(
-                                    targetModal
-                                );
-
-                            },
-                            150
-                        );
-
-                    }
+                modal.classList.add(
+                    'active'
                 );
 
-            }
-        );
+
+                modal.setAttribute(
+                    'aria-hidden',
+                    'false'
+                );
 
 
-        /*
-        =====================================================
-        CLICK OUTSIDE MODAL
-        =====================================================
-        */
+                document.body.classList.add(
+                    'modal-open'
+                );
 
-        document
-            .querySelectorAll(
-                ".modal-overlay"
-            )
-            .forEach(
-                function (modal) {
 
-                    modal.addEventListener(
-                        "click",
-                        function (event) {
+                /*
+                |--------------------------------------------------------------
+                | FOCUS INPUT
+                |--------------------------------------------------------------
+                */
 
-                            if (
-                                event.target ===
-                                modal
-                            ) {
+                setTimeout(
+                    function () {
 
-                                closeModal(
-                                    modal.id
-                                );
+                        const firstInput =
+                            modal.querySelector(
+                                'input:not([type="hidden"])'
+                            );
 
-                            }
+
+                        if (firstInput) {
+
+                            firstInput.focus();
 
                         }
+
+                    },
+                    200
+                );
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CLOSE MODAL
+            |--------------------------------------------------------------------------
+            */
+
+            function closeModal(modal) {
+
+                if (!modal) {
+                    return;
+                }
+
+
+                modal.classList.remove(
+                    'active'
+                );
+
+
+                modal.setAttribute(
+                    'aria-hidden',
+                    'true'
+                );
+
+
+                document.body.classList.remove(
+                    'modal-open'
+                );
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | SWITCH MODAL
+            |--------------------------------------------------------------------------
+            */
+
+            function switchModal(
+                currentModal,
+                targetModal
+            ) {
+
+                if (currentModal) {
+
+                    closeModal(
+                        currentModal
                     );
 
                 }
-            );
 
 
-        /*
-        =====================================================
-        ESC KEY
-        =====================================================
-        */
+                setTimeout(
+                    function () {
 
-        document.addEventListener(
-            "keydown",
-            function (event) {
+                        if (targetModal) {
 
-                if (
-                    event.key ===
-                    "Escape"
-                ) {
-
-                    closeAllModals();
-
-                }
-
-            }
-        );
-
-
-        /*
-        =====================================================
-        PASSWORD TOGGLE
-        =====================================================
-        */
-
-        document
-            .querySelectorAll(
-                "[data-password-target]"
-            )
-            .forEach(
-                function (button) {
-
-                    button.addEventListener(
-                        "click",
-                        function (event) {
-
-                            event.preventDefault();
-
-
-                            const targetId =
-                                button.getAttribute(
-                                    "data-password-target"
-                                );
-
-
-                            const input =
-                                document.getElementById(
-                                    targetId
-                                );
-
-
-                            if (!input) {
-
-                                return;
-
-                            }
-
-
-                            if (
-                                input.type ===
-                                "password"
-                            ) {
-
-                                input.type =
-                                    "text";
-
-                                button.textContent =
-                                    "🙈";
-
-                                button.setAttribute(
-                                    "aria-label",
-                                    "Hide password"
-                                );
-
-                            } else {
-
-                                input.type =
-                                    "password";
-
-                                button.textContent =
-                                    "👁";
-
-                                button.setAttribute(
-                                    "aria-label",
-                                    "Show password"
-                                );
-
-                            }
+                            openModal(
+                                targetModal
+                            );
 
                         }
-                    );
 
-                }
-            );
+                    },
+                    150
+                );
 
-
-        /*
-        =====================================================
-        REGISTER PASSWORD VALIDATION
-        =====================================================
-        */
-
-        const registerForm =
-            document.getElementById(
-                "registerForm"
-            );
+            }
 
 
-        if (registerForm) {
+            /*
+            |--------------------------------------------------------------------------
+            | OPEN MODAL BUTTONS
+            |--------------------------------------------------------------------------
+            */
 
-            registerForm.addEventListener(
-                "submit",
+            document.addEventListener(
+                'click',
                 function (event) {
 
-                    const password =
-                        document.getElementById(
-                            "registerPassword"
+
+                    const button =
+                        event.target.closest(
+                            '[data-modal-target]'
                         );
 
 
-                    const confirmPassword =
-                        document.getElementById(
-                            "registerConfirmPassword"
-                        );
+                    if (!button) {
 
-
-                    if (
-                        password &&
-                        confirmPassword &&
-                        password.value !==
-                        confirmPassword.value
-                    ) {
-
-                        event.preventDefault();
-
-
-                        alert(
-                            "Passwords do not match."
-                        );
-
-
-                        confirmPassword.focus();
+                        return;
 
                     }
 
-                }
-            );
 
-        }
+                    event.preventDefault();
 
 
-        /*
-        =====================================================
-        ⭐ AUTO OPEN LOGIN AFTER REGISTER
-        =====================================================
-        */
-
-        const urlParams =
-            new URLSearchParams(
-                window.location.search
-            );
+                    const targetId =
+                        button.getAttribute(
+                            'data-modal-target'
+                        );
 
 
-        const loginRequested =
-            urlParams.get(
-                "login"
-            );
+                    const targetModal =
+                        document.getElementById(
+                            targetId
+                        );
 
 
-        if (
-            loginRequested ===
-            "1"
-        ) {
-
-            console.log(
-                "Automatic login modal requested"
-            );
-
-
-            setTimeout(
-                function () {
-
-                    openModal(
-                        "loginModal"
-                    );
+                    const currentId =
+                        button.getAttribute(
+                            'data-modal-switch'
+                        );
 
 
                     /*
-                    Automatically focus password
+                    |----------------------------------------------------------
+                    | SWITCH
+                    |----------------------------------------------------------
                     */
+
+                    if (currentId) {
+
+                        const currentModal =
+                            document.getElementById(
+                                currentId
+                            );
+
+
+                        switchModal(
+                            currentModal,
+                            targetModal
+                        );
+
+                    }
+
+
+                    /*
+                    |----------------------------------------------------------
+                    | OPEN
+                    |----------------------------------------------------------
+                    */
+
+                    else {
+
+                        openModal(
+                            targetModal
+                        );
+
+                    }
+
+                }
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CLOSE BUTTON
+            |--------------------------------------------------------------------------
+            */
+
+            document.addEventListener(
+                'click',
+                function (event) {
+
+
+                    const closeButton =
+                        event.target.closest(
+                            '[data-modal-close]'
+                        );
+
+
+                    if (!closeButton) {
+
+                        return;
+
+                    }
+
+
+                    const modalId =
+                        closeButton.getAttribute(
+                            'data-modal-close'
+                        );
+
+
+                    const modal =
+                        document.getElementById(
+                            modalId
+                        );
+
+
+                    closeModal(
+                        modal
+                    );
+
+                }
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CLICK OUTSIDE
+            |--------------------------------------------------------------------------
+            */
+
+            document.addEventListener(
+                'click',
+                function (event) {
+
+
+                    if (
+                        loginModal &&
+                        event.target === loginModal
+                    ) {
+
+                        closeModal(
+                            loginModal
+                        );
+
+                    }
+
+
+                    if (
+                        registerModal &&
+                        event.target === registerModal
+                    ) {
+
+                        closeModal(
+                            registerModal
+                        );
+
+                    }
+
+                }
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ESC
+            |--------------------------------------------------------------------------
+            */
+
+            document.addEventListener(
+                'keydown',
+                function (event) {
+
+
+                    if (
+                        event.key !== 'Escape'
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    if (
+                        loginModal &&
+                        loginModal.classList.contains(
+                            'active'
+                        )
+                    ) {
+
+                        closeModal(
+                            loginModal
+                        );
+
+                    }
+
+
+                    if (
+                        registerModal &&
+                        registerModal.classList.contains(
+                            'active'
+                        )
+                    ) {
+
+                        closeModal(
+                            registerModal
+                        );
+
+                    }
+
+                }
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | PASSWORD SHOW / HIDE
+            |--------------------------------------------------------------------------
+            */
+
+            document.addEventListener(
+                'click',
+                function (event) {
+
+
+                    const toggle =
+                        event.target.closest(
+                            '[data-password-target]'
+                        );
+
+
+                    if (!toggle) {
+
+                        return;
+
+                    }
+
+
+                    event.preventDefault();
+
+
+                    const targetId =
+                        toggle.getAttribute(
+                            'data-password-target'
+                        );
+
+
+                    const passwordInput =
+                        document.getElementById(
+                            targetId
+                        );
+
+
+                    if (!passwordInput) {
+
+                        console.error(
+                            'Password input not found: ' +
+                            targetId
+                        );
+
+                        return;
+
+                    }
+
+
+                    /*
+                    |----------------------------------------------------------
+                    | SHOW PASSWORD
+                    |----------------------------------------------------------
+                    */
+
+                    if (
+                        passwordInput.type ===
+                        'password'
+                    ) {
+
+                        passwordInput.type =
+                            'text';
+
+
+                        toggle.textContent =
+                            '🙈';
+
+
+                        toggle.setAttribute(
+                            'aria-label',
+                            'Hide password'
+                        );
+
+                    }
+
+
+                    /*
+                    |----------------------------------------------------------
+                    | HIDE PASSWORD
+                    |----------------------------------------------------------
+                    */
+
+                    else {
+
+                        passwordInput.type =
+                            'password';
+
+
+                        toggle.textContent =
+                            '👁';
+
+
+                        toggle.setAttribute(
+                            'aria-label',
+                            'Show password'
+                        );
+
+                    }
+
+                }
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | AUTO OPEN LOGIN
+            |--------------------------------------------------------------------------
+            |
+            | This supports both:
+            |
+            | 1. ?login=1
+            |
+            | 2. PHP-generated .active class
+            |--------------------------------------------------------------------------
+            */
+
+            const urlParams =
+                new URLSearchParams(
+                    window.location.search
+                );
+
+
+            if (
+                loginModal &&
+                urlParams.get('login') === '1'
+            ) {
+
+                openModal(
+                    loginModal
+                );
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | AUTO OPEN REGISTER
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                registerModal &&
+                urlParams.get('register') === '1'
+            ) {
+
+                openModal(
+                    registerModal
+                );
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | IF PHP ALREADY OPENED LOGIN
+            |--------------------------------------------------------------------------
+            |
+            | PHP adds:
+            |
+            | class="modal-overlay active"
+            |
+            | We make sure body also gets modal-open.
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                loginModal &&
+                loginModal.classList.contains(
+                    'active'
+                )
+            ) {
+
+                document.body.classList.add(
+                    'modal-open'
+                );
+
+
+                /*
+                |--------------------------------------------------------------
+                | FOCUS PASSWORD
+                |--------------------------------------------------------------
+                */
+
+                const loginPassword =
+                    document.getElementById(
+                        'loginPassword'
+                    );
+
+
+                if (loginPassword) {
 
                     setTimeout(
                         function () {
 
-                            const password =
-                                document.getElementById(
-                                    "loginPassword"
-                                );
-
-
-                            if (password) {
-
-                                password.focus();
-
-                            }
+                            loginPassword.focus();
 
                         },
-                        200
-                    );
-
-                },
-                100
-            );
-
-        }
-
-
-        /*
-        =====================================================
-        AUTO OPEN REGISTER
-        =====================================================
-        */
-
-        const registerRequested =
-            urlParams.get(
-                "register"
-            );
-
-
-        if (
-            registerRequested ===
-            "1"
-        ) {
-
-            setTimeout(
-                function () {
-
-                    openModal(
-                        "registerModal"
-                    );
-
-                },
-                100
-            );
-
-        }
-
-    }
-
-
-    /*
-    =========================================================
-    OPEN MODAL
-    =========================================================
-    */
-
-    function openModal(modalId) {
-
-        const modal =
-            document.getElementById(
-                modalId
-            );
-
-
-        if (!modal) {
-
-            console.error(
-                "AUTH MODAL NOT FOUND:",
-                modalId
-            );
-
-            return;
-
-        }
-
-
-        /*
-        Close other modals
-        */
-
-        document
-            .querySelectorAll(
-                ".modal-overlay"
-            )
-            .forEach(
-                function (item) {
-
-                    item.classList.remove(
-                        "show"
-                    );
-
-                    item.setAttribute(
-                        "aria-hidden",
-                        "true"
+                        300
                     );
 
                 }
-            );
 
+            }
 
-        /*
-        Open selected modal
-        */
-
-        modal.classList.add(
-            "show"
-        );
-
-
-        modal.setAttribute(
-            "aria-hidden",
-            "false"
-        );
-
-
-        /*
-        Lock body scrolling
-        */
-
-        document.body.classList.add(
-            "modal-open"
-        );
-
-
-        document.body.style.overflow =
-            "hidden";
-
-
-        /*
-        Focus first input
-        */
-
-        setTimeout(
-            function () {
-
-                const firstInput =
-                    modal.querySelector(
-                        "input:not([type='hidden'])"
-                    );
-
-
-                if (firstInput) {
-
-                    firstInput.focus();
-
-                }
-
-            },
-            100
-        );
-
-    }
-
-
-    /*
-    =========================================================
-    CLOSE MODAL
-    =========================================================
-    */
-
-    function closeModal(modalId) {
-
-        const modal =
-            typeof modalId === "string"
-                ? document.getElementById(
-                    modalId
-                )
-                : modalId;
-
-
-        if (!modal) {
-
-            return;
 
         }
-
-
-        modal.classList.remove(
-            "show"
-        );
-
-
-        modal.setAttribute(
-            "aria-hidden",
-            "true"
-        );
-
-
-        /*
-        Unlock body when no modal is open
-        */
-
-        if (
-            !document.querySelector(
-                ".modal-overlay.show"
-            )
-        ) {
-
-            document.body.classList.remove(
-                "modal-open"
-            );
-
-
-            document.body.style.overflow =
-                "";
-
-        }
-
-    }
-
-
-    /*
-    =========================================================
-    CLOSE ALL MODALS
-    =========================================================
-    */
-
-    function closeAllModals() {
-
-        document
-            .querySelectorAll(
-                ".modal-overlay"
-            )
-            .forEach(
-                function (modal) {
-
-                    modal.classList.remove(
-                        "show"
-                    );
-
-
-                    modal.setAttribute(
-                        "aria-hidden",
-                        "true"
-                    );
-
-                }
-            );
-
-
-        document.body.classList.remove(
-            "modal-open"
-        );
-
-
-        document.body.style.overflow =
-            "";
-
-    }
-
-
-    /*
-    =========================================================
-    GLOBAL FUNCTIONS
-    =========================================================
-    */
-
-    window.openModal =
-        openModal;
-
-
-    window.closeModal =
-        closeModal;
-
-
-    window.closeAllModals =
-        closeAllModals;
-
-
-    /*
-    =========================================================
-    START
-    =========================================================
-    */
-
-    if (
-        document.readyState ===
-        "loading"
-    ) {
-
-        document.addEventListener(
-            "DOMContentLoaded",
-            initializeModals
-        );
-
-    } else {
-
-        initializeModals();
-
-    }
+    );
 
 })();
