@@ -970,7 +970,7 @@ try {
          SIDEBAR
     ============================================================== -->
 
-    <aside class="admin-sidebar">
+    <?php require_once dirname(__DIR__) . '/includes/admin_sidebar.php'; ?>
 
         <div class="admin-logo">
 
@@ -1034,9 +1034,6 @@ try {
             </a>
 
         </div>
-
-    </aside>
-
 
     <!-- ==============================================================
          MAIN
