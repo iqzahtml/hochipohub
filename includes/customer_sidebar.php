@@ -6,94 +6,201 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $currentPage = basename($_SERVER['PHP_SELF'] ?? '');
 
+$userName = $_SESSION['user_name']
+    ?? $_SESSION['name']
+    ?? 'Customer';
+
+$userRole = $_SESSION['user_role']
+    ?? $_SESSION['role']
+    ?? 'customer';
+
+$userRole = ucfirst(strtolower($userRole));
+
+function customerSidebarActive($pages)
+{
+    global $currentPage;
+
+    if (!is_array($pages)) {
+        $pages = [$pages];
+    }
+
+    return in_array($currentPage, $pages, true)
+        ? 'active'
+        : '';
+}
+
 ?>
 
-<aside class="dashboard-sidebar">
+<nav class="customer-sidebar">
 
-    <div class="sidebar-header">
+    <div class="customer-sidebar-inner">
 
-        <div class="sidebar-brand">
-            <div class="sidebar-brand-icon">H</div>
-
-            <div>
-                <h2>HochipoHub</h2>
-                <span>Customer</span>
-            </div>
-        </div>
-
-    </div>
-
-
-    <nav class="sidebar-menu">
+        <!-- DASHBOARD -->
 
         <a
             href="dashboard.php"
-            class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>"
+            class="customer-sidebar-item <?= customerSidebarActive('dashboard.php') ?>"
         >
-            <span>🏠</span>
-            <span>Dashboard</span>
+
+            <span class="sidebar-icon">
+                <i class="bi bi-house"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Dashboard
+            </span>
+
         </a>
 
+
+        <!-- PRODUCTS -->
 
         <a
             href="catalog.php"
-            class="<?= $currentPage === 'catalog.php' ? 'active' : '' ?>"
+            class="customer-sidebar-item <?= customerSidebarActive([
+                'catalog.php',
+                'product.php',
+                'product_details.php'
+            ]) ?>"
         >
-            <span>🛍️</span>
-            <span>Browse Products</span>
+
+            <span class="sidebar-icon">
+                <i class="bi bi-bag"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Browse Products
+            </span>
+
         </a>
 
+
+        <!-- CART -->
 
         <a
             href="cart.php"
-            class="<?= $currentPage === 'cart.php' ? 'active' : '' ?>"
+            class="customer-sidebar-item <?= customerSidebarActive('cart.php') ?>"
         >
-            <span>🛒</span>
-            <span>Cart</span>
+
+            <span class="sidebar-icon">
+                <i class="bi bi-cart3"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Cart
+            </span>
+
+            <?php if (!empty($cartCount) && $cartCount > 0): ?>
+
+                <span class="sidebar-badge">
+                    <?= $cartCount > 99 ? '99+' : $cartCount ?>
+                </span>
+
+            <?php endif; ?>
+
         </a>
 
+
+        <!-- WISHLIST -->
 
         <a
             href="wishlist.php"
-            class="<?= $currentPage === 'wishlist.php' ? 'active' : '' ?>"
+            class="customer-sidebar-item <?= customerSidebarActive('wishlist.php') ?>"
         >
-            <span>❤️</span>
-            <span>Wishlist</span>
+
+            <span class="sidebar-icon">
+                <i class="bi bi-heart"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Wishlist
+            </span>
+
+            <?php if (!empty($wishlistCount) && $wishlistCount > 0): ?>
+
+                <span class="sidebar-badge">
+                    <?= $wishlistCount > 99 ? '99+' : $wishlistCount ?>
+                </span>
+
+            <?php endif; ?>
+
         </a>
 
+
+        <!-- ORDERS -->
 
         <a
             href="order.php"
-            class="<?= $currentPage === 'order.php' ? 'active' : '' ?>"
+            class="customer-sidebar-item <?= customerSidebarActive([
+                'order.php',
+                'order_details.php'
+            ]) ?>"
         >
-            <span>📦</span>
-            <span>My Orders</span>
+
+            <span class="sidebar-icon">
+                <i class="bi bi-box-seam"></i>
+            </span>
+
+            <span class="sidebar-text">
+                My Orders
+            </span>
+
         </a>
 
+
+        <!-- PROFILE -->
 
         <a
             href="profile.php"
-            class="<?= $currentPage === 'profile.php' ? 'active' : '' ?>"
+            class="customer-sidebar-item <?= customerSidebarActive('profile.php') ?>"
         >
-            <span>👤</span>
-            <span>My Profile</span>
+
+            <span class="sidebar-icon">
+                <i class="bi bi-person"></i>
+            </span>
+
+            <span class="sidebar-text">
+                My Profile
+            </span>
+
         </a>
 
 
-        <a href="index.php">
-            <span>🏠</span>
-            <span>Home</span>
+        <!-- HOME -->
+
+        <a
+            href="index.php"
+            class="customer-sidebar-item"
+        >
+
+            <span class="sidebar-icon">
+                <i class="bi bi-house-door"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Home
+            </span>
+
         </a>
 
+
+        <!-- LOGOUT -->
 
         <a
             href="auth/logout.php"
-            class="sidebar-logout"
+            class="customer-sidebar-item sidebar-logout"
         >
-            <span>🚪</span>
-            <span>Logout</span>
+
+            <span class="sidebar-icon">
+                <i class="bi bi-box-arrow-right"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Logout
+            </span>
+
         </a>
 
-    </nav>
+    </div>
 
-</aside>
+</nav>
