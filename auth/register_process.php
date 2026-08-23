@@ -4,6 +4,15 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - REGISTER PROCESS
 |--------------------------------------------------------------------------
+| File:
+| auth/register_process.php
+|
+| Purpose:
+| - Process new registration
+| - Create customer/vendor account
+| - After successful registration:
+|   automatically open LOGIN modal
+|--------------------------------------------------------------------------
 */
 
 require_once dirname(__DIR__) . '/config.php';
@@ -62,11 +71,31 @@ $terms = isset($_POST['terms']);
 */
 
 $_SESSION['register_old'] = [
-    'name' => $name,
+    'name'  => $name,
     'email' => $email,
     'phone' => $phone,
-    'role' => $role
+    'role'  => $role
 ];
+
+
+/*
+|--------------------------------------------------------------------------
+| HELPER - REDIRECT BACK TO REGISTER
+|--------------------------------------------------------------------------
+*/
+
+function registerError($message)
+{
+    $_SESSION['register_error'] = $message;
+
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?register=1'
+    );
+
+    exit;
+}
 
 
 /*
@@ -77,16 +106,9 @@ $_SESSION['register_old'] = [
 
 if ($name === '') {
 
-    $_SESSION['register_error'] =
-        'Name is required.';
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php?register=1'
+    registerError(
+        'Name is required.'
     );
-
-    exit;
 }
 
 
@@ -104,16 +126,9 @@ if (
     )
 ) {
 
-    $_SESSION['register_error'] =
-        'Please enter a valid email address.';
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php?register=1'
+    registerError(
+        'Please enter a valid email address.'
     );
-
-    exit;
 }
 
 
@@ -131,16 +146,9 @@ $cleanPhone = preg_replace(
 
 if ($cleanPhone === '') {
 
-    $_SESSION['register_error'] =
-        'Phone number is required.';
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php?register=1'
+    registerError(
+        'Phone number is required.'
     );
-
-    exit;
 }
 
 
@@ -163,16 +171,9 @@ if (
     )
 ) {
 
-    $_SESSION['register_error'] =
-        'Invalid account type.';
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php?register=1'
+    registerError(
+        'Invalid account type.'
     );
-
-    exit;
 }
 
 
@@ -184,16 +185,9 @@ if (
 
 if (strlen($password) < 6) {
 
-    $_SESSION['register_error'] =
-        'Password must contain at least 6 characters.';
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php?register=1'
+    registerError(
+        'Password must contain at least 6 characters.'
     );
-
-    exit;
 }
 
 
@@ -205,16 +199,9 @@ if (strlen($password) < 6) {
 
 if ($password !== $confirmPassword) {
 
-    $_SESSION['register_error'] =
-        'Passwords do not match.';
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php?register=1'
+    registerError(
+        'Passwords do not match.'
     );
-
-    exit;
 }
 
 
@@ -226,22 +213,15 @@ if ($password !== $confirmPassword) {
 
 if (!$terms) {
 
-    $_SESSION['register_error'] =
-        'You must agree to the terms and conditions.';
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php?register=1'
+    registerError(
+        'You must agree to the terms and conditions.'
     );
-
-    exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| DATABASE REGISTER
+| DATABASE
 |--------------------------------------------------------------------------
 */
 
@@ -269,16 +249,9 @@ try {
 
     if ($stmt->fetch()) {
 
-        $_SESSION['register_error'] =
-            'This email is already registered.';
-
-        header(
-            'Location: ' .
-            BASE_URL .
-            'index.php?register=1'
+        registerError(
+            'This email is already registered.'
         );
-
-        exit;
     }
 
 
@@ -301,16 +274,9 @@ try {
 
     if ($stmt->fetch()) {
 
-        $_SESSION['register_error'] =
-            'This phone number is already registered.';
-
-        header(
-            'Location: ' .
-            BASE_URL .
-            'index.php?register=1'
+        registerError(
+            'This phone number is already registered.'
         );
-
-        exit;
     }
 
 
@@ -339,9 +305,6 @@ try {
     |--------------------------------------------------------------------------
     | INSERT USER
     |--------------------------------------------------------------------------
-    |
-    | Ikut database users awak.
-    |--------------------------------------------------------------------------
     */
 
     $stmt = $db->prepare("
@@ -365,18 +328,22 @@ try {
         )
     ");
 
-
     $stmt->execute([
 
-        ':name' => $name,
+        ':name' =>
+            $name,
 
-        ':email' => $email,
+        ':email' =>
+            $email,
 
-        ':phone' => $cleanPhone,
+        ':phone' =>
+            $cleanPhone,
 
-        ':password' => $passwordHash,
+        ':password' =>
+            $passwordHash,
 
-        ':role' => $role
+        ':role' =>
+            $role
 
     ]);
 
@@ -401,7 +368,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | VENDOR PROFILE
+    | CREATE VENDOR PROFILE
     |--------------------------------------------------------------------------
     */
 
@@ -427,7 +394,6 @@ try {
             $name,
             'Pending'
         ]);
-
     }
 
 
@@ -442,18 +408,23 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CLEAR OLD DATA
+    | CLEAR REGISTER DATA
     |--------------------------------------------------------------------------
     */
 
     unset(
-        $_SESSION['register_old']
+        $_SESSION['register_old'],
+        $_SESSION['register_error']
     );
 
 
     /*
     |--------------------------------------------------------------------------
-    | SUCCESS
+    | IMPORTANT
+    |--------------------------------------------------------------------------
+    | Save success message and email.
+    |
+    | DO NOT LOGIN THE USER HERE.
     |--------------------------------------------------------------------------
     */
 
@@ -463,6 +434,12 @@ try {
     $_SESSION['login_email'] =
         $email;
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | REDIRECT TO LOGIN MODAL
+    |--------------------------------------------------------------------------
+    */
 
     header(
         'Location: ' .
@@ -489,13 +466,12 @@ try {
     ) {
 
         $db->rollBack();
-
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | DEBUG
+    | ERROR
     |--------------------------------------------------------------------------
     */
 
@@ -511,5 +487,4 @@ try {
     );
 
     exit;
-
 }
