@@ -6,7 +6,17 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $currentPage = basename($_SERVER['PHP_SELF'] ?? '');
 
-function sidebarActive($pages)
+$userName = $_SESSION['user_name']
+    ?? $_SESSION['name']
+    ?? 'Customer';
+
+$userRole = $_SESSION['user_role']
+    ?? $_SESSION['role']
+    ?? 'customer';
+
+$userRole = ucfirst(strtolower($userRole));
+
+function customerSidebarActive($pages)
 {
     global $currentPage;
 
@@ -21,110 +31,176 @@ function sidebarActive($pages)
 
 ?>
 
-<aside class="dashboard-sidebar">
+<nav class="customer-sidebar">
 
-    <div class="dashboard-sidebar-inner">
+    <div class="customer-sidebar-inner">
 
-        <!-- SIDEBAR BRAND -->
+        <!-- DASHBOARD -->
 
-        <div class="sidebar-brand">
+        <a
+            href="dashboard.php"
+            class="customer-sidebar-item <?= customerSidebarActive('dashboard.php') ?>"
+        >
 
-            <div class="sidebar-brand-icon">
-                H
-            </div>
+            <span class="sidebar-icon">
+                <i class="bi bi-house"></i>
+            </span>
 
-            <div class="sidebar-brand-text">
-                <strong>HochipoHub</strong>
-                <span>Customer Portal</span>
-            </div>
+            <span class="sidebar-text">
+                Dashboard
+            </span>
 
-        </div>
-
-
-        <!-- SIDEBAR MENU -->
-
-        <nav class="sidebar-menu">
-
-            <a
-                href="dashboard.php"
-                class="<?= sidebarActive('dashboard.php') ?>"
-            >
-                <span class="sidebar-icon">🏠</span>
-                <span>Dashboard</span>
-            </a>
+        </a>
 
 
-            <a
-                href="catalog.php"
-                class="<?= sidebarActive([
-                    'catalog.php',
-                    'product.php',
-                    'product_details.php'
-                ]) ?>"
-            >
-                <span class="sidebar-icon">🛍️</span>
-                <span>Browse Products</span>
-            </a>
+        <!-- PRODUCTS -->
+
+        <a
+            href="catalog.php"
+            class="customer-sidebar-item <?= customerSidebarActive([
+                'catalog.php',
+                'product.php',
+                'product_details.php'
+            ]) ?>"
+        >
+
+            <span class="sidebar-icon">
+                <i class="bi bi-bag"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Browse Products
+            </span>
+
+        </a>
 
 
-            <a
-                href="cart.php"
-                class="<?= sidebarActive('cart.php') ?>"
-            >
-                <span class="sidebar-icon">🛒</span>
-                <span>Cart</span>
-            </a>
+        <!-- CART -->
+
+        <a
+            href="cart.php"
+            class="customer-sidebar-item <?= customerSidebarActive('cart.php') ?>"
+        >
+
+            <span class="sidebar-icon">
+                <i class="bi bi-cart3"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Cart
+            </span>
+
+            <?php if (!empty($cartCount) && $cartCount > 0): ?>
+
+                <span class="sidebar-badge">
+                    <?= $cartCount > 99 ? '99+' : $cartCount ?>
+                </span>
+
+            <?php endif; ?>
+
+        </a>
 
 
-            <a
-                href="wishlist.php"
-                class="<?= sidebarActive('wishlist.php') ?>"
-            >
-                <span class="sidebar-icon">❤️</span>
-                <span>Wishlist</span>
-            </a>
+        <!-- WISHLIST -->
+
+        <a
+            href="wishlist.php"
+            class="customer-sidebar-item <?= customerSidebarActive('wishlist.php') ?>"
+        >
+
+            <span class="sidebar-icon">
+                <i class="bi bi-heart"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Wishlist
+            </span>
+
+            <?php if (!empty($wishlistCount) && $wishlistCount > 0): ?>
+
+                <span class="sidebar-badge">
+                    <?= $wishlistCount > 99 ? '99+' : $wishlistCount ?>
+                </span>
+
+            <?php endif; ?>
+
+        </a>
 
 
-            <a
-                href="order.php"
-                class="<?= sidebarActive([
-                    'order.php',
-                    'orders.php'
-                ]) ?>"
-            >
-                <span class="sidebar-icon">📦</span>
-                <span>My Orders</span>
-            </a>
+        <!-- ORDERS -->
+
+        <a
+            href="order.php"
+            class="customer-sidebar-item <?= customerSidebarActive([
+                'order.php',
+                'order_details.php'
+            ]) ?>"
+        >
+
+            <span class="sidebar-icon">
+                <i class="bi bi-box-seam"></i>
+            </span>
+
+            <span class="sidebar-text">
+                My Orders
+            </span>
+
+        </a>
 
 
-            <a
-                href="profile.php"
-                class="<?= sidebarActive('profile.php') ?>"
-            >
-                <span class="sidebar-icon">👤</span>
-                <span>My Profile</span>
-            </a>
+        <!-- PROFILE -->
+
+        <a
+            href="profile.php"
+            class="customer-sidebar-item <?= customerSidebarActive('profile.php') ?>"
+        >
+
+            <span class="sidebar-icon">
+                <i class="bi bi-person"></i>
+            </span>
+
+            <span class="sidebar-text">
+                My Profile
+            </span>
+
+        </a>
 
 
-            <a
-                href="index.php"
-                class="<?= sidebarActive('index.php') ?>"
-            >
-                <span class="sidebar-icon">🏡</span>
-                <span>Home</span>
-            </a>
+        <!-- HOME -->
+
+        <a
+            href="index.php"
+            class="customer-sidebar-item"
+        >
+
+            <span class="sidebar-icon">
+                <i class="bi bi-house-door"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Home
+            </span>
+
+        </a>
 
 
-            <a
-                href="auth/logout.php"
-                class="sidebar-logout"
-            >
-                <span class="sidebar-icon">↪</span>
-                <span>Logout</span>
-            </a>
+        <!-- LOGOUT -->
 
-        </nav>
+        <a
+            href="auth/logout.php"
+            class="customer-sidebar-item sidebar-logout"
+        >
+
+            <span class="sidebar-icon">
+                <i class="bi bi-box-arrow-right"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Logout
+            </span>
+
+        </a>
 
     </div>
 
-</aside>
+</nav>
