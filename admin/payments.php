@@ -1163,7 +1163,7 @@ foreach ($payments as $payment) {
                                                             ]
                                                         )
                                                     )
-                                                "
+                                                ?>"
                                             >
 
                                                 <?= e(
