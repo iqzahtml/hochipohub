@@ -846,8 +846,8 @@ foreach ($payments as $payment) {
          SIDEBAR
     ====================================================== -->
 
-    <aside class="admin-sidebar">
-
+        <?php require_once dirname(__DIR__) . '/includes/admin_sidebar.php'; ?>
+        
         <div class="admin-logo">
 
             <h2>
@@ -910,8 +910,6 @@ foreach ($payments as $payment) {
             </a>
 
         </div>
-
-    </aside>
 
 
     <!-- =====================================================
