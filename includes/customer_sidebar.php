@@ -1,47 +1,10 @@
 <?php
 
-/*
-|--------------------------------------------------------------------------
-| HOCHIPOHUB - CUSTOMER SIDEBAR
-|--------------------------------------------------------------------------
-| Prevent this file from being loaded more than once.
-|--------------------------------------------------------------------------
-*/
-
-if (defined('HOCHIPOHUB_CUSTOMER_SIDEBAR_LOADED')) {
-    return;
-}
-
-define('HOCHIPOHUB_CUSTOMER_SIDEBAR_LOADED', true);
-
-
-/*
-|--------------------------------------------------------------------------
-| SESSION
-|--------------------------------------------------------------------------
-*/
-
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| CURRENT PAGE
-|--------------------------------------------------------------------------
-*/
-
-$currentPage = basename(
-    $_SERVER['PHP_SELF'] ?? ''
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| USER INFO
-|--------------------------------------------------------------------------
-*/
+$currentPage = basename($_SERVER['PHP_SELF'] ?? '');
 
 $userName = $_SESSION['user_name']
     ?? $_SESSION['name']
@@ -51,49 +14,28 @@ $userRole = $_SESSION['user_role']
     ?? $_SESSION['role']
     ?? 'customer';
 
-$userRole = ucfirst(
-    strtolower($userRole)
-);
+$userRole = ucfirst(strtolower($userRole));
 
+function customerSidebarActive($pages)
+{
+    global $currentPage;
 
-/*
-|--------------------------------------------------------------------------
-| ACTIVE SIDEBAR FUNCTION
-|--------------------------------------------------------------------------
-*/
-
-if (!function_exists('customerSidebarActive')) {
-
-    function customerSidebarActive($pages)
-    {
-        global $currentPage;
-
-        if (!is_array($pages)) {
-            $pages = [$pages];
-        }
-
-        return in_array(
-            $currentPage,
-            $pages,
-            true
-        )
-            ? 'active'
-            : '';
+    if (!is_array($pages)) {
+        $pages = [$pages];
     }
 
+    return in_array($currentPage, $pages, true)
+        ? 'active'
+        : '';
 }
 
 ?>
-
 
 <nav class="customer-sidebar">
 
     <div class="customer-sidebar-inner">
 
-
-        <!-- =====================================================
-             DASHBOARD
-        ====================================================== -->
+        <!-- DASHBOARD -->
 
         <a
             href="dashboard.php"
@@ -111,9 +53,7 @@ if (!function_exists('customerSidebarActive')) {
         </a>
 
 
-        <!-- =====================================================
-             PRODUCTS
-        ====================================================== -->
+        <!-- PRODUCTS -->
 
         <a
             href="catalog.php"
@@ -135,9 +75,7 @@ if (!function_exists('customerSidebarActive')) {
         </a>
 
 
-        <!-- =====================================================
-             CART
-        ====================================================== -->
+        <!-- CART -->
 
         <a
             href="cart.php"
@@ -155,11 +93,7 @@ if (!function_exists('customerSidebarActive')) {
             <?php if (!empty($cartCount) && $cartCount > 0): ?>
 
                 <span class="sidebar-badge">
-
-                    <?= $cartCount > 99
-                        ? '99+'
-                        : (int) $cartCount ?>
-
+                    <?= $cartCount > 99 ? '99+' : $cartCount ?>
                 </span>
 
             <?php endif; ?>
@@ -167,9 +101,7 @@ if (!function_exists('customerSidebarActive')) {
         </a>
 
 
-        <!-- =====================================================
-             WISHLIST
-        ====================================================== -->
+        <!-- WISHLIST -->
 
         <a
             href="wishlist.php"
@@ -187,11 +119,7 @@ if (!function_exists('customerSidebarActive')) {
             <?php if (!empty($wishlistCount) && $wishlistCount > 0): ?>
 
                 <span class="sidebar-badge">
-
-                    <?= $wishlistCount > 99
-                        ? '99+'
-                        : (int) $wishlistCount ?>
-
+                    <?= $wishlistCount > 99 ? '99+' : $wishlistCount ?>
                 </span>
 
             <?php endif; ?>
@@ -199,9 +127,7 @@ if (!function_exists('customerSidebarActive')) {
         </a>
 
 
-        <!-- =====================================================
-             ORDERS
-        ====================================================== -->
+        <!-- ORDERS -->
 
         <a
             href="order.php"
@@ -222,9 +148,7 @@ if (!function_exists('customerSidebarActive')) {
         </a>
 
 
-        <!-- =====================================================
-             PROFILE
-        ====================================================== -->
+        <!-- PROFILE -->
 
         <a
             href="profile.php"
@@ -242,9 +166,7 @@ if (!function_exists('customerSidebarActive')) {
         </a>
 
 
-        <!-- =====================================================
-             HOME
-        ====================================================== -->
+        <!-- HOME -->
 
         <a
             href="index.php"
@@ -262,9 +184,7 @@ if (!function_exists('customerSidebarActive')) {
         </a>
 
 
-        <!-- =====================================================
-             LOGOUT
-        ====================================================== -->
+        <!-- LOGOUT -->
 
         <a
             href="auth/logout.php"
@@ -280,7 +200,6 @@ if (!function_exists('customerSidebarActive')) {
             </span>
 
         </a>
-
 
     </div>
 
