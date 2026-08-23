@@ -12,8 +12,34 @@ require_once dirname(__DIR__) . '/config.php';
 
 /*
 |--------------------------------------------------------------------------
-| DATABASE INSTANCE
+| DATABASE CONNECTION
+|--------------------------------------------------------------------------
+|
+| config.php provides getDB().
+|
+| Some admin pages use $db while older admin pages use $conn.
+| We provide BOTH variables so every admin page can use the same
+| database connection.
+|
 |--------------------------------------------------------------------------
 */
 
 $db = getDB();
+
+/*
+|--------------------------------------------------------------------------
+| BACKWARD COMPATIBILITY
+|--------------------------------------------------------------------------
+*/
+
+$conn = $db;
+
+/*
+|--------------------------------------------------------------------------
+| SAFETY CHECK
+|--------------------------------------------------------------------------
+*/
+
+if (!$conn) {
+    die('Database connection failed.');
+}

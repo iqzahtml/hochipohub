@@ -53,13 +53,9 @@ LOGIN / REGISTER POPUP
                             );
 
 
-                        console.log(
-                            "Opening modal:",
+                        openModal(
                             modalId
                         );
-
-
-                        openModal(modalId);
 
                     }
                 );
@@ -98,7 +94,9 @@ LOGIN / REGISTER POPUP
                             );
 
 
-                        closeModal(modalId);
+                        closeModal(
+                            modalId
+                        );
 
                     }
                 );
@@ -351,6 +349,103 @@ LOGIN / REGISTER POPUP
                     }
 
                 }
+            );
+
+        }
+
+
+        /*
+        =====================================================
+        ⭐ AUTO OPEN LOGIN AFTER REGISTER
+        =====================================================
+        */
+
+        const urlParams =
+            new URLSearchParams(
+                window.location.search
+            );
+
+
+        const loginRequested =
+            urlParams.get(
+                "login"
+            );
+
+
+        if (
+            loginRequested ===
+            "1"
+        ) {
+
+            console.log(
+                "Automatic login modal requested"
+            );
+
+
+            setTimeout(
+                function () {
+
+                    openModal(
+                        "loginModal"
+                    );
+
+
+                    /*
+                    Automatically focus password
+                    */
+
+                    setTimeout(
+                        function () {
+
+                            const password =
+                                document.getElementById(
+                                    "loginPassword"
+                                );
+
+
+                            if (password) {
+
+                                password.focus();
+
+                            }
+
+                        },
+                        200
+                    );
+
+                },
+                100
+            );
+
+        }
+
+
+        /*
+        =====================================================
+        AUTO OPEN REGISTER
+        =====================================================
+        */
+
+        const registerRequested =
+            urlParams.get(
+                "register"
+            );
+
+
+        if (
+            registerRequested ===
+            "1"
+        ) {
+
+            setTimeout(
+                function () {
+
+                    openModal(
+                        "registerModal"
+                    );
+
+                },
+                100
             );
 
         }
