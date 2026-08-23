@@ -712,4 +712,4 @@ SELECT
     status,
     mfa_enabled
 FROM users
-WHERE email = 'admin@hochipohub.com';
+WHERE email = 'admin@hochipohub.com';hochipohubhochipohubusers
