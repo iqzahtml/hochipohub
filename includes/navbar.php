@@ -150,36 +150,37 @@ if (!empty($userName)) {
 
     <div class="navbar-container">
 
+
         <!-- =====================================================
              BRAND
-             ===================================================== -->
+        ====================================================== -->
 
         <a
-    href="<?= htmlspecialchars(
-        navUrl('index.php'),
-        ENT_QUOTES,
-        'UTF-8'
-    ) ?>"
-    class="brand"
-    aria-label="HochipoHub Home"
->
+            href="<?= htmlspecialchars(
+                navUrl('index.php'),
+                ENT_QUOTES,
+                'UTF-8'
+            ) ?>"
+            class="brand"
+            aria-label="HochipoHub Home"
+        >
 
-    <img
-        src="<?= htmlspecialchars(
-            navUrl('image/logo.jpeg'),
-            ENT_QUOTES,
-            'UTF-8'
-        ) ?>"
-        alt="HochipoHub"
-        class="header-logo"
-    >
+            <img
+                src="<?= htmlspecialchars(
+                    navUrl('image/logo.jpeg'),
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>"
+                alt="HochipoHub"
+                class="header-logo"
+            >
 
-</a>
+        </a>
 
 
         <!-- =====================================================
              MAIN NAVIGATION
-             ===================================================== -->
+        ====================================================== -->
 
         <nav
             class="main-nav"
@@ -242,7 +243,7 @@ if (!empty($userName)) {
 
         <!-- =====================================================
              SEARCH
-             ===================================================== -->
+        ====================================================== -->
 
         <form
             class="navbar-search"
@@ -281,15 +282,22 @@ if (!empty($userName)) {
 
         <!-- =====================================================
              RIGHT ACTIONS
-             ===================================================== -->
+        ====================================================== -->
 
         <div class="navbar-actions">
 
+
             <?php if ($isLoggedIn): ?>
 
-                <!-- CUSTOMER -->
+
+                <!-- =================================================
+                     CUSTOMER
+                ================================================== -->
 
                 <?php if ($userRole === 'customer'): ?>
+
+
+                    <!-- CART -->
 
                     <a
                         href="<?= htmlspecialchars(
@@ -304,6 +312,7 @@ if (!empty($userName)) {
                         <span class="nav-icon">
                             🛒
                         </span>
+
 
                         <?php if ($cartCount > 0): ?>
 
@@ -320,6 +329,8 @@ if (!empty($userName)) {
                     </a>
 
 
+                    <!-- WISHLIST -->
+
                     <a
                         href="<?= htmlspecialchars(
                             navUrl('wishlist.php'),
@@ -333,6 +344,7 @@ if (!empty($userName)) {
                         <span class="nav-icon wishlist-icon">
                             ♡
                         </span>
+
 
                         <?php if ($wishlistCount > 0): ?>
 
@@ -348,57 +360,39 @@ if (!empty($userName)) {
 
                     </a>
 
+
+                    <!--
+                    --------------------------------------------------
+                    CUSTOMER USER MENU DI BUANG
+                    --------------------------------------------------
+                    Profile / My Orders / Logout sekarang berada
+                    dalam customer_sidebar.php
+                    -->
+
+
                 <?php endif; ?>
 
 
-                <!-- USER MENU -->
+                <!-- =================================================
+                     VENDOR / ADMIN USER MENU
+                ================================================== -->
 
-                <div class="user-menu">
-
-                    <button
-                        type="button"
-                        class="user-menu-button"
-                        id="userMenuButton"
-                        aria-expanded="false"
-                    >
-
-                        <span class="user-avatar">
-
-                            <?= htmlspecialchars(
-                                $userInitial,
-                                ENT_QUOTES,
-                                'UTF-8'
-                            ) ?>
-
-                        </span>
+                <?php if (
+                    $userRole === 'vendor' ||
+                    $userRole === 'admin'
+                ): ?>
 
 
-                        <span class="user-menu-name">
+                    <div class="user-menu">
 
-                            <?= htmlspecialchars(
-                                $userName ?: 'Account',
-                                ENT_QUOTES,
-                                'UTF-8'
-                            ) ?>
+                        <button
+                            type="button"
+                            class="user-menu-button"
+                            id="userMenuButton"
+                            aria-expanded="false"
+                        >
 
-                        </span>
-
-
-                        <span class="user-chevron">
-                            ▼
-                        </span>
-
-                    </button>
-
-
-                    <div
-                        class="user-dropdown"
-                        id="userDropdown"
-                    >
-
-                        <div class="dropdown-user-info">
-
-                            <span class="dropdown-avatar">
+                            <span class="user-avatar">
 
                                 <?= htmlspecialchars(
                                     $userInitial,
@@ -409,185 +403,230 @@ if (!empty($userName)) {
                             </span>
 
 
-                            <div>
+                            <span class="user-menu-name">
 
-                                <strong>
+                                <?= htmlspecialchars(
+                                    $userName ?: 'Account',
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>
+
+                            </span>
+
+
+                            <span class="user-chevron">
+                                ▼
+                            </span>
+
+                        </button>
+
+
+                        <div
+                            class="user-dropdown"
+                            id="userDropdown"
+                        >
+
+
+                            <!-- USER INFO -->
+
+                            <div class="dropdown-user-info">
+
+                                <span class="dropdown-avatar">
 
                                     <?= htmlspecialchars(
-                                        $userName ?: 'User',
+                                        $userInitial,
                                         ENT_QUOTES,
                                         'UTF-8'
                                     ) ?>
 
-                                </strong>
+                                </span>
 
 
-                                <small>
+                                <div>
 
-                                    <?= htmlspecialchars(
-                                        ucfirst($userRole),
-                                        ENT_QUOTES,
-                                        'UTF-8'
-                                    ) ?>
+                                    <strong>
 
-                                </small>
+                                        <?= htmlspecialchars(
+                                            $userName ?: 'User',
+                                            ENT_QUOTES,
+                                            'UTF-8'
+                                        ) ?>
+
+                                    </strong>
+
+
+                                    <small>
+
+                                        <?= htmlspecialchars(
+                                            ucfirst($userRole),
+                                            ENT_QUOTES,
+                                            'UTF-8'
+                                        ) ?>
+
+                                    </small>
+
+                                </div>
 
                             </div>
 
+
+                            <div class="dropdown-divider"></div>
+
+
+                            <!-- PROFILE -->
+
+                            <a
+                                href="<?= htmlspecialchars(
+                                    navUrl('profile.php'),
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>"
+                                class="dropdown-link"
+                            >
+                                👤 Profile
+                            </a>
+
+
+                            <!-- =================================================
+                                 VENDOR
+                            ================================================== -->
+
+                            <?php if ($userRole === 'vendor'): ?>
+
+
+                                <a
+                                    href="<?= htmlspecialchars(
+                                        navUrl(
+                                            'seller/dashboard.php'
+                                        ),
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?>"
+                                    class="dropdown-link"
+                                >
+                                    🏪 Vendor Dashboard
+                                </a>
+
+
+                                <a
+                                    href="<?= htmlspecialchars(
+                                        navUrl(
+                                            'seller/products.php'
+                                        ),
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?>"
+                                    class="dropdown-link"
+                                >
+                                    🛍️ My Products
+                                </a>
+
+
+                                <a
+                                    href="<?= htmlspecialchars(
+                                        navUrl(
+                                            'seller/orders.php'
+                                        ),
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?>"
+                                    class="dropdown-link"
+                                >
+                                    📦 Orders
+                                </a>
+
+
+                            <?php endif; ?>
+
+
+                            <!-- =================================================
+                                 ADMIN
+                            ================================================== -->
+
+                            <?php if ($userRole === 'admin'): ?>
+
+
+                                <a
+                                    href="<?= htmlspecialchars(
+                                        navUrl(
+                                            'admin/dashboard.php'
+                                        ),
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?>"
+                                    class="dropdown-link"
+                                >
+                                    ⚙️ Admin Dashboard
+                                </a>
+
+
+                                <a
+                                    href="<?= htmlspecialchars(
+                                        navUrl(
+                                            'admin/products.php'
+                                        ),
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?>"
+                                    class="dropdown-link"
+                                >
+                                    🛍️ Manage Products
+                                </a>
+
+
+                                <a
+                                    href="<?= htmlspecialchars(
+                                        navUrl(
+                                            'admin/users.php'
+                                        ),
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?>"
+                                    class="dropdown-link"
+                                >
+                                    👥 Manage Users
+                                </a>
+
+
+                            <?php endif; ?>
+
+
+                            <div class="dropdown-divider"></div>
+
+
+                            <!-- LOGOUT -->
+
+                            <a
+                                href="<?= htmlspecialchars(
+                                    navUrl(
+                                        'auth/logout.php'
+                                    ),
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>"
+                                class="dropdown-link dropdown-danger"
+                            >
+                                ↪ Logout
+                            </a>
+
+
                         </div>
-
-
-                        <div class="dropdown-divider"></div>
-
-
-                        <a
-                            href="<?= htmlspecialchars(
-                                navUrl('profile.php'),
-                                ENT_QUOTES,
-                                'UTF-8'
-                            ) ?>"
-                            class="dropdown-link"
-                        >
-                            👤 Profile
-                        </a>
-
-
-                        <?php if ($userRole === 'customer'): ?>
-
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl('order.php'),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                📦 My Orders
-                            </a>
-
-                        <?php endif; ?>
-
-
-                        <?php if ($userRole === 'vendor'): ?>
-
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'seller/dashboard.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                🏪 Vendor Dashboard
-                            </a>
-
-
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'seller/products.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                🛍️ My Products
-                            </a>
-
-
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'seller/orders.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                📦 Orders
-                            </a>
-
-                        <?php endif; ?>
-
-
-                        <?php if ($userRole === 'admin'): ?>
-
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'admin/dashboard.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                ⚙️ Admin Dashboard
-                            </a>
-
-
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'admin/products.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                🛍️ Manage Products
-                            </a>
-
-
-                            <a
-                                href="<?= htmlspecialchars(
-                                    navUrl(
-                                        'admin/users.php'
-                                    ),
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                class="dropdown-link"
-                            >
-                                👥 Manage Users
-                            </a>
-
-                        <?php endif; ?>
-
-
-                        <div class="dropdown-divider"></div>
-
-
-                        <a
-                            href="<?= htmlspecialchars(
-                                navUrl(
-                                    'auth/logout.php'
-                                ),
-                                ENT_QUOTES,
-                                'UTF-8'
-                            ) ?>"
-                            class="dropdown-link dropdown-danger"
-                        >
-                            ↪ Logout
-                        </a>
 
                     </div>
 
-                </div>
+
+                <?php endif; ?>
 
 
             <?php else: ?>
 
+
                 <!-- =================================================
                      GUEST AUTH
-                     ================================================= -->
+                ================================================== -->
 
                 <div class="auth-buttons">
+
 
                     <button
                         type="button"
@@ -606,12 +645,16 @@ if (!empty($userName)) {
                         Register
                     </button>
 
+
                 </div>
+
 
             <?php endif; ?>
 
 
-            <!-- MOBILE -->
+            <!-- =================================================
+                 MOBILE
+            ================================================== -->
 
             <button
                 type="button"
@@ -627,6 +670,7 @@ if (!empty($userName)) {
 
             </button>
 
+
         </div>
 
     </div>
@@ -634,7 +678,7 @@ if (!empty($userName)) {
 
     <!-- =========================================================
          MOBILE MENU
-         ========================================================= -->
+    ========================================================= -->
 
     <div
         class="mobile-menu"
@@ -642,6 +686,9 @@ if (!empty($userName)) {
     >
 
         <div class="mobile-menu-inner">
+
+
+            <!-- SEARCH -->
 
             <form
                 class="mobile-search"
@@ -659,6 +706,7 @@ if (!empty($userName)) {
                     placeholder="Search products..."
                 >
 
+
                 <button type="submit">
                     🔍
                 </button>
@@ -666,27 +714,60 @@ if (!empty($userName)) {
             </form>
 
 
-            <a href="<?= htmlspecialchars(navUrl('index.php'), ENT_QUOTES, 'UTF-8') ?>">
+            <!-- HOME -->
+
+            <a
+                href="<?= htmlspecialchars(
+                    navUrl('index.php'),
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>"
+            >
                 🏠 Home
             </a>
 
 
-            <a href="<?= htmlspecialchars(navUrl('catalog.php'), ENT_QUOTES, 'UTF-8') ?>">
+            <!-- CATALOG -->
+
+            <a
+                href="<?= htmlspecialchars(
+                    navUrl('catalog.php'),
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>"
+            >
                 🛍️ Catalog
             </a>
 
 
-            <a href="<?= htmlspecialchars(navUrl('category.php'), ENT_QUOTES, 'UTF-8') ?>">
+            <!-- CATEGORIES -->
+
+            <a
+                href="<?= htmlspecialchars(
+                    navUrl('category.php'),
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>"
+            >
                 📂 Categories
             </a>
 
 
-            <a href="<?= htmlspecialchars(navUrl('vendor.php'), ENT_QUOTES, 'UTF-8') ?>">
+            <!-- VENDORS -->
+
+            <a
+                href="<?= htmlspecialchars(
+                    navUrl('vendor.php'),
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>"
+            >
                 🏪 Vendors
             </a>
 
 
             <?php if (!$isLoggedIn): ?>
+
 
                 <button
                     type="button"
@@ -705,7 +786,9 @@ if (!empty($userName)) {
                     Register
                 </button>
 
+
             <?php endif; ?>
+
 
         </div>
 
@@ -716,7 +799,7 @@ if (!empty($userName)) {
 
 <!-- =========================================================
      AUTH MODALS
-     ========================================================= -->
+========================================================= -->
 
 <?php
 
@@ -738,7 +821,7 @@ endif;
 
 <!-- =========================================================
      NAVBAR JAVASCRIPT
-     ========================================================= -->
+========================================================= -->
 
 <script>
 
@@ -746,14 +829,16 @@ document.addEventListener(
     'DOMContentLoaded',
     function () {
 
+
         /* =====================================================
            USER DROPDOWN
-           ===================================================== */
+        ===================================================== */
 
         const userButton =
             document.getElementById(
                 'userMenuButton'
             );
+
 
         const userDropdown =
             document.getElementById(
@@ -766,20 +851,24 @@ document.addEventListener(
             userDropdown
         ) {
 
+
             userButton.addEventListener(
                 'click',
                 function (event) {
 
                     event.stopPropagation();
 
+
                     const isOpen =
                         userDropdown.classList.contains(
                             'show'
                         );
 
+
                     userDropdown.classList.toggle(
                         'show'
                     );
+
 
                     userButton.setAttribute(
                         'aria-expanded',
@@ -807,6 +896,7 @@ document.addEventListener(
                             'show'
                         );
 
+
                         userButton.setAttribute(
                             'aria-expanded',
                             'false'
@@ -822,12 +912,13 @@ document.addEventListener(
 
         /* =====================================================
            MOBILE MENU
-           ===================================================== */
+        ===================================================== */
 
         const mobileToggle =
             document.getElementById(
                 'mobileMenuToggle'
             );
+
 
         const mobileMenu =
             document.getElementById(
@@ -840,6 +931,7 @@ document.addEventListener(
             mobileMenu
         ) {
 
+
             mobileToggle.addEventListener(
                 'click',
                 function () {
@@ -849,13 +941,16 @@ document.addEventListener(
                             'show'
                         );
 
+
                     mobileMenu.classList.toggle(
                         'show'
                     );
 
+
                     mobileToggle.classList.toggle(
                         'active'
                     );
+
 
                     mobileToggle.setAttribute(
                         'aria-expanded',
@@ -876,7 +971,7 @@ document.addEventListener(
 
 <!-- =========================================================
      AUTH MODAL JAVASCRIPT
-     ========================================================= -->
+========================================================= -->
 
 <script
     src="<?= htmlspecialchars(
