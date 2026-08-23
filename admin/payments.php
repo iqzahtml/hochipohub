@@ -4,6 +4,12 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - ADMIN PAYMENTS
 |--------------------------------------------------------------------------
+| File: admin/payments.php
+|--------------------------------------------------------------------------
+| IMPORTANT:
+| database/db.php returns PDO connection as $db.
+| This file uses PDO syntax throughout.
+|--------------------------------------------------------------------------
 */
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -17,12 +23,9 @@ require_once dirname(__DIR__) . '/database/db.php';
 |--------------------------------------------------------------------------
 | DATABASE CONNECTION
 |--------------------------------------------------------------------------
-| database/db.php creates $db.
-| This page uses $conn for compatibility.
-|--------------------------------------------------------------------------
 */
 
-$conn = $db;
+$pdo = $db;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,7 +40,7 @@ if (!isset($_SESSION['user_id'])) {
 
 if (
     !isset($_SESSION['role']) ||
-    strtolower($_SESSION['role']) !== 'admin'
+    strtolower(trim($_SESSION['role'])) !== 'admin'
 ) {
     header("Location: ../index.php");
     exit;
@@ -86,7 +89,7 @@ if (!function_exists('payment_status_class')) {
                 str_replace(
                     ' ',
                     '-',
-                    $status
+                    trim((string) $status)
                 )
             );
     }
@@ -128,137 +131,115 @@ if (
 
     } else {
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPDATE PAYMENT
-        |--------------------------------------------------------------------------
-        */
+        try {
 
-        if ($new_status === 'Paid') {
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE PAYMENT
+            |--------------------------------------------------------------------------
+            */
 
-            $stmt = $conn->prepare("
-                UPDATE payments
-                SET
-                    payment_status = ?,
-                    payment_date = COALESCE(
-                        payment_date,
-                        NOW()
-                    )
-                WHERE payment_id = ?
-            ");
+            if ($new_status === 'Paid') {
 
-        } else {
-
-            $stmt = $conn->prepare("
-                UPDATE payments
-                SET payment_status = ?
-                WHERE payment_id = ?
-            ");
-        }
-
-        if ($stmt) {
-
-            $stmt->bind_param(
-                'si',
-                $new_status,
-                $payment_id
-            );
-
-            if ($stmt->execute()) {
-
-                /*
-                |--------------------------------------------------------------------------
-                | GET ORDER ID
-                |--------------------------------------------------------------------------
-                */
-
-                $order_id = 0;
-
-                $get_order = $conn->prepare("
-                    SELECT order_id
-                    FROM payments
-                    WHERE payment_id = ?
-                    LIMIT 1
+                $stmt = $pdo->prepare("
+                    UPDATE payments
+                    SET
+                        payment_status = :payment_status,
+                        payment_date = COALESCE(
+                            payment_date,
+                            NOW()
+                        )
+                    WHERE payment_id = :payment_id
                 ");
-
-                if ($get_order) {
-
-                    $get_order->bind_param(
-                        'i',
-                        $payment_id
-                    );
-
-                    $get_order->execute();
-
-                    $result = $get_order->get_result();
-
-                    $row = $result->fetch_assoc();
-
-                    if ($row) {
-                        $order_id = (int) $row['order_id'];
-                    }
-
-                    $get_order->close();
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | ADMIN LOG
-                |--------------------------------------------------------------------------
-                */
-
-                $action =
-                    'Updated payment #' .
-                    $payment_id .
-                    ' status to ' .
-                    $new_status;
-
-                $target_type = 'payment';
-
-                $log = $conn->prepare("
-                    INSERT INTO admin_logs
-                    (
-                        admin_id,
-                        action,
-                        target_type,
-                        target_id
-                    )
-                    VALUES (?, ?, ?, ?)
-                ");
-
-                if ($log) {
-
-                    $log->bind_param(
-                        'issi',
-                        $admin_id,
-                        $action,
-                        $target_type,
-                        $payment_id
-                    );
-
-                    $log->execute();
-
-                    $log->close();
-                }
-
-                $message =
-                    'Payment #' .
-                    $payment_id .
-                    ' status updated successfully.';
 
             } else {
 
-                $error =
-                    'Failed to update payment status.';
+                $stmt = $pdo->prepare("
+                    UPDATE payments
+                    SET
+                        payment_status = :payment_status
+                    WHERE payment_id = :payment_id
+                ");
             }
 
-            $stmt->close();
+            $stmt->execute([
+                ':payment_status' => $new_status,
+                ':payment_id' => $payment_id
+            ]);
 
-        } else {
+            /*
+            |--------------------------------------------------------------------------
+            | GET ORDER ID
+            |--------------------------------------------------------------------------
+            */
+
+            $order_id = 0;
+
+            $get_order = $pdo->prepare("
+                SELECT order_id
+                FROM payments
+                WHERE payment_id = :payment_id
+                LIMIT 1
+            ");
+
+            $get_order->execute([
+                ':payment_id' => $payment_id
+            ]);
+
+            $row = $get_order->fetch(PDO::FETCH_ASSOC);
+
+            if ($row) {
+                $order_id = (int) $row['order_id'];
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | ADMIN LOG
+            |--------------------------------------------------------------------------
+            */
+
+            $action =
+                'Updated payment #' .
+                $payment_id .
+                ' status to ' .
+                $new_status;
+
+            $target_type = 'payment';
+
+            $log = $pdo->prepare("
+                INSERT INTO admin_logs
+                (
+                    admin_id,
+                    action,
+                    target_type,
+                    target_id
+                )
+                VALUES
+                (
+                    :admin_id,
+                    :action,
+                    :target_type,
+                    :target_id
+                )
+            ");
+
+            $log->execute([
+                ':admin_id' => $admin_id,
+                ':action' => $action,
+                ':target_type' => $target_type,
+                ':target_id' => $payment_id
+            ]);
+
+            $message =
+                'Payment #' .
+                $payment_id .
+                ' status updated successfully.';
+
+        } catch (PDOException $e) {
 
             $error =
                 'Database error: ' .
-                $conn->error;
+                $e->getMessage();
         }
     }
 }
@@ -271,42 +252,50 @@ if (
 
 $payments = [];
 
-$sql = "
-    SELECT
-        p.payment_id,
-        p.order_id,
-        p.payment_method,
-        p.payment_status,
-        p.payment_date,
-        p.amount,
-        p.transaction_reference,
+try {
 
-        o.order_date,
-        o.order_status,
+    $sql = "
+        SELECT
+            p.payment_id,
+            p.order_id,
+            p.payment_method,
+            p.payment_status,
+            p.payment_date,
+            p.amount,
+            p.transaction_reference,
 
-        u.user_id AS customer_id,
-        u.name AS customer_name,
-        u.email AS customer_email
+            o.order_date,
+            o.order_status,
 
-    FROM payments p
+            u.user_id AS customer_id,
+            u.name AS customer_name,
+            u.email AS customer_email
 
-    INNER JOIN orders o
-        ON p.order_id = o.order_id
+        FROM payments p
 
-    INNER JOIN users u
-        ON o.customer_id = u.user_id
+        INNER JOIN orders o
+            ON p.order_id = o.order_id
 
-    ORDER BY p.payment_id DESC
-";
+        INNER JOIN users u
+            ON o.customer_id = u.user_id
 
-$result = $conn->query($sql);
+        ORDER BY p.payment_id DESC
+    ";
 
-if ($result) {
+    $stmt = $pdo->query($sql);
 
-    while ($row = $result->fetch_assoc()) {
+    if ($stmt) {
 
-        $payments[] = $row;
+        $payments = $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        );
     }
+
+} catch (PDOException $e) {
+
+    $error =
+        'Unable to load payments: ' .
+        $e->getMessage();
 }
 
 /*
@@ -328,9 +317,11 @@ $total_refunded_amount = 0;
 
 foreach ($payments as $payment) {
 
-    $status = $payment['payment_status'];
+    $status = $payment['payment_status'] ?? '';
 
-    $amount = (float) $payment['amount'];
+    $amount = (float) (
+        $payment['amount'] ?? 0
+    );
 
     switch ($status) {
 
@@ -397,36 +388,49 @@ foreach ($payments as $payment) {
 
     <style>
 
+        /*
+        |--------------------------------------------------------------------------
+        | PAYMENT PAGE
+        |--------------------------------------------------------------------------
+        */
+
         .payment-page {
             min-height: 100vh;
-            padding: 35px;
+            padding: 32px;
             background:
                 radial-gradient(
                     circle at top right,
-                    rgba(37, 99, 235, .10),
+                    rgba(37, 99, 235, 0.10),
                     transparent 30%
                 ),
                 #f8fafc;
         }
 
         .payment-container {
+            width: 100%;
             max-width: 1500px;
             margin: 0 auto;
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | HEADER
+        |--------------------------------------------------------------------------
+        */
 
         .payment-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 28px;
             gap: 20px;
+            margin-bottom: 28px;
         }
 
         .payment-header h1 {
             margin: 0;
+            color: #0f172a;
             font-size: 32px;
             font-weight: 900;
-            color: #0f172a;
         }
 
         .payment-header p {
@@ -438,13 +442,21 @@ foreach ($payments as $payment) {
         .admin-badge {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             padding: 10px 16px;
             border-radius: 999px;
             background: #eff6ff;
             color: #2563eb;
             font-size: 12px;
             font-weight: 800;
+            border: 1px solid #dbeafe;
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ALERT
+        |--------------------------------------------------------------------------
+        */
 
         .payment-alert {
             padding: 14px 18px;
@@ -466,6 +478,12 @@ foreach ($payments as $payment) {
             border: 1px solid #fecaca;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | STATISTICS
+        |--------------------------------------------------------------------------
+        */
+
         .payment-stats {
             display: grid;
             grid-template-columns:
@@ -481,7 +499,17 @@ foreach ($payments as $payment) {
             padding: 22px;
             box-shadow:
                 0 8px 25px
-                rgba(15, 23, 42, .05);
+                rgba(15, 23, 42, 0.05);
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+        .payment-stat:hover {
+            transform: translateY(-3px);
+            box-shadow:
+                0 14px 35px
+                rgba(15, 23, 42, 0.09);
         }
 
         .payment-stat-label {
@@ -490,7 +518,7 @@ foreach ($payments as $payment) {
             font-size: 12px;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: .5px;
+            letter-spacing: 0.5px;
             margin-bottom: 10px;
         }
 
@@ -509,6 +537,12 @@ foreach ($payments as $payment) {
             font-weight: 700;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | CARD
+        |--------------------------------------------------------------------------
+        */
+
         .payment-card {
             background: #ffffff;
             border: 1px solid #e2e8f0;
@@ -516,7 +550,7 @@ foreach ($payments as $payment) {
             overflow: hidden;
             box-shadow:
                 0 10px 30px
-                rgba(15, 23, 42, .06);
+                rgba(15, 23, 42, 0.06);
         }
 
         .payment-card-header {
@@ -540,7 +574,14 @@ foreach ($payments as $payment) {
             font-size: 12px;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | TABLE
+        |--------------------------------------------------------------------------
+        */
+
         .payment-table-wrapper {
+            width: 100%;
             overflow-x: auto;
         }
 
@@ -558,7 +599,8 @@ foreach ($payments as $payment) {
             font-weight: 900;
             text-align: left;
             text-transform: uppercase;
-            letter-spacing: .5px;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
         }
 
         .payment-table td {
@@ -569,9 +611,23 @@ foreach ($payments as $payment) {
             vertical-align: middle;
         }
 
-        .payment-table tr:hover td {
+        .payment-table tbody tr {
+            transition: background 0.15s ease;
+        }
+
+        .payment-table tbody tr:hover {
             background: #f8fafc;
         }
+
+        .payment-table tbody tr:hover td {
+            background: transparent;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PAYMENT DATA
+        |--------------------------------------------------------------------------
+        */
 
         .payment-id {
             color: #2563eb;
@@ -604,9 +660,15 @@ foreach ($payments as $payment) {
         .payment-amount {
             color: #059669;
             font-weight: 900;
+            white-space: nowrap;
         }
 
         .payment-reference {
+            display: inline-block;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
             padding: 5px 8px;
             border-radius: 7px;
             background: #f1f5f9;
@@ -614,13 +676,21 @@ foreach ($payments as $payment) {
             font-size: 11px;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | STATUS
+        |--------------------------------------------------------------------------
+        */
+
         .payment-status {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             padding: 6px 10px;
             border-radius: 999px;
             font-size: 11px;
             font-weight: 900;
+            white-space: nowrap;
         }
 
         .payment-status-pending {
@@ -643,6 +713,16 @@ foreach ($payments as $payment) {
             color: #6d28d9;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE FORM
+        |--------------------------------------------------------------------------
+        */
+
+        .payment-form {
+            margin: 0;
+        }
+
         .payment-form select {
             min-width: 120px;
             padding: 8px 10px;
@@ -655,13 +735,23 @@ foreach ($payments as $payment) {
             cursor: pointer;
         }
 
+        .payment-form select:hover {
+            border-color: #94a3b8;
+        }
+
         .payment-form select:focus {
             outline: none;
             border-color: #2563eb;
             box-shadow:
                 0 0 0 3px
-                rgba(37, 99, 235, .10);
+                rgba(37, 99, 235, 0.10);
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | EMPTY
+        |--------------------------------------------------------------------------
+        */
 
         .payment-empty {
             padding: 70px 20px;
@@ -694,16 +784,21 @@ foreach ($payments as $payment) {
             font-size: 13px;
         }
 
-        @media (max-width: 1100px) {
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSIVE
+        |--------------------------------------------------------------------------
+        */
+
+        @media (max-width: 1200px) {
 
             .payment-stats {
                 grid-template-columns:
                     repeat(3, minmax(0, 1fr));
             }
-
         }
 
-        @media (max-width: 700px) {
+        @media (max-width: 800px) {
 
             .payment-page {
                 padding: 20px;
@@ -718,15 +813,25 @@ foreach ($payments as $payment) {
                 grid-template-columns:
                     repeat(2, minmax(0, 1fr));
             }
-
         }
 
-        @media (max-width: 450px) {
+        @media (max-width: 500px) {
+
+            .payment-page {
+                padding: 15px;
+            }
 
             .payment-stats {
                 grid-template-columns: 1fr;
             }
 
+            .payment-header h1 {
+                font-size: 26px;
+            }
+
+            .payment-card-header {
+                padding: 18px;
+            }
         }
 
     </style>
@@ -737,7 +842,9 @@ foreach ($payments as $payment) {
 
 <div class="admin-layout">
 
-    <!-- SIDEBAR -->
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
 
     <aside class="admin-sidebar">
 
@@ -807,13 +914,17 @@ foreach ($payments as $payment) {
     </aside>
 
 
-    <!-- MAIN -->
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
 
     <main class="admin-main">
 
         <div class="payment-page">
 
             <div class="payment-container">
+
+                <!-- HEADER -->
 
                 <header class="payment-header">
 
@@ -836,6 +947,8 @@ foreach ($payments as $payment) {
                 </header>
 
 
+                <!-- ALERT -->
+
                 <?php if ($message): ?>
 
                     <div class="payment-alert success">
@@ -854,7 +967,9 @@ foreach ($payments as $payment) {
                 <?php endif; ?>
 
 
-                <!-- STATISTICS -->
+                <!-- =================================================
+                     STATISTICS
+                ================================================== -->
 
                 <section class="payment-stats">
 
@@ -937,7 +1052,9 @@ foreach ($payments as $payment) {
                 </section>
 
 
-                <!-- TABLE -->
+                <!-- =================================================
+                     PAYMENT TABLE
+                ================================================== -->
 
                 <section class="payment-card">
 
@@ -1032,6 +1149,8 @@ foreach ($payments as $payment) {
 
                                     <tr>
 
+                                        <!-- PAYMENT ID -->
+
                                         <td>
 
                                             <span class="payment-id">
@@ -1044,6 +1163,8 @@ foreach ($payments as $payment) {
 
                                         </td>
 
+
+                                        <!-- ORDER -->
 
                                         <td>
 
@@ -1063,23 +1184,21 @@ foreach ($payments as $payment) {
                                         </td>
 
 
+                                        <!-- CUSTOMER -->
+
                                         <td>
 
                                             <div class="payment-customer">
 
                                                 <strong>
                                                     <?= e(
-                                                        $payment[
-                                                            'customer_name'
-                                                        ]
+                                                        $payment['customer_name']
                                                     ) ?>
                                                 </strong>
 
                                                 <small>
                                                     <?= e(
-                                                        $payment[
-                                                            'customer_email'
-                                                        ]
+                                                        $payment['customer_email']
                                                     ) ?>
                                                 </small>
 
@@ -1088,16 +1207,19 @@ foreach ($payments as $payment) {
                                         </td>
 
 
+                                        <!-- METHOD -->
+
                                         <td>
 
                                             <?= e(
-                                                $payment[
-                                                    'payment_method'
-                                                ] ?: '-'
+                                                $payment['payment_method']
+                                                    ?: '-'
                                             ) ?>
 
                                         </td>
 
+
+                                        <!-- AMOUNT -->
 
                                         <td>
 
@@ -1111,6 +1233,8 @@ foreach ($payments as $payment) {
 
                                         </td>
 
+
+                                        <!-- REFERENCE -->
 
                                         <td>
 
@@ -1141,6 +1265,8 @@ foreach ($payments as $payment) {
                                         </td>
 
 
+                                        <!-- DATE -->
+
                                         <td>
 
                                             <?= e(
@@ -1151,19 +1277,18 @@ foreach ($payments as $payment) {
                                         </td>
 
 
+                                        <!-- STATUS -->
+
                                         <td>
 
                                             <span
-                                                class="
-                                                    payment-status
-                                                    <?= e(
-                                                        payment_status_class(
-                                                            $payment[
-                                                                'payment_status'
-                                                            ]
-                                                        )
+                                                class="payment-status <?= e(
+                                                    payment_status_class(
+                                                        $payment[
+                                                            'payment_status'
+                                                        ]
                                                     )
-                                                ?>"
+                                                ) ?>"
                                             >
 
                                                 <?= e(
@@ -1176,6 +1301,8 @@ foreach ($payments as $payment) {
 
                                         </td>
 
+
+                                        <!-- UPDATE -->
 
                                         <td>
 
@@ -1200,12 +1327,14 @@ foreach ($payments as $payment) {
                                                 >
 
                                                     <?php
+
                                                     $statuses = [
                                                         'Pending',
                                                         'Paid',
                                                         'Failed',
                                                         'Refunded'
                                                     ];
+
                                                     ?>
 
                                                     <?php foreach (
@@ -1217,11 +1346,14 @@ foreach ($payments as $payment) {
                                                             value="<?= e(
                                                                 $status
                                                             ) ?>"
-                                                            <?= $payment[
-                                                                'payment_status'
-                                                            ] === $status
+                                                            <?= (
+                                                                $payment[
+                                                                    'payment_status'
+                                                                ] === $status
+                                                            )
                                                                 ? 'selected'
-                                                                : '' ?>
+                                                                : ''
+                                                            ?>
                                                         >
 
                                                             <?= e(
