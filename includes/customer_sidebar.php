@@ -16,18 +16,40 @@ $userRole = $_SESSION['user_role']
 
 $userRole = ucfirst(strtolower($userRole));
 
-function customerSidebarActive($pages)
-{
-    global $currentPage;
 
-    if (!is_array($pages)) {
-        $pages = [$pages];
+/*
+|--------------------------------------------------------------------------
+| ACTIVE SIDEBAR
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('customerSidebarActive')) {
+
+    function customerSidebarActive($pages)
+    {
+        global $currentPage;
+
+        if (!is_array($pages)) {
+            $pages = [$pages];
+        }
+
+        return in_array($currentPage, $pages, true)
+            ? 'active'
+            : '';
     }
 
-    return in_array($currentPage, $pages, true)
-        ? 'active'
-        : '';
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| LOGOUT ONLY ON CUSTOMER DASHBOARD
+|--------------------------------------------------------------------------
+*/
+
+$showCustomerLogout =
+    strtolower($userRole) === 'customer'
+    && $currentPage === 'dashboard.php';
 
 ?>
 
@@ -35,7 +57,10 @@ function customerSidebarActive($pages)
 
     <div class="customer-sidebar-inner">
 
-        <!-- DASHBOARD -->
+
+        <!-- =====================================================
+             DASHBOARD
+        ====================================================== -->
 
         <a
             href="dashboard.php"
@@ -53,7 +78,9 @@ function customerSidebarActive($pages)
         </a>
 
 
-        <!-- PRODUCTS -->
+        <!-- =====================================================
+             PRODUCTS
+        ====================================================== -->
 
         <a
             href="catalog.php"
@@ -75,7 +102,9 @@ function customerSidebarActive($pages)
         </a>
 
 
-        <!-- CART -->
+        <!-- =====================================================
+             CART
+        ====================================================== -->
 
         <a
             href="cart.php"
@@ -101,7 +130,9 @@ function customerSidebarActive($pages)
         </a>
 
 
-        <!-- WISHLIST -->
+        <!-- =====================================================
+             WISHLIST
+        ====================================================== -->
 
         <a
             href="wishlist.php"
@@ -127,7 +158,9 @@ function customerSidebarActive($pages)
         </a>
 
 
-        <!-- ORDERS -->
+        <!-- =====================================================
+             ORDERS
+        ====================================================== -->
 
         <a
             href="order.php"
@@ -148,7 +181,9 @@ function customerSidebarActive($pages)
         </a>
 
 
-        <!-- PROFILE -->
+        <!-- =====================================================
+             PROFILE
+        ====================================================== -->
 
         <a
             href="profile.php"
@@ -166,7 +201,9 @@ function customerSidebarActive($pages)
         </a>
 
 
-        <!-- HOME -->
+        <!-- =====================================================
+             HOME
+        ====================================================== -->
 
         <a
             href="index.php"
@@ -184,22 +221,30 @@ function customerSidebarActive($pages)
         </a>
 
 
-        <!-- LOGOUT -->
+        <!-- =====================================================
+             LOGOUT
+             ONLY CUSTOMER DASHBOARD
+        ====================================================== -->
 
-        <a
-            href="auth/logout.php"
-            class="customer-sidebar-item sidebar-logout"
-        >
+        <?php if ($showCustomerLogout): ?>
 
-            <span class="sidebar-icon">
-                <i class="bi bi-box-arrow-right"></i>
-            </span>
+            <a
+                href="auth/logout.php"
+                class="customer-sidebar-item sidebar-logout"
+            >
 
-            <span class="sidebar-text">
-                Logout
-            </span>
+                <span class="sidebar-icon">
+                    <i class="bi bi-box-arrow-right"></i>
+                </span>
 
-        </a>
+                <span class="sidebar-text">
+                    Logout
+                </span>
+
+            </a>
+
+        <?php endif; ?>
+
 
     </div>
 
