@@ -677,7 +677,7 @@ foreach ($orders as $order) {
     ====================================================== -->
 
 
-    <aside class="admin-sidebar">
+    <?php require_once dirname(__DIR__) . '/includes/admin_sidebar.php'; ?>
 
 
         <div class="admin-logo">
@@ -754,11 +754,6 @@ foreach ($orders as $order) {
             </a>
 
         </div>
-
-
-    </aside>
-
-
 
     <!-- =====================================================
          MAIN
