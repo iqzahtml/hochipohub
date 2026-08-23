@@ -1,23 +1,23 @@
 <?php
-/**
- * HOCHIPOHUB
- * Admin - Users Management
- */
 
 require_once dirname(__DIR__) . '/database/db.php';
 require_once dirname(__DIR__) . '/includes/session.php';
 
 $db = getDB();
 
+if (!function_exists('e')) {
+    function e($value)
+    {
+        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    }
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (
-    !isset($_SESSION['user_id']) ||
-    ($_SESSION['role'] ?? '') !== 'admin'
-) {
-    header("Location: ../index.php");
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+    header('Location: ../index.php');
     exit;
 }
 
@@ -29,108 +29,48 @@ $admin_id = (int) $_SESSION['user_id'];
 |--------------------------------------------------------------------------
 */
 
-if (
-    $_SERVER['REQUEST_METHOD'] === 'POST' &&
-    isset($_POST['update_user'])
-) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
 
-    $user_id =
-        (int) ($_POST['user_id'] ?? 0);
+    $user_id = (int) ($_POST['user_id'] ?? 0);
+    $role = $_POST['role'] ?? '';
+    $status = $_POST['status'] ?? '';
 
-    $role =
-        $_POST['role'] ?? '';
-
-    $status =
-        $_POST['status'] ?? '';
-
-
-    $allowed_roles = [
-        'customer',
-        'vendor',
-        'admin'
-    ];
-
-    $allowed_status = [
-        'active',
-        'inactive',
-        'pending',
-        'suspended'
-    ];
-
-
-    if ($user_id <= 0) {
-
-        header("Location: users.php?error=invalid");
+    if (
+        $user_id <= 0 ||
+        !in_array($role, ['customer', 'vendor', 'admin'], true) ||
+        !in_array($status, ['active', 'inactive', 'pending', 'suspended'], true)
+    ) {
+        header('Location: users.php?error=invalid');
         exit;
     }
-
-
-    if (!in_array($role, $allowed_roles, true)) {
-
-        header("Location: users.php?error=invalid");
-        exit;
-    }
-
-
-    if (!in_array($status, $allowed_status, true)) {
-
-        header("Location: users.php?error=invalid");
-        exit;
-    }
-
-
-    /*
-     * Prevent admin from disabling own account.
-     */
 
     if ($user_id === $admin_id) {
-
-        header("Location: users.php?error=self");
+        header('Location: users.php?error=self');
         exit;
     }
-
 
     try {
 
-        /*
-         * Get old user
-         */
+        $stmt = $db->prepare(
+            "SELECT role, status
+             FROM users
+             WHERE user_id = ?
+             LIMIT 1"
+        );
 
-        $stmt = $db->prepare("
-            SELECT
-                role,
-                status
-            FROM users
-            WHERE user_id = ?
-            LIMIT 1
-        ");
+        $stmt->execute([$user_id]);
 
-        $stmt->execute([
-            $user_id
-        ]);
-
-        $oldUser =
-            $stmt->fetch(PDO::FETCH_ASSOC);
-
-
-        if (!$oldUser) {
-
-            header("Location: users.php?error=notfound");
+        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+            header('Location: users.php?error=notfound');
             exit;
         }
 
-
-        /*
-         * Update
-         */
-
-        $stmt = $db->prepare("
-            UPDATE users
-            SET
-                role = ?,
-                status = ?
-            WHERE user_id = ?
-        ");
+        $stmt = $db->prepare(
+            "UPDATE users
+             SET role = ?,
+                 status = ?
+             WHERE user_id = ?"
+        );
 
         $stmt->execute([
             $role,
@@ -138,66 +78,41 @@ if (
             $user_id
         ]);
 
-
-        /*
-         * Admin log
-         */
-
-        $action =
-            "Updated user #{$user_id} role to {$role} and status to {$status}";
-
-
-        $stmt = $db->prepare("
-            INSERT INTO admin_logs
-            (
-                admin_id,
-                action,
-                target_type,
-                target_id
-            )
-            VALUES (?, ?, ?, ?)
-        ");
+        $stmt = $db->prepare(
+            "INSERT INTO admin_logs
+                (admin_id, action, target_type, target_id)
+             VALUES
+                (?, ?, ?, ?)"
+        );
 
         $stmt->execute([
             $admin_id,
-            $action,
+            "Updated user #{$user_id} role to {$role} and status to {$status}",
             'user',
             $user_id
         ]);
 
-
-        header("Location: users.php?success=updated");
+        header('Location: users.php?success=updated');
         exit;
 
     } catch (PDOException $e) {
 
-        header("Location: users.php?error=update");
+        error_log($e->getMessage());
+
+        header('Location: users.php?error=update');
         exit;
     }
 }
 
-
 /*
 |--------------------------------------------------------------------------
-| FILTERS
+| SEARCH & FILTER
 |--------------------------------------------------------------------------
 */
 
-$search =
-    trim($_GET['search'] ?? '');
-
-$role_filter =
-    $_GET['role'] ?? '';
-
-$status_filter =
-    $_GET['status'] ?? '';
-
-
-/*
-|--------------------------------------------------------------------------
-| USER QUERY
-|--------------------------------------------------------------------------
-*/
+$search = trim($_GET['search'] ?? '');
+$role_filter = $_GET['role'] ?? '';
+$status_filter = $_GET['status'] ?? '';
 
 $sql = "
     SELECT
@@ -209,21 +124,16 @@ $sql = "
         u.status,
         u.mfa_enabled,
         u.created_at,
-
         v.vendor_id,
         v.business_name,
         v.approval_status
-
     FROM users u
-
     LEFT JOIN vendors v
         ON u.user_id = v.user_id
-
     WHERE 1 = 1
 ";
 
 $params = [];
-
 
 if ($search !== '') {
 
@@ -235,118 +145,84 @@ if ($search !== '') {
         )
     ";
 
-    $value =
-        '%' . $search . '%';
+    $v = "%$search%";
 
-    $params[] = $value;
-    $params[] = $value;
-    $params[] = $value;
+    array_push(
+        $params,
+        $v,
+        $v,
+        $v
+    );
 }
-
 
 if (
     in_array(
         $role_filter,
-        [
-            'customer',
-            'vendor',
-            'admin'
-        ],
+        ['customer', 'vendor', 'admin'],
         true
     )
 ) {
 
-    $sql .= "
-        AND u.role = ?
-    ";
-
-    $params[] =
-        $role_filter;
+    $sql .= " AND u.role = ?";
+    $params[] = $role_filter;
 }
-
 
 if (
     in_array(
         $status_filter,
-        [
-            'active',
-            'inactive',
-            'pending',
-            'suspended'
-        ],
+        ['active', 'inactive', 'pending', 'suspended'],
         true
     )
 ) {
 
-    $sql .= "
-        AND u.status = ?
-    ";
-
-    $params[] =
-        $status_filter;
+    $sql .= " AND u.status = ?";
+    $params[] = $status_filter;
 }
 
+$sql .= " ORDER BY u.created_at DESC";
 
-$sql .= "
-    ORDER BY u.created_at DESC
-";
-
-
-$stmt =
-    $db->prepare($sql);
-
+$stmt = $db->prepare($sql);
 $stmt->execute($params);
 
-$users =
-    $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+$users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 /*
 |--------------------------------------------------------------------------
-| STATISTICS
+| USER STATISTICS
 |--------------------------------------------------------------------------
 */
 
-$stmt = $db->query("
-    SELECT COUNT(*)
-    FROM users
-");
+$total_users = (int) $db
+    ->query("SELECT COUNT(*) FROM users")
+    ->fetchColumn();
 
-$total_users =
-    (int) $stmt->fetchColumn();
+$total_customers = (int) $db
+    ->query(
+        "SELECT COUNT(*)
+         FROM users
+         WHERE role = 'customer'"
+    )
+    ->fetchColumn();
 
+$total_vendors = (int) $db
+    ->query(
+        "SELECT COUNT(*)
+         FROM users
+         WHERE role = 'vendor'"
+    )
+    ->fetchColumn();
 
-$stmt = $db->query("
-    SELECT COUNT(*)
-    FROM users
-    WHERE role = 'customer'
-");
-
-$total_customers =
-    (int) $stmt->fetchColumn();
-
-
-$stmt = $db->query("
-    SELECT COUNT(*)
-    FROM users
-    WHERE role = 'vendor'
-");
-
-$total_vendors =
-    (int) $stmt->fetchColumn();
-
-
-$stmt = $db->query("
-    SELECT COUNT(*)
-    FROM users
-    WHERE role = 'admin'
-");
-
-$total_admins =
-    (int) $stmt->fetchColumn();
+$total_admins = (int) $db
+    ->query(
+        "SELECT COUNT(*)
+         FROM users
+         WHERE role = 'admin'"
+    )
+    ->fetchColumn();
 
 ?>
-<!DOCTYPE html>
+
+<!doctype html>
 <html lang="en">
 
 <head>
@@ -358,9 +234,7 @@ $total_admins =
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>
-        Users | HochipoHub Admin
-    </title>
+    <title>Users | HochipoHub Admin</title>
 
     <link
         rel="stylesheet"
@@ -376,593 +250,443 @@ $total_admins =
 
 <body>
 
-<div class="admin-wrapper">
+    <div class="admin-wrapper">
 
-    <?php
+        <?php require_once dirname(__DIR__) . '/includes/admin_sidebar.php'; ?>
 
-    $sidebar =
-        dirname(__DIR__) .
-        '/includes/admin_sidebar.php';
+        <main class="admin-main">
 
-    if (file_exists($sidebar)) {
-        require_once $sidebar;
-    }
+            <!-- Header -->
 
-    ?>
+            <header class="admin-topbar">
 
+                <div class="admin-header-left">
 
-    <main class="admin-main">
-
-
-        <div class="admin-topbar">
-
-            <div>
-
-                <h1>
-                    Users
-                </h1>
-
-                <p>
-                    Manage HochipoHub user accounts.
-                </p>
-
-            </div>
-
-        </div>
-
-
-        <?php if (isset($_GET['success'])): ?>
-
-            <div class="admin-alert success">
-
-                User updated successfully.
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <?php if (isset($_GET['error'])): ?>
-
-            <div class="admin-alert error">
-
-                <?php
-
-                $error =
-                    $_GET['error'];
-
-                if ($error === 'self') {
-
-                    echo
-                        'You cannot modify your own administrator account from this page.';
-
-                } elseif ($error === 'notfound') {
-
-                    echo
-                        'User not found.';
-
-                } else {
-
-                    echo
-                        'Unable to process the request.';
-                }
-
-                ?>
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <!-- STATISTICS -->
-
-        <section class="admin-stats">
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Total Users
-                </span>
-
-                <strong>
-                    <?= $total_users ?>
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Customers
-                </span>
-
-                <strong>
-                    <?= $total_customers ?>
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Vendors
-                </span>
-
-                <strong>
-                    <?= $total_vendors ?>
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Admins
-                </span>
-
-                <strong>
-                    <?= $total_admins ?>
-                </strong>
-
-            </div>
-
-
-        </section>
-
-
-        <!-- FILTER -->
-
-        <section class="admin-panel">
-
-            <form
-                method="GET"
-                class="admin-filter-form"
-            >
-
-                <input
-                    type="text"
-                    name="search"
-                    placeholder="Search name, email or phone..."
-                    value="<?= htmlspecialchars($search) ?>"
-                >
-
-
-                <select name="role">
-
-                    <option value="">
-                        All Roles
-                    </option>
-
-                    <option
-                        value="customer"
-                        <?= $role_filter === 'customer'
-                            ? 'selected'
-                            : '' ?>
+                    <button
+                        type="button"
+                        id="adminSidebarToggle"
+                        class="admin-sidebar-toggle"
+                        aria-label="Open sidebar"
+                        aria-expanded="false"
                     >
-                        Customer
-                    </option>
+                        ☰
+                    </button>
 
-                    <option
-                        value="vendor"
-                        <?= $role_filter === 'vendor'
-                            ? 'selected'
-                            : '' ?>
-                    >
-                        Vendor
-                    </option>
+                    <div>
 
-                    <option
-                        value="admin"
-                        <?= $role_filter === 'admin'
-                            ? 'selected'
-                            : '' ?>
-                    >
-                        Admin
-                    </option>
+                        <h1>Users</h1>
 
-                </select>
+                        <p>
+                            Manage HochipoHub user accounts.
+                        </p>
 
-
-                <select name="status">
-
-                    <option value="">
-                        All Status
-                    </option>
-
-                    <option
-                        value="active"
-                        <?= $status_filter === 'active'
-                            ? 'selected'
-                            : '' ?>
-                    >
-                        Active
-                    </option>
-
-                    <option
-                        value="inactive"
-                        <?= $status_filter === 'inactive'
-                            ? 'selected'
-                            : '' ?>
-                    >
-                        Inactive
-                    </option>
-
-                    <option
-                        value="pending"
-                        <?= $status_filter === 'pending'
-                            ? 'selected'
-                            : '' ?>
-                    >
-                        Pending
-                    </option>
-
-                    <option
-                        value="suspended"
-                        <?= $status_filter === 'suspended'
-                            ? 'selected'
-                            : '' ?>
-                    >
-                        Suspended
-                    </option>
-
-                </select>
-
-
-                <button
-                    type="submit"
-                    class="admin-btn primary"
-                >
-                    Search
-                </button>
-
-
-                <a
-                    href="users.php"
-                    class="admin-btn secondary"
-                >
-                    Reset
-                </a>
-
-            </form>
-
-        </section>
-
-
-        <!-- USERS TABLE -->
-
-        <section class="admin-panel">
-
-            <div class="panel-header">
-
-                <div>
-
-                    <h2>
-                        User List
-                    </h2>
-
-                    <p>
-                        <?= count($users) ?>
-                        user(s) found
-                    </p>
+                    </div>
 
                 </div>
 
-            </div>
+            </header>
 
+            <!-- Success Message -->
 
-            <div class="table-wrapper">
+            <?php if (isset($_GET['success'])): ?>
 
-                <table class="admin-table">
+                <div class="admin-alert success">
+                    User updated successfully.
+                </div>
 
-                    <thead>
+            <?php endif; ?>
 
-                    <tr>
+            <!-- Error Message -->
 
-                        <th>ID</th>
+            <?php if (isset($_GET['error'])): ?>
 
-                        <th>User</th>
+                <div class="admin-alert error">
 
-                        <th>Phone</th>
+                    <?php
 
-                        <th>Role</th>
+                    $err = $_GET['error'];
 
-                        <th>Status</th>
+                    echo $err === 'self'
+                        ? 'You cannot modify your own administrator account from this page.'
+                        : (
+                            $err === 'notfound'
+                                ? 'User not found.'
+                                : 'Unable to process the request.'
+                        );
 
-                        <th>MFA</th>
+                    ?>
 
-                        <th>Joined</th>
+                </div>
 
-                        <th>Action</th>
+            <?php endif; ?>
 
-                    </tr>
+            <!-- Statistics -->
 
-                    </thead>
+            <section class="admin-stats">
 
+                <?php
+                foreach (
+                    [
+                        ['Total Users', $total_users],
+                        ['Customers', $total_customers],
+                        ['Vendors', $total_vendors],
+                        ['Admins', $total_admins]
+                    ] as $s
+                ):
+                ?>
 
-                    <tbody>
+                    <div class="stat-card">
 
-                    <?php if (empty($users)): ?>
+                        <span class="stat-label">
+                            <?= e($s[0]) ?>
+                        </span>
 
-                        <tr>
+                        <strong>
+                            <?= number_format($s[1]) ?>
+                        </strong>
 
-                            <td
-                                colspan="8"
-                                class="empty-state"
+                    </div>
+
+                <?php endforeach; ?>
+
+            </section>
+
+            <!-- Filter -->
+
+            <section class="admin-panel">
+
+                <form
+                    method="GET"
+                    class="admin-filter-form"
+                >
+
+                    <input
+                        type="text"
+                        name="search"
+                        placeholder="Search name, email or phone..."
+                        value="<?= e($search) ?>"
+                    >
+
+                    <select name="role">
+
+                        <option value="">
+                            All Roles
+                        </option>
+
+                        <?php foreach (
+                            ['customer', 'vendor', 'admin'] as $r
+                        ): ?>
+
+                            <option
+                                value="<?= e($r) ?>"
+                                <?= $role_filter === $r ? 'selected' : '' ?>
                             >
-                                No users found.
-                            </td>
-
-                        </tr>
-
-                    <?php else: ?>
-
-
-                        <?php foreach ($users as $user): ?>
-
-                            <tr>
-
-                                <td>
-                                    #<?= (int) $user['user_id'] ?>
-                                </td>
-
-
-                                <td>
-
-                                    <strong>
-
-                                        <?= htmlspecialchars(
-                                            $user['name']
-                                        ) ?>
-
-                                    </strong>
-
-                                    <small>
-
-                                        <?= htmlspecialchars(
-                                            $user['email']
-                                        ) ?>
-
-                                    </small>
-
-                                    <?php if (!empty($user['business_name'])): ?>
-
-                                        <small>
-
-                                            <?= htmlspecialchars(
-                                                $user['business_name']
-                                            ) ?>
-
-                                        </small>
-
-                                    <?php endif; ?>
-
-                                </td>
-
-
-                                <td>
-
-                                    <?= htmlspecialchars(
-                                        $user['phone'] ?? '-'
-                                    ) ?>
-
-                                </td>
-
-
-                                <td>
-
-                                    <form
-                                        method="POST"
-                                        class="inline-form"
-                                    >
-
-                                        <input
-                                            type="hidden"
-                                            name="update_user"
-                                            value="1"
-                                        >
-
-                                        <input
-                                            type="hidden"
-                                            name="user_id"
-                                            value="<?= (int) $user['user_id'] ?>"
-                                        >
-
-                                        <input
-                                            type="hidden"
-                                            name="status"
-                                            value="<?= htmlspecialchars(
-                                                $user['status']
-                                            ) ?>"
-                                        >
-
-                                        <select
-                                            name="role"
-                                            onchange="this.form.submit()"
-                                            <?= (int) $user['user_id'] === $admin_id
-                                                ? 'disabled'
-                                                : '' ?>
-                                        >
-
-                                            <option
-                                                value="customer"
-                                                <?= $user['role'] === 'customer'
-                                                    ? 'selected'
-                                                    : '' ?>
-                                            >
-                                                Customer
-                                            </option>
-
-                                            <option
-                                                value="vendor"
-                                                <?= $user['role'] === 'vendor'
-                                                    ? 'selected'
-                                                    : '' ?>
-                                            >
-                                                Vendor
-                                            </option>
-
-                                            <option
-                                                value="admin"
-                                                <?= $user['role'] === 'admin'
-                                                    ? 'selected'
-                                                    : '' ?>
-                                            >
-                                                Admin
-                                            </option>
-
-                                        </select>
-
-                                    </form>
-
-                                </td>
-
-
-                                <td>
-
-                                    <?php if (
-                                        (int) $user['user_id'] ===
-                                        $admin_id
-                                    ): ?>
-
-                                        <span>
-                                            <?= htmlspecialchars(
-                                                $user['status']
-                                            ) ?>
-                                        </span>
-
-                                    <?php else: ?>
-
-                                        <form
-                                            method="POST"
-                                            class="inline-form"
-                                        >
-
-                                            <input
-                                                type="hidden"
-                                                name="update_user"
-                                                value="1"
-                                            >
-
-                                            <input
-                                                type="hidden"
-                                                name="user_id"
-                                                value="<?= (int) $user['user_id'] ?>"
-                                            >
-
-                                            <input
-                                                type="hidden"
-                                                name="role"
-                                                value="<?= htmlspecialchars(
-                                                    $user['role']
-                                                ) ?>"
-                                            >
-
-                                            <select
-                                                name="status"
-                                                onchange="this.form.submit()"
-                                            >
-
-                                                <option
-                                                    value="active"
-                                                    <?= $user['status'] === 'active'
-                                                        ? 'selected'
-                                                        : '' ?>
-                                                >
-                                                    Active
-                                                </option>
-
-                                                <option
-                                                    value="inactive"
-                                                    <?= $user['status'] === 'inactive'
-                                                        ? 'selected'
-                                                        : '' ?>
-                                                >
-                                                    Inactive
-                                                </option>
-
-                                                <option
-                                                    value="pending"
-                                                    <?= $user['status'] === 'pending'
-                                                        ? 'selected'
-                                                        : '' ?>
-                                                >
-                                                    Pending
-                                                </option>
-
-                                                <option
-                                                    value="suspended"
-                                                    <?= $user['status'] === 'suspended'
-                                                        ? 'selected'
-                                                        : '' ?>
-                                                >
-                                                    Suspended
-                                                </option>
-
-                                            </select>
-
-                                        </form>
-
-                                    <?php endif; ?>
-
-                                </td>
-
-
-                                <td>
-
-                                    <?= $user['mfa_enabled']
-                                        ? 'Enabled'
-                                        : 'Disabled'
-                                    ?>
-
-                                </td>
-
-
-                                <td>
-
-                                    <?= date(
-                                        'd M Y',
-                                        strtotime(
-                                            $user['created_at']
-                                        )
-                                    ) ?>
-
-                                </td>
-
-
-                                <td>
-
-                                    <a
-                                        href="../profile.php?id=<?= (int) $user['user_id'] ?>"
-                                        class="admin-btn small"
-                                        target="_blank"
-                                    >
-                                        View
-                                    </a>
-
-                                </td>
-
-                            </tr>
+                                <?= ucfirst($r) ?>
+                            </option>
 
                         <?php endforeach; ?>
 
+                    </select>
 
-                    <?php endif; ?>
+                    <select name="status">
 
-                    </tbody>
+                        <option value="">
+                            All Status
+                        </option>
 
-                </table>
+                        <?php foreach (
+                            ['active', 'inactive', 'pending', 'suspended'] as $s
+                        ): ?>
 
-            </div>
+                            <option
+                                value="<?= e($s) ?>"
+                                <?= $status_filter === $s ? 'selected' : '' ?>
+                            >
+                                <?= ucfirst($s) ?>
+                            </option>
 
-        </section>
+                        <?php endforeach; ?>
 
-    </main>
+                    </select>
 
-</div>
+                    <button
+                        class="admin-btn primary"
+                        type="submit"
+                    >
+                        Search
+                    </button>
+
+                    <a
+                        class="admin-btn secondary"
+                        href="users.php"
+                    >
+                        Reset
+                    </a>
+
+                </form>
+
+            </section>
+
+            <!-- User List -->
+
+            <section class="admin-panel">
+
+                <div class="panel-header">
+
+                    <div>
+
+                        <h2>User List</h2>
+
+                        <p>
+                            <?= count($users) ?> user(s) found
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <div class="table-wrapper">
+
+                    <table class="admin-table">
+
+                        <thead>
+
+                            <tr>
+                                <th>ID</th>
+                                <th>User</th>
+                                <th>Phone</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>MFA</th>
+                                <th>Joined</th>
+                                <th>Action</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            <?php if (!$users): ?>
+
+                                <tr>
+
+                                    <td
+                                        colspan="8"
+                                        class="empty-state"
+                                    >
+                                        No users found.
+                                    </td>
+
+                                </tr>
+
+                            <?php else: ?>
+
+                                <?php foreach ($users as $u): ?>
+
+                                    <tr>
+
+                                        <td>
+                                            #<?= (int) $u['user_id'] ?>
+                                        </td>
+
+                                        <td>
+
+                                            <strong>
+                                                <?= e($u['name']) ?>
+                                            </strong>
+
+                                            <small>
+                                                <?= e($u['email']) ?>
+                                            </small>
+
+                                            <?php if (!empty($u['business_name'])): ?>
+
+                                                <small>
+                                                    <?= e($u['business_name']) ?>
+                                                </small>
+
+                                            <?php endif; ?>
+
+                                        </td>
+
+                                        <td>
+                                            <?= e($u['phone'] ?? '-') ?>
+                                        </td>
+
+                                        <!-- Role -->
+
+                                        <td>
+
+                                            <?php if (
+                                                (int) $u['user_id'] === $admin_id
+                                            ): ?>
+
+                                                <span>
+                                                    <?= e($u['role']) ?>
+                                                </span>
+
+                                            <?php else: ?>
+
+                                                <form
+                                                    method="POST"
+                                                    class="inline-form"
+                                                >
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="update_user"
+                                                        value="1"
+                                                    >
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="user_id"
+                                                        value="<?= (int) $u['user_id'] ?>"
+                                                    >
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="status"
+                                                        value="<?= e($u['status']) ?>"
+                                                    >
+
+                                                    <select
+                                                        name="role"
+                                                        onchange="this.form.submit()"
+                                                    >
+
+                                                        <?php foreach (
+                                                            ['customer', 'vendor', 'admin'] as $r
+                                                        ): ?>
+
+                                                            <option
+                                                                value="<?= e($r) ?>"
+                                                                <?= $u['role'] === $r ? 'selected' : '' ?>
+                                                            >
+                                                                <?= ucfirst($r) ?>
+                                                            </option>
+
+                                                        <?php endforeach; ?>
+
+                                                    </select>
+
+                                                </form>
+
+                                            <?php endif; ?>
+
+                                        </td>
+
+                                        <!-- Status -->
+
+                                        <td>
+
+                                            <?php if (
+                                                (int) $u['user_id'] === $admin_id
+                                            ): ?>
+
+                                                <span class="admin-status status-active">
+                                                    <?= e($u['status']) ?>
+                                                </span>
+
+                                            <?php else: ?>
+
+                                                <form
+                                                    method="POST"
+                                                    class="inline-form"
+                                                >
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="update_user"
+                                                        value="1"
+                                                    >
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="user_id"
+                                                        value="<?= (int) $u['user_id'] ?>"
+                                                    >
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="role"
+                                                        value="<?= e($u['role']) ?>"
+                                                    >
+
+                                                    <select
+                                                        name="status"
+                                                        onchange="this.form.submit()"
+                                                    >
+
+                                                        <?php foreach (
+                                                            ['active', 'inactive', 'pending', 'suspended'] as $s
+                                                        ): ?>
+
+                                                            <option
+                                                                value="<?= e($s) ?>"
+                                                                <?= $u['status'] === $s ? 'selected' : '' ?>
+                                                            >
+                                                                <?= ucfirst($s) ?>
+                                                            </option>
+
+                                                        <?php endforeach; ?>
+
+                                                    </select>
+
+                                                </form>
+
+                                            <?php endif; ?>
+
+                                        </td>
+
+                                        <!-- MFA -->
+
+                                        <td>
+                                            <?= $u['mfa_enabled'] ? 'Enabled' : 'Disabled' ?>
+                                        </td>
+
+                                        <!-- Joined -->
+
+                                        <td>
+                                            <?= e(
+                                                date(
+                                                    'd M Y',
+                                                    strtotime($u['created_at'])
+                                                )
+                                            ) ?>
+                                        </td>
+
+                                        <!-- Action -->
+
+                                        <td>
+
+                                            <a
+                                                class="admin-btn small"
+                                                href="../profile.php?id=<?= (int) $u['user_id'] ?>"
+                                                target="_blank"
+                                            >
+                                                View
+                                            </a>
+
+                                        </td>
+
+                                    </tr>
+
+                                <?php endforeach; ?>
+
+                            <?php endif; ?>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
 
 </body>
 

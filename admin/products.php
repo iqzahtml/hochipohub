@@ -1,26 +1,23 @@
 <?php
-/**
- * HOCHIPOHUB
- * Admin - Products Management
- */
 
 require_once dirname(__DIR__) . '/database/db.php';
 require_once dirname(__DIR__) . '/includes/session.php';
 
 $db = getDB();
 
-/*
-|--------------------------------------------------------------------------
-| ADMIN ACCESS
-|--------------------------------------------------------------------------
-*/
+if (!function_exists('e')) {
+    function e($value)
+    {
+        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    }
+}
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
-    header("Location: ../index.php");
+    header('Location: ../index.php');
     exit;
 }
 
@@ -32,135 +29,82 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
 
 if (isset($_GET['delete'])) {
 
-    $product_id = (int) $_GET['delete'];
+    $id = (int) $_GET['delete'];
 
-    if ($product_id > 0) {
+    if ($id > 0) {
 
         try {
 
             $db->beginTransaction();
 
-            /*
-             * Delete wishlist records
-             */
-            $stmt = $db->prepare("
-                DELETE FROM wishlist
-                WHERE product_id = ?
-            ");
-            $stmt->execute([$product_id]);
+            foreach (
+                ['wishlist', 'cart', 'reviews', 'inventory'] as $table
+            ) {
 
-            /*
-             * Delete cart records
-             */
-            $stmt = $db->prepare("
-                DELETE FROM cart
-                WHERE product_id = ?
-            ");
-            $stmt->execute([$product_id]);
+                $stmt = $db->prepare(
+                    "DELETE FROM {$table}
+                     WHERE product_id = ?"
+                );
 
-            /*
-             * Delete reviews
-             */
-            $stmt = $db->prepare("
-                DELETE FROM reviews
-                WHERE product_id = ?
-            ");
-            $stmt->execute([$product_id]);
+                $stmt->execute([$id]);
+            }
 
-            /*
-             * Delete inventory
-             */
-            $stmt = $db->prepare("
-                DELETE FROM inventory
-                WHERE product_id = ?
-            ");
-            $stmt->execute([$product_id]);
+            $stmt = $db->prepare(
+                "SELECT COUNT(*)
+                 FROM order_details
+                 WHERE product_id = ?"
+            );
 
-            /*
-             * Delete order details
-             *
-             * We don't delete order_details because
-             * old orders should remain as transaction records.
-             *
-             * Therefore product deletion is blocked if
-             * the product already exists in an order.
-             */
+            $stmt->execute([$id]);
 
-            $stmt = $db->prepare("
-                SELECT COUNT(*)
-                FROM order_details
-                WHERE product_id = ?
-            ");
-
-            $stmt->execute([$product_id]);
-
-            $orderCount = (int) $stmt->fetchColumn();
-
-            if ($orderCount > 0) {
+            if ((int) $stmt->fetchColumn() > 0) {
 
                 $db->rollBack();
 
-                header("Location: products.php?error=order");
+                header('Location: products.php?error=order');
                 exit;
             }
 
-            /*
-             * Get vendor ID before deleting
-             */
-            $stmt = $db->prepare("
-                SELECT vendor_id
-                FROM products
-                WHERE product_id = ?
-            ");
+            $stmt = $db->prepare(
+                "SELECT product_id
+                 FROM products
+                 WHERE product_id = ?"
+            );
 
-            $stmt->execute([$product_id]);
+            $stmt->execute([$id]);
 
-            $product = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$product) {
+            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
 
                 $db->rollBack();
 
-                header("Location: products.php?error=notfound");
+                header('Location: products.php?error=notfound');
                 exit;
             }
 
-            /*
-             * Delete product
-             */
-            $stmt = $db->prepare("
-                DELETE FROM products
-                WHERE product_id = ?
-            ");
+            $stmt = $db->prepare(
+                "DELETE FROM products
+                 WHERE product_id = ?"
+            );
 
-            $stmt->execute([$product_id]);
+            $stmt->execute([$id]);
 
-            /*
-             * Admin log
-             */
-            $admin_id = (int) $_SESSION['user_id'];
-
-            $stmt = $db->prepare("
-                INSERT INTO admin_logs
-                (
-                    admin_id,
-                    action,
-                    target_type,
-                    target_id
-                )
-                VALUES (?, ?, ?, ?)
-            ");
+            $stmt = $db->prepare(
+                "INSERT INTO admin_logs
+                    (admin_id, action, target_type, target_id)
+                 VALUES
+                    (?, ?, ?, ?)"
+            );
 
             $stmt->execute([
-                $admin_id,
+                (int) $_SESSION['user_id'],
                 'Deleted product',
                 'product',
-                $product_id
+                $id
             ]);
 
             $db->commit();
 
-            header("Location: products.php?success=deleted");
+            header('Location: products.php?success=deleted');
             exit;
 
         } catch (PDOException $e) {
@@ -169,7 +113,9 @@ if (isset($_GET['delete'])) {
                 $db->rollBack();
             }
 
-            header("Location: products.php?error=delete");
+            error_log($e->getMessage());
+
+            header('Location: products.php?error=delete');
             exit;
         }
     }
@@ -181,62 +127,60 @@ if (isset($_GET['delete'])) {
 |--------------------------------------------------------------------------
 */
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['update_status'])
+) {
 
-    $product_id = (int) ($_POST['product_id'] ?? 0);
+    $id = (int) ($_POST['product_id'] ?? 0);
     $status = $_POST['status'] ?? '';
 
-    $allowed_status = [
+    $allowed = [
         'Available',
         'Out of Stock',
         'Hidden'
     ];
 
     if (
-        $product_id > 0 &&
-        in_array($status, $allowed_status, true)
+        $id > 0 &&
+        in_array($status, $allowed, true)
     ) {
 
         try {
 
-            $stmt = $db->prepare("
-                UPDATE products
-                SET status = ?
-                WHERE product_id = ?
-            ");
+            $stmt = $db->prepare(
+                "UPDATE products
+                 SET status = ?
+                 WHERE product_id = ?"
+            );
 
             $stmt->execute([
                 $status,
-                $product_id
+                $id
             ]);
 
-            /*
-             * Admin log
-             */
-            $stmt = $db->prepare("
-                INSERT INTO admin_logs
-                (
-                    admin_id,
-                    action,
-                    target_type,
-                    target_id
-                )
-                VALUES (?, ?, ?, ?)
-            ");
+            $stmt = $db->prepare(
+                "INSERT INTO admin_logs
+                    (admin_id, action, target_type, target_id)
+                 VALUES
+                    (?, ?, ?, ?)"
+            );
 
             $stmt->execute([
                 $_SESSION['user_id'],
                 'Updated product status to ' . $status,
                 'product',
-                $product_id
+                $id
             ]);
 
-            header("Location: products.php?success=status");
+            header('Location: products.php?success=status');
             exit;
 
         } catch (PDOException $e) {
 
-            header("Location: products.php?error=update");
+            error_log($e->getMessage());
+
+            header('Location: products.php?error=update');
             exit;
         }
     }
@@ -252,27 +196,13 @@ $search = trim($_GET['search'] ?? '');
 $status_filter = $_GET['status'] ?? '';
 $category_filter = (int) ($_GET['category'] ?? 0);
 
-/*
-|--------------------------------------------------------------------------
-| CATEGORIES
-|--------------------------------------------------------------------------
-*/
-
-$stmt = $db->query("
-    SELECT
-        category_id,
-        category_name
-    FROM categories
-    ORDER BY category_name ASC
-");
-
-$categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-/*
-|--------------------------------------------------------------------------
-| PRODUCTS QUERY
-|--------------------------------------------------------------------------
-*/
+$categories = $db
+    ->query(
+        "SELECT category_id, category_name
+         FROM categories
+         ORDER BY category_name ASC"
+    )
+    ->fetchAll(PDO::FETCH_ASSOC);
 
 $sql = "
     SELECT
@@ -284,35 +214,21 @@ $sql = "
         p.image,
         p.status,
         p.created_at,
-
         c.category_name,
-
         v.vendor_id,
         v.business_name,
-
         u.name AS vendor_name
-
     FROM products p
-
     INNER JOIN categories c
         ON p.category_id = c.category_id
-
     INNER JOIN vendors v
         ON p.vendor_id = v.vendor_id
-
     INNER JOIN users u
         ON v.user_id = u.user_id
-
     WHERE 1 = 1
 ";
 
 $params = [];
-
-/*
-|--------------------------------------------------------------------------
-| SEARCH
-|--------------------------------------------------------------------------
-*/
 
 if ($search !== '') {
 
@@ -324,52 +240,29 @@ if ($search !== '') {
         )
     ";
 
-    $searchValue = '%' . $search . '%';
+    $v = "%$search%";
 
-    $params[] = $searchValue;
-    $params[] = $searchValue;
-    $params[] = $searchValue;
+    array_push(
+        $params,
+        $v,
+        $v,
+        $v
+    );
 }
-
-/*
-|--------------------------------------------------------------------------
-| STATUS FILTER
-|--------------------------------------------------------------------------
-*/
 
 if ($status_filter !== '') {
 
-    $sql .= "
-        AND p.status = ?
-    ";
-
+    $sql .= " AND p.status = ?";
     $params[] = $status_filter;
 }
 
-/*
-|--------------------------------------------------------------------------
-| CATEGORY FILTER
-|--------------------------------------------------------------------------
-*/
-
 if ($category_filter > 0) {
 
-    $sql .= "
-        AND p.category_id = ?
-    ";
-
+    $sql .= " AND p.category_id = ?";
     $params[] = $category_filter;
 }
 
-/*
-|--------------------------------------------------------------------------
-| ORDER
-|--------------------------------------------------------------------------
-*/
-
-$sql .= "
-    ORDER BY p.created_at DESC
-";
+$sql .= " ORDER BY p.created_at DESC";
 
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
@@ -378,43 +271,41 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 /*
 |--------------------------------------------------------------------------
-| STATISTICS
+| PRODUCT STATISTICS
 |--------------------------------------------------------------------------
 */
 
-$stmt = $db->query("
-    SELECT COUNT(*)
-    FROM products
-");
+$total_products = (int) $db
+    ->query("SELECT COUNT(*) FROM products")
+    ->fetchColumn();
 
-$total_products = (int) $stmt->fetchColumn();
+$available_products = (int) $db
+    ->query(
+        "SELECT COUNT(*)
+         FROM products
+         WHERE status = 'Available'"
+    )
+    ->fetchColumn();
 
-$stmt = $db->query("
-    SELECT COUNT(*)
-    FROM products
-    WHERE status = 'Available'
-");
+$out_of_stock = (int) $db
+    ->query(
+        "SELECT COUNT(*)
+         FROM products
+         WHERE status = 'Out of Stock'"
+    )
+    ->fetchColumn();
 
-$available_products = (int) $stmt->fetchColumn();
-
-$stmt = $db->query("
-    SELECT COUNT(*)
-    FROM products
-    WHERE status = 'Out of Stock'
-");
-
-$out_of_stock = (int) $stmt->fetchColumn();
-
-$stmt = $db->query("
-    SELECT COUNT(*)
-    FROM products
-    WHERE status = 'Hidden'
-");
-
-$hidden_products = (int) $stmt->fetchColumn();
+$hidden_products = (int) $db
+    ->query(
+        "SELECT COUNT(*)
+         FROM products
+         WHERE status = 'Hidden'"
+    )
+    ->fetchColumn();
 
 ?>
-<!DOCTYPE html>
+
+<!doctype html>
 <html lang="en">
 
 <head>
@@ -442,546 +333,421 @@ $hidden_products = (int) $stmt->fetchColumn();
 
 <body>
 
-<div class="admin-wrapper">
+    <div class="admin-wrapper">
 
-    <!-- SIDEBAR -->
+        <?php require_once dirname(__DIR__) . '/includes/admin_sidebar.php'; ?>
 
-    <?php
-    $admin_sidebar = dirname(__DIR__) . '/includes/admin_sidebar.php';
+        <main class="admin-main">
 
-    if (file_exists($admin_sidebar)) {
-        require_once $admin_sidebar;
-    }
-    ?>
+            <!-- Header -->
 
-    <!-- MAIN CONTENT -->
+            <header class="admin-topbar">
 
-    <main class="admin-main">
+                <div class="admin-header-left">
 
-        <!-- TOP BAR -->
-
-        <div class="admin-topbar">
-
-            <div>
-                <h1>Products</h1>
-
-                <p>
-                    Manage all products listed by HochipoHub vendors.
-                </p>
-            </div>
-
-            <div class="admin-user">
-
-                <span>
-                    <?= htmlspecialchars($_SESSION['name'] ?? 'Administrator') ?>
-                </span>
-
-            </div>
-
-        </div>
-
-        <!-- ALERT -->
-
-        <?php if (isset($_GET['success'])): ?>
-
-            <div class="admin-alert success">
-
-                <?php if ($_GET['success'] === 'deleted'): ?>
-
-                    Product deleted successfully.
-
-                <?php elseif ($_GET['success'] === 'status'): ?>
-
-                    Product status updated successfully.
-
-                <?php endif; ?>
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <?php if (isset($_GET['error'])): ?>
-
-            <div class="admin-alert error">
-
-                <?php if ($_GET['error'] === 'order'): ?>
-
-                    This product cannot be deleted because it is already
-                    connected to an existing order.
-
-                <?php elseif ($_GET['error'] === 'notfound'): ?>
-
-                    Product not found.
-
-                <?php else: ?>
-
-                    Unable to process the request.
-
-                <?php endif; ?>
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <!-- STATISTICS -->
-
-        <section class="admin-stats">
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Total Products
-                </span>
-
-                <strong>
-                    <?= $total_products ?>
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Available
-                </span>
-
-                <strong>
-                    <?= $available_products ?>
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Out of Stock
-                </span>
-
-                <strong>
-                    <?= $out_of_stock ?>
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span class="stat-label">
-                    Hidden
-                </span>
-
-                <strong>
-                    <?= $hidden_products ?>
-                </strong>
-
-            </div>
-
-        </section>
-
-
-        <!-- FILTER -->
-
-        <section class="admin-panel">
-
-            <form
-                method="GET"
-                class="admin-filter-form"
-            >
-
-                <input
-                    type="text"
-                    name="search"
-                    placeholder="Search product or vendor..."
-                    value="<?= htmlspecialchars($search) ?>"
-                >
-
-
-                <select name="status">
-
-                    <option value="">
-                        All Status
-                    </option>
-
-                    <option
-                        value="Available"
-                        <?= $status_filter === 'Available' ? 'selected' : '' ?>
+                    <button
+                        type="button"
+                        id="adminSidebarToggle"
+                        class="admin-sidebar-toggle"
+                        aria-label="Open sidebar"
+                        aria-expanded="false"
                     >
-                        Available
-                    </option>
+                        ☰
+                    </button>
 
-                    <option
-                        value="Out of Stock"
-                        <?= $status_filter === 'Out of Stock' ? 'selected' : '' ?>
-                    >
-                        Out of Stock
-                    </option>
+                    <div>
 
-                    <option
-                        value="Hidden"
-                        <?= $status_filter === 'Hidden' ? 'selected' : '' ?>
-                    >
-                        Hidden
-                    </option>
+                        <h1>Products</h1>
 
-                </select>
+                        <p>
+                            Manage all products listed by HochipoHub vendors.
+                        </p>
 
-
-                <select name="category">
-
-                    <option value="">
-                        All Categories
-                    </option>
-
-                    <?php foreach ($categories as $category): ?>
-
-                        <option
-                            value="<?= $category['category_id'] ?>"
-                            <?= $category_filter == $category['category_id'] ? 'selected' : '' ?>
-                        >
-
-                            <?= htmlspecialchars(
-                                $category['category_name']
-                            ) ?>
-
-                        </option>
-
-                    <?php endforeach; ?>
-
-                </select>
-
-
-                <button
-                    type="submit"
-                    class="admin-btn primary"
-                >
-                    Search
-                </button>
-
-
-                <a
-                    href="products.php"
-                    class="admin-btn secondary"
-                >
-                    Reset
-                </a>
-
-            </form>
-
-        </section>
-
-
-        <!-- PRODUCTS TABLE -->
-
-        <section class="admin-panel">
-
-            <div class="panel-header">
-
-                <div>
-
-                    <h2>
-                        Product List
-                    </h2>
-
-                    <p>
-                        <?= count($products) ?> product(s) found
-                    </p>
+                    </div>
 
                 </div>
 
-            </div>
+            </header>
 
+            <!-- Success Message -->
 
-            <div class="table-wrapper">
+            <?php if (isset($_GET['success'])): ?>
 
-                <table class="admin-table">
+                <div class="admin-alert success">
 
-                    <thead>
+                    <?= $_GET['success'] === 'deleted'
+                        ? 'Product deleted successfully.'
+                        : 'Product status updated successfully.'
+                    ?>
 
-                    <tr>
+                </div>
 
-                        <th>ID</th>
+            <?php endif; ?>
 
-                        <th>Product</th>
+            <!-- Error Message -->
 
-                        <th>Vendor</th>
+            <?php if (isset($_GET['error'])): ?>
 
-                        <th>Category</th>
+                <div class="admin-alert error">
 
-                        <th>Price</th>
+                    <?php if ($_GET['error'] === 'order'): ?>
 
-                        <th>Stock</th>
+                        This product cannot be deleted because it is already connected to an existing order.
 
-                        <th>Status</th>
+                    <?php elseif ($_GET['error'] === 'notfound'): ?>
 
-                        <th>Created</th>
-
-                        <th>Action</th>
-
-                    </tr>
-
-                    </thead>
-
-
-                    <tbody>
-
-                    <?php if (empty($products)): ?>
-
-                        <tr>
-
-                            <td
-                                colspan="9"
-                                class="empty-state"
-                            >
-
-                                No products found.
-
-                            </td>
-
-                        </tr>
+                        Product not found.
 
                     <?php else: ?>
 
-
-                        <?php foreach ($products as $product): ?>
-
-                            <tr>
-
-                                <!-- ID -->
-
-                                <td>
-
-                                    #<?= (int) $product['product_id'] ?>
-
-                                </td>
-
-
-                                <!-- PRODUCT -->
-
-                                <td>
-
-                                    <div class="product-table-info">
-
-                                        <?php
-                                        $image = trim(
-                                            $product['image'] ?? ''
-                                        );
-
-                                        if ($image !== ''):
-
-                                            $imagePath =
-                                                '../uploads/products/' .
-                                                basename($image);
-                                        ?>
-
-                                            <img
-                                                src="<?= htmlspecialchars($imagePath) ?>"
-                                                alt="<?= htmlspecialchars($product['product_name']) ?>"
-                                                class="table-product-image"
-                                                onerror="this.style.display='none';"
-                                            >
-
-                                        <?php endif; ?>
-
-
-                                        <div>
-
-                                            <strong>
-
-                                                <?= htmlspecialchars(
-                                                    $product['product_name']
-                                                ) ?>
-
-                                            </strong>
-
-                                            <small>
-
-                                                <?= htmlspecialchars(
-                                                    $product['description'] ?? ''
-                                                ) ?>
-
-                                            </small>
-
-                                        </div>
-
-                                    </div>
-
-                                </td>
-
-
-                                <!-- VENDOR -->
-
-                                <td>
-
-                                    <strong>
-
-                                        <?= htmlspecialchars(
-                                            $product['business_name']
-                                        ) ?>
-
-                                    </strong>
-
-                                    <small>
-
-                                        <?= htmlspecialchars(
-                                            $product['vendor_name']
-                                        ) ?>
-
-                                    </small>
-
-                                </td>
-
-
-                                <!-- CATEGORY -->
-
-                                <td>
-
-                                    <?= htmlspecialchars(
-                                        $product['category_name']
-                                    ) ?>
-
-                                </td>
-
-
-                                <!-- PRICE -->
-
-                                <td>
-
-                                    RM
-                                    <?= number_format(
-                                        (float) $product['price'],
-                                        2
-                                    ) ?>
-
-                                </td>
-
-
-                                <!-- STOCK -->
-
-                                <td>
-
-                                    <?= (int) $product['stock_quantity'] ?>
-
-                                </td>
-
-
-                                <!-- STATUS -->
-
-                                <td>
-
-                                    <form
-                                        method="POST"
-                                        class="inline-form"
-                                    >
-
-                                        <input
-                                            type="hidden"
-                                            name="product_id"
-                                            value="<?= (int) $product['product_id'] ?>"
-                                        >
-
-                                        <input
-                                            type="hidden"
-                                            name="update_status"
-                                            value="1"
-                                        >
-
-                                        <select
-                                            name="status"
-                                            onchange="this.form.submit()"
-                                            class="status-select"
-                                        >
-
-                                            <option
-                                                value="Available"
-                                                <?= $product['status'] === 'Available' ? 'selected' : '' ?>
-                                            >
-                                                Available
-                                            </option>
-
-                                            <option
-                                                value="Out of Stock"
-                                                <?= $product['status'] === 'Out of Stock' ? 'selected' : '' ?>
-                                            >
-                                                Out of Stock
-                                            </option>
-
-                                            <option
-                                                value="Hidden"
-                                                <?= $product['status'] === 'Hidden' ? 'selected' : '' ?>
-                                            >
-                                                Hidden
-                                            </option>
-
-                                        </select>
-
-                                    </form>
-
-                                </td>
-
-
-                                <!-- DATE -->
-
-                                <td>
-
-                                    <?= date(
-                                        'd M Y',
-                                        strtotime(
-                                            $product['created_at']
-                                        )
-                                    ) ?>
-
-                                </td>
-
-
-                                <!-- ACTION -->
-
-                                <td>
-
-                                    <div class="table-actions">
-
-                                        <a
-                                            href="../product_details.php?id=<?= (int) $product['product_id'] ?>"
-                                            class="admin-btn small"
-                                            target="_blank"
-                                        >
-                                            View
-                                        </a>
-
-
-                                        <a
-                                            href="products.php?delete=<?= (int) $product['product_id'] ?>"
-                                            class="admin-btn small danger"
-                                            onclick="return confirm('Are you sure you want to delete this product?');"
-                                        >
-                                            Delete
-                                        </a>
-
-                                    </div>
-
-                                </td>
-
-                            </tr>
-
-                        <?php endforeach; ?>
-
+                        Unable to process the request.
 
                     <?php endif; ?>
 
-                    </tbody>
+                </div>
 
-                </table>
+            <?php endif; ?>
 
-            </div>
+            <!-- Statistics -->
 
-        </section>
+            <section class="admin-stats">
 
-    </main>
+                <?php
+                foreach (
+                    [
+                        ['Total Products', $total_products],
+                        ['Available', $available_products],
+                        ['Out of Stock', $out_of_stock],
+                        ['Hidden', $hidden_products]
+                    ] as $s
+                ):
+                ?>
 
-</div>
+                    <div class="stat-card">
+
+                        <span class="stat-label">
+                            <?= e($s[0]) ?>
+                        </span>
+
+                        <strong>
+                            <?= number_format($s[1]) ?>
+                        </strong>
+
+                    </div>
+
+                <?php endforeach; ?>
+
+            </section>
+
+            <!-- Filter -->
+
+            <section class="admin-panel">
+
+                <form
+                    method="GET"
+                    class="admin-filter-form"
+                >
+
+                    <input
+                        type="text"
+                        name="search"
+                        placeholder="Search product or vendor..."
+                        value="<?= e($search) ?>"
+                    >
+
+                    <select name="status">
+
+                        <option value="">
+                            All Status
+                        </option>
+
+                        <?php foreach (
+                            ['Available', 'Out of Stock', 'Hidden'] as $s
+                        ): ?>
+
+                            <option
+                                value="<?= e($s) ?>"
+                                <?= $status_filter === $s ? 'selected' : '' ?>
+                            >
+                                <?= e($s) ?>
+                            </option>
+
+                        <?php endforeach; ?>
+
+                    </select>
+
+                    <select name="category">
+
+                        <option value="">
+                            All Categories
+                        </option>
+
+                        <?php foreach ($categories as $c): ?>
+
+                            <option
+                                value="<?= (int) $c['category_id'] ?>"
+                                <?= $category_filter == (int) $c['category_id'] ? 'selected' : '' ?>
+                            >
+                                <?= e($c['category_name']) ?>
+                            </option>
+
+                        <?php endforeach; ?>
+
+                    </select>
+
+                    <button
+                        class="admin-btn primary"
+                        type="submit"
+                    >
+                        Search
+                    </button>
+
+                    <a
+                        class="admin-btn secondary"
+                        href="products.php"
+                    >
+                        Reset
+                    </a>
+
+                </form>
+
+            </section>
+
+            <!-- Product List -->
+
+            <section class="admin-panel">
+
+                <div class="panel-header">
+
+                    <div>
+
+                        <h2>Product List</h2>
+
+                        <p>
+                            <?= count($products) ?> product(s) found
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <div class="table-wrapper">
+
+                    <table class="admin-table">
+
+                        <thead>
+
+                            <tr>
+                                <th>ID</th>
+                                <th>Product</th>
+                                <th>Vendor</th>
+                                <th>Category</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Action</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            <?php if (!$products): ?>
+
+                                <tr>
+
+                                    <td
+                                        colspan="9"
+                                        class="empty-state"
+                                    >
+                                        No products found.
+                                    </td>
+
+                                </tr>
+
+                            <?php else: ?>
+
+                                <?php foreach ($products as $p): ?>
+
+                                    <tr>
+
+                                        <td>
+                                            #<?= (int) $p['product_id'] ?>
+                                        </td>
+
+                                        <!-- Product -->
+
+                                        <td>
+
+                                            <div class="product-table-info">
+
+                                                <?php
+                                                $image = trim($p['image'] ?? '');
+                                                ?>
+
+                                                <?php if ($image !== ''): ?>
+
+                                                    <img
+                                                        class="table-product-image"
+                                                        src="../uploads/products/<?= e(basename($image)) ?>"
+                                                        alt="<?= e($p['product_name']) ?>"
+                                                        onerror="this.style.display='none';"
+                                                    >
+
+                                                <?php endif; ?>
+
+                                                <div>
+
+                                                    <strong>
+                                                        <?= e($p['product_name']) ?>
+                                                    </strong>
+
+                                                    <small>
+                                                        <?= e($p['description'] ?? '') ?>
+                                                    </small>
+
+                                                </div>
+
+                                            </div>
+
+                                        </td>
+
+                                        <!-- Vendor -->
+
+                                        <td>
+
+                                            <strong>
+                                                <?= e($p['business_name']) ?>
+                                            </strong>
+
+                                            <small>
+                                                <?= e($p['vendor_name']) ?>
+                                            </small>
+
+                                        </td>
+
+                                        <!-- Category -->
+
+                                        <td>
+                                            <?= e($p['category_name']) ?>
+                                        </td>
+
+                                        <!-- Price -->
+
+                                        <td>
+                                            RM <?= number_format(
+                                                (float) $p['price'],
+                                                2
+                                            ) ?>
+                                        </td>
+
+                                        <!-- Stock -->
+
+                                        <td>
+                                            <?= (int) $p['stock_quantity'] ?>
+                                        </td>
+
+                                        <!-- Status -->
+
+                                        <td>
+
+                                            <form
+                                                method="POST"
+                                                class="inline-form"
+                                            >
+
+                                                <input
+                                                    type="hidden"
+                                                    name="product_id"
+                                                    value="<?= (int) $p['product_id'] ?>"
+                                                >
+
+                                                <input
+                                                    type="hidden"
+                                                    name="update_status"
+                                                    value="1"
+                                                >
+
+                                                <select
+                                                    class="status-select"
+                                                    name="status"
+                                                    onchange="this.form.submit()"
+                                                >
+
+                                                    <?php foreach (
+                                                        ['Available', 'Out of Stock', 'Hidden'] as $s
+                                                    ): ?>
+
+                                                        <option
+                                                            value="<?= e($s) ?>"
+                                                            <?= $p['status'] === $s ? 'selected' : '' ?>
+                                                        >
+                                                            <?= e($s) ?>
+                                                        </option>
+
+                                                    <?php endforeach; ?>
+
+                                                </select>
+
+                                            </form>
+
+                                        </td>
+
+                                        <!-- Created -->
+
+                                        <td>
+                                            <?= e(
+                                                date(
+                                                    'd M Y',
+                                                    strtotime($p['created_at'])
+                                                )
+                                            ) ?>
+                                        </td>
+
+                                        <!-- Action -->
+
+                                        <td>
+
+                                            <div class="table-actions">
+
+                                                <a
+                                                    class="admin-btn small"
+                                                    href="../product_details.php?id=<?= (int) $p['product_id'] ?>"
+                                                    target="_blank"
+                                                >
+                                                    View
+                                                </a>
+
+                                                <a
+                                                    class="admin-btn small danger"
+                                                    href="products.php?delete=<?= (int) $p['product_id'] ?>"
+                                                    onclick="return confirm('Are you sure you want to delete this product?');"
+                                                >
+                                                    Delete
+                                                </a>
+
+                                            </div>
+
+                                        </td>
+
+                                    </tr>
+
+                                <?php endforeach; ?>
+
+                            <?php endif; ?>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
 
 </body>
 
