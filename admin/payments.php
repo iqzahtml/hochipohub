@@ -1,8 +1,28 @@
 <?php
-session_start();
 
-require_once "../config.php";
-require_once "../database/db.php";
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - ADMIN PAYMENTS
+|--------------------------------------------------------------------------
+*/
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/database/db.php';
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE CONNECTION
+|--------------------------------------------------------------------------
+| database/db.php creates $db.
+| This page uses $conn for compatibility.
+|--------------------------------------------------------------------------
+*/
+
+$conn = $db;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,7 +35,10 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+if (
+    !isset($_SESSION['role']) ||
+    strtolower($_SESSION['role']) !== 'admin'
+) {
     header("Location: ../index.php");
     exit;
 }
@@ -27,13 +50,57 @@ $error = "";
 
 /*
 |--------------------------------------------------------------------------
+| HELPER FUNCTIONS
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('e')) {
+
+    function e($value)
+    {
+        return htmlspecialchars(
+            (string) $value,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    }
+}
+
+if (!function_exists('money')) {
+
+    function money($value)
+    {
+        return 'RM ' . number_format(
+            (float) $value,
+            2
+        );
+    }
+}
+
+if (!function_exists('payment_status_class')) {
+
+    function payment_status_class($status)
+    {
+        return 'payment-status-' .
+            strtolower(
+                str_replace(
+                    ' ',
+                    '-',
+                    $status
+                )
+            );
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
 | UPDATE PAYMENT STATUS
 |--------------------------------------------------------------------------
 */
 
 if (
-    $_SERVER['REQUEST_METHOD'] === 'POST'
-    && isset($_POST['update_payment'])
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['update_payment'])
 ) {
 
     $payment_id = isset($_POST['payment_id'])
@@ -53,11 +120,11 @@ if (
 
     if ($payment_id <= 0) {
 
-        $error = "Invalid payment ID.";
+        $error = 'Invalid payment ID.';
 
     } elseif (!in_array($new_status, $allowed_status, true)) {
 
-        $error = "Invalid payment status.";
+        $error = 'Invalid payment status.';
 
     } else {
 
@@ -71,8 +138,12 @@ if (
 
             $stmt = $conn->prepare("
                 UPDATE payments
-                SET payment_status = ?,
-                    payment_date = COALESCE(payment_date, NOW())
+                SET
+                    payment_status = ?,
+                    payment_date = COALESCE(
+                        payment_date,
+                        NOW()
+                    )
                 WHERE payment_id = ?
             ");
 
@@ -88,7 +159,7 @@ if (
         if ($stmt) {
 
             $stmt->bind_param(
-                "si",
+                'si',
                 $new_status,
                 $payment_id
             );
@@ -113,7 +184,7 @@ if (
                 if ($get_order) {
 
                     $get_order->bind_param(
-                        "i",
+                        'i',
                         $payment_id
                     );
 
@@ -121,15 +192,14 @@ if (
 
                     $result = $get_order->get_result();
 
-                    $payment_row = $result->fetch_assoc();
+                    $row = $result->fetch_assoc();
 
-                    if ($payment_row) {
-                        $order_id = (int) $payment_row['order_id'];
+                    if ($row) {
+                        $order_id = (int) $row['order_id'];
                     }
 
                     $get_order->close();
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
@@ -137,10 +207,13 @@ if (
                 |--------------------------------------------------------------------------
                 */
 
-                $action = "Updated payment #".$payment_id.
-                          " status to ".$new_status;
+                $action =
+                    'Updated payment #' .
+                    $payment_id .
+                    ' status to ' .
+                    $new_status;
 
-                $target_type = "payment";
+                $target_type = 'payment';
 
                 $log = $conn->prepare("
                     INSERT INTO admin_logs
@@ -156,7 +229,7 @@ if (
                 if ($log) {
 
                     $log->bind_param(
-                        "issi",
+                        'issi',
                         $admin_id,
                         $action,
                         $target_type,
@@ -169,19 +242,23 @@ if (
                 }
 
                 $message =
-                    "Payment #".$payment_id.
-                    " status updated successfully.";
+                    'Payment #' .
+                    $payment_id .
+                    ' status updated successfully.';
 
             } else {
 
-                $error = "Failed to update payment status.";
+                $error =
+                    'Failed to update payment status.';
             }
 
             $stmt->close();
 
         } else {
 
-            $error = "Database error.";
+            $error =
+                'Database error: ' .
+                $conn->error;
         }
     }
 }
@@ -234,7 +311,7 @@ if ($result) {
 
 /*
 |--------------------------------------------------------------------------
-| PAYMENT STATISTICS
+| STATISTICS
 |--------------------------------------------------------------------------
 */
 
@@ -265,7 +342,6 @@ foreach ($payments as $payment) {
 
             break;
 
-
         case 'Paid':
 
             $paid_payments++;
@@ -274,13 +350,11 @@ foreach ($payments as $payment) {
 
             break;
 
-
         case 'Failed':
 
             $failed_payments++;
 
             break;
-
 
         case 'Refunded':
 
@@ -292,39 +366,370 @@ foreach ($payments as $payment) {
     }
 }
 
-function e($value)
-{
-    return htmlspecialchars(
-        (string) $value,
-        ENT_QUOTES,
-        'UTF-8'
-    );
-}
-
-function money($value)
-{
-    return "RM " . number_format(
-        (float) $value,
-        2
-    );
-}
-
 ?>
 
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
 
     <meta charset="UTF-8">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-    <title>Payments | HochipoHub Admin</title>
+    <title>
+        Payments | HochipoHub Admin
+    </title>
 
-    <link rel="stylesheet"
-          href="../css/admin.css">
+    <link
+        rel="stylesheet"
+        href="../css/admin.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/responsive.css"
+    >
+
+    <style>
+
+        .payment-page {
+            min-height: 100vh;
+            padding: 35px;
+            background:
+                radial-gradient(
+                    circle at top right,
+                    rgba(37, 99, 235, .10),
+                    transparent 30%
+                ),
+                #f8fafc;
+        }
+
+        .payment-container {
+            max-width: 1500px;
+            margin: 0 auto;
+        }
+
+        .payment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 28px;
+            gap: 20px;
+        }
+
+        .payment-header h1 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .payment-header p {
+            margin: 7px 0 0;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .admin-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #2563eb;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .payment-alert {
+            padding: 14px 18px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .payment-alert.success {
+            background: #ecfdf5;
+            color: #047857;
+            border: 1px solid #a7f3d0;
+        }
+
+        .payment-alert.error {
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+
+        .payment-stats {
+            display: grid;
+            grid-template-columns:
+                repeat(5, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .payment-stat {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            padding: 22px;
+            box-shadow:
+                0 8px 25px
+                rgba(15, 23, 42, .05);
+        }
+
+        .payment-stat-label {
+            display: block;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: 10px;
+        }
+
+        .payment-stat-value {
+            display: block;
+            color: #0f172a;
+            font-size: 26px;
+            font-weight: 900;
+        }
+
+        .payment-stat-money {
+            display: block;
+            margin-top: 5px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .payment-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow:
+                0 10px 30px
+                rgba(15, 23, 42, .06);
+        }
+
+        .payment-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 22px 24px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .payment-card-header h2 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .payment-card-header p {
+            margin: 5px 0 0;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .payment-table-wrapper {
+            overflow-x: auto;
+        }
+
+        .payment-table {
+            width: 100%;
+            min-width: 1100px;
+            border-collapse: collapse;
+        }
+
+        .payment-table th {
+            padding: 15px 18px;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 900;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+
+        .payment-table td {
+            padding: 17px 18px;
+            border-top: 1px solid #f1f5f9;
+            color: #334155;
+            font-size: 13px;
+            vertical-align: middle;
+        }
+
+        .payment-table tr:hover td {
+            background: #f8fafc;
+        }
+
+        .payment-id {
+            color: #2563eb;
+            font-weight: 900;
+        }
+
+        .payment-customer strong {
+            display: block;
+            color: #0f172a;
+            font-weight: 800;
+        }
+
+        .payment-customer small {
+            display: block;
+            margin-top: 3px;
+            color: #94a3b8;
+            font-size: 11px;
+        }
+
+        .payment-order-link {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 900;
+        }
+
+        .payment-order-link:hover {
+            text-decoration: underline;
+        }
+
+        .payment-amount {
+            color: #059669;
+            font-weight: 900;
+        }
+
+        .payment-reference {
+            padding: 5px 8px;
+            border-radius: 7px;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 11px;
+        }
+
+        .payment-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .payment-status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .payment-status-paid {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .payment-status-failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .payment-status-refunded {
+            background: #ede9fe;
+            color: #6d28d9;
+        }
+
+        .payment-form select {
+            min-width: 120px;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 9px;
+            background: #ffffff;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .payment-form select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow:
+                0 0 0 3px
+                rgba(37, 99, 235, .10);
+        }
+
+        .payment-empty {
+            padding: 70px 20px;
+            text-align: center;
+        }
+
+        .payment-empty-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 18px;
+            background: #eff6ff;
+            color: #2563eb;
+            font-size: 26px;
+            font-weight: 900;
+        }
+
+        .payment-empty h3 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 17px;
+        }
+
+        .payment-empty p {
+            margin: 7px 0 0;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        @media (max-width: 1100px) {
+
+            .payment-stats {
+                grid-template-columns:
+                    repeat(3, minmax(0, 1fr));
+            }
+
+        }
+
+        @media (max-width: 700px) {
+
+            .payment-page {
+                padding: 20px;
+            }
+
+            .payment-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .payment-stats {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+        }
+
+        @media (max-width: 450px) {
+
+            .payment-stats {
+                grid-template-columns: 1fr;
+            }
+
+        }
+
+    </style>
 
 </head>
 
@@ -332,9 +737,7 @@ function money($value)
 
 <div class="admin-layout">
 
-    <!-- =====================================================
-         SIDEBAR
-    ====================================================== -->
+    <!-- SIDEBAR -->
 
     <aside class="admin-sidebar">
 
@@ -349,7 +752,6 @@ function money($value)
             </p>
 
         </div>
-
 
         <nav>
 
@@ -373,8 +775,10 @@ function money($value)
                 Orders
             </a>
 
-            <a href="payments.php"
-               class="active">
+            <a
+                href="payments.php"
+                class="active"
+            >
                 Payments
             </a>
 
@@ -392,7 +796,6 @@ function money($value)
 
         </nav>
 
-
         <div class="admin-sidebar-bottom">
 
             <a href="../auth/logout.php">
@@ -404,461 +807,460 @@ function money($value)
     </aside>
 
 
-    <!-- =====================================================
-         MAIN CONTENT
-    ====================================================== -->
+    <!-- MAIN -->
 
     <main class="admin-main">
 
-        <header class="admin-header">
+        <div class="payment-page">
 
-            <div>
+            <div class="payment-container">
 
-                <h1>
-                    Payments
-                </h1>
+                <header class="payment-header">
 
-                <p>
-                    Monitor customer payment transactions.
-                </p>
+                    <div>
 
-            </div>
+                        <h1>
+                            Payments
+                        </h1>
 
-        </header>
+                        <p>
+                            Monitor and manage all customer payment transactions.
+                        </p>
 
+                    </div>
 
-        <!-- =================================================
-             ALERT
-        ================================================== -->
+                    <div class="admin-badge">
+                        ADMIN CONTROL
+                    </div>
 
-        <?php if ($message): ?>
+                </header>
 
-            <div class="admin-alert success">
 
-                <?= e($message) ?>
+                <?php if ($message): ?>
 
-            </div>
+                    <div class="payment-alert success">
+                        <?= e($message) ?>
+                    </div>
 
-        <?php endif; ?>
+                <?php endif; ?>
 
 
-        <?php if ($error): ?>
+                <?php if ($error): ?>
 
-            <div class="admin-alert error">
+                    <div class="payment-alert error">
+                        <?= e($error) ?>
+                    </div>
 
-                <?= e($error) ?>
+                <?php endif; ?>
 
-            </div>
 
-        <?php endif; ?>
+                <!-- STATISTICS -->
 
+                <section class="payment-stats">
 
-        <!-- =================================================
-             STATISTICS
-        ================================================== -->
+                    <div class="payment-stat">
 
-        <section class="admin-stats">
+                        <span class="payment-stat-label">
+                            Total Payments
+                        </span>
 
+                        <strong class="payment-stat-value">
+                            <?= number_format($total_payments) ?>
+                        </strong>
 
-            <div class="stat-card">
+                    </div>
 
-                <span>
-                    Total Payments
-                </span>
 
-                <strong>
-                    <?= $total_payments ?>
-                </strong>
+                    <div class="payment-stat">
 
-            </div>
+                        <span class="payment-stat-label">
+                            Paid
+                        </span>
 
+                        <strong class="payment-stat-value">
+                            <?= number_format($paid_payments) ?>
+                        </strong>
 
-            <div class="stat-card">
+                        <span class="payment-stat-money">
+                            <?= money($total_paid_amount) ?>
+                        </span>
 
-                <span>
-                    Paid
-                </span>
+                    </div>
 
-                <strong>
-                    <?= $paid_payments ?>
-                </strong>
 
-                <small>
-                    <?= money($total_paid_amount) ?>
-                </small>
+                    <div class="payment-stat">
 
-            </div>
+                        <span class="payment-stat-label">
+                            Pending
+                        </span>
 
+                        <strong class="payment-stat-value">
+                            <?= number_format($pending_payments) ?>
+                        </strong>
 
-            <div class="stat-card">
+                        <span class="payment-stat-money">
+                            <?= money($total_pending_amount) ?>
+                        </span>
 
-                <span>
-                    Pending
-                </span>
+                    </div>
 
-                <strong>
-                    <?= $pending_payments ?>
-                </strong>
 
-                <small>
-                    <?= money($total_pending_amount) ?>
-                </small>
+                    <div class="payment-stat">
 
-            </div>
+                        <span class="payment-stat-label">
+                            Failed
+                        </span>
 
+                        <strong class="payment-stat-value">
+                            <?= number_format($failed_payments) ?>
+                        </strong>
 
-            <div class="stat-card">
+                    </div>
 
-                <span>
-                    Failed
-                </span>
 
-                <strong>
-                    <?= $failed_payments ?>
-                </strong>
+                    <div class="payment-stat">
 
-            </div>
+                        <span class="payment-stat-label">
+                            Refunded
+                        </span>
 
+                        <strong class="payment-stat-value">
+                            <?= number_format($refunded_payments) ?>
+                        </strong>
 
-            <div class="stat-card">
+                        <span class="payment-stat-money">
+                            <?= money($total_refunded_amount) ?>
+                        </span>
 
-                <span>
-                    Refunded
-                </span>
+                    </div>
 
-                <strong>
-                    <?= $refunded_payments ?>
-                </strong>
+                </section>
 
-                <small>
-                    <?= money($total_refunded_amount) ?>
-                </small>
 
-            </div>
+                <!-- TABLE -->
 
+                <section class="payment-card">
 
-        </section>
+                    <div class="payment-card-header">
 
+                        <div>
 
-        <!-- =================================================
-             PAYMENTS TABLE
-        ================================================== -->
+                            <h2>
+                                Payment Transactions
+                            </h2>
 
-        <section class="admin-card">
+                            <p>
+                                All payment records from customer orders.
+                            </p>
 
-            <div class="card-header">
+                        </div>
 
-                <div>
-
-                    <h2>
-                        Payment Transactions
-                    </h2>
-
-                    <p>
-                        All payment records from customer orders.
-                    </p>
-
-                </div>
-
-            </div>
-
-
-            <div class="admin-table-wrapper">
-
-                <table class="admin-table">
-
-                    <thead>
-
-                    <tr>
-
-                        <th>
-                            Payment ID
-                        </th>
-
-                        <th>
-                            Order
-                        </th>
-
-                        <th>
-                            Customer
-                        </th>
-
-                        <th>
-                            Method
-                        </th>
-
-                        <th>
-                            Amount
-                        </th>
-
-                        <th>
-                            Transaction Reference
-                        </th>
-
-                        <th>
-                            Payment Date
-                        </th>
-
-                        <th>
-                            Status
-                        </th>
-
-                        <th>
-                            Action
-                        </th>
-
-                    </tr>
-
-                    </thead>
-
-
-                    <tbody>
+                    </div>
 
 
                     <?php if (empty($payments)): ?>
 
-                        <tr>
+                        <div class="payment-empty">
 
-                            <td colspan="9">
+                            <div class="payment-empty-icon">
+                                $
+                            </div>
 
-                                No payment records found.
+                            <h3>
+                                No payment records
+                            </h3>
 
-                            </td>
+                            <p>
+                                Payment transactions will appear here when customers make payments.
+                            </p>
 
-                        </tr>
+                        </div>
 
                     <?php else: ?>
 
+                        <div class="payment-table-wrapper">
 
-                        <?php foreach ($payments as $payment): ?>
+                            <table class="payment-table">
 
-                            <tr>
+                                <thead>
 
+                                    <tr>
 
-                                <!-- PAYMENT ID -->
+                                        <th>
+                                            Payment
+                                        </th>
 
-                                <td>
+                                        <th>
+                                            Order
+                                        </th>
 
-                                    <strong>
-                                        #<?= e(
-                                            $payment['payment_id']
-                                        ) ?>
-                                    </strong>
+                                        <th>
+                                            Customer
+                                        </th>
 
-                                </td>
+                                        <th>
+                                            Method
+                                        </th>
 
+                                        <th>
+                                            Amount
+                                        </th>
 
-                                <!-- ORDER -->
+                                        <th>
+                                            Reference
+                                        </th>
 
-                                <td>
+                                        <th>
+                                            Date
+                                        </th>
 
-                                    <a href="orders.php?view=<?= e(
-                                        $payment['order_id']
-                                    ) ?>">
+                                        <th>
+                                            Status
+                                        </th>
 
-                                        #<?= e(
-                                            $payment['order_id']
-                                        ) ?>
+                                        <th>
+                                            Update
+                                        </th>
 
-                                    </a>
+                                    </tr>
 
-                                </td>
+                                </thead>
 
+                                <tbody>
 
-                                <!-- CUSTOMER -->
+                                <?php foreach ($payments as $payment): ?>
 
-                                <td>
+                                    <tr>
 
-                                    <strong>
+                                        <td>
 
-                                        <?= e(
-                                            $payment['customer_name']
-                                        ) ?>
+                                            <span class="payment-id">
 
-                                    </strong>
+                                                #<?= e(
+                                                    $payment['payment_id']
+                                                ) ?>
 
-                                    <small>
+                                            </span>
 
-                                        <?= e(
-                                            $payment['customer_email']
-                                        ) ?>
-
-                                    </small>
-
-                                </td>
-
-
-                                <!-- METHOD -->
-
-                                <td>
-
-                                    <?= e(
-                                        $payment['payment_method']
-                                            ?: '-'
-                                    ) ?>
-
-                                </td>
+                                        </td>
 
 
-                                <!-- AMOUNT -->
+                                        <td>
 
-                                <td>
+                                            <a
+                                                class="payment-order-link"
+                                                href="orders.php?view=<?= e(
+                                                    $payment['order_id']
+                                                ) ?>"
+                                            >
 
-                                    <strong>
+                                                #<?= e(
+                                                    $payment['order_id']
+                                                ) ?>
 
-                                        <?= money(
-                                            $payment['amount']
-                                        ) ?>
+                                            </a>
 
-                                    </strong>
-
-                                </td>
+                                        </td>
 
 
-                                <!-- TRANSACTION REFERENCE -->
+                                        <td>
 
-                                <td>
+                                            <div class="payment-customer">
 
-                                    <?php if (
-                                        !empty(
-                                            $payment[
-                                                'transaction_reference'
-                                            ]
-                                        )
-                                    ): ?>
+                                                <strong>
+                                                    <?= e(
+                                                        $payment[
+                                                            'customer_name'
+                                                        ]
+                                                    ) ?>
+                                                </strong>
 
-                                        <code>
+                                                <small>
+                                                    <?= e(
+                                                        $payment[
+                                                            'customer_email'
+                                                        ]
+                                                    ) ?>
+                                                </small>
+
+                                            </div>
+
+                                        </td>
+
+
+                                        <td>
 
                                             <?= e(
                                                 $payment[
-                                                    'transaction_reference'
-                                                ]
+                                                    'payment_method'
+                                                ] ?: '-'
                                             ) ?>
 
-                                        </code>
-
-                                    <?php else: ?>
-
-                                        -
-
-                                    <?php endif; ?>
-
-                                </td>
+                                        </td>
 
 
-                                <!-- PAYMENT DATE -->
+                                        <td>
 
-                                <td>
+                                            <span class="payment-amount">
 
-                                    <?= e(
-                                        $payment['payment_date']
-                                            ?: '-'
-                                    ) ?>
+                                                <?= money(
+                                                    $payment['amount']
+                                                ) ?>
 
-                                </td>
+                                            </span>
 
-
-                                <!-- STATUS -->
-
-                                <td>
-
-                                    <span class="status-badge">
-
-                                        <?= e(
-                                            $payment[
-                                                'payment_status'
-                                            ]
-                                        ) ?>
-
-                                    </span>
-
-                                </td>
+                                        </td>
 
 
-                                <!-- UPDATE -->
+                                        <td>
 
-                                <td>
+                                            <?php if (
+                                                !empty(
+                                                    $payment[
+                                                        'transaction_reference'
+                                                    ]
+                                                )
+                                            ): ?>
 
-                                    <form method="POST">
-
-                                        <input
-                                            type="hidden"
-                                            name="payment_id"
-                                            value="<?= e(
-                                                $payment[
-                                                    'payment_id'
-                                                ]
-                                            ) ?>"
-                                        >
-
-
-                                        <select
-                                            name="payment_status"
-                                            onchange="this.form.submit()"
-                                        >
-
-                                            <?php
-                                            $statuses = [
-                                                'Pending',
-                                                'Paid',
-                                                'Failed',
-                                                'Refunded'
-                                            ];
-
-                                            foreach (
-                                                $statuses
-                                                as $status
-                                            ):
-                                            ?>
-
-                                                <option
-                                                    value="<?= e(
-                                                        $status
-                                                    ) ?>"
-                                                    <?= $payment[
-                                                        'payment_status'
-                                                    ] === $status
-                                                        ? 'selected'
-                                                        : '' ?>
-                                                >
+                                                <code class="payment-reference">
 
                                                     <?= e(
-                                                        $status
+                                                        $payment[
+                                                            'transaction_reference'
+                                                        ]
                                                     ) ?>
 
-                                                </option>
+                                                </code>
 
-                                            <?php endforeach; ?>
+                                            <?php else: ?>
 
-                                        </select>
+                                                -
 
+                                            <?php endif; ?>
 
-                                        <input
-                                            type="hidden"
-                                            name="update_payment"
-                                            value="1"
-                                        >
-
-                                    </form>
-
-                                </td>
+                                        </td>
 
 
-                            </tr>
+                                        <td>
 
-                        <?php endforeach; ?>
+                                            <?= e(
+                                                $payment['payment_date']
+                                                    ?: '-'
+                                            ) ?>
 
+                                        </td>
+
+
+                                        <td>
+
+                                            <span
+                                                class="
+                                                    payment-status
+                                                    <?= e(
+                                                        payment_status_class(
+                                                            $payment[
+                                                                'payment_status'
+                                                            ]
+                                                        )
+                                                    )
+                                                "
+                                            >
+
+                                                <?= e(
+                                                    $payment[
+                                                        'payment_status'
+                                                    ]
+                                                ) ?>
+
+                                            </span>
+
+                                        </td>
+
+
+                                        <td>
+
+                                            <form
+                                                method="POST"
+                                                class="payment-form"
+                                            >
+
+                                                <input
+                                                    type="hidden"
+                                                    name="payment_id"
+                                                    value="<?= e(
+                                                        $payment[
+                                                            'payment_id'
+                                                        ]
+                                                    ) ?>"
+                                                >
+
+                                                <select
+                                                    name="payment_status"
+                                                    onchange="this.form.submit()"
+                                                >
+
+                                                    <?php
+                                                    $statuses = [
+                                                        'Pending',
+                                                        'Paid',
+                                                        'Failed',
+                                                        'Refunded'
+                                                    ];
+                                                    ?>
+
+                                                    <?php foreach (
+                                                        $statuses
+                                                        as $status
+                                                    ): ?>
+
+                                                        <option
+                                                            value="<?= e(
+                                                                $status
+                                                            ) ?>"
+                                                            <?= $payment[
+                                                                'payment_status'
+                                                            ] === $status
+                                                                ? 'selected'
+                                                                : '' ?>
+                                                        >
+
+                                                            <?= e(
+                                                                $status
+                                                            ) ?>
+
+                                                        </option>
+
+                                                    <?php endforeach; ?>
+
+                                                </select>
+
+                                                <input
+                                                    type="hidden"
+                                                    name="update_payment"
+                                                    value="1"
+                                                >
+
+                                            </form>
+
+                                        </td>
+
+                                    </tr>
+
+                                <?php endforeach; ?>
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
 
                     <?php endif; ?>
 
-
-                    </tbody>
-
-                </table>
+                </section>
 
             </div>
 
-        </section>
+        </div>
 
     </main>
 
