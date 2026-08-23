@@ -11,27 +11,37 @@
 | - Dropdown menus
 | - Flash messages
 | - Scroll behaviour
-| - Password visibility
 | - Quantity controls
 | - Back to top
 | - General UI interactions
 |--------------------------------------------------------------------------
 */
 
-document.addEventListener("DOMContentLoaded", function () {
 
-    initMobileMenu();
-    initDropdowns();
-    initSearch();
-    initFlashMessages();
-    initPasswordToggle();
-    initQuantityControls();
-    initBackToTop();
-    initSmoothScroll();
-    initNavbarScroll();
-    initGeneralButtons();
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
 
-});
+        initMobileMenu();
+
+        initDropdowns();
+
+        initSearch();
+
+        initFlashMessages();
+
+        initQuantityControls();
+
+        initBackToTop();
+
+        initSmoothScroll();
+
+        initNavbarScroll();
+
+        initGeneralButtons();
+
+    }
+);
 
 
 /*
@@ -58,7 +68,9 @@ function initMobileMenu() {
         !menuButton ||
         !mobileMenu
     ) {
+
         return;
+
     }
 
 
@@ -86,7 +98,7 @@ function initMobileMenu() {
 
     /*
     |--------------------------------------------------------------------------
-    | Close when clicking outside
+    | CLOSE WHEN CLICKING OUTSIDE
     |--------------------------------------------------------------------------
     */
 
@@ -123,7 +135,7 @@ function initMobileMenu() {
 
     /*
     |--------------------------------------------------------------------------
-    | Close after clicking link
+    | CLOSE AFTER CLICKING LINK
     |--------------------------------------------------------------------------
     */
 
@@ -133,28 +145,30 @@ function initMobileMenu() {
         );
 
 
-    links.forEach(function (link) {
+    links.forEach(
+        function (link) {
 
-        link.addEventListener(
-            "click",
-            function () {
+            link.addEventListener(
+                "click",
+                function () {
 
-                mobileMenu.classList.remove(
-                    "active"
-                );
+                    mobileMenu.classList.remove(
+                        "active"
+                    );
 
-                menuButton.classList.remove(
-                    "active"
-                );
+                    menuButton.classList.remove(
+                        "active"
+                    );
 
-                document.body.classList.remove(
-                    "menu-open"
-                );
+                    document.body.classList.remove(
+                        "menu-open"
+                    );
 
-            }
-        );
+                }
+            );
 
-    });
+        }
+    );
 
 }
 
@@ -173,65 +187,69 @@ function initDropdowns() {
         );
 
 
-    dropdowns.forEach(function (dropdown) {
+    dropdowns.forEach(
+        function (dropdown) {
 
-        const toggle =
-            dropdown.querySelector(
-                ".dropdown-toggle"
-            );
-
-
-        if (!toggle) {
-            return;
-        }
-
-
-        toggle.addEventListener(
-            "click",
-            function (event) {
-
-                event.preventDefault();
-
-                event.stopPropagation();
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Close other dropdowns
-                |--------------------------------------------------------------------------
-                */
-
-                dropdowns.forEach(
-                    function (other) {
-
-                        if (
-                            other !==
-                            dropdown
-                        ) {
-
-                            other.classList.remove(
-                                "active"
-                            );
-
-                        }
-
-                    }
+            const toggle =
+                dropdown.querySelector(
+                    ".dropdown-toggle"
                 );
 
 
-                dropdown.classList.toggle(
-                    "active"
-                );
+            if (!toggle) {
+
+                return;
 
             }
-        );
 
-    });
+
+            toggle.addEventListener(
+                "click",
+                function (event) {
+
+                    event.preventDefault();
+
+                    event.stopPropagation();
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CLOSE OTHER DROPDOWNS
+                    |--------------------------------------------------------------------------
+                    */
+
+                    dropdowns.forEach(
+                        function (other) {
+
+                            if (
+                                other !==
+                                dropdown
+                            ) {
+
+                                other.classList.remove(
+                                    "active"
+                                );
+
+                            }
+
+                        }
+                    );
+
+
+                    dropdown.classList.toggle(
+                        "active"
+                    );
+
+                }
+            );
+
+        }
+    );
 
 
     /*
     |--------------------------------------------------------------------------
-    | Click outside
+    | CLICK OUTSIDE
     |--------------------------------------------------------------------------
     */
 
@@ -269,48 +287,52 @@ function initSearch() {
         );
 
 
-    searchForms.forEach(function (form) {
+    searchForms.forEach(
+        function (form) {
 
-        form.addEventListener(
-            "submit",
-            function (event) {
+            form.addEventListener(
+                "submit",
+                function (event) {
 
-                const input =
-                    form.querySelector(
-                        "input[name='q'], input[name='search'], input[type='search']"
-                    );
+                    const input =
+                        form.querySelector(
+                            "input[name='q'], input[name='search'], input[type='search']"
+                        );
 
 
-                if (!input) {
-                    return;
+                    if (!input) {
+
+                        return;
+
+                    }
+
+
+                    const keyword =
+                        input.value.trim();
+
+
+                    if (
+                        keyword.length === 0
+                    ) {
+
+                        event.preventDefault();
+
+                        input.focus();
+
+                        return;
+
+                    }
+
                 }
+            );
 
-
-                const keyword =
-                    input.value.trim();
-
-
-                if (
-                    keyword.length === 0
-                ) {
-
-                    event.preventDefault();
-
-                    input.focus();
-
-                    return;
-
-                }
-
-            }
-        );
-
-    });
+        }
+    );
 
 
     /*
     |--------------------------------------------------------------------------
-    | Search clear button
+    | SEARCH CLEAR BUTTON
     |--------------------------------------------------------------------------
     */
 
@@ -320,41 +342,45 @@ function initSearch() {
         );
 
 
-    clearButtons.forEach(function (button) {
+    clearButtons.forEach(
+        function (button) {
 
-        button.addEventListener(
-            "click",
-            function () {
+            button.addEventListener(
+                "click",
+                function () {
 
-                const form =
-                    button.closest(
-                        "form"
-                    );
+                    const form =
+                        button.closest(
+                            "form"
+                        );
 
 
-                if (!form) {
-                    return;
+                    if (!form) {
+
+                        return;
+
+                    }
+
+
+                    const input =
+                        form.querySelector(
+                            "input[type='search'], input[name='q'], input[name='search']"
+                        );
+
+
+                    if (input) {
+
+                        input.value = "";
+
+                        input.focus();
+
+                    }
+
                 }
+            );
 
-
-                const input =
-                    form.querySelector(
-                        "input[type='search'], input[name='q'], input[name='search']"
-                    );
-
-
-                if (input) {
-
-                    input.value = "";
-
-                    input.focus();
-
-                }
-
-            }
-        );
-
-    });
+        }
+    );
 
 }
 
@@ -373,55 +399,57 @@ function initFlashMessages() {
         );
 
 
-    messages.forEach(function (message) {
+    messages.forEach(
+        function (message) {
 
-        const closeButton =
-            message.querySelector(
-                ".alert-close, .close-alert"
-            );
+            const closeButton =
+                message.querySelector(
+                    ".alert-close, .close-alert"
+                );
 
 
-        if (closeButton) {
+            if (closeButton) {
 
-            closeButton.addEventListener(
-                "click",
-                function () {
+                closeButton.addEventListener(
+                    "click",
+                    function () {
 
-                    removeFlashMessage(
-                        message
-                    );
+                        removeFlashMessage(
+                            message
+                        );
 
-                }
-            );
+                    }
+                );
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | AUTO HIDE
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                message.dataset.autohide !==
+                "false"
+            ) {
+
+                setTimeout(
+                    function () {
+
+                        removeFlashMessage(
+                            message
+                        );
+
+                    },
+                    5000
+                );
+
+            }
 
         }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Auto hide
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            message.dataset.autohide !==
-            "false"
-        ) {
-
-            setTimeout(
-                function () {
-
-                    removeFlashMessage(
-                        message
-                    );
-
-                },
-                5000
-            );
-
-        }
-
-    });
+    );
 
 }
 
@@ -437,7 +465,9 @@ function removeFlashMessage(
 ) {
 
     if (!element) {
+
         return;
+
     }
 
 
@@ -468,106 +498,6 @@ function removeFlashMessage(
 
 /*
 |--------------------------------------------------------------------------
-| PASSWORD TOGGLE
-|--------------------------------------------------------------------------
-*/
-
-function initPasswordToggle() {
-
-    const buttons =
-        document.querySelectorAll(
-            ".password-toggle, [data-password-toggle]"
-        );
-
-
-    buttons.forEach(function (button) {
-
-        button.addEventListener(
-            "click",
-            function (event) {
-
-                event.preventDefault();
-
-
-                const targetId =
-                    button.dataset.target ||
-                    button.getAttribute(
-                        "data-password-toggle"
-                    );
-
-
-                let input = null;
-
-
-                if (targetId) {
-
-                    input =
-                        document.getElementById(
-                            targetId
-                        );
-
-                }
-
-
-                if (!input) {
-
-                    input =
-                        button.parentElement
-                            ?.querySelector(
-                                "input[type='password'], input[type='text']"
-                            );
-
-                }
-
-
-                if (!input) {
-                    return;
-                }
-
-
-                if (
-                    input.type ===
-                    "password"
-                ) {
-
-                    input.type =
-                        "text";
-
-                    button.classList.add(
-                        "active"
-                    );
-
-                    button.setAttribute(
-                        "aria-label",
-                        "Hide password"
-                    );
-
-                } else {
-
-                    input.type =
-                        "password";
-
-                    button.classList.remove(
-                        "active"
-                    );
-
-                    button.setAttribute(
-                        "aria-label",
-                        "Show password"
-                    );
-
-                }
-
-            }
-        );
-
-    });
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
 | QUANTITY CONTROLS
 |--------------------------------------------------------------------------
 */
@@ -580,65 +510,69 @@ function initQuantityControls() {
         );
 
 
-    quantityGroups.forEach(function (group) {
+    quantityGroups.forEach(
+        function (group) {
 
-        const input =
-            group.querySelector(
-                "input[type='number']"
-            );
+            const input =
+                group.querySelector(
+                    "input[type='number']"
+                );
 
 
-        if (!input) {
-            return;
+            if (!input) {
+
+                return;
+
+            }
+
+
+            const decrease =
+                group.querySelector(
+                    ".quantity-minus, [data-quantity-minus]"
+                );
+
+
+            const increase =
+                group.querySelector(
+                    ".quantity-plus, [data-quantity-plus]"
+                );
+
+
+            if (decrease) {
+
+                decrease.addEventListener(
+                    "click",
+                    function () {
+
+                        changeQuantity(
+                            input,
+                            -1
+                        );
+
+                    }
+                );
+
+            }
+
+
+            if (increase) {
+
+                increase.addEventListener(
+                    "click",
+                    function () {
+
+                        changeQuantity(
+                            input,
+                            1
+                        );
+
+                    }
+                );
+
+            }
+
         }
-
-
-        const decrease =
-            group.querySelector(
-                ".quantity-minus, [data-quantity-minus]"
-            );
-
-
-        const increase =
-            group.querySelector(
-                ".quantity-plus, [data-quantity-plus]"
-            );
-
-
-        if (decrease) {
-
-            decrease.addEventListener(
-                "click",
-                function () {
-
-                    changeQuantity(
-                        input,
-                        -1
-                    );
-
-                }
-            );
-
-        }
-
-
-        if (increase) {
-
-            increase.addEventListener(
-                "click",
-                function () {
-
-                    changeQuantity(
-                        input,
-                        1
-                    );
-
-                }
-            );
-
-        }
-
-    });
+    );
 
 }
 
@@ -655,7 +589,9 @@ function changeQuantity(
 ) {
 
     if (!input) {
+
         return;
+
     }
 
 
@@ -696,13 +632,21 @@ function changeQuantity(
     value += amount;
 
 
-    if (value < min) {
+    if (
+        value < min
+    ) {
+
         value = min;
+
     }
 
 
-    if (value > max) {
+    if (
+        value > max
+    ) {
+
         value = max;
+
     }
 
 
@@ -747,7 +691,9 @@ function initBackToTop() {
 
 
     if (!button) {
+
         return;
+
     }
 
 
@@ -782,6 +728,7 @@ function initBackToTop() {
 
             event.preventDefault();
 
+
             window.scrollTo({
                 top: 0,
                 behavior: "smooth"
@@ -807,49 +754,55 @@ function initSmoothScroll() {
         );
 
 
-    links.forEach(function (link) {
+    links.forEach(
+        function (link) {
 
-        link.addEventListener(
-            "click",
-            function (event) {
+            link.addEventListener(
+                "click",
+                function (event) {
 
-                const href =
-                    link.getAttribute(
-                        "href"
-                    );
+                    const href =
+                        link.getAttribute(
+                            "href"
+                        );
 
 
-                if (
-                    !href ||
-                    href === "#"
-                ) {
-                    return;
+                    if (
+                        !href ||
+                        href === "#"
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    const target =
+                        document.querySelector(
+                            href
+                        );
+
+
+                    if (!target) {
+
+                        return;
+
+                    }
+
+
+                    event.preventDefault();
+
+
+                    target.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start"
+                    });
+
                 }
+            );
 
-
-                const target =
-                    document.querySelector(
-                        href
-                    );
-
-
-                if (!target) {
-                    return;
-                }
-
-
-                event.preventDefault();
-
-
-                target.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start"
-                });
-
-            }
-        );
-
-    });
+        }
+    );
 
 }
 
@@ -869,12 +822,10 @@ function initNavbarScroll() {
 
 
     if (!navbar) {
+
         return;
+
     }
-
-
-    let lastScroll =
-        window.scrollY;
 
 
     window.addEventListener(
@@ -902,10 +853,6 @@ function initNavbarScroll() {
 
             }
 
-
-            lastScroll =
-                currentScroll;
-
         }
     );
 
@@ -926,61 +873,65 @@ function initGeneralButtons() {
         );
 
 
-    buttons.forEach(function (button) {
+    buttons.forEach(
+        function (button) {
 
-        button.addEventListener(
-            "click",
-            function () {
+            button.addEventListener(
+                "click",
+                function () {
 
-                if (
-                    button.dataset.loadingActive ===
-                    "true"
-                ) {
-                    return;
+                    if (
+                        button.dataset.loadingActive ===
+                        "true"
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    button.dataset.loadingActive =
+                        "true";
+
+
+                    const original =
+                        button.innerHTML;
+
+
+                    button.dataset.originalContent =
+                        original;
+
+
+                    button.innerHTML =
+                        "PLEASE WAIT...";
+
+
+                    button.classList.add(
+                        "button-loading"
+                    );
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | DO NOT DISABLE LINKS
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        button.tagName !==
+                        "A"
+                    ) {
+
+                        button.disabled =
+                            true;
+
+                    }
+
                 }
+            );
 
-
-                button.dataset.loadingActive =
-                    "true";
-
-
-                const original =
-                    button.innerHTML;
-
-
-                button.dataset.originalContent =
-                    original;
-
-
-                button.innerHTML =
-                    "PLEASE WAIT...";
-
-
-                button.classList.add(
-                    "button-loading"
-                );
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Do not disable links
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    button.tagName !==
-                    "A"
-                ) {
-
-                    button.disabled =
-                        true;
-
-                }
-
-            }
-        );
-
-    });
+        }
+    );
 
 }
 
@@ -996,7 +947,9 @@ window.addEventListener(
     function () {
 
         /*
-        | Close mobile menu on desktop
+        |--------------------------------------------------------------------------
+        | CLOSE MOBILE MENU ON DESKTOP
+        |--------------------------------------------------------------------------
         */
 
         if (
@@ -1060,7 +1013,9 @@ document.addEventListener(
         ) {
 
             /*
-            | Close dropdowns
+            |--------------------------------------------------------------------------
+            | CLOSE DROPDOWNS
+            |--------------------------------------------------------------------------
             */
 
             document
@@ -1079,7 +1034,9 @@ document.addEventListener(
 
 
             /*
-            | Close mobile menu
+            |--------------------------------------------------------------------------
+            | CLOSE MOBILE MENU
+            |--------------------------------------------------------------------------
             */
 
             const menu =
