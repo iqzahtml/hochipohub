@@ -32,7 +32,9 @@ $loginError =
         aria-labelledby="loginModalTitle"
     >
 
-        <!-- CLOSE BUTTON -->
+        <!-- =====================================================
+             CLOSE BUTTON
+        ====================================================== -->
 
         <button
             type="button"
@@ -44,7 +46,9 @@ $loginError =
         </button>
 
 
-        <!-- HEADER -->
+        <!-- =====================================================
+             HEADER
+        ====================================================== -->
 
         <div class="auth-modal-header">
 
@@ -67,7 +71,9 @@ $loginError =
         </div>
 
 
-        <!-- SUCCESS MESSAGE -->
+        <!-- =====================================================
+             SUCCESS MESSAGE
+        ====================================================== -->
 
         <?php if (!empty($loginSuccess)): ?>
 
@@ -88,7 +94,9 @@ $loginError =
         <?php endif; ?>
 
 
-        <!-- ERROR MESSAGE -->
+        <!-- =====================================================
+             ERROR MESSAGE
+        ====================================================== -->
 
         <?php if (!empty($loginError)): ?>
 
@@ -109,7 +117,9 @@ $loginError =
         <?php endif; ?>
 
 
-        <!-- LOGIN FORM -->
+        <!-- =====================================================
+             LOGIN FORM
+        ====================================================== -->
 
         <form
             action="<?= htmlspecialchars(
@@ -123,7 +133,9 @@ $loginError =
         >
 
 
-            <!-- CSRF -->
+            <!-- =================================================
+                 CSRF
+            ================================================== -->
 
             <?php if (function_exists('csrfToken')): ?>
 
@@ -152,7 +164,9 @@ $loginError =
             <?php endif; ?>
 
 
-            <!-- EMAIL -->
+            <!-- =================================================
+                 EMAIL
+            ================================================== -->
 
             <div class="form-group">
 
@@ -177,7 +191,9 @@ $loginError =
             </div>
 
 
-            <!-- PASSWORD -->
+            <!-- =================================================
+                 PASSWORD
+            ================================================== -->
 
             <div class="form-group">
 
@@ -202,7 +218,11 @@ $loginError =
                 </div>
 
 
+                <!-- PASSWORD CONTAINER -->
+
                 <div class="password-input">
+
+                    <!-- PASSWORD INPUT -->
 
                     <input
                         type="password"
@@ -213,11 +233,16 @@ $loginError =
                         required
                     >
 
+
+                    <!-- EYE BUTTON -->
+
                     <button
                         type="button"
+                        id="loginPasswordToggle"
                         class="password-toggle"
                         data-password-target="loginPassword"
                         aria-label="Show password"
+                        aria-pressed="false"
                     >
                         👁
                     </button>
@@ -227,7 +252,9 @@ $loginError =
             </div>
 
 
-            <!-- REMEMBER ME -->
+            <!-- =================================================
+                 REMEMBER ME
+            ================================================== -->
 
             <label class="checkbox-row">
 
@@ -244,7 +271,9 @@ $loginError =
             </label>
 
 
-            <!-- LOGIN BUTTON -->
+            <!-- =================================================
+                 LOGIN BUTTON
+            ================================================== -->
 
             <button
                 type="submit"
@@ -262,7 +291,9 @@ $loginError =
             </button>
 
 
-            <!-- DIVIDER -->
+            <!-- =================================================
+                 DIVIDER
+            ================================================== -->
 
             <div class="auth-divider">
 
@@ -273,7 +304,9 @@ $loginError =
             </div>
 
 
-            <!-- REGISTER -->
+            <!-- =================================================
+                 REGISTER
+            ================================================== -->
 
             <p class="auth-switch">
 
@@ -302,13 +335,22 @@ $loginError =
      AUTOMATIC LOGIN MODAL
 ========================================================= -->
 
-<?php if (isset($_GET['login']) && $_GET['login'] === '1'): ?>
+<?php if (
+    isset($_GET['login']) &&
+    $_GET['login'] === '1'
+): ?>
 
 <script>
 
 document.addEventListener(
     "DOMContentLoaded",
     function () {
+
+        /*
+        |----------------------------------------------------------
+        | OPEN LOGIN MODAL AUTOMATICALLY
+        |----------------------------------------------------------
+        */
 
         if (
             typeof window.openModal ===
@@ -319,30 +361,32 @@ document.addEventListener(
                 "loginModal"
             );
 
-            /*
-            Automatically focus password
-            because email is already filled.
-            */
-
-            setTimeout(
-                function () {
-
-                    const password =
-                        document.getElementById(
-                            "loginPassword"
-                        );
-
-                    if (password) {
-
-                        password.focus();
-
-                    }
-
-                },
-                300
-            );
-
         }
+
+
+        /*
+        |----------------------------------------------------------
+        | FOCUS PASSWORD
+        |----------------------------------------------------------
+        */
+
+        setTimeout(
+            function () {
+
+                const password =
+                    document.getElementById(
+                        "loginPassword"
+                    );
+
+                if (password) {
+
+                    password.focus();
+
+                }
+
+            },
+            300
+        );
 
     }
 );
@@ -350,3 +394,217 @@ document.addEventListener(
 </script>
 
 <?php endif; ?>
+
+
+<!-- =========================================================
+     PASSWORD SHOW / HIDE
+========================================================= -->
+
+<script>
+
+(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | PASSWORD TOGGLE FUNCTION
+    |--------------------------------------------------------------------------
+    */
+
+    function setupPasswordToggle() {
+
+        const button =
+            document.getElementById(
+                "loginPasswordToggle"
+            );
+
+        const password =
+            document.getElementById(
+                "loginPassword"
+            );
+
+
+        /*
+        |----------------------------------------------------------------------
+        | CHECK ELEMENTS
+        |----------------------------------------------------------------------
+        */
+
+        if (!button || !password) {
+
+            return;
+
+        }
+
+
+        /*
+        |----------------------------------------------------------------------
+        | PREVENT DUPLICATE EVENT
+        |----------------------------------------------------------------------
+        */
+
+        if (
+            button.dataset.toggleReady === "true"
+        ) {
+
+            return;
+
+        }
+
+
+        button.dataset.toggleReady = "true";
+
+
+        /*
+        |----------------------------------------------------------------------
+        | CLICK EVENT
+        |----------------------------------------------------------------------
+        */
+
+        button.addEventListener(
+            "click",
+            function (event) {
+
+                event.preventDefault();
+
+                event.stopPropagation();
+
+
+                /*
+                |--------------------------------------------------------------
+                | PASSWORD IS HIDDEN
+                |--------------------------------------------------------------
+                */
+
+                if (
+                    password.type === "password"
+                ) {
+
+                    password.type = "text";
+
+
+                    /*
+                    |----------------------------------------------------------
+                    | CHANGE ICON
+                    |----------------------------------------------------------
+                    */
+
+                    button.textContent = "🙈";
+
+
+                    /*
+                    |----------------------------------------------------------
+                    | CHANGE ACCESSIBILITY
+                    |----------------------------------------------------------
+                    */
+
+                    button.setAttribute(
+                        "aria-label",
+                        "Hide password"
+                    );
+
+                    button.setAttribute(
+                        "aria-pressed",
+                        "true"
+                    );
+
+
+                /*
+                |--------------------------------------------------------------
+                | PASSWORD IS VISIBLE
+                |--------------------------------------------------------------
+                */
+
+                } else {
+
+                    password.type = "password";
+
+
+                    /*
+                    |----------------------------------------------------------
+                    | CHANGE ICON
+                    |----------------------------------------------------------
+                    */
+
+                    button.textContent = "👁";
+
+
+                    /*
+                    |----------------------------------------------------------
+                    | CHANGE ACCESSIBILITY
+                    |----------------------------------------------------------
+                    */
+
+                    button.setAttribute(
+                        "aria-label",
+                        "Show password"
+                    );
+
+                    button.setAttribute(
+                        "aria-pressed",
+                        "false"
+                    );
+
+                }
+
+            }
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAGE LOADED
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        document.readyState === "loading"
+    ) {
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            setupPasswordToggle
+        );
+
+    } else {
+
+        setupPasswordToggle();
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RUN AGAIN WHEN LOGIN MODAL IS OPENED
+    |--------------------------------------------------------------------------
+    */
+
+    document.addEventListener(
+        "click",
+        function (event) {
+
+            const loginTrigger =
+                event.target.closest(
+                    '[data-modal-target="loginModal"]'
+                );
+
+
+            if (!loginTrigger) {
+
+                return;
+
+            }
+
+
+            setTimeout(
+                setupPasswordToggle,
+                150
+            );
+
+        }
+    );
+
+})();
+
+</script>
