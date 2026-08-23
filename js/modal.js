@@ -1,6 +1,6 @@
 /*
 =========================================================
-HOCHIPO HUB - MODAL JAVASCRIPT
+HOCHIPOHUB - MODAL JAVASCRIPT
 LOGIN / REGISTER POPUP
 =========================================================
 */
@@ -53,13 +53,9 @@ LOGIN / REGISTER POPUP
                             );
 
 
-                        console.log(
-                            "Opening modal:",
+                        openModal(
                             modalId
                         );
-
-
-                        openModal(modalId);
 
                     }
                 );
@@ -98,7 +94,9 @@ LOGIN / REGISTER POPUP
                             );
 
 
-                        closeModal(modalId);
+                        closeModal(
+                            modalId
+                        );
 
                     }
                 );
@@ -355,6 +353,103 @@ LOGIN / REGISTER POPUP
 
         }
 
+
+        /*
+        =====================================================
+        ⭐ AUTO OPEN LOGIN AFTER REGISTER
+        =====================================================
+        */
+
+        const urlParams =
+            new URLSearchParams(
+                window.location.search
+            );
+
+
+        const loginRequested =
+            urlParams.get(
+                "login"
+            );
+
+
+        if (
+            loginRequested ===
+            "1"
+        ) {
+
+            console.log(
+                "Automatic login modal requested"
+            );
+
+
+            setTimeout(
+                function () {
+
+                    openModal(
+                        "loginModal"
+                    );
+
+
+                    /*
+                    Automatically focus password
+                    */
+
+                    setTimeout(
+                        function () {
+
+                            const password =
+                                document.getElementById(
+                                    "loginPassword"
+                                );
+
+
+                            if (password) {
+
+                                password.focus();
+
+                            }
+
+                        },
+                        200
+                    );
+
+                },
+                100
+            );
+
+        }
+
+
+        /*
+        =====================================================
+        AUTO OPEN REGISTER
+        =====================================================
+        */
+
+        const registerRequested =
+            urlParams.get(
+                "register"
+            );
+
+
+        if (
+            registerRequested ===
+            "1"
+        ) {
+
+            setTimeout(
+                function () {
+
+                    openModal(
+                        "registerModal"
+                    );
+
+                },
+                100
+            );
+
+        }
+
     }
 
 
@@ -385,9 +480,7 @@ LOGIN / REGISTER POPUP
 
 
         /*
-        =====================================================
-        CLOSE OTHER MODALS
-        =====================================================
+        Close other modals
         */
 
         document
@@ -411,9 +504,7 @@ LOGIN / REGISTER POPUP
 
 
         /*
-        =====================================================
-        OPEN SELECTED MODAL
-        =====================================================
+        Open selected modal
         */
 
         modal.classList.add(
@@ -428,9 +519,7 @@ LOGIN / REGISTER POPUP
 
 
         /*
-        =====================================================
-        LOCK BODY SCROLLING
-        =====================================================
+        Lock body scrolling
         */
 
         document.body.classList.add(
@@ -443,9 +532,7 @@ LOGIN / REGISTER POPUP
 
 
         /*
-        =====================================================
-        FOCUS FIRST INPUT
-        =====================================================
+        Focus first input
         */
 
         setTimeout(
@@ -505,9 +592,7 @@ LOGIN / REGISTER POPUP
 
 
         /*
-        =====================================================
-        UNLOCK BODY WHEN NO MODAL IS OPEN
-        =====================================================
+        Unlock body when no modal is open
         */
 
         if (
@@ -571,80 +656,6 @@ LOGIN / REGISTER POPUP
 
     /*
     =========================================================
-    OPEN LOGIN AFTER SUCCESSFUL REGISTRATION
-    =========================================================
-    */
-
-    function openLoginAfterRegister() {
-
-        const urlParams =
-            new URLSearchParams(
-                window.location.search
-            );
-
-
-        const loginParam =
-            urlParams.get("login");
-
-
-        /*
-        =====================================================
-        CHECK ?login=1
-        =====================================================
-        */
-
-        if (
-            loginParam === "1"
-        ) {
-
-            console.log(
-                "Opening login modal after registration"
-            );
-
-
-            /*
-            =================================================
-            OPEN LOGIN MODAL
-            =================================================
-            */
-
-            openModal(
-                "loginModal"
-            );
-
-
-            /*
-            =================================================
-            REMOVE ?login=1 FROM URL
-            =================================================
-
-            Example:
-
-            Before:
-            index.php?login=1
-
-            After:
-            index.php
-            =================================================
-            */
-
-            const cleanUrl =
-                window.location.pathname;
-
-
-            window.history.replaceState(
-                {},
-                document.title,
-                cleanUrl
-            );
-
-        }
-
-    }
-
-
-    /*
-    =========================================================
     GLOBAL FUNCTIONS
     =========================================================
     */
@@ -674,20 +685,12 @@ LOGIN / REGISTER POPUP
 
         document.addEventListener(
             "DOMContentLoaded",
-            function () {
-
-                initializeModals();
-
-                openLoginAfterRegister();
-
-            }
+            initializeModals
         );
 
     } else {
 
         initializeModals();
-
-        openLoginAfterRegister();
 
     }
 
