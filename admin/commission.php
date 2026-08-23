@@ -17,8 +17,7 @@ require_once dirname(__DIR__) . '/database/db.php';
 |--------------------------------------------------------------------------
 | DATABASE CONNECTION
 |--------------------------------------------------------------------------
-| database/db.php creates $db.
-| This page uses $conn for compatibility.
+| database/db.php creates $db as PDO connection.
 |--------------------------------------------------------------------------
 */
 
@@ -31,9 +30,7 @@ $conn = $db;
 */
 
 if (!isset($_SESSION['user_id'])) {
-
     header("Location: ../index.php");
-
     exit;
 }
 
@@ -41,9 +38,7 @@ if (
     !isset($_SESSION['role']) ||
     strtolower($_SESSION['role']) !== 'admin'
 ) {
-
     header("Location: ../index.php");
-
     exit;
 }
 
@@ -82,7 +77,6 @@ if (!function_exists('commission_date')) {
 
     function commission_date($date)
     {
-
         if (!$date) {
             return '-';
         }
@@ -104,13 +98,12 @@ if (!function_exists('commission_status_class')) {
 
     function commission_status_class($status)
     {
-
         return 'commission-status-' .
             strtolower(
                 str_replace(
                     ' ',
                     '-',
-                    $status
+                    trim((string) $status)
                 )
             );
     }
@@ -135,7 +128,6 @@ if (!in_array(
     $allowedStatuses,
     true
 )) {
-
     $statusFilter = 'all';
 }
 
@@ -167,24 +159,38 @@ $summary = [
 |--------------------------------------------------------------------------
 */
 
-$result = $conn->query("
-    SELECT
-        COALESCE(
-            SUM(commission_amount),
-            0
-        ) AS total
-    FROM commission
-");
+try {
 
-if ($result) {
+    $result = $conn->query("
+        SELECT
+            COALESCE(
+                SUM(commission_amount),
+                0
+            ) AS total
+        FROM commission
+    ");
 
-    $row = $result->fetch_assoc();
+    if ($result) {
 
-    $summary['total'] =
-        (float) (
-            $row['total']
-            ?? 0
-        );
+        /*
+        | PDO uses fetch(), NOT fetch_assoc()
+        */
+
+        $row = $result->fetch(PDO::FETCH_ASSOC);
+
+        if ($row) {
+
+            $summary['total'] =
+                (float) (
+                    $row['total']
+                    ?? 0
+                );
+        }
+    }
+
+} catch (PDOException $e) {
+
+    $summary['total'] = 0;
 }
 
 /*
@@ -193,34 +199,47 @@ if ($result) {
 |--------------------------------------------------------------------------
 */
 
-$result = $conn->query("
-    SELECT
-        status,
-        COUNT(*) AS total
-    FROM commission
-    GROUP BY status
-");
+try {
 
-if ($result) {
+    $result = $conn->query("
+        SELECT
+            status,
+            COUNT(*) AS total
+        FROM commission
+        GROUP BY status
+    ");
 
-    while ($row = $result->fetch_assoc()) {
+    if ($result) {
 
-        $status = $row['status'];
+        while (
+            $row =
+            $result->fetch(PDO::FETCH_ASSOC)
+        ) {
 
-        $count = (int) $row['total'];
+            $status = $row['status'] ?? '';
 
-        if ($status === 'Pending') {
+            $count = (int) (
+                $row['total'] ?? 0
+            );
 
-            $summary['pending'] =
-                $count;
-        }
+            if ($status === 'Pending') {
 
-        if ($status === 'Paid') {
+                $summary['pending'] =
+                    $count;
+            }
 
-            $summary['paid'] =
-                $count;
+            if ($status === 'Paid') {
+
+                $summary['paid'] =
+                    $count;
+            }
         }
     }
+
+} catch (PDOException $e) {
+
+    $summary['pending'] = 0;
+    $summary['paid'] = 0;
 }
 
 /*
@@ -259,7 +278,6 @@ $sql = "
     WHERE 1 = 1
 ";
 
-$types = '';
 $params = [];
 
 /*
@@ -271,12 +289,10 @@ $params = [];
 if ($statusFilter !== 'all') {
 
     $sql .= "
-        AND c.status = ?
+        AND c.status = :status
     ";
 
-    $types .= 's';
-
-    $params[] =
+    $params[':status'] =
         $statusFilter;
 }
 
@@ -291,37 +307,52 @@ if ($search !== '') {
     $sql .= "
         AND (
             CAST(c.commission_id AS CHAR)
-                LIKE ?
+                LIKE :search1
 
             OR CAST(c.order_id AS CHAR)
-                LIKE ?
+                LIKE :search2
 
             OR CAST(c.vendor_id AS CHAR)
-                LIKE ?
+                LIKE :search3
 
             OR v.business_name
-                LIKE ?
+                LIKE :search4
 
             OR u.name
-                LIKE ?
+                LIKE :search5
 
             OR u.email
-                LIKE ?
+                LIKE :search6
         )
     ";
 
     $searchValue =
         '%' . $search . '%';
 
-    $types .= 'ssssss';
+    $params[':search1'] =
+        $searchValue;
 
-    $params[] = $searchValue;
-    $params[] = $searchValue;
-    $params[] = $searchValue;
-    $params[] = $searchValue;
-    $params[] = $searchValue;
-    $params[] = $searchValue;
+    $params[':search2'] =
+        $searchValue;
+
+    $params[':search3'] =
+        $searchValue;
+
+    $params[':search4'] =
+        $searchValue;
+
+    $params[':search5'] =
+        $searchValue;
+
+    $params[':search6'] =
+        $searchValue;
 }
+
+/*
+|--------------------------------------------------------------------------
+| ORDER
+|--------------------------------------------------------------------------
+*/
 
 $sql .= "
     ORDER BY c.created_at DESC
@@ -330,37 +361,43 @@ $sql .= "
 
 /*
 |--------------------------------------------------------------------------
-| PREPARE COMMISSION QUERY
+| EXECUTE COMMISSION QUERY
 |--------------------------------------------------------------------------
 */
 
-$stmt = $conn->prepare($sql);
+try {
 
-if ($stmt) {
+    $stmt =
+        $conn->prepare($sql);
 
-    if (!empty($params)) {
+    $stmt->execute($params);
 
-        $stmt->bind_param(
-            $types,
-            ...$params
-        );
-    }
-
-    $stmt->execute();
-
-    $result =
-        $stmt->get_result();
+    /*
+    | PDO uses fetch(PDO::FETCH_ASSOC)
+    */
 
     while (
         $row =
-        $result->fetch_assoc()
+        $stmt->fetch(PDO::FETCH_ASSOC)
     ) {
 
         $commissionRows[] =
             $row;
     }
 
-    $stmt->close();
+} catch (PDOException $e) {
+
+    $commissionRows = [];
+
+    /*
+    | Do not expose database details to users.
+    | For development, you can inspect the PHP error log.
+    */
+
+    error_log(
+        'Commission query error: ' .
+        $e->getMessage()
+    );
 }
 
 ?>
@@ -394,6 +431,14 @@ if ($stmt) {
 
     <style>
 
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+        }
+
         .commission-page {
             min-height: 100vh;
             padding: 35px;
@@ -411,6 +456,10 @@ if ($stmt) {
             margin: 0 auto;
         }
 
+        /* --------------------------------------------------------------
+           HEADER
+        -------------------------------------------------------------- */
+
         .commission-header {
             display: flex;
             justify-content: space-between;
@@ -419,11 +468,38 @@ if ($stmt) {
             margin-bottom: 28px;
         }
 
+        .commission-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .commission-header-icon {
+            width: 58px;
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 18px;
+            background: linear-gradient(
+                135deg,
+                #2563eb,
+                #4f46e5
+            );
+            color: #ffffff;
+            font-size: 26px;
+            font-weight: 900;
+            box-shadow:
+                0 10px 25px
+                rgba(37, 99, 235, .20);
+        }
+
         .commission-header h1 {
             margin: 0;
             color: #0f172a;
             font-size: 32px;
             font-weight: 900;
+            line-height: 1.1;
         }
 
         .commission-header p {
@@ -433,33 +509,66 @@ if ($stmt) {
         }
 
         .commission-admin-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
             padding: 10px 16px;
             border-radius: 999px;
             background: #eff6ff;
+            border: 1px solid #bfdbfe;
             color: #2563eb;
             font-size: 12px;
             font-weight: 900;
         }
 
+        /* --------------------------------------------------------------
+           SUMMARY
+        -------------------------------------------------------------- */
+
         .commission-summary {
             display: grid;
             grid-template-columns:
                 repeat(3, minmax(0, 1fr));
-            gap: 16px;
+            gap: 18px;
             margin-bottom: 24px;
         }
 
         .commission-stat {
-            padding: 23px;
+            position: relative;
+            overflow: hidden;
+            padding: 24px;
             background: #ffffff;
             border: 1px solid #e2e8f0;
-            border-radius: 18px;
+            border-radius: 20px;
             box-shadow:
                 0 8px 25px
                 rgba(15, 23, 42, .05);
+            transition:
+                transform .2s ease,
+                box-shadow .2s ease;
+        }
+
+        .commission-stat:hover {
+            transform: translateY(-3px);
+            box-shadow:
+                0 14px 32px
+                rgba(15, 23, 42, .08);
+        }
+
+        .commission-stat::after {
+            content: "";
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            right: -35px;
+            bottom: -45px;
+            border-radius: 50%;
+            background: #eff6ff;
         }
 
         .commission-stat-label {
+            position: relative;
+            z-index: 1;
             display: block;
             margin-bottom: 10px;
             color: #64748b;
@@ -470,6 +579,8 @@ if ($stmt) {
         }
 
         .commission-stat-value {
+            position: relative;
+            z-index: 1;
             display: block;
             color: #0f172a;
             font-size: 28px;
@@ -487,6 +598,10 @@ if ($stmt) {
         .commission-stat-value.green {
             color: #059669;
         }
+
+        /* --------------------------------------------------------------
+           FILTER
+        -------------------------------------------------------------- */
 
         .commission-filter {
             display: flex;
@@ -511,11 +626,11 @@ if ($stmt) {
         .commission-search input,
         .commission-filter select {
             min-height: 42px;
-            box-sizing: border-box;
             border: 1px solid #cbd5e1;
             border-radius: 10px;
             background: #ffffff;
             color: #334155;
+            font-family: inherit;
             font-size: 13px;
         }
 
@@ -525,6 +640,7 @@ if ($stmt) {
         }
 
         .commission-filter select {
+            min-width: 145px;
             padding: 0 12px;
             cursor: pointer;
         }
@@ -545,9 +661,11 @@ if ($stmt) {
             border-radius: 10px;
             background: #2563eb;
             color: #ffffff;
+            font-family: inherit;
             font-size: 12px;
             font-weight: 900;
             cursor: pointer;
+            transition: background .2s ease;
         }
 
         .commission-btn:hover {
@@ -558,7 +676,7 @@ if ($stmt) {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-height: 40px;
+            min-height: 42px;
             padding: 0 15px;
             border: 1px solid #cbd5e1;
             border-radius: 10px;
@@ -566,12 +684,18 @@ if ($stmt) {
             font-size: 12px;
             font-weight: 900;
             text-decoration: none;
+            background: #ffffff;
         }
 
         .commission-reset:hover {
             background: #f8fafc;
             color: #2563eb;
+            border-color: #93c5fd;
         }
+
+        /* --------------------------------------------------------------
+           CARD
+        -------------------------------------------------------------- */
 
         .commission-card {
             overflow: hidden;
@@ -587,6 +711,7 @@ if ($stmt) {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 20px;
             padding: 22px 24px;
             border-bottom: 1px solid #e2e8f0;
         }
@@ -605,13 +730,18 @@ if ($stmt) {
         }
 
         .commission-record-count {
-            padding: 7px 10px;
+            padding: 7px 11px;
             border-radius: 999px;
             background: #f1f5f9;
             color: #475569;
             font-size: 11px;
             font-weight: 900;
+            white-space: nowrap;
         }
+
+        /* --------------------------------------------------------------
+           TABLE
+        -------------------------------------------------------------- */
 
         .commission-table-wrapper {
             overflow-x: auto;
@@ -632,6 +762,7 @@ if ($stmt) {
             text-align: left;
             text-transform: uppercase;
             letter-spacing: .5px;
+            white-space: nowrap;
         }
 
         .commission-table td {
@@ -639,13 +770,23 @@ if ($stmt) {
             border-top: 1px solid #f1f5f9;
             color: #334155;
             font-size: 13px;
+            vertical-align: middle;
         }
 
-        .commission-table tr:hover td {
+        .commission-table tbody tr {
+            transition: background .15s ease;
+        }
+
+        .commission-table tbody tr:hover td {
             background: #f8fafc;
         }
 
         .commission-id {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 9px;
+            border-radius: 8px;
+            background: #eff6ff;
             color: #2563eb;
             font-weight: 900;
         }
@@ -663,19 +804,24 @@ if ($stmt) {
 
         .commission-owner {
             display: block;
-            margin-top: 3px;
+            margin-top: 4px;
             color: #94a3b8;
             font-size: 11px;
         }
 
         .commission-rate {
-            font-weight: 800;
+            display: inline-flex;
+            padding: 5px 8px;
+            border-radius: 7px;
+            background: #f1f5f9;
             color: #475569;
+            font-weight: 800;
         }
 
         .commission-amount {
             color: #059669;
             font-weight: 900;
+            white-space: nowrap;
         }
 
         .commission-status {
@@ -697,19 +843,23 @@ if ($stmt) {
             color: #166534;
         }
 
+        /* --------------------------------------------------------------
+           EMPTY
+        -------------------------------------------------------------- */
+
         .commission-empty {
-            padding: 70px 20px;
+            padding: 75px 20px;
             text-align: center;
         }
 
         .commission-empty-icon {
-            width: 60px;
-            height: 60px;
-            margin: 0 auto 15px;
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 18px;
+            border-radius: 20px;
             background: #eff6ff;
             color: #2563eb;
             font-size: 27px;
@@ -724,9 +874,23 @@ if ($stmt) {
 
         .commission-empty p {
             max-width: 430px;
-            margin: 7px auto 0;
+            margin: 8px auto 0;
             color: #64748b;
             font-size: 13px;
+            line-height: 1.6;
+        }
+
+        /* --------------------------------------------------------------
+           RESPONSIVE
+        -------------------------------------------------------------- */
+
+        @media (max-width: 1000px) {
+
+            .commission-summary {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
         }
 
         @media (max-width: 800px) {
@@ -737,6 +901,10 @@ if ($stmt) {
 
             .commission-header {
                 flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .commission-header-left {
                 align-items: flex-start;
             }
 
@@ -753,11 +921,38 @@ if ($stmt) {
                 width: 100%;
             }
 
+            .commission-filter select {
+                width: 100%;
+            }
+
+            .commission-reset {
+                width: 100%;
+            }
+
         }
 
         @media (max-width: 500px) {
 
+            .commission-header h1 {
+                font-size: 26px;
+            }
+
+            .commission-header-icon {
+                width: 50px;
+                height: 50px;
+                border-radius: 15px;
+            }
+
             .commission-search {
+                flex-direction: column;
+            }
+
+            .commission-btn {
+                width: 100%;
+            }
+
+            .commission-card-header {
+                align-items: flex-start;
                 flex-direction: column;
             }
 
@@ -771,7 +966,9 @@ if ($stmt) {
 
 <div class="admin-layout">
 
-    <!-- SIDEBAR -->
+    <!-- ==============================================================
+         SIDEBAR
+    ============================================================== -->
 
     <aside class="admin-sidebar">
 
@@ -841,7 +1038,9 @@ if ($stmt) {
     </aside>
 
 
-    <!-- MAIN -->
+    <!-- ==============================================================
+         MAIN
+    ============================================================== -->
 
     <main class="admin-main">
 
@@ -849,17 +1048,27 @@ if ($stmt) {
 
             <div class="commission-container">
 
+                <!-- HEADER -->
+
                 <header class="commission-header">
 
-                    <div>
+                    <div class="commission-header-left">
 
-                        <h1>
-                            Commission
-                        </h1>
+                        <div class="commission-header-icon">
+                            %
+                        </div>
 
-                        <p>
-                            Monitor commission generated from vendor transactions.
-                        </p>
+                        <div>
+
+                            <h1>
+                                Commission
+                            </h1>
+
+                            <p>
+                                Monitor commission generated from vendor transactions.
+                            </p>
+
+                        </div>
 
                     </div>
 
@@ -870,9 +1079,13 @@ if ($stmt) {
                 </header>
 
 
-                <!-- SUMMARY -->
+                <!-- ==================================================
+                     SUMMARY
+                ================================================== -->
 
                 <section class="commission-summary">
+
+                    <!-- TOTAL -->
 
                     <div class="commission-stat">
 
@@ -886,15 +1099,15 @@ if ($stmt) {
                                 blue
                             "
                         >
-
                             <?= commission_money(
                                 $summary['total']
                             ) ?>
-
                         </strong>
 
                     </div>
 
+
+                    <!-- PENDING -->
 
                     <div class="commission-stat">
 
@@ -908,15 +1121,15 @@ if ($stmt) {
                                 yellow
                             "
                         >
-
                             <?= number_format(
                                 $summary['pending']
                             ) ?>
-
                         </strong>
 
                     </div>
 
+
+                    <!-- PAID -->
 
                     <div class="commission-stat">
 
@@ -930,11 +1143,9 @@ if ($stmt) {
                                 green
                             "
                         >
-
                             <?= number_format(
                                 $summary['paid']
                             ) ?>
-
                         </strong>
 
                     </div>
@@ -942,7 +1153,9 @@ if ($stmt) {
                 </section>
 
 
-                <!-- FILTER -->
+                <!-- ==================================================
+                     FILTER
+                ================================================== -->
 
                 <form
                     method="GET"
@@ -1015,7 +1228,9 @@ if ($stmt) {
                 </form>
 
 
-                <!-- COMMISSION TABLE -->
+                <!-- ==================================================
+                     COMMISSION TABLE
+                ================================================== -->
 
                 <section class="commission-card">
 
@@ -1115,45 +1330,47 @@ if ($stmt) {
 
                                     <tr>
 
+                                        <!-- ID -->
+
                                         <td>
 
-                                            <span
-                                                class="
-                                                    commission-id
-                                                "
-                                            >
+                                            <span class="commission-id">
 
                                                 #
 
                                                 <?= (int)
-                                                    $row[
-                                                        'commission_id'
-                                                    ] ?>
+                                                    (
+                                                        $row[
+                                                            'commission_id'
+                                                        ] ?? 0
+                                                    ) ?>
 
                                             </span>
 
                                         </td>
 
 
+                                        <!-- ORDER -->
+
                                         <td>
 
-                                            <span
-                                                class="
-                                                    commission-order
-                                                "
-                                            >
+                                            <span class="commission-order">
 
                                                 #
 
                                                 <?= (int)
-                                                    $row[
-                                                        'order_id'
-                                                    ] ?>
+                                                    (
+                                                        $row[
+                                                            'order_id'
+                                                        ] ?? 0
+                                                    ) ?>
 
                                             </span>
 
                                         </td>
 
+
+                                        <!-- VENDOR -->
 
                                         <td>
 
@@ -1164,10 +1381,15 @@ if ($stmt) {
                                             >
 
                                                 <?= commission_e(
-                                                    $row[
-                                                        'business_name'
-                                                    ]
-                                                    ?: 'Unknown Vendor'
+                                                    !empty(
+                                                        $row[
+                                                            'business_name'
+                                                        ]
+                                                    )
+                                                        ? $row[
+                                                            'business_name'
+                                                        ]
+                                                        : 'Unknown Vendor'
                                                 ) ?>
 
                                             </span>
@@ -1200,6 +1422,8 @@ if ($stmt) {
                                         </td>
 
 
+                                        <!-- RATE -->
+
                                         <td>
 
                                             <span
@@ -1210,9 +1434,11 @@ if ($stmt) {
 
                                                 <?= number_format(
                                                     (float)
-                                                    $row[
-                                                        'commission_rate'
-                                                    ],
+                                                    (
+                                                        $row[
+                                                            'commission_rate'
+                                                        ] ?? 0
+                                                    ),
                                                     2
                                                 ) ?>
 
@@ -1222,6 +1448,8 @@ if ($stmt) {
 
                                         </td>
 
+
+                                        <!-- COMMISSION -->
 
                                         <td>
 
@@ -1234,7 +1462,7 @@ if ($stmt) {
                                                 <?= commission_money(
                                                     $row[
                                                         'commission_amount'
-                                                    ]
+                                                    ] ?? 0
                                                 ) ?>
 
                                             </span>
@@ -1242,31 +1470,40 @@ if ($stmt) {
                                         </td>
 
 
+                                        <!-- STATUS -->
+
                                         <td>
+
+                                            <?php
+
+                                            $rowStatus =
+                                                $row[
+                                                    'status'
+                                                ] ?? 'Pending';
+
+                                            ?>
 
                                             <span
                                                 class="
                                                     commission-status
                                                     <?= commission_e(
                                                         commission_status_class(
-                                                            $row[
-                                                                'status'
-                                                            ]
+                                                            $rowStatus
                                                         )
                                                     ) ?>
                                                 "
                                             >
 
                                                 <?= commission_e(
-                                                    $row[
-                                                        'status'
-                                                    ]
+                                                    $rowStatus
                                                 ) ?>
 
                                             </span>
 
                                         </td>
 
+
+                                        <!-- DATE -->
 
                                         <td>
 
@@ -1274,7 +1511,7 @@ if ($stmt) {
                                                 commission_date(
                                                     $row[
                                                         'created_at'
-                                                    ]
+                                                    ] ?? null
                                                 )
                                             ) ?>
 
