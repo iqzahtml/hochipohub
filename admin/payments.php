@@ -6,26 +6,24 @@
 |--------------------------------------------------------------------------
 | File: admin/payments.php
 |--------------------------------------------------------------------------
-| IMPORTANT:
-| database/db.php returns PDO connection as $db.
-| This file uses PDO syntax throughout.
-|--------------------------------------------------------------------------
 */
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/database/db.php';
 
 /*
 |--------------------------------------------------------------------------
-| DATABASE CONNECTION
+| CONFIG + DATABASE
 |--------------------------------------------------------------------------
 */
 
-$pdo = $db;
+require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/database/db.php';
+
+$pdo = getDB();
+
 
 /*
 |--------------------------------------------------------------------------
@@ -51,6 +49,7 @@ $admin_id = (int) $_SESSION['user_id'];
 $message = "";
 $error = "";
 
+
 /*
 |--------------------------------------------------------------------------
 | HELPER FUNCTIONS
@@ -69,6 +68,7 @@ if (!function_exists('e')) {
     }
 }
 
+
 if (!function_exists('money')) {
 
     function money($value)
@@ -79,6 +79,7 @@ if (!function_exists('money')) {
         );
     }
 }
+
 
 if (!function_exists('payment_status_class')) {
 
@@ -94,6 +95,7 @@ if (!function_exists('payment_status_class')) {
             );
     }
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -120,6 +122,7 @@ if (
         'Failed',
         'Refunded'
     ];
+
 
     if ($payment_id <= 0) {
 
@@ -162,10 +165,12 @@ if (
                 ");
             }
 
+
             $stmt->execute([
                 ':payment_status' => $new_status,
                 ':payment_id' => $payment_id
             ]);
+
 
             /*
             |--------------------------------------------------------------------------
@@ -191,6 +196,7 @@ if (
             if ($row) {
                 $order_id = (int) $row['order_id'];
             }
+
 
             /*
             |--------------------------------------------------------------------------
@@ -230,6 +236,7 @@ if (
                 ':target_id' => $payment_id
             ]);
 
+
             $message =
                 'Payment #' .
                 $payment_id .
@@ -237,12 +244,17 @@ if (
 
         } catch (PDOException $e) {
 
+            error_log(
+                "HOCHIPOHUB ADMIN PAYMENT UPDATE ERROR: "
+                . $e->getMessage()
+            );
+
             $error =
-                'Database error: ' .
-                $e->getMessage();
+                'Unable to update payment status.';
         }
     }
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -282,6 +294,7 @@ try {
         ORDER BY p.payment_id DESC
     ";
 
+
     $stmt = $pdo->query($sql);
 
     if ($stmt) {
@@ -293,10 +306,15 @@ try {
 
 } catch (PDOException $e) {
 
+    error_log(
+        "HOCHIPOHUB ADMIN FETCH PAYMENTS ERROR: "
+        . $e->getMessage()
+    );
+
     $error =
-        'Unable to load payments: ' .
-        $e->getMessage();
+        'Unable to load payments.';
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -315,6 +333,7 @@ $total_paid_amount = 0;
 $total_pending_amount = 0;
 $total_refunded_amount = 0;
 
+
 foreach ($payments as $payment) {
 
     $status = $payment['payment_status'] ?? '';
@@ -322,6 +341,7 @@ foreach ($payments as $payment) {
     $amount = (float) (
         $payment['amount'] ?? 0
     );
+
 
     switch ($status) {
 
@@ -333,6 +353,7 @@ foreach ($payments as $payment) {
 
             break;
 
+
         case 'Paid':
 
             $paid_payments++;
@@ -341,11 +362,13 @@ foreach ($payments as $payment) {
 
             break;
 
+
         case 'Failed':
 
             $failed_payments++;
 
             break;
+
 
         case 'Refunded':
 
@@ -358,6 +381,7 @@ foreach ($payments as $payment) {
 }
 
 ?>
+
 
 <!DOCTYPE html>
 
@@ -376,6 +400,28 @@ foreach ($payments as $payment) {
         Payments | HochipoHub Admin
     </title>
 
+
+    <!-- Poppins -->
+
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
+
+    <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossorigin
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet"
+    >
+
+
+    <!-- Existing Admin CSS -->
+
     <link
         rel="stylesheet"
         href="../css/admin.css"
@@ -386,547 +432,1227 @@ foreach ($payments as $payment) {
         href="../css/responsive.css"
     >
 
+
     <style>
 
+        /* =====================================================
+           GLOBAL
+        ===================================================== */
+
+        * {
+            box-sizing: border-box;
+        }
+
+
+        body {
+            font-family: 'Poppins', sans-serif !important;
+            background: #f4f8ff;
+        }
+
+
+        .admin-main {
+            font-family: 'Poppins', sans-serif !important;
+        }
+
+
         /*
-        |--------------------------------------------------------------------------
-        | PAYMENT PAGE
-        |--------------------------------------------------------------------------
+        =========================================================
+        PAYMENT PAGE
+        =========================================================
         */
 
         .payment-page {
             min-height: 100vh;
-            padding: 32px;
+
+            padding: 34px;
+
             background:
                 radial-gradient(
-                    circle at top right,
-                    rgba(37, 99, 235, 0.10),
-                    transparent 30%
+                    circle at 92% 0%,
+                    rgba(37, 99, 235, 0.16),
+                    transparent 27%
                 ),
-                #f8fafc;
+
+                radial-gradient(
+                    circle at 15% 35%,
+                    rgba(14, 165, 233, 0.08),
+                    transparent 28%
+                ),
+
+                linear-gradient(
+                    135deg,
+                    #f7faff 0%,
+                    #eef5ff 100%
+                );
         }
+
 
         .payment-container {
             width: 100%;
-            max-width: 1500px;
+            max-width: 1550px;
             margin: 0 auto;
         }
 
+
         /*
-        |--------------------------------------------------------------------------
-        | HEADER
-        |--------------------------------------------------------------------------
+        =========================================================
+        HEADER
+        =========================================================
         */
 
         .payment-header {
+            position: relative;
+
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            gap: 20px;
-            margin-bottom: 28px;
+            justify-content: space-between;
+
+            gap: 24px;
+
+            padding: 28px 30px;
+
+            margin-bottom: 24px;
+
+            border-radius: 24px;
+
+            overflow: hidden;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #071d49 0%,
+                    #0b3b91 55%,
+                    #1476e8 100%
+                );
+
+            box-shadow:
+                0 18px 45px
+                rgba(15, 68, 150, 0.22);
         }
+
+
+        .payment-header::before {
+            content: "";
+
+            position: absolute;
+
+            width: 240px;
+            height: 240px;
+
+            right: -70px;
+            top: -100px;
+
+            border-radius: 50%;
+
+            background:
+                rgba(255,255,255,0.08);
+        }
+
+
+        .payment-header::after {
+            content: "";
+
+            position: absolute;
+
+            width: 130px;
+            height: 130px;
+
+            right: 130px;
+            bottom: -90px;
+
+            border-radius: 50%;
+
+            background:
+                rgba(255,255,255,0.06);
+        }
+
+
+        .payment-header-content {
+            position: relative;
+            z-index: 2;
+        }
+
 
         .payment-header h1 {
             margin: 0;
-            color: #0f172a;
+
+            color: #ffffff;
+
             font-size: 32px;
+            line-height: 1.2;
+
             font-weight: 900;
+
+            letter-spacing: -0.8px;
         }
+
 
         .payment-header p {
-            margin: 7px 0 0;
-            color: #64748b;
-            font-size: 14px;
+            margin: 8px 0 0;
+
+            color: rgba(255,255,255,0.76);
+
+            font-size: 13px;
+
+            font-weight: 500;
         }
 
-        .admin-badge {
-            display: inline-flex;
+
+        .payment-header-icon {
+            position: relative;
+
+            z-index: 2;
+
+            width: 64px;
+            height: 64px;
+
+            display: flex;
             align-items: center;
             justify-content: center;
-            padding: 10px 16px;
-            border-radius: 999px;
-            background: #eff6ff;
-            color: #2563eb;
-            font-size: 12px;
-            font-weight: 800;
-            border: 1px solid #dbeafe;
+
+            border-radius: 20px;
+
+            background:
+                rgba(255,255,255,0.14);
+
+            border:
+                1px solid
+                rgba(255,255,255,0.20);
+
+            color: #ffffff;
+
+            font-size: 27px;
+
+            font-weight: 900;
+
+            backdrop-filter: blur(10px);
+
+            box-shadow:
+                inset 0 1px 0
+                rgba(255,255,255,0.18);
         }
 
+
         /*
-        |--------------------------------------------------------------------------
-        | ALERT
-        |--------------------------------------------------------------------------
+        =========================================================
+        ALERT
+        =========================================================
         */
 
         .payment-alert {
-            padding: 14px 18px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            font-weight: 700;
+            display: flex;
+            align-items: center;
+
+            min-height: 50px;
+
+            padding: 13px 18px;
+
+            margin-bottom: 22px;
+
+            border-radius: 14px;
+
             font-size: 13px;
+
+            font-weight: 700;
         }
+
 
         .payment-alert.success {
-            background: #ecfdf5;
             color: #047857;
-            border: 1px solid #a7f3d0;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #ecfdf5,
+                    #d1fae5
+                );
+
+            border:
+                1px solid #a7f3d0;
+
+            box-shadow:
+                0 8px 25px
+                rgba(16,185,129,0.08);
         }
+
 
         .payment-alert.error {
-            background: #fef2f2;
             color: #b91c1c;
-            border: 1px solid #fecaca;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #fff1f2,
+                    #fee2e2
+                );
+
+            border:
+                1px solid #fecaca;
         }
 
+
         /*
-        |--------------------------------------------------------------------------
-        | STATISTICS
-        |--------------------------------------------------------------------------
+        =========================================================
+        STATISTICS
+        =========================================================
         */
 
         .payment-stats {
             display: grid;
+
             grid-template-columns:
                 repeat(5, minmax(0, 1fr));
+
             gap: 16px;
-            margin-bottom: 24px;
+
+            margin-bottom: 26px;
         }
+
 
         .payment-stat {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 18px;
-            padding: 22px;
+            position: relative;
+
+            min-height: 150px;
+
+            padding: 21px;
+
+            overflow: hidden;
+
+            border-radius: 20px;
+
+            background: rgba(255,255,255,0.88);
+
+            border:
+                1px solid
+                rgba(148,163,184,0.22);
+
             box-shadow:
-                0 8px 25px
-                rgba(15, 23, 42, 0.05);
+                0 12px 32px
+                rgba(15, 50, 100, 0.07);
+
             transition:
-                transform 0.2s ease,
-                box-shadow 0.2s ease;
+                transform .22s ease,
+                box-shadow .22s ease,
+                border-color .22s ease;
         }
 
-        .payment-stat:hover {
-            transform: translateY(-3px);
-            box-shadow:
-                0 14px 35px
-                rgba(15, 23, 42, 0.09);
+
+        .payment-stat::after {
+            content: "";
+
+            position: absolute;
+
+            width: 90px;
+            height: 90px;
+
+            right: -30px;
+            bottom: -35px;
+
+            border-radius: 50%;
+
+            background:
+                rgba(37,99,235,0.07);
         }
+
+
+        .payment-stat:hover {
+            transform: translateY(-5px);
+
+            border-color:
+                rgba(37,99,235,0.28);
+
+            box-shadow:
+                0 18px 38px
+                rgba(15,68,150,0.13);
+        }
+
 
         .payment-stat-label {
             display: block;
+
+            margin-bottom: 9px;
+
             color: #64748b;
-            font-size: 12px;
+
+            font-size: 10px;
+
             font-weight: 800;
+
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 10px;
+
+            letter-spacing: 0.9px;
         }
+
 
         .payment-stat-value {
             display: block;
-            color: #0f172a;
-            font-size: 26px;
+
+            color: #0f2f68;
+
+            font-size: 28px;
+
+            line-height: 1;
+
             font-weight: 900;
+
+            letter-spacing: -0.8px;
         }
+
 
         .payment-stat-money {
             display: block;
-            margin-top: 5px;
-            color: #64748b;
-            font-size: 12px;
+
+            margin-top: 9px;
+
+            color: #2563eb;
+
+            font-size: 11px;
+
             font-weight: 700;
         }
 
+
         /*
-        |--------------------------------------------------------------------------
-        | CARD
-        |--------------------------------------------------------------------------
+        =========================================================
+        STAT COLOR ACCENTS
+        =========================================================
+        */
+
+        .payment-stat:nth-child(1) {
+            border-top:
+                4px solid #2563eb;
+        }
+
+
+        .payment-stat:nth-child(2) {
+            border-top:
+                4px solid #16a34a;
+        }
+
+
+        .payment-stat:nth-child(3) {
+            border-top:
+                4px solid #f59e0b;
+        }
+
+
+        .payment-stat:nth-child(4) {
+            border-top:
+                4px solid #ef4444;
+        }
+
+
+        .payment-stat:nth-child(5) {
+            border-top:
+                4px solid #8b5cf6;
+        }
+
+
+        /*
+        =========================================================
+        MAIN CARD
+        =========================================================
         */
 
         .payment-card {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 20px;
             overflow: hidden;
+
+            border-radius: 24px;
+
+            background: #ffffff;
+
+            border:
+                1px solid
+                rgba(148,163,184,0.22);
+
             box-shadow:
-                0 10px 30px
-                rgba(15, 23, 42, 0.06);
+                0 18px 45px
+                rgba(15,50,100,0.08);
         }
+
 
         .payment-card-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 22px 24px;
-            border-bottom: 1px solid #e2e8f0;
+            justify-content: space-between;
+
+            padding: 24px 26px;
+
+            background:
+                linear-gradient(
+                    180deg,
+                    #ffffff,
+                    #fafdff
+                );
+
+            border-bottom:
+                1px solid #e8eef7;
         }
 
-        .payment-card-header h2 {
-            margin: 0;
-            color: #0f172a;
-            font-size: 18px;
+
+        .payment-card-title {
+            display: flex;
+            align-items: center;
+
+            gap: 13px;
+        }
+
+
+        .payment-card-title-icon {
+            width: 42px;
+            height: 42px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 13px;
+
+            color: #ffffff;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #0ea5e9
+                );
+
+            box-shadow:
+                0 8px 18px
+                rgba(37,99,235,0.22);
+
+            font-size: 17px;
+
             font-weight: 900;
         }
 
-        .payment-card-header p {
-            margin: 5px 0 0;
-            color: #64748b;
-            font-size: 12px;
+
+        .payment-card-header h2 {
+            margin: 0;
+
+            color: #102f66;
+
+            font-size: 18px;
+
+            font-weight: 900;
         }
 
+
+        .payment-card-header p {
+            margin: 4px 0 0;
+
+            color: #8a9bb5;
+
+            font-size: 11px;
+
+            font-weight: 500;
+        }
+
+
+        .payment-count {
+            padding: 8px 13px;
+
+            border-radius: 999px;
+
+            color: #2563eb;
+
+            background: #eff6ff;
+
+            border:
+                1px solid #dbeafe;
+
+            font-size: 11px;
+
+            font-weight: 800;
+        }
+
+
         /*
-        |--------------------------------------------------------------------------
-        | TABLE
-        |--------------------------------------------------------------------------
+        =========================================================
+        TABLE
+        =========================================================
         */
 
         .payment-table-wrapper {
             width: 100%;
+
             overflow-x: auto;
         }
 
+
         .payment-table {
             width: 100%;
-            min-width: 1100px;
-            border-collapse: collapse;
+
+            min-width: 1150px;
+
+            border-collapse: separate;
+
+            border-spacing: 0;
         }
+
 
         .payment-table th {
             padding: 15px 18px;
-            background: #f8fafc;
-            color: #64748b;
-            font-size: 11px;
+
+            background:
+                #f5f8fd;
+
+            color: #71819a;
+
+            border-bottom:
+                1px solid #e5ebf4;
+
+            font-size: 10px;
+
             font-weight: 900;
+
             text-align: left;
+
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+
+            letter-spacing: 0.7px;
+
             white-space: nowrap;
         }
+
+
+        .payment-table th:first-child {
+            padding-left: 25px;
+        }
+
 
         .payment-table td {
             padding: 17px 18px;
-            border-top: 1px solid #f1f5f9;
+
             color: #334155;
-            font-size: 13px;
+
+            border-bottom:
+                1px solid #edf1f7;
+
+            font-size: 12px;
+
+            font-weight: 500;
+
             vertical-align: middle;
         }
 
-        .payment-table tbody tr {
-            transition: background 0.15s ease;
+
+        .payment-table td:first-child {
+            padding-left: 25px;
         }
+
+
+        .payment-table tbody tr {
+            transition:
+                background .18s ease;
+        }
+
 
         .payment-table tbody tr:hover {
-            background: #f8fafc;
+            background:
+                linear-gradient(
+                    90deg,
+                    #f4f8ff,
+                    #ffffff
+                );
         }
 
-        .payment-table tbody tr:hover td {
-            background: transparent;
+
+        .payment-table tbody tr:last-child td {
+            border-bottom: none;
         }
+
 
         /*
-        |--------------------------------------------------------------------------
-        | PAYMENT DATA
-        |--------------------------------------------------------------------------
+        =========================================================
+        PAYMENT ID
+        =========================================================
         */
 
         .payment-id {
+            display: inline-flex;
+
+            align-items: center;
+
+            padding: 7px 10px;
+
+            border-radius: 9px;
+
             color: #2563eb;
+
+            background: #eff6ff;
+
+            border:
+                1px solid #dbeafe;
+
+            font-size: 11px;
+
             font-weight: 900;
         }
+
+
+        /*
+        =========================================================
+        ORDER LINK
+        =========================================================
+        */
+
+        .payment-order-link {
+            display: inline-flex;
+
+            align-items: center;
+
+            padding: 6px 9px;
+
+            border-radius: 8px;
+
+            color: #1d4ed8;
+
+            background: #f1f6ff;
+
+            text-decoration: none;
+
+            font-size: 11px;
+
+            font-weight: 900;
+
+            transition: .18s ease;
+        }
+
+
+        .payment-order-link:hover {
+            color: #ffffff;
+
+            background:
+                #2563eb;
+
+            transform: translateY(-1px);
+        }
+
+
+        /*
+        =========================================================
+        CUSTOMER
+        =========================================================
+        */
 
         .payment-customer strong {
             display: block;
-            color: #0f172a;
+
+            color: #173665;
+
+            font-size: 12px;
+
             font-weight: 800;
         }
 
+
         .payment-customer small {
             display: block;
+
+            max-width: 180px;
+
             margin-top: 3px;
+
+            overflow: hidden;
+
             color: #94a3b8;
-            font-size: 11px;
+
+            font-size: 10px;
+
+            text-overflow: ellipsis;
+
+            white-space: nowrap;
         }
 
-        .payment-order-link {
-            color: #2563eb;
-            text-decoration: none;
-            font-weight: 900;
+
+        /*
+        =========================================================
+        PAYMENT METHOD
+        =========================================================
+        */
+
+        .payment-method {
+            display: inline-flex;
+
+            align-items: center;
+
+            padding: 6px 9px;
+
+            border-radius: 8px;
+
+            background: #f8fafc;
+
+            color: #475569;
+
+            border:
+                1px solid #e2e8f0;
+
+            font-size: 10px;
+
+            font-weight: 800;
         }
 
-        .payment-order-link:hover {
-            text-decoration: underline;
-        }
+
+        /*
+        =========================================================
+        AMOUNT
+        =========================================================
+        */
 
         .payment-amount {
             color: #059669;
+
+            font-size: 13px;
+
             font-weight: 900;
+
             white-space: nowrap;
         }
+
+
+        /*
+        =========================================================
+        REFERENCE
+        =========================================================
+        */
 
         .payment-reference {
             display: inline-block;
-            max-width: 180px;
+
+            max-width: 170px;
+
+            padding: 6px 9px;
+
             overflow: hidden;
+
+            border-radius: 8px;
+
+            background: #f5f7fb;
+
+            color: #64748b;
+
+            border:
+                1px solid #e5eaf2;
+
+            font-family:
+                'Poppins',
+                sans-serif;
+
+            font-size: 9px;
+
+            font-weight: 700;
+
             text-overflow: ellipsis;
+
             white-space: nowrap;
-            padding: 5px 8px;
-            border-radius: 7px;
-            background: #f1f5f9;
-            color: #475569;
-            font-size: 11px;
         }
 
+
         /*
-        |--------------------------------------------------------------------------
-        | STATUS
-        |--------------------------------------------------------------------------
+        =========================================================
+        DATE
+        =========================================================
+        */
+
+        .payment-date {
+            color: #64748b;
+
+            font-size: 10px;
+
+            font-weight: 600;
+
+            white-space: nowrap;
+        }
+
+
+        /*
+        =========================================================
+        STATUS
+        =========================================================
         */
 
         .payment-status {
+            position: relative;
+
             display: inline-flex;
+
             align-items: center;
-            justify-content: center;
-            padding: 6px 10px;
+
+            gap: 6px;
+
+            padding: 7px 11px;
+
             border-radius: 999px;
-            font-size: 11px;
+
+            font-size: 10px;
+
             font-weight: 900;
+
             white-space: nowrap;
         }
 
-        .payment-status-pending {
-            background: #fef3c7;
-            color: #92400e;
+
+        .payment-status::before {
+            content: "";
+
+            width: 6px;
+            height: 6px;
+
+            border-radius: 50%;
+
+            background: currentColor;
         }
+
+
+        .payment-status-pending {
+            color: #a16207;
+
+            background: #fef9c3;
+
+            border:
+                1px solid #fde68a;
+        }
+
 
         .payment-status-paid {
+            color: #15803d;
+
             background: #dcfce7;
-            color: #166534;
+
+            border:
+                1px solid #bbf7d0;
         }
+
 
         .payment-status-failed {
+            color: #dc2626;
+
             background: #fee2e2;
-            color: #991b1b;
+
+            border:
+                1px solid #fecaca;
         }
+
 
         .payment-status-refunded {
+            color: #7c3aed;
+
             background: #ede9fe;
-            color: #6d28d9;
+
+            border:
+                1px solid #ddd6fe;
         }
 
+
         /*
-        |--------------------------------------------------------------------------
-        | UPDATE FORM
-        |--------------------------------------------------------------------------
+        =========================================================
+        UPDATE SELECT
+        =========================================================
         */
 
         .payment-form {
             margin: 0;
         }
 
+
         .payment-form select {
-            min-width: 120px;
-            padding: 8px 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 9px;
-            background: #ffffff;
+            min-width: 125px;
+
+            padding: 8px 28px 8px 10px;
+
+            border:
+                1px solid #d7e0ec;
+
+            border-radius: 10px;
+
+            background:
+                #ffffff;
+
             color: #334155;
-            font-size: 12px;
+
+            font-family:
+                'Poppins',
+                sans-serif;
+
+            font-size: 10px;
+
             font-weight: 700;
+
             cursor: pointer;
+
+            transition:
+                border-color .18s ease,
+                box-shadow .18s ease;
         }
 
+
         .payment-form select:hover {
-            border-color: #94a3b8;
+            border-color:
+                #93b4ec;
         }
+
 
         .payment-form select:focus {
             outline: none;
-            border-color: #2563eb;
+
+            border-color:
+                #2563eb;
+
             box-shadow:
                 0 0 0 3px
-                rgba(37, 99, 235, 0.10);
+                rgba(37,99,235,0.10);
         }
 
+
         /*
-        |--------------------------------------------------------------------------
-        | EMPTY
-        |--------------------------------------------------------------------------
+        =========================================================
+        EMPTY
+        =========================================================
         */
 
         .payment-empty {
-            padding: 70px 20px;
+            padding: 75px 25px;
+
             text-align: center;
         }
 
+
         .payment-empty-icon {
-            width: 60px;
-            height: 60px;
-            margin: 0 auto 15px;
+            width: 68px;
+            height: 68px;
+
+            margin:
+                0 auto 17px;
+
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 18px;
-            background: #eff6ff;
+
+            border-radius: 20px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #eff6ff,
+                    #dbeafe
+                );
+
             color: #2563eb;
-            font-size: 26px;
+
+            font-size: 27px;
+
             font-weight: 900;
+
+            box-shadow:
+                0 12px 25px
+                rgba(37,99,235,0.10);
         }
+
 
         .payment-empty h3 {
             margin: 0;
-            color: #0f172a;
+
+            color: #173665;
+
             font-size: 17px;
+
+            font-weight: 900;
         }
+
 
         .payment-empty p {
-            margin: 7px 0 0;
-            color: #64748b;
-            font-size: 13px;
+            max-width: 420px;
+
+            margin: 7px auto 0;
+
+            color: #94a3b8;
+
+            font-size: 11px;
+
+            line-height: 1.7;
         }
 
+
         /*
-        |--------------------------------------------------------------------------
-        | RESPONSIVE
-        |--------------------------------------------------------------------------
+        =========================================================
+        SCROLLBAR
+        =========================================================
         */
 
-        @media (max-width: 1200px) {
+        .payment-table-wrapper::-webkit-scrollbar {
+            height: 8px;
+        }
+
+
+        .payment-table-wrapper::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+
+        .payment-table-wrapper::-webkit-scrollbar-thumb {
+            background: #b9cbea;
+
+            border-radius: 999px;
+        }
+
+
+        .payment-table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #7fa1d4;
+        }
+
+
+        /*
+        =========================================================
+        RESPONSIVE
+        =========================================================
+        */
+
+        @media (max-width: 1250px) {
 
             .payment-stats {
                 grid-template-columns:
                     repeat(3, minmax(0, 1fr));
             }
+
         }
 
-        @media (max-width: 800px) {
+
+        @media (max-width: 850px) {
 
             .payment-page {
-                padding: 20px;
+                padding: 22px;
             }
 
+
             .payment-header {
-                flex-direction: column;
-                align-items: flex-start;
+                padding: 24px;
             }
+
+
+            .payment-header h1 {
+                font-size: 27px;
+            }
+
 
             .payment-stats {
                 grid-template-columns:
                     repeat(2, minmax(0, 1fr));
             }
+
         }
 
-        @media (max-width: 500px) {
+
+        @media (max-width: 550px) {
 
             .payment-page {
                 padding: 15px;
             }
 
-            .payment-stats {
-                grid-template-columns: 1fr;
+
+            .payment-header {
+                padding: 21px;
+
+                border-radius: 19px;
             }
 
-            .payment-header h1 {
-                font-size: 26px;
+
+            .payment-header-icon {
+                width: 50px;
+                height: 50px;
+
+                border-radius: 15px;
+
+                font-size: 21px;
             }
+
+
+            .payment-header h1 {
+                font-size: 23px;
+            }
+
+
+            .payment-header p {
+                font-size: 10px;
+            }
+
+
+            .payment-stats {
+                grid-template-columns: 1fr;
+
+                gap: 12px;
+            }
+
+
+            .payment-stat {
+                min-height: 125px;
+            }
+
+
+            .payment-card {
+                border-radius: 18px;
+            }
+
 
             .payment-card-header {
                 padding: 18px;
             }
+
+
+            .payment-card-title-icon {
+                width: 37px;
+                height: 37px;
+            }
+
+
+            .payment-card-header h2 {
+                font-size: 15px;
+            }
+
         }
 
     </style>
 
 </head>
 
+
 <body>
+
 
 <div class="admin-layout">
 
+
     <!-- =====================================================
          SIDEBAR
+         IMPORTANT:
+         Only include admin_sidebar.php.
+         DO NOT duplicate sidebar HTML here.
     ====================================================== -->
 
-        <?php require_once dirname(__DIR__) . '/includes/admin_sidebar.php'; ?>
-        
-        <div class="admin-logo">
-
-            <h2>
-                Hochipo<span>Hub</span>
-            </h2>
-
-            <p>
-                ADMIN PANEL
-            </p>
-
-        </div>
-
-        <nav>
-
-            <a href="dashboard.php">
-                Dashboard
-            </a>
-
-            <a href="products.php">
-                Products
-            </a>
-
-            <a href="users.php">
-                Users
-            </a>
-
-            <a href="vendors.php">
-                Vendors
-            </a>
-
-            <a href="orders.php">
-                Orders
-            </a>
-
-            <a
-                href="payments.php"
-                class="active"
-            >
-                Payments
-            </a>
-
-            <a href="commission.php">
-                Commission
-            </a>
-
-            <a href="reviews.php">
-                Reviews
-            </a>
-
-            <a href="settings.php">
-                Settings
-            </a>
-
-        </nav>
-
-        <div class="admin-sidebar-bottom">
-
-            <a href="../auth/logout.php">
-                Logout
-            </a>
-
-        </div>
+    <?php
+    require_once dirname(__DIR__) . '/includes/admin_sidebar.php';
+    ?>
 
 
     <!-- =====================================================
-         MAIN
+         MAIN CONTENT
     ====================================================== -->
 
     <main class="admin-main">
+
 
         <div class="payment-page">
 
             <div class="payment-container">
 
-                <!-- HEADER -->
+
+                <!-- =================================================
+                     HEADER
+                ================================================== -->
 
                 <header class="payment-header">
 
-                    <div>
+                    <div class="payment-header-content">
 
                         <h1>
                             Payments
@@ -938,19 +1664,26 @@ foreach ($payments as $payment) {
 
                     </div>
 
-                    <div class="admin-badge">
-                        ADMIN CONTROL
+
+                    <div class="payment-header-icon">
+                        $
                     </div>
 
                 </header>
 
 
-                <!-- ALERT -->
+                <!-- =================================================
+                     ALERTS
+                ================================================== -->
 
                 <?php if ($message): ?>
 
                     <div class="payment-alert success">
+
+                        ✓ &nbsp;
+
                         <?= e($message) ?>
+
                     </div>
 
                 <?php endif; ?>
@@ -959,7 +1692,11 @@ foreach ($payments as $payment) {
                 <?php if ($error): ?>
 
                     <div class="payment-alert error">
+
+                        ⚠ &nbsp;
+
                         <?= e($error) ?>
+
                     </div>
 
                 <?php endif; ?>
@@ -970,6 +1707,9 @@ foreach ($payments as $payment) {
                 ================================================== -->
 
                 <section class="payment-stats">
+
+
+                    <!-- TOTAL -->
 
                     <div class="payment-stat">
 
@@ -983,6 +1723,8 @@ foreach ($payments as $payment) {
 
                     </div>
 
+
+                    <!-- PAID -->
 
                     <div class="payment-stat">
 
@@ -1001,6 +1743,8 @@ foreach ($payments as $payment) {
                     </div>
 
 
+                    <!-- PENDING -->
+
                     <div class="payment-stat">
 
                         <span class="payment-stat-label">
@@ -1018,6 +1762,8 @@ foreach ($payments as $payment) {
                     </div>
 
 
+                    <!-- FAILED -->
+
                     <div class="payment-stat">
 
                         <span class="payment-stat-label">
@@ -1030,6 +1776,8 @@ foreach ($payments as $payment) {
 
                     </div>
 
+
+                    <!-- REFUNDED -->
 
                     <div class="payment-stat">
 
@@ -1056,22 +1804,46 @@ foreach ($payments as $payment) {
 
                 <section class="payment-card">
 
+
+                    <!-- CARD HEADER -->
+
                     <div class="payment-card-header">
 
-                        <div>
+                        <div class="payment-card-title">
 
-                            <h2>
-                                Payment Transactions
-                            </h2>
+                            <div class="payment-card-title-icon">
+                                $
+                            </div>
 
-                            <p>
-                                All payment records from customer orders.
-                            </p>
+                            <div>
+
+                                <h2>
+                                    Payment Transactions
+                                </h2>
+
+                                <p>
+                                    All payment records from customer orders.
+                                </p>
+
+                            </div>
 
                         </div>
 
+
+                        <span class="payment-count">
+
+                            <?= number_format($total_payments) ?>
+
+                            transaction<?= $total_payments == 1 ? '' : 's' ?>
+
+                        </span>
+
                     </div>
 
+
+                    <!-- =================================================
+                         EMPTY
+                    ================================================== -->
 
                     <?php if (empty($payments)): ?>
 
@@ -1086,16 +1858,24 @@ foreach ($payments as $payment) {
                             </h3>
 
                             <p>
-                                Payment transactions will appear here when customers make payments.
+                                Payment transactions will appear here
+                                when customers make payments.
                             </p>
 
                         </div>
 
+
                     <?php else: ?>
+
+
+                        <!-- =================================================
+                             TABLE
+                        ================================================== -->
 
                         <div class="payment-table-wrapper">
 
                             <table class="payment-table">
+
 
                                 <thead>
 
@@ -1141,19 +1921,24 @@ foreach ($payments as $payment) {
 
                                 </thead>
 
+
                                 <tbody>
+
 
                                 <?php foreach ($payments as $payment): ?>
 
                                     <tr>
 
-                                        <!-- PAYMENT ID -->
+
+                                        <!-- PAYMENT -->
 
                                         <td>
 
                                             <span class="payment-id">
 
-                                                #<?= e(
+                                                #
+
+                                                <?= e(
                                                     $payment['payment_id']
                                                 ) ?>
 
@@ -1173,7 +1958,9 @@ foreach ($payments as $payment) {
                                                 ) ?>"
                                             >
 
-                                                #<?= e(
+                                                #
+
+                                                <?= e(
                                                     $payment['order_id']
                                                 ) ?>
 
@@ -1189,15 +1976,23 @@ foreach ($payments as $payment) {
                                             <div class="payment-customer">
 
                                                 <strong>
+
                                                     <?= e(
-                                                        $payment['customer_name']
+                                                        $payment[
+                                                            'customer_name'
+                                                        ]
                                                     ) ?>
+
                                                 </strong>
 
                                                 <small>
+
                                                     <?= e(
-                                                        $payment['customer_email']
+                                                        $payment[
+                                                            'customer_email'
+                                                        ]
                                                     ) ?>
+
                                                 </small>
 
                                             </div>
@@ -1209,10 +2004,15 @@ foreach ($payments as $payment) {
 
                                         <td>
 
-                                            <?= e(
-                                                $payment['payment_method']
-                                                    ?: '-'
-                                            ) ?>
+                                            <span class="payment-method">
+
+                                                <?= e(
+                                                    $payment[
+                                                        'payment_method'
+                                                    ] ?: '-'
+                                                ) ?>
+
+                                            </span>
 
                                         </td>
 
@@ -1244,7 +2044,14 @@ foreach ($payments as $payment) {
                                                 )
                                             ): ?>
 
-                                                <code class="payment-reference">
+                                                <code
+                                                    class="payment-reference"
+                                                    title="<?= e(
+                                                        $payment[
+                                                            'transaction_reference'
+                                                        ]
+                                                    ) ?>"
+                                                >
 
                                                     <?= e(
                                                         $payment[
@@ -1256,7 +2063,14 @@ foreach ($payments as $payment) {
 
                                             <?php else: ?>
 
-                                                -
+                                                <span
+                                                    style="
+                                                        color:#c0cad8;
+                                                        font-weight:700;
+                                                    "
+                                                >
+                                                    —
+                                                </span>
 
                                             <?php endif; ?>
 
@@ -1267,10 +2081,15 @@ foreach ($payments as $payment) {
 
                                         <td>
 
-                                            <?= e(
-                                                $payment['payment_date']
-                                                    ?: '-'
-                                            ) ?>
+                                            <span class="payment-date">
+
+                                                <?= e(
+                                                    $payment[
+                                                        'payment_date'
+                                                    ] ?: '-'
+                                                ) ?>
+
+                                            </span>
 
                                         </td>
 
@@ -1319,9 +2138,18 @@ foreach ($payments as $payment) {
                                                     ) ?>"
                                                 >
 
+
+                                                <input
+                                                    type="hidden"
+                                                    name="update_payment"
+                                                    value="1"
+                                                >
+
+
                                                 <select
                                                     name="payment_status"
                                                     onchange="this.form.submit()"
+                                                    aria-label="Update payment status"
                                                 >
 
                                                     <?php
@@ -1334,6 +2162,7 @@ foreach ($payments as $payment) {
                                                     ];
 
                                                     ?>
+
 
                                                     <?php foreach (
                                                         $statuses
@@ -1364,19 +2193,15 @@ foreach ($payments as $payment) {
 
                                                 </select>
 
-                                                <input
-                                                    type="hidden"
-                                                    name="update_payment"
-                                                    value="1"
-                                                >
-
                                             </form>
 
                                         </td>
 
+
                                     </tr>
 
                                 <?php endforeach; ?>
+
 
                                 </tbody>
 
@@ -1384,17 +2209,23 @@ foreach ($payments as $payment) {
 
                         </div>
 
+
                     <?php endif; ?>
 
+
                 </section>
+
 
             </div>
 
         </div>
 
+
     </main>
 
+
 </div>
+
 
 </body>
 
