@@ -11,7 +11,7 @@
 | - Switch modal
 | - Close modal
 | - Password show/hide
-| - Auto login popup support
+| - Auto login popup after registration
 |--------------------------------------------------------------------------
 */
 
@@ -22,7 +22,7 @@
 
     /*
     |--------------------------------------------------------------------------
-    | PAGE READY
+    | WAIT FOR PAGE
     |--------------------------------------------------------------------------
     */
 
@@ -57,12 +57,25 @@
             function openModal(modal) {
 
                 if (!modal) {
+
                     return;
+
                 }
 
 
+                /*
+                |--------------------------------------------------------------
+                | SHOW MODAL
+                |--------------------------------------------------------------
+                */
+
                 modal.classList.add(
                     'active'
+                );
+
+
+                modal.classList.add(
+                    'show'
                 );
 
 
@@ -79,7 +92,7 @@
 
                 /*
                 |--------------------------------------------------------------
-                | FOCUS INPUT
+                | FOCUS FIRST INPUT
                 |--------------------------------------------------------------
                 */
 
@@ -114,7 +127,9 @@
             function closeModal(modal) {
 
                 if (!modal) {
+
                     return;
+
                 }
 
 
@@ -123,11 +138,22 @@
                 );
 
 
+                modal.classList.remove(
+                    'show'
+                );
+
+
                 modal.setAttribute(
                     'aria-hidden',
                     'true'
                 );
 
+
+                /*
+                |--------------------------------------------------------------
+                | REMOVE BODY LOCK
+                |--------------------------------------------------------------
+                */
 
                 document.body.classList.remove(
                     'modal-open'
@@ -176,14 +202,13 @@
 
             /*
             |--------------------------------------------------------------------------
-            | OPEN MODAL BUTTONS
+            | OPEN / SWITCH MODAL BUTTON
             |--------------------------------------------------------------------------
             */
 
             document.addEventListener(
                 'click',
                 function (event) {
-
 
                     const button =
                         event.target.closest(
@@ -221,7 +246,7 @@
 
                     /*
                     |----------------------------------------------------------
-                    | SWITCH
+                    | SWITCH MODAL
                     |----------------------------------------------------------
                     */
 
@@ -243,7 +268,7 @@
 
                     /*
                     |----------------------------------------------------------
-                    | OPEN
+                    | OPEN MODAL
                     |----------------------------------------------------------
                     */
 
@@ -268,7 +293,6 @@
             document.addEventListener(
                 'click',
                 function (event) {
-
 
                     const closeButton =
                         event.target.closest(
@@ -305,7 +329,7 @@
 
             /*
             |--------------------------------------------------------------------------
-            | CLICK OUTSIDE
+            | CLICK OUTSIDE MODAL
             |--------------------------------------------------------------------------
             */
 
@@ -313,6 +337,12 @@
                 'click',
                 function (event) {
 
+
+                    /*
+                    |----------------------------------------------------------
+                    | LOGIN
+                    |----------------------------------------------------------
+                    */
 
                     if (
                         loginModal &&
@@ -326,6 +356,12 @@
                     }
 
 
+                    /*
+                    |----------------------------------------------------------
+                    | REGISTER
+                    |----------------------------------------------------------
+                    */
+
                     if (
                         registerModal &&
                         event.target === registerModal
@@ -337,20 +373,43 @@
 
                     }
 
+
+                    /*
+                    |----------------------------------------------------------
+                    | TERMS
+                    |----------------------------------------------------------
+                    */
+
+                    const termsModal =
+                        document.getElementById(
+                            'termsModal'
+                        );
+
+
+                    if (
+                        termsModal &&
+                        event.target === termsModal
+                    ) {
+
+                        closeModal(
+                            termsModal
+                        );
+
+                    }
+
                 }
             );
 
 
             /*
             |--------------------------------------------------------------------------
-            | ESC
+            | ESCAPE KEY
             |--------------------------------------------------------------------------
             */
 
             document.addEventListener(
                 'keydown',
                 function (event) {
-
 
                     if (
                         event.key !== 'Escape'
@@ -360,6 +419,46 @@
 
                     }
 
+
+                    /*
+                    |----------------------------------------------------------
+                    | TERMS
+                    |----------------------------------------------------------
+                    */
+
+                    const termsModal =
+                        document.getElementById(
+                            'termsModal'
+                        );
+
+
+                    if (
+                        termsModal &&
+                        (
+                            termsModal.classList.contains(
+                                'show'
+                            )
+                            ||
+                            termsModal.classList.contains(
+                                'active'
+                            )
+                        )
+                    ) {
+
+                        closeModal(
+                            termsModal
+                        );
+
+                        return;
+
+                    }
+
+
+                    /*
+                    |----------------------------------------------------------
+                    | LOGIN
+                    |----------------------------------------------------------
+                    */
 
                     if (
                         loginModal &&
@@ -374,6 +473,12 @@
 
                     }
 
+
+                    /*
+                    |----------------------------------------------------------
+                    | REGISTER
+                    |----------------------------------------------------------
+                    */
 
                     if (
                         registerModal &&
@@ -401,7 +506,6 @@
             document.addEventListener(
                 'click',
                 function (event) {
-
 
                     const toggle =
                         event.target.closest(
@@ -467,6 +571,12 @@
                             'Hide password'
                         );
 
+
+                        toggle.setAttribute(
+                            'aria-pressed',
+                            'true'
+                        );
+
                     }
 
 
@@ -491,6 +601,12 @@
                             'Show password'
                         );
 
+
+                        toggle.setAttribute(
+                            'aria-pressed',
+                            'false'
+                        );
+
                     }
 
                 }
@@ -499,14 +615,19 @@
 
             /*
             |--------------------------------------------------------------------------
-            | AUTO OPEN LOGIN
+            | AUTOMATIC LOGIN MODAL
             |--------------------------------------------------------------------------
             |
-            | This supports both:
+            | After successful registration:
             |
-            | 1. ?login=1
+            | register_process.php
+            |        ↓
+            | index.php?login=1
+            |        ↓
+            | this code
+            |        ↓
+            | login modal opens automatically
             |
-            | 2. PHP-generated .active class
             |--------------------------------------------------------------------------
             */
 
@@ -521,16 +642,73 @@
                 urlParams.get('login') === '1'
             ) {
 
+
+                /*
+                |--------------------------------------------------------------
+                | OPEN LOGIN
+                |--------------------------------------------------------------
+                */
+
                 openModal(
                     loginModal
                 );
+
+
+                /*
+                |--------------------------------------------------------------
+                | FOCUS EMAIL
+                |--------------------------------------------------------------
+                */
+
+                setTimeout(
+                    function () {
+
+                        const loginEmail =
+                            document.getElementById(
+                                'loginEmail'
+                            );
+
+
+                        if (loginEmail) {
+
+                            loginEmail.focus();
+
+                        }
+
+                    },
+                    300
+                );
+
+
+                /*
+                |--------------------------------------------------------------
+                | REMOVE ?login=1 FROM URL
+                |--------------------------------------------------------------
+                */
+
+                if (
+                    window.history &&
+                    window.history.replaceState
+                ) {
+
+                    const cleanUrl =
+                        window.location.pathname;
+
+
+                    window.history.replaceState(
+                        {},
+                        document.title,
+                        cleanUrl
+                    );
+
+                }
 
             }
 
 
             /*
             |--------------------------------------------------------------------------
-            | AUTO OPEN REGISTER
+            | AUTOMATIC REGISTER MODAL
             |--------------------------------------------------------------------------
             */
 
@@ -548,14 +726,7 @@
 
             /*
             |--------------------------------------------------------------------------
-            | IF PHP ALREADY OPENED LOGIN
-            |--------------------------------------------------------------------------
-            |
-            | PHP adds:
-            |
-            | class="modal-overlay active"
-            |
-            | We make sure body also gets modal-open.
+            | PHP ALREADY OPENED LOGIN
             |--------------------------------------------------------------------------
             */
 
@@ -570,34 +741,27 @@
                     'modal-open'
                 );
 
-
-                /*
-                |--------------------------------------------------------------
-                | FOCUS PASSWORD
-                |--------------------------------------------------------------
-                */
-
-                const loginPassword =
-                    document.getElementById(
-                        'loginPassword'
-                    );
-
-
-                if (loginPassword) {
-
-                    setTimeout(
-                        function () {
-
-                            loginPassword.focus();
-
-                        },
-                        300
-                    );
-
-                }
-
             }
 
+
+            /*
+            |--------------------------------------------------------------------------
+            | PHP ALREADY OPENED REGISTER
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                registerModal &&
+                registerModal.classList.contains(
+                    'active'
+                )
+            ) {
+
+                document.body.classList.add(
+                    'modal-open'
+                );
+
+            }
 
         }
     );
