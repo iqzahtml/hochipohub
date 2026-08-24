@@ -1,15 +1,69 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - REGISTER MODAL
+|--------------------------------------------------------------------------
+*/
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| BASE URL
+|--------------------------------------------------------------------------
+*/
 
 $baseUrl = defined('BASE_URL')
     ? rtrim(BASE_URL, '/') . '/'
     : '/hochipohub/';
 
+
+/*
+|--------------------------------------------------------------------------
+| OLD REGISTER DATA
+|--------------------------------------------------------------------------
+*/
+
 $registerOld =
     $_SESSION['register_old'] ?? [];
+
+
+/*
+|--------------------------------------------------------------------------
+| REGISTER ERROR
+|--------------------------------------------------------------------------
+*/
+
+$registerError =
+    $_SESSION['register_error'] ?? '';
+
+
+/*
+|--------------------------------------------------------------------------
+| CHECK WHETHER REGISTER SHOULD OPEN
+|--------------------------------------------------------------------------
+*/
+
+$openRegister =
+    !empty($_SESSION['open_register_modal'])
+    ||
+    isset($_GET['register']);
+
+
+/*
+|--------------------------------------------------------------------------
+| MODAL CLASS
+|--------------------------------------------------------------------------
+*/
+
+$registerModalClass =
+    $openRegister
+        ? 'modal-overlay active show'
+        : 'modal-overlay';
 
 ?>
 
@@ -18,9 +72,9 @@ $registerOld =
 ========================================================= -->
 
 <div
-    class="modal-overlay"
+    class="<?= $registerModalClass ?>"
     id="registerModal"
-    aria-hidden="true"
+    aria-hidden="<?= $openRegister ? 'false' : 'true' ?>"
 >
 
     <div
@@ -30,7 +84,7 @@ $registerOld =
         aria-labelledby="registerModalTitle"
     >
 
-        <!-- CLOSE REGISTER -->
+        <!-- CLOSE -->
 
         <button
             type="button"
@@ -65,26 +119,28 @@ $registerOld =
         </div>
 
 
-        <!-- ERROR MESSAGE -->
+        <!-- =====================================================
+             ERROR MESSAGE
+        ====================================================== -->
 
-        <?php if (!empty($_SESSION['register_error'])): ?>
+        <?php if (!empty($registerError)): ?>
 
             <div class="auth-alert auth-alert-error">
 
                 <?= htmlspecialchars(
-                    $_SESSION['register_error'],
+                    $registerError,
                     ENT_QUOTES,
                     'UTF-8'
                 ) ?>
 
             </div>
 
-            <?php unset($_SESSION['register_error']); ?>
-
         <?php endif; ?>
 
 
-        <!-- REGISTER FORM -->
+        <!-- =====================================================
+             REGISTER FORM
+        ====================================================== -->
 
         <form
             action="<?= htmlspecialchars(
@@ -98,7 +154,9 @@ $registerOld =
         >
 
 
-            <!-- CSRF -->
+            <!-- =================================================
+                 CSRF
+            ================================================== -->
 
             <?php if (function_exists('csrfToken')): ?>
 
@@ -127,7 +185,9 @@ $registerOld =
             <?php endif; ?>
 
 
-            <!-- FULL NAME -->
+            <!-- =================================================
+                 FULL NAME
+            ================================================== -->
 
             <div class="form-group">
 
@@ -153,7 +213,9 @@ $registerOld =
             </div>
 
 
-            <!-- EMAIL + PHONE -->
+            <!-- =================================================
+                 EMAIL + PHONE
+            ================================================== -->
 
             <div class="form-grid-2">
 
@@ -205,7 +267,9 @@ $registerOld =
             </div>
 
 
-            <!-- ACCOUNT TYPE -->
+            <!-- =================================================
+                 ACCOUNT TYPE
+            ================================================== -->
 
             <div class="form-group">
 
@@ -250,7 +314,9 @@ $registerOld =
             </div>
 
 
-            <!-- PASSWORD -->
+            <!-- =================================================
+                 PASSWORD
+            ================================================== -->
 
             <div class="form-group">
 
@@ -285,7 +351,9 @@ $registerOld =
             </div>
 
 
-            <!-- CONFIRM PASSWORD -->
+            <!-- =================================================
+                 CONFIRM PASSWORD
+            ================================================== -->
 
             <div class="form-group">
 
@@ -320,9 +388,9 @@ $registerOld =
             </div>
 
 
-            <!-- =====================================================
-                 TERMS CHECKBOX
-            ====================================================== -->
+            <!-- =================================================
+                 TERMS
+            ================================================== -->
 
             <div class="checkbox-row">
 
@@ -352,9 +420,9 @@ $registerOld =
             </div>
 
 
-            <!-- =====================================================
-                 CREATE ACCOUNT BUTTON
-            ====================================================== -->
+            <!-- =================================================
+                 CREATE ACCOUNT
+            ================================================== -->
 
             <button
                 type="submit"
@@ -372,7 +440,9 @@ $registerOld =
             </button>
 
 
-            <!-- LOGIN -->
+            <!-- =================================================
+                 LOGIN
+            ================================================== -->
 
             <p class="auth-switch">
 
@@ -396,9 +466,8 @@ $registerOld =
 </div>
 
 
-
 <!-- =========================================================
-     TERMS & CONDITIONS POPUP
+     TERMS MODAL
 ========================================================= -->
 
 <div
@@ -413,8 +482,6 @@ $registerOld =
         aria-modal="true"
         aria-labelledby="termsModalTitle"
     >
-
-        <!-- TERMS HEADER -->
 
         <div class="terms-modal-header">
 
@@ -437,18 +504,12 @@ $registerOld =
         </div>
 
 
-        <!-- =====================================================
-             TERMS CONTENT
-        ====================================================== -->
-
         <div
             class="terms-content"
             id="termsContent"
         >
 
-            <h3>
-                1. Acceptance of Terms
-            </h3>
+            <h3>1. Acceptance of Terms</h3>
 
             <p>
                 By creating an account on HOCHIPOHUB,
@@ -457,9 +518,7 @@ $registerOld =
             </p>
 
 
-            <h3>
-                2. Account Registration
-            </h3>
+            <h3>2. Account Registration</h3>
 
             <p>
                 You agree to provide accurate, complete
@@ -468,22 +527,16 @@ $registerOld =
             </p>
 
 
-            <h3>
-                3. User Responsibilities
-            </h3>
+            <h3>3. User Responsibilities</h3>
 
             <p>
                 You are responsible for maintaining the
                 confidentiality of your account information
-                and password. You must not use HOCHIPOHUB
-                for unlawful, fraudulent or harmful
-                activities.
+                and password.
             </p>
 
 
-            <h3>
-                4. Customer Responsibilities
-            </h3>
+            <h3>4. Customer Responsibilities</h3>
 
             <p>
                 Customers are responsible for reviewing
@@ -493,72 +546,50 @@ $registerOld =
             </p>
 
 
-            <h3>
-                5. Vendor Responsibilities
-            </h3>
+            <h3>5. Vendor Responsibilities</h3>
 
             <p>
                 Vendors are responsible for ensuring that
                 their product information, prices,
-                descriptions and images are accurate and
-                not misleading.
+                descriptions and images are accurate.
             </p>
 
 
-            <h3>
-                6. Orders and Payments
-            </h3>
+            <h3>6. Orders and Payments</h3>
 
             <p>
                 Customers agree to provide correct
                 information when placing an order and
-                completing payment. Orders may be subject
-                to availability and applicable platform
-                policies.
+                completing payment.
             </p>
 
 
-            <h3>
-                7. Privacy
-            </h3>
+            <h3>7. Privacy</h3>
 
             <p>
                 HOCHIPOHUB respects the privacy of its
-                users. Personal information provided during
-                registration and transactions should be
-                handled in accordance with applicable
-                privacy requirements.
+                users.
             </p>
 
 
-            <h3>
-                8. Account Suspension or Termination
-            </h3>
+            <h3>8. Account Suspension or Termination</h3>
 
             <p>
                 HOCHIPOHUB reserves the right to suspend
                 or terminate an account if the user
-                violates these Terms &amp; Conditions or
-                engages in activities that may harm the
-                platform or other users.
+                violates these Terms &amp; Conditions.
             </p>
 
 
-            <h3>
-                9. Changes to Terms
-            </h3>
+            <h3>9. Changes to Terms</h3>
 
             <p>
                 HOCHIPOHUB may update these Terms &amp;
-                Conditions from time to time. Users are
-                encouraged to review the terms whenever
-                they use the platform.
+                Conditions from time to time.
             </p>
 
 
-            <h3>
-                10. Agreement
-            </h3>
+            <h3>10. Agreement</h3>
 
             <p>
                 By clicking
@@ -572,10 +603,6 @@ $registerOld =
 
         </div>
 
-
-        <!-- =====================================================
-             AGREE BUTTON
-        ====================================================== -->
 
         <button
             type="button"
@@ -599,7 +626,6 @@ $registerOld =
 </div>
 
 
-
 <!-- =========================================================
      TERMS JAVASCRIPT
 ========================================================= -->
@@ -610,10 +636,6 @@ $registerOld =
 
     'use strict';
 
-
-    /* =====================================================
-       RUN AFTER PAGE LOAD
-    ===================================================== */
 
     function initTermsSystem() {
 
@@ -636,104 +658,37 @@ $registerOld =
             document.getElementById('termsContent');
 
 
-        /* =================================================
-           CHECK ELEMENTS
-        ================================================= */
-
-        if (!openTermsButton) {
-
-            console.error(
-                'HOCHIPOHUB ERROR: openTermsModal not found.'
-            );
-
+        if (
+            !openTermsButton ||
+            !termsModal ||
+            !agreeTermsButton ||
+            !termsContent
+        ) {
             return;
         }
 
-
-        if (!termsModal) {
-
-            console.error(
-                'HOCHIPOHUB ERROR: termsModal not found.'
-            );
-
-            return;
-        }
-
-
-        if (!termsContent) {
-
-            console.error(
-                'HOCHIPOHUB ERROR: termsContent not found.'
-            );
-
-            return;
-        }
-
-
-        if (!agreeTermsButton) {
-
-            console.error(
-                'HOCHIPOHUB ERROR: termsAgreeButton not found.'
-            );
-
-            return;
-        }
-
-
-        console.log(
-            'HOCHIPOHUB Terms System Ready'
-        );
-
-
-        /* =================================================
-           TERMS STATUS
-        ================================================= */
 
         let termsHaveBeenRead = false;
 
 
-        /* =================================================
-           OPEN TERMS
-        ================================================= */
+        /*
+        |--------------------------------------------------------------------------
+        | OPEN TERMS
+        |--------------------------------------------------------------------------
+        */
 
         openTermsButton.addEventListener(
             'click',
             function (event) {
 
                 event.preventDefault();
-
                 event.stopPropagation();
-
-
-                console.log(
-                    'Terms & Conditions button clicked'
-                );
-
-
-                /* -----------------------------------------
-                   RESET READING
-                ----------------------------------------- */
 
                 termsHaveBeenRead = false;
 
-
-                /* -----------------------------------------
-                   DISABLE AGREE
-                ----------------------------------------- */
-
                 agreeTermsButton.disabled = true;
 
-
-                /* -----------------------------------------
-                   START FROM TOP
-                ----------------------------------------- */
-
                 termsContent.scrollTop = 0;
-
-
-                /* -----------------------------------------
-                   OPEN TERMS
-                ----------------------------------------- */
 
                 termsModal.classList.add('show');
 
@@ -742,28 +697,16 @@ $registerOld =
                     'false'
                 );
 
-
-                /* -----------------------------------------
-                   KEEP REGISTER OPEN
-                ----------------------------------------- */
-
                 if (registerModal) {
 
-                    registerModal.classList.add(
-                        'active'
-                    );
+                    registerModal.classList.add('active');
+                    registerModal.classList.add('show');
 
                     registerModal.setAttribute(
                         'aria-hidden',
                         'false'
                     );
-
                 }
-
-
-                /* -----------------------------------------
-                   BODY
-                ----------------------------------------- */
 
                 document.body.classList.add(
                     'terms-open'
@@ -773,9 +716,11 @@ $registerOld =
         );
 
 
-        /* =================================================
-           CHECK SCROLL
-        ================================================= */
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK SCROLL
+        |--------------------------------------------------------------------------
+        */
 
         termsContent.addEventListener(
             'scroll',
@@ -790,11 +735,9 @@ $registerOld =
                 const scrollHeight =
                     termsContent.scrollHeight;
 
-
                 const reachedBottom =
                     scrollTop + clientHeight >=
                     scrollHeight - 10;
-
 
                 if (reachedBottom) {
 
@@ -803,29 +746,24 @@ $registerOld =
                     agreeTermsButton.disabled =
                         false;
 
-
-                    console.log(
-                        'Terms completely read.'
-                    );
-
                 }
 
             }
         );
 
 
-        /* =================================================
-           AGREE BUTTON
-        ================================================= */
+        /*
+        |--------------------------------------------------------------------------
+        | AGREE
+        |--------------------------------------------------------------------------
+        */
 
         agreeTermsButton.addEventListener(
             'click',
             function (event) {
 
                 event.preventDefault();
-
                 event.stopPropagation();
-
 
                 if (!termsHaveBeenRead) {
 
@@ -836,178 +774,34 @@ $registerOld =
                     return;
                 }
 
-
-                /* -----------------------------------------
-                   ENABLE CHECKBOX
-                ----------------------------------------- */
-
                 if (termsCheckbox) {
 
-                    termsCheckbox.disabled =
-                        false;
+                    termsCheckbox.disabled = false;
+
+                    termsCheckbox.checked = true;
 
                 }
 
-
-                /* -----------------------------------------
-                   CLOSE TERMS
-                ----------------------------------------- */
-
-                termsModal.classList.remove(
-                    'show'
-                );
+                termsModal.classList.remove('show');
 
                 termsModal.setAttribute(
                     'aria-hidden',
                     'true'
                 );
 
-
                 document.body.classList.remove(
                     'terms-open'
                 );
 
-
-                /* -----------------------------------------
-                   KEEP REGISTER OPEN
-                ----------------------------------------- */
-
-                if (registerModal) {
-
-                    registerModal.classList.add(
-                        'active'
-                    );
-
-                    registerModal.setAttribute(
-                        'aria-hidden',
-                        'false'
-                    );
-
-                }
-
-
-                /* -----------------------------------------
-                   FOCUS CHECKBOX
-                ----------------------------------------- */
-
-                setTimeout(
-                    function () {
-
-                        if (termsCheckbox) {
-
-                            termsCheckbox.focus();
-
-                        }
-
-                    },
-                    100
-                );
-
             }
         );
 
 
-        /* =================================================
-           CHECKBOX
-        ================================================= */
-
-        if (termsCheckbox) {
-
-            termsCheckbox.addEventListener(
-                'click',
-                function (event) {
-
-                    if (!termsHaveBeenRead) {
-
-                        event.preventDefault();
-
-                        alert(
-                            'Please read all Terms & Conditions first.'
-                        );
-
-                    }
-
-                }
-            );
-
-        }
-
-
-        /* =================================================
-           CLICK OUTSIDE TERMS
-        ================================================= */
-
-        termsModal.addEventListener(
-            'click',
-            function (event) {
-
-                if (
-                    event.target === termsModal
-                ) {
-
-                    termsModal.classList.remove(
-                        'show'
-                    );
-
-                    termsModal.setAttribute(
-                        'aria-hidden',
-                        'true'
-                    );
-
-                    document.body.classList.remove(
-                        'terms-open'
-                    );
-
-                }
-
-            }
-        );
-
-
-        /* =================================================
-           ESCAPE
-        ================================================= */
-
-        document.addEventListener(
-            'keydown',
-            function (event) {
-
-                if (
-                    event.key !== 'Escape'
-                ) {
-
-                    return;
-                }
-
-
-                if (
-                    termsModal.classList.contains(
-                        'show'
-                    )
-                ) {
-
-                    termsModal.classList.remove(
-                        'show'
-                    );
-
-                    termsModal.setAttribute(
-                        'aria-hidden',
-                        'true'
-                    );
-
-                    document.body.classList.remove(
-                        'terms-open'
-                    );
-
-                }
-
-            }
-        );
-
-
-        /* =================================================
-           PASSWORD TOGGLE
-        ================================================= */
+        /*
+        |--------------------------------------------------------------------------
+        | PASSWORD TOGGLE
+        |--------------------------------------------------------------------------
+        */
 
         function setupPasswordToggle(
             inputId,
@@ -1020,66 +814,33 @@ $registerOld =
             const button =
                 document.getElementById(buttonId);
 
-
             if (!input || !button) {
-
                 return;
             }
-
 
             button.addEventListener(
                 'click',
                 function (event) {
 
                     event.preventDefault();
-
                     event.stopPropagation();
 
+                    if (input.type === 'password') {
 
-                    if (
-                        input.type ===
-                        'password'
-                    ) {
+                        input.type = 'text';
 
-                        input.type =
-                            'text';
-
-                        button.innerHTML =
-                            '🙈';
-
-                        button.setAttribute(
-                            'aria-label',
-                            'Hide password'
-                        );
-
-                        button.setAttribute(
-                            'title',
-                            'Hide password'
-                        );
+                        button.innerHTML = '🙈';
 
                     } else {
 
-                        input.type =
-                            'password';
+                        input.type = 'password';
 
-                        button.innerHTML =
-                            '👁';
-
-                        button.setAttribute(
-                            'aria-label',
-                            'Show password'
-                        );
-
-                        button.setAttribute(
-                            'title',
-                            'Show password'
-                        );
+                        button.innerHTML = '👁';
 
                     }
 
                 }
             );
-
         }
 
 
@@ -1087,7 +848,6 @@ $registerOld =
             'registerPassword',
             'registerPasswordToggle'
         );
-
 
         setupPasswordToggle(
             'registerConfirmPassword',
@@ -1097,14 +857,7 @@ $registerOld =
     }
 
 
-    /* =====================================================
-       INITIALIZE
-    ===================================================== */
-
-    if (
-        document.readyState ===
-        'loading'
-    ) {
+    if (document.readyState === 'loading') {
 
         document.addEventListener(
             'DOMContentLoaded',
@@ -1124,8 +877,19 @@ $registerOld =
 
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| CLEAR TEMP SESSION DATA
+|--------------------------------------------------------------------------
+|
+| The form has already used the values above.
+|--------------------------------------------------------------------------
+*/
+
 unset(
-    $_SESSION['register_old']
+    $_SESSION['register_old'],
+    $_SESSION['register_error'],
+    $_SESSION['open_register_modal']
 );
 
 ?>
