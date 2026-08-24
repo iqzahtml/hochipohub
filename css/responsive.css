@@ -1,236 +1,54 @@
-/* =========================================================
-HOCHIPOHUB - RESPONSIVE CSS
-========================================================= */
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB
+| Responsive CSS
+|--------------------------------------------------------------------------
+| Admin-specific responsive behaviour is primarily handled by admin.css.
+| This file provides safe global responsive rules without destroying
+| the admin design system.
+|--------------------------------------------------------------------------
+*/
 
-/* =========================================================
-LARGE TABLET
-========================================================= */
+img {
+    max-width: 100%;
+}
+
+
+* {
+    max-width: 100%;
+}
+
 
 @media (max-width: 1100px) {
 
-.navbar-container {
-    gap: 13px;
-}
-.main-nav {
-    gap: 0;
-}
-.main-nav a {
-    padding:
-        9px 9px;
-}
-.navbar-search {
-    max-width: 300px;
-}
-.product-grid {
-    grid-template-columns:
-        repeat(3, minmax(0, 1fr));
-}
-.footer-grid {
-    grid-template-columns:
-        repeat(2, 1fr);
-}
-
-}
-
-/* =========================================================
-TABLET / MOBILE NAVBAR
-========================================================= */
-
-@media (max-width: 850px) {
-
-.navbar-container {
-    min-height: 68px;
-    width:
-        calc(100% - 24px);
-}
-/*
- * Hide desktop navigation.
- */
-.main-nav,
-.navbar-search,
-.auth-buttons {
-    display: none;
-}
-/*
- * Show mobile toggle.
- */
-.mobile-menu-toggle {
-    display: block;
-}
-/*
- * Brand.
- */
-.brand-text {
-    font-size: 19px;
-}
-.brand-mark {
-    width: 38px;
-    height: 38px;
-    border-radius: 11px;
-    font-size: 19px;
-}
-/*
- * User menu.
- */
-.user-menu-name,
-.user-chevron {
-    display: none;
-}
-.user-menu-button {
-    padding: 3px;
-    border: none;
-    background:
-        transparent;
-}
-.user-avatar {
-    width: 38px;
-    height: 38px;
-}
-/*
- * Product grid.
- */
-.product-grid {
-    grid-template-columns:
-        repeat(2, minmax(0, 1fr));
-}
-/*
- * Sections.
- */
-.section {
-    padding:
-        45px 0;
-}
-/*
- * Footer.
- */
-.footer-grid {
-    grid-template-columns:
-        repeat(2, 1fr);
-    gap: 30px;
-}
-
-}
-
-/* =========================================================
-SMALL MOBILE
-========================================================= */
-
-@media (max-width: 520px) {
-
-.container {
-    width:
-        calc(100% - 24px);
-}
-.navbar-container {
-    width:
-        calc(100% - 18px);
-}
-.navbar-actions {
-    gap: 3px;
-}
-.nav-icon-btn {
-    width: 38px;
-    height: 38px;
-}
-/*
- * Product grid.
- */
-.product-grid {
-    grid-template-columns:
-        1fr;
-}
-/*
- * Page header.
- */
-.page-header {
-    padding:
-        40px 0 28px;
-}
-.page-header h1 {
-    font-size: 30px;
-}
-.section-title {
-    font-size: 23px;
-}
-/*
- * Card.
- */
-.card {
-    padding: 16px;
-}
-/*
- * Footer.
- */
-.footer-grid {
-    grid-template-columns:
-        1fr;
-    gap: 25px;
-}
-/*
- * Buttons.
- */
-.btn {
-    width: 100%;
-}
-/*
- * User dropdown.
- */
-.user-dropdown {
-    right: -5px;
-    width: 230px;
-}
-
-}
-
-/* =========================================================
-EXTRA SMALL DEVICES
-========================================================= */
-
-@media (max-width: 380px) {
-
-.brand-text {
-    font-size: 17px;
-}
-.brand-mark {
-    width: 35px;
-    height: 35px;
-    font-size: 17px;
-}
-.nav-icon-btn {
-    width: 35px;
-    height: 35px;
-    font-size: 17px;
-}
-.user-avatar {
-    width: 35px;
-    height: 35px;
-}
-
-}
-/* =========================================================
-   RESPONSIVE ADMIN OVERRIDES
-   Load after admin.css.
-========================================================= */
-
-@media (max-width: 1100px) {
-
-    .admin-main {
+    .admin-wrapper {
         width: 100%;
     }
 
 }
 
+
 @media (max-width: 760px) {
 
-    .admin-panel,
-    .admin-section {
-        border-radius: 13px;
+    table {
+        max-width: 100%;
     }
 
-    .admin-table th,
-    .admin-table td {
-        padding-left: 12px;
-        padding-right: 12px;
+
+    input,
+    select,
+    textarea,
+    button {
+        max-width: 100%;
+    }
+
+}
+
+
+@media (max-width: 480px) {
+
+    body {
+        overflow-x: hidden;
     }
 
 }
