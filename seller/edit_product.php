@@ -1,441 +1,1112 @@
 <?php
-require_once '../database/db.php';
-require_once '../includes/session.php';
+
+/**
+ * =========================================================
+ * HOCHIPOHUB
+ * SELLER - EDIT PRODUCT
+ * File: seller/edit_product.php
+ * =========================================================
+ */
+
+
+/*
+|--------------------------------------------------------------------------
+| LOAD DATABASE + SESSION + FUNCTIONS
+|--------------------------------------------------------------------------
+*/
+
+require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/functions.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| SESSION
+|--------------------------------------------------------------------------
+*/
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
 /*
 |--------------------------------------------------------------------------
-| CHECK LOGIN
+| SECURITY - LOGIN
 |--------------------------------------------------------------------------
 */
+
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ../index.php");
+
+    header(
+        'Location: ../index.php'
+    );
+
     exit;
 }
+
 
 /*
 |--------------------------------------------------------------------------
-| CHECK VENDOR ROLE
+| SECURITY - VENDOR ONLY
 |--------------------------------------------------------------------------
 */
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'vendor') {
-    header("Location: ../dashboard.php");
+
+if (
+    !isset($_SESSION['role']) ||
+    $_SESSION['role'] !== 'vendor'
+) {
+
+    header(
+        'Location: ../dashboard.php'
+    );
+
     exit;
 }
 
-$user_id = (int) $_SESSION['user_id'];
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE
+|--------------------------------------------------------------------------
+*/
+
+$db = getDB();
+
+
+/*
+|--------------------------------------------------------------------------
+| VARIABLES
+|--------------------------------------------------------------------------
+*/
+
+$userId = (int) $_SESSION['user_id'];
 
 $errors = [];
-$success = "";
+
+$success = '';
+
+
+/*
+|--------------------------------------------------------------------------
+| GET PRODUCT ID
+|--------------------------------------------------------------------------
+|
+| Example:
+|
+| seller/edit_product.php?id=5
+|
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !isset($_GET['id']) ||
+    !is_numeric($_GET['id']) ||
+    (int) $_GET['id'] <= 0
+) {
+
+    header(
+        'Location: products.php?error=invalid_product'
+    );
+
+    exit;
+}
+
+
+$productId = (int) $_GET['id'];
+
 
 /*
 |--------------------------------------------------------------------------
 | GET VENDOR
 |--------------------------------------------------------------------------
 */
-$stmt = $conn->prepare("
-    SELECT vendor_id, approval_status
-    FROM vendors
-    WHERE user_id = ?
-    LIMIT 1
-");
 
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
+try {
 
-$result = $stmt->get_result();
-$vendor = $result->fetch_assoc();
+    $vendorStmt = $db->prepare("
+        SELECT
+            vendor_id,
+            business_name,
+            approval_status
+        FROM vendors
+        WHERE user_id = ?
+        LIMIT 1
+    ");
 
-$stmt->close();
+    $vendorStmt->execute([
+        $userId
+    ]);
+
+    $vendor = $vendorStmt->fetch(
+        PDO::FETCH_ASSOC
+    );
+
+} catch (PDOException $e) {
+
+    $vendor = false;
+
+}
+
 
 if (!$vendor) {
-    header("Location: dashboard.php?error=vendor_not_found");
+
+    header(
+        'Location: dashboard.php?error=vendor_not_found'
+    );
+
     exit;
 }
 
-$vendor_id = (int) $vendor['vendor_id'];
+
+$vendorId = (int) $vendor['vendor_id'];
+
 
 /*
 |--------------------------------------------------------------------------
 | CHECK VENDOR APPROVAL
 |--------------------------------------------------------------------------
 */
-if ($vendor['approval_status'] !== 'Approved') {
-    header("Location: dashboard.php?error=vendor_not_approved");
+
+if (
+    $vendor['approval_status'] !== 'Approved'
+) {
+
+    header(
+        'Location: dashboard.php?error=vendor_not_approved'
+    );
+
     exit;
 }
 
-/*
-|--------------------------------------------------------------------------
-| GET PRODUCT ID
-|--------------------------------------------------------------------------
-*/
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    header("Location: products.php?error=invalid_product");
-    exit;
-}
-
-$product_id = (int) $_GET['id'];
 
 /*
 |--------------------------------------------------------------------------
 | GET PRODUCT
 |--------------------------------------------------------------------------
+|
+| IMPORTANT:
+|
+| Product must belong to the logged-in vendor.
+|
+|--------------------------------------------------------------------------
 */
-$stmt = $conn->prepare("
-    SELECT
-        product_id,
-        vendor_id,
-        category_id,
-        product_name,
-        description,
-        price,
-        stock_quantity,
-        image,
-        status
-    FROM products
-    WHERE product_id = ?
-    AND vendor_id = ?
-    LIMIT 1
-");
 
-$stmt->bind_param("ii", $product_id, $vendor_id);
-$stmt->execute();
+try {
 
-$result = $stmt->get_result();
-$product = $result->fetch_assoc();
+    $productStmt = $db->prepare("
+        SELECT
+            product_id,
+            vendor_id,
+            category_id,
+            product_name,
+            description,
+            price,
+            stock_quantity,
+            image,
+            status
+        FROM products
+        WHERE product_id = ?
+        AND vendor_id = ?
+        LIMIT 1
+    ");
 
-$stmt->close();
+    $productStmt->execute([
+        $productId,
+        $vendorId
+    ]);
+
+    $product = $productStmt->fetch(
+        PDO::FETCH_ASSOC
+    );
+
+} catch (PDOException $e) {
+
+    $product = false;
+
+}
+
 
 if (!$product) {
-    header("Location: products.php?error=product_not_found");
+
+    header(
+        'Location: products.php?error=product_not_found'
+    );
+
     exit;
 }
+
 
 /*
 |--------------------------------------------------------------------------
 | GET CATEGORIES
 |--------------------------------------------------------------------------
 */
+
 $categories = [];
 
-$result = $conn->query("
-    SELECT category_id, category_name
-    FROM categories
-    ORDER BY category_name ASC
-");
 
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
-        $categories[] = $row;
-    }
+try {
+
+    $categoryStmt = $db->prepare("
+        SELECT
+            category_id,
+            category_name
+        FROM categories
+        ORDER BY category_name ASC
+    ");
+
+    $categoryStmt->execute();
+
+    $categories = $categoryStmt->fetchAll(
+        PDO::FETCH_ASSOC
+    );
+
+} catch (PDOException $e) {
+
+    $categories = [];
+
+    $errors[] =
+        'Unable to load product categories.';
+
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| DEFAULT FORM VALUES
+|--------------------------------------------------------------------------
+*/
+
+$currentName =
+    $product['product_name'];
+
+$currentDescription =
+    $product['description'];
+
+$currentPrice =
+    $product['price'];
+
+$currentStock =
+    $product['stock_quantity'];
+
+$currentCategory =
+    $product['category_id'];
+
+$currentStatus =
+    $product['status'];
+
 
 /*
 |--------------------------------------------------------------------------
 | FORM SUBMISSION
 |--------------------------------------------------------------------------
 */
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $product_name = trim($_POST['product_name'] ?? '');
-    $description = trim($_POST['description'] ?? '');
-    $price = trim($_POST['price'] ?? '');
-    $stock_quantity = trim($_POST['stock_quantity'] ?? '');
-    $category_id = trim($_POST['category_id'] ?? '');
-    $status = trim($_POST['status'] ?? 'Available');
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+) {
+
 
     /*
     |--------------------------------------------------------------------------
-    | VALIDATION
+    | GET FORM DATA
     |--------------------------------------------------------------------------
     */
 
-    if ($product_name === '') {
-        $errors[] = "Product name is required.";
-    }
+    $currentName =
+        trim(
+            $_POST['product_name'] ?? ''
+        );
 
-    if ($category_id === '' || !is_numeric($category_id)) {
-        $errors[] = "Please select a valid category.";
-    }
+    $currentDescription =
+        trim(
+            $_POST['description'] ?? ''
+        );
 
-    if ($price === '' || !is_numeric($price) || (float)$price < 0) {
-        $errors[] = "Please enter a valid price.";
-    }
+    $currentPrice =
+        trim(
+            $_POST['price'] ?? ''
+        );
+
+    $currentStock =
+        trim(
+            $_POST['stock_quantity'] ?? ''
+        );
+
+    $currentCategory =
+        (int) (
+            $_POST['category_id'] ?? 0
+        );
+
+    $currentStatus =
+        trim(
+            $_POST['status'] ?? 'Available'
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATE PRODUCT NAME
+    |--------------------------------------------------------------------------
+    */
 
     if (
-        $stock_quantity === '' ||
-        !is_numeric($stock_quantity) ||
-        (int)$stock_quantity < 0
+        $currentName === ''
     ) {
-        $errors[] = "Please enter a valid stock quantity.";
+
+        $errors[] =
+            'Product name is required.';
+
     }
 
-    $allowed_status = [
+
+    if (
+        strlen($currentName) > 150
+    ) {
+
+        $errors[] =
+            'Product name cannot exceed 150 characters.';
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATE CATEGORY
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $currentCategory <= 0
+    ) {
+
+        $errors[] =
+            'Please select a product category.';
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATE PRICE
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $currentPrice === '' ||
+        !is_numeric($currentPrice)
+    ) {
+
+        $errors[] =
+            'Please enter a valid product price.';
+
+    } elseif (
+        (float) $currentPrice < 0
+    ) {
+
+        $errors[] =
+            'Product price cannot be negative.';
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATE STOCK
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $currentStock === '' ||
+        !is_numeric($currentStock) ||
+        (int) $currentStock < 0
+    ) {
+
+        $errors[] =
+            'Please enter a valid stock quantity.';
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATE STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    $allowedStatuses = [
         'Available',
         'Out of Stock',
         'Hidden'
     ];
 
-    if (!in_array($status, $allowed_status, true)) {
-        $errors[] = "Invalid product status.";
+
+    if (
+        !in_array(
+            $currentStatus,
+            $allowedStatuses,
+            true
+        )
+    ) {
+
+        $errors[] =
+            'Invalid product status.';
+
     }
+
 
     /*
     |--------------------------------------------------------------------------
-    | AUTO STATUS BASED ON STOCK
+    | AUTO STOCK STATUS
+    |--------------------------------------------------------------------------
+    |
+    | Hidden remains Hidden.
+    |
+    | Available + stock 0
+    |       -> Out of Stock
+    |
+    | Out of Stock + stock > 0
+    |       -> Available
+    |
     |--------------------------------------------------------------------------
     */
-    $stock_quantity_int = (int)$stock_quantity;
 
-    if ($stock_quantity_int <= 0 && $status === 'Available') {
-        $status = 'Out of Stock';
+    $stockValue =
+        (int) $currentStock;
+
+
+    if (
+        $currentStatus !== 'Hidden'
+    ) {
+
+        if (
+            $stockValue <= 0
+        ) {
+
+            $currentStatus =
+                'Out of Stock';
+
+        } else {
+
+            $currentStatus =
+                'Available';
+
+        }
+
     }
 
-    if ($stock_quantity_int > 0 && $status === 'Out of Stock') {
-        $status = 'Available';
-    }
 
     /*
     |--------------------------------------------------------------------------
-    | IMAGE
+    | CHECK CATEGORY EXISTS
     |--------------------------------------------------------------------------
     */
-    $new_image_name = $product['image'];
+
+    if (
+        $currentCategory > 0
+    ) {
+
+        try {
+
+            $categoryCheck =
+                $db->prepare("
+                    SELECT
+                        category_id
+                    FROM categories
+                    WHERE category_id = ?
+                    LIMIT 1
+                ");
+
+            $categoryCheck->execute([
+                $currentCategory
+            ]);
+
+            $categoryExists =
+                $categoryCheck->fetch(
+                    PDO::FETCH_ASSOC
+                );
+
+            if (!$categoryExists) {
+
+                $errors[] =
+                    'Selected category does not exist.';
+
+            }
+
+        } catch (PDOException $e) {
+
+            $errors[] =
+                'Unable to verify selected category.';
+
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | IMAGE VARIABLES
+    |--------------------------------------------------------------------------
+    */
+
+    $oldImage =
+        $product['image'];
+
+    $newImage =
+        $oldImage;
+
+    $newImagePath =
+        null;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | IMAGE UPLOAD
+    |--------------------------------------------------------------------------
+    */
 
     if (
         isset($_FILES['image']) &&
         $_FILES['image']['error'] !== UPLOAD_ERR_NO_FILE
     ) {
 
-        if ($_FILES['image']['error'] !== UPLOAD_ERR_OK) {
-            $errors[] = "Failed to upload image.";
-        } else {
 
-            $allowed_extensions = [
-                'jpg',
-                'jpeg',
-                'png',
-                'webp'
+        $file =
+            $_FILES['image'];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPLOAD ERROR
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $file['error'] !== UPLOAD_ERR_OK
+        ) {
+
+            $errors[] =
+                'There was a problem uploading the product image.';
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILE SIZE
+        |--------------------------------------------------------------------------
+        */
+
+        $maxSize =
+            5 * 1024 * 1024;
+
+
+        if (
+            empty($errors) &&
+            $file['size'] > $maxSize
+        ) {
+
+            $errors[] =
+                'Product image must not exceed 5MB.';
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MIME TYPE
+        |--------------------------------------------------------------------------
+        */
+
+        $allowedMimeTypes = [
+            'image/jpeg',
+            'image/png',
+            'image/webp'
+        ];
+
+
+        $realMime =
+            null;
+
+
+        if (
+            empty($errors)
+        ) {
+
+            $finfo =
+                new finfo(
+                    FILEINFO_MIME_TYPE
+                );
+
+            $realMime =
+                $finfo->file(
+                    $file['tmp_name']
+                );
+
+
+            if (
+                !in_array(
+                    $realMime,
+                    $allowedMimeTypes,
+                    true
+                )
+            ) {
+
+                $errors[] =
+                    'Only JPG, PNG and WEBP images are allowed.';
+
+            }
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MIME TO EXTENSION
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            empty($errors)
+        ) {
+
+            $extensionMap = [
+
+                'image/jpeg' =>
+                    'jpg',
+
+                'image/png' =>
+                    'png',
+
+                'image/webp' =>
+                    'webp'
+
             ];
 
-            $file_name = $_FILES['image']['name'];
-            $file_tmp = $_FILES['image']['tmp_name'];
-            $file_size = $_FILES['image']['size'];
 
-            $extension = strtolower(
-                pathinfo($file_name, PATHINFO_EXTENSION)
-            );
+            $extension =
+                $extensionMap[$realMime];
 
-            if (!in_array($extension, $allowed_extensions, true)) {
-                $errors[] = "Only JPG, JPEG, PNG and WEBP images are allowed.";
-            }
 
-            if ($file_size > 5 * 1024 * 1024) {
-                $errors[] = "Image size must not exceed 5MB.";
-            }
+            /*
+            |--------------------------------------------------------------------------
+            | SAFE RANDOM FILE NAME
+            |--------------------------------------------------------------------------
+            */
 
-            if (empty($errors)) {
+            $newImage =
+                'product_' .
+                $vendorId .
+                '_' .
+                bin2hex(
+                    random_bytes(8)
+                ) .
+                '.' .
+                $extension;
 
-                $new_image_name =
-                    'product_' .
-                    $product_id .
-                    '_' .
-                    time() .
-                    '_' .
-                    bin2hex(random_bytes(4)) .
-                    '.' .
-                    $extension;
 
-                $upload_directory = '../uploads/products/';
+            /*
+            |--------------------------------------------------------------------------
+            | UPLOAD DIRECTORY
+            |--------------------------------------------------------------------------
+            */
 
-                if (!is_dir($upload_directory)) {
-                    mkdir(
-                        $upload_directory,
+            $uploadDirectory =
+                __DIR__ .
+                '/../uploads/products/';
+
+
+            if (
+                !is_dir(
+                    $uploadDirectory
+                )
+            ) {
+
+                if (
+                    !mkdir(
+                        $uploadDirectory,
                         0755,
                         true
-                    );
+                    )
+                ) {
+
+                    $errors[] =
+                        'Unable to create product upload directory.';
+
                 }
 
-                $upload_path =
-                    $upload_directory .
-                    $new_image_name;
-
-                if (!move_uploaded_file(
-                    $file_tmp,
-                    $upload_path
-                )) {
-                    $errors[] = "Unable to save uploaded image.";
-                }
             }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | MOVE IMAGE
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                empty($errors)
+            ) {
+
+                $newImagePath =
+                    $uploadDirectory .
+                    $newImage;
+
+
+                if (
+                    !move_uploaded_file(
+                        $file['tmp_name'],
+                        $newImagePath
+                    )
+                ) {
+
+                    $errors[] =
+                        'Failed to save the new product image.';
+
+                    $newImage =
+                        $oldImage;
+
+                    $newImagePath =
+                        null;
+
+                }
+
+            }
+
         }
+
     }
+
 
     /*
     |--------------------------------------------------------------------------
-    | UPDATE DATABASE
+    | UPDATE PRODUCT
     |--------------------------------------------------------------------------
     */
-    if (empty($errors)) {
 
-        $category_id_int = (int)$category_id;
-        $price_float = (float)$price;
+    if (
+        empty($errors)
+    ) {
 
-        $stmt = $conn->prepare("
-            UPDATE products
-            SET
-                category_id = ?,
-                product_name = ?,
-                description = ?,
-                price = ?,
-                stock_quantity = ?,
-                image = ?,
-                status = ?
-            WHERE product_id = ?
-            AND vendor_id = ?
-        ");
+        try {
 
-        $stmt->bind_param(
-            "issdissii",
-            $category_id_int,
-            $product_name,
-            $description,
-            $price_float,
-            $stock_quantity_int,
-            $new_image_name,
-            $status,
-            $product_id,
-            $vendor_id
-        );
 
-        if ($stmt->execute()) {
+            /*
+            |--------------------------------------------------------------------------
+            | CONVERT VALUES
+            |--------------------------------------------------------------------------
+            */
 
-            $stmt->close();
+            $priceValue =
+                (float) $currentPrice;
+
+            $stockValue =
+                (int) $currentStock;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | START TRANSACTION
+            |--------------------------------------------------------------------------
+            */
+
+            $db->beginTransaction();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE PRODUCTS
+            |--------------------------------------------------------------------------
+            */
+
+            $updateProductStmt =
+                $db->prepare("
+                    UPDATE products
+
+                    SET
+                        category_id = ?,
+                        product_name = ?,
+                        description = ?,
+                        price = ?,
+                        stock_quantity = ?,
+                        image = ?,
+                        status = ?
+
+                    WHERE product_id = ?
+                    AND vendor_id = ?
+                ");
+
+
+            $updateProductStmt->execute([
+
+                $currentCategory,
+
+                $currentName,
+
+                $currentDescription,
+
+                $priceValue,
+
+                $stockValue,
+
+                $newImage,
+
+                $currentStatus,
+
+                $productId,
+
+                $vendorId
+
+            ]);
+
 
             /*
             |--------------------------------------------------------------------------
             | UPDATE INVENTORY
             |--------------------------------------------------------------------------
+            |
+            | INSERT if product does not have inventory record.
+            | UPDATE if record already exists.
+            |
+            |--------------------------------------------------------------------------
             */
-            $stmt = $conn->prepare("
-                INSERT INTO inventory
-                (
-                    product_id,
-                    quantity
-                )
-                VALUES (?, ?)
-                ON DUPLICATE KEY UPDATE
-                    quantity = VALUES(quantity)
-            ");
 
-            $stmt->bind_param(
-                "ii",
-                $product_id,
-                $stock_quantity_int
-            );
+            $inventoryCheckStmt =
+                $db->prepare("
+                    SELECT
+                        product_id
+                    FROM inventory
+                    WHERE product_id = ?
+                    LIMIT 1
+                ");
 
-            $stmt->execute();
-            $stmt->close();
+
+            $inventoryCheckStmt->execute([
+                $productId
+            ]);
+
+
+            $inventoryExists =
+                $inventoryCheckStmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
+
+
+            if ($inventoryExists) {
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | UPDATE INVENTORY
+                |--------------------------------------------------------------------------
+                */
+
+                $inventoryStmt =
+                    $db->prepare("
+                        UPDATE inventory
+
+                        SET
+                            quantity = ?
+
+                        WHERE product_id = ?
+                    ");
+
+
+                $inventoryStmt->execute([
+                    $stockValue,
+                    $productId
+                ]);
+
+
+            } else {
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | INSERT INVENTORY
+                |--------------------------------------------------------------------------
+                */
+
+                $inventoryStmt =
+                    $db->prepare("
+                        INSERT INTO inventory (
+                            product_id,
+                            quantity
+                        )
+
+                        VALUES (?, ?)
+                    ");
+
+
+                $inventoryStmt->execute([
+                    $productId,
+                    $stockValue
+                ]);
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | COMMIT
+            |--------------------------------------------------------------------------
+            */
+
+            $db->commit();
+
 
             /*
             |--------------------------------------------------------------------------
             | DELETE OLD IMAGE
             |--------------------------------------------------------------------------
+            |
+            | Only delete old image AFTER database update succeeds.
+            |
+            |--------------------------------------------------------------------------
             */
+
             if (
-                $new_image_name !== $product['image'] &&
-                !empty($product['image'])
+                $newImage !== $oldImage &&
+                !empty($oldImage)
             ) {
 
-                $old_image =
-                    '../uploads/products/' .
-                    $product['image'];
+                $oldImagePath =
+                    __DIR__ .
+                    '/../uploads/products/' .
+                    $oldImage;
+
 
                 if (
-                    file_exists($old_image) &&
-                    is_file($old_image)
+                    file_exists(
+                        $oldImagePath
+                    ) &&
+                    is_file(
+                        $oldImagePath
+                    )
                 ) {
-                    unlink($old_image);
+
+                    unlink(
+                        $oldImagePath
+                    );
+
                 }
+
             }
+
 
             /*
             |--------------------------------------------------------------------------
-            | REDIRECT
+            | SUCCESS REDIRECT
             |--------------------------------------------------------------------------
             */
+
             header(
-                "Location: products.php?success=product_updated"
+                'Location: products.php?success=product_updated'
             );
+
             exit;
 
-        } else {
 
-            $errors[] =
-                "Failed to update product: " .
-                $stmt->error;
+        } catch (PDOException $e) {
 
-            $stmt->close();
 
             /*
             |--------------------------------------------------------------------------
-            | REMOVE NEW IMAGE IF DATABASE UPDATE FAILED
+            | ROLLBACK
             |--------------------------------------------------------------------------
             */
+
             if (
-                $new_image_name !== $product['image'] &&
-                !empty($new_image_name)
+                $db->inTransaction()
             ) {
 
-                $new_file =
-                    '../uploads/products/' .
-                    $new_image_name;
+                $db->rollBack();
 
-                if (
-                    file_exists($new_file) &&
-                    is_file($new_file)
-                ) {
-                    unlink($new_file);
-                }
             }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | DELETE NEW IMAGE
+            |--------------------------------------------------------------------------
+            |
+            | Database update failed, therefore remove newly uploaded image.
+            |
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $newImagePath !== null &&
+                file_exists(
+                    $newImagePath
+                ) &&
+                is_file(
+                    $newImagePath
+                )
+            ) {
+
+                unlink(
+                    $newImagePath
+                );
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | RESTORE OLD IMAGE
+            |--------------------------------------------------------------------------
+            */
+
+            $newImage =
+                $oldImage;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ERROR MESSAGE
+            |--------------------------------------------------------------------------
+            */
+
+            $errors[] =
+                'Unable to update product. Please try again.';
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | DEVELOPMENT DEBUG
+            |--------------------------------------------------------------------------
+            |
+            | DO NOT show database errors to customers.
+            |
+            | During development you may temporarily use:
+            |
+            | $errors[] = $e->getMessage();
+            |
+            |--------------------------------------------------------------------------
+            */
+
         }
+
     }
+
 }
+
 
 /*
 |--------------------------------------------------------------------------
-| USE POST VALUES AFTER ERROR
+| PAGE SETTINGS
 |--------------------------------------------------------------------------
 */
-$current_name =
-    $_POST['product_name']
-    ?? $product['product_name'];
 
-$current_description =
-    $_POST['description']
-    ?? $product['description'];
-
-$current_price =
-    $_POST['price']
-    ?? $product['price'];
-
-$current_stock =
-    $_POST['stock_quantity']
-    ?? $product['stock_quantity'];
-
-$current_category =
-    $_POST['category_id']
-    ?? $product['category_id'];
-
-$current_status =
-    $_POST['status']
-    ?? $product['status'];
+$pageTitle =
+    'Edit Product - HochipoHub';
 
 ?>
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
@@ -447,17 +1118,36 @@ $current_status =
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Edit Product | HochipoHub</title>
+    <title>
+        <?= htmlspecialchars($pageTitle) ?>
+    </title>
+
+
+    <!-- GLOBAL CSS -->
 
     <link
         rel="stylesheet"
         href="../css/style.css"
     >
 
+
+    <!-- DASHBOARD CSS -->
+
+    <link
+        rel="stylesheet"
+        href="../css/dashboard.css"
+    >
+
+
+    <!-- VENDOR CSS -->
+
     <link
         rel="stylesheet"
         href="../css/vendor.css"
     >
+
+
+    <!-- RESPONSIVE CSS -->
 
     <link
         rel="stylesheet"
@@ -466,316 +1156,625 @@ $current_status =
 
 </head>
 
+
 <body>
 
+
 <?php
-if (file_exists('../includes/navbar.php')) {
-    include '../includes/navbar.php';
+
+/*
+|--------------------------------------------------------------------------
+| VENDOR SIDEBAR
+|--------------------------------------------------------------------------
+*/
+
+$sidebarPath =
+    __DIR__ .
+    '/../includes/vendor_sidebar.php';
+
+
+if (
+    file_exists(
+        $sidebarPath
+    )
+) {
+
+    include $sidebarPath;
+
 }
+
 ?>
 
-<div class="dashboard-layout">
 
-    <?php
-    if (file_exists('../includes/vendor_sidebar.php')) {
-        include '../includes/vendor_sidebar.php';
-    }
-    ?>
+<main class="dashboard-main">
 
-    <main class="dashboard-content">
 
-        <div class="page-header">
+    <!-- =====================================================
+         PAGE HEADER
+    ====================================================== -->
 
-            <div>
-                <h1>Edit Product</h1>
+    <div class="dashboard-header">
 
-                <p>
-                    Update your product information
-                </p>
-            </div>
+        <div>
 
-            <a
-                href="products.php"
-                class="btn btn-secondary"
+            <span
+                style="
+                    color:#2563eb;
+                    font-weight:700;
+                "
             >
-                ← Back to Products
-            </a>
+                SELLER PANEL
+            </span>
+
+
+            <h1>
+                Edit Product
+            </h1>
+
+
+            <p>
+                Update your product information.
+            </p>
 
         </div>
 
-        <?php if (!empty($errors)): ?>
 
-            <div class="alert alert-danger">
+        <a
+            href="products.php"
+            class="btn"
+        >
+            ← My Products
+        </a>
 
-                <strong>
-                    Please fix the following:
-                </strong>
+    </div>
 
-                <ul>
 
-                    <?php foreach ($errors as $error): ?>
+    <!-- =====================================================
+         ERROR ALERT
+    ====================================================== -->
 
-                        <li>
-                            <?= htmlspecialchars($error) ?>
-                        </li>
+    <?php if (!empty($errors)): ?>
+
+        <div
+            style="
+                margin:20px 0;
+                padding:16px 20px;
+                border-radius:12px;
+                background:#fee2e2;
+                color:#991b1b;
+            "
+        >
+
+            <strong>
+                Please fix the following:
+            </strong>
+
+
+            <?php foreach ($errors as $error): ?>
+
+                <div style="margin-top:6px;">
+
+                    •
+                    <?= htmlspecialchars($error) ?>
+
+                </div>
+
+            <?php endforeach; ?>
+
+        </div>
+
+    <?php endif; ?>
+
+
+    <!-- =====================================================
+         PRODUCT FORM
+    ====================================================== -->
+
+    <section
+        style="
+            max-width:900px;
+            margin:30px auto;
+            background:#ffffff;
+            padding:30px;
+            border-radius:20px;
+            box-shadow:0 8px 30px rgba(15,23,42,.08);
+        "
+    >
+
+
+        <form
+            method="POST"
+            enctype="multipart/form-data"
+        >
+
+
+            <!-- =================================================
+                 PRODUCT NAME
+            ================================================== -->
+
+            <div
+                style="
+                    margin-bottom:22px;
+                "
+            >
+
+                <label
+                    for="product_name"
+                    style="
+                        display:block;
+                        font-weight:700;
+                        margin-bottom:8px;
+                    "
+                >
+                    Product Name
+                </label>
+
+
+                <input
+                    type="text"
+                    id="product_name"
+                    name="product_name"
+                    maxlength="150"
+                    required
+                    value="<?= htmlspecialchars($currentName) ?>"
+                    style="
+                        width:100%;
+                        padding:14px;
+                        border:1px solid #cbd5e1;
+                        border-radius:10px;
+                        box-sizing:border-box;
+                    "
+                >
+
+            </div>
+
+
+            <!-- =================================================
+                 CATEGORY
+            ================================================== -->
+
+            <div
+                style="
+                    margin-bottom:22px;
+                "
+            >
+
+                <label
+                    for="category_id"
+                    style="
+                        display:block;
+                        font-weight:700;
+                        margin-bottom:8px;
+                    "
+                >
+                    Category
+                </label>
+
+
+                <select
+                    id="category_id"
+                    name="category_id"
+                    required
+                    style="
+                        width:100%;
+                        padding:14px;
+                        border:1px solid #cbd5e1;
+                        border-radius:10px;
+                        box-sizing:border-box;
+                    "
+                >
+
+                    <option value="">
+                        Select Category
+                    </option>
+
+
+                    <?php foreach (
+                        $categories
+                        as $category
+                    ): ?>
+
+                        <option
+                            value="<?= (int) $category['category_id'] ?>"
+                            <?= (
+                                (int) $currentCategory ===
+                                (int) $category['category_id']
+                            )
+                                ? 'selected'
+                                : ''
+                            ?>
+                        >
+
+                            <?= htmlspecialchars(
+                                $category['category_name']
+                            ) ?>
+
+                        </option>
 
                     <?php endforeach; ?>
 
-                </ul>
+                </select>
 
             </div>
 
-        <?php endif; ?>
 
+            <!-- =================================================
+                 PRICE + STOCK
+            ================================================== -->
 
-        <div class="form-card">
-
-            <form
-                method="POST"
-                enctype="multipart/form-data"
+            <div
+                style="
+                    display:grid;
+                    grid-template-columns:1fr 1fr;
+                    gap:20px;
+                    margin-bottom:22px;
+                "
             >
 
-                <div class="form-group">
 
-                    <label for="product_name">
-                        Product Name
+                <!-- PRICE -->
+
+                <div>
+
+                    <label
+                        for="price"
+                        style="
+                            display:block;
+                            font-weight:700;
+                            margin-bottom:8px;
+                        "
+                    >
+                        Price (RM)
                     </label>
+
 
                     <input
-                        type="text"
-                        id="product_name"
-                        name="product_name"
-                        value="<?= htmlspecialchars($current_name) ?>"
-                        maxlength="150"
+                        type="number"
+                        id="price"
+                        name="price"
+                        min="0"
+                        step="0.01"
                         required
+                        value="<?= htmlspecialchars($currentPrice) ?>"
+                        style="
+                            width:100%;
+                            padding:14px;
+                            border:1px solid #cbd5e1;
+                            border-radius:10px;
+                            box-sizing:border-box;
+                        "
                     >
 
                 </div>
 
 
-                <div class="form-group">
+                <!-- STOCK -->
 
-                    <label for="category_id">
-                        Category
-                    </label>
+                <div>
 
-                    <select
-                        id="category_id"
-                        name="category_id"
-                        required
+                    <label
+                        for="stock_quantity"
+                        style="
+                            display:block;
+                            font-weight:700;
+                            margin-bottom:8px;
+                        "
                     >
-
-                        <option value="">
-                            Select Category
-                        </option>
-
-                        <?php foreach ($categories as $category): ?>
-
-                            <option
-                                value="<?= $category['category_id'] ?>"
-                                <?= (
-                                    (string)$current_category ===
-                                    (string)$category['category_id']
-                                ) ? 'selected' : '' ?>
-                            >
-
-                                <?= htmlspecialchars(
-                                    $category['category_name']
-                                ) ?>
-
-                            </option>
-
-                        <?php endforeach; ?>
-
-                    </select>
-
-                </div>
-
-
-                <div class="form-row">
-
-                    <div class="form-group">
-
-                        <label for="price">
-                            Price (RM)
-                        </label>
-
-                        <input
-                            type="number"
-                            id="price"
-                            name="price"
-                            value="<?= htmlspecialchars($current_price) ?>"
-                            min="0"
-                            step="0.01"
-                            required
-                        >
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label for="stock_quantity">
-                            Stock Quantity
-                        </label>
-
-                        <input
-                            type="number"
-                            id="stock_quantity"
-                            name="stock_quantity"
-                            value="<?= htmlspecialchars($current_stock) ?>"
-                            min="0"
-                            required
-                        >
-
-                    </div>
-
-                </div>
-
-
-                <div class="form-group">
-
-                    <label for="description">
-                        Description
+                        Stock Quantity
                     </label>
 
-                    <textarea
-                        id="description"
-                        name="description"
-                        rows="6"
-                    ><?= htmlspecialchars($current_description) ?></textarea>
-
-                </div>
-
-
-                <div class="form-group">
-
-                    <label for="status">
-                        Product Status
-                    </label>
-
-                    <select
-                        id="status"
-                        name="status"
-                    >
-
-                        <option
-                            value="Available"
-                            <?= $current_status === 'Available'
-                                ? 'selected'
-                                : '' ?>
-                        >
-                            Available
-                        </option>
-
-                        <option
-                            value="Out of Stock"
-                            <?= $current_status === 'Out of Stock'
-                                ? 'selected'
-                                : '' ?>
-                        >
-                            Out of Stock
-                        </option>
-
-                        <option
-                            value="Hidden"
-                            <?= $current_status === 'Hidden'
-                                ? 'selected'
-                                : '' ?>
-                        >
-                            Hidden
-                        </option>
-
-                    </select>
-
-                </div>
-
-
-                <div class="form-group">
-
-                    <label>
-                        Current Image
-                    </label>
-
-                    <div class="current-product-image">
-
-                        <?php if (!empty($product['image'])): ?>
-
-                            <img
-                                src="../uploads/products/<?= htmlspecialchars($product['image']) ?>"
-                                alt="<?= htmlspecialchars($product['product_name']) ?>"
-                                style="
-                                    max-width:220px;
-                                    max-height:220px;
-                                    object-fit:cover;
-                                    border-radius:12px;
-                                "
-                            >
-
-                        <?php else: ?>
-
-                            <p>
-                                No image uploaded.
-                            </p>
-
-                        <?php endif; ?>
-
-                    </div>
-
-                </div>
-
-
-                <div class="form-group">
-
-                    <label for="image">
-                        Replace Image
-                    </label>
 
                     <input
-                        type="file"
-                        id="image"
-                        name="image"
-                        accept=".jpg,.jpeg,.png,.webp"
+                        type="number"
+                        id="stock_quantity"
+                        name="stock_quantity"
+                        min="0"
+                        step="1"
+                        required
+                        value="<?= htmlspecialchars($currentStock) ?>"
+                        style="
+                            width:100%;
+                            padding:14px;
+                            border:1px solid #cbd5e1;
+                            border-radius:10px;
+                            box-sizing:border-box;
+                        "
                     >
-
-                    <small>
-                        JPG, JPEG, PNG or WEBP. Maximum 5MB.
-                    </small>
 
                 </div>
 
+            </div>
 
-                <div class="form-actions">
 
-                    <a
-                        href="products.php"
-                        class="btn btn-secondary"
+            <!-- =================================================
+                 DESCRIPTION
+            ================================================== -->
+
+            <div
+                style="
+                    margin-bottom:22px;
+                "
+            >
+
+                <label
+                    for="description"
+                    style="
+                        display:block;
+                        font-weight:700;
+                        margin-bottom:8px;
+                    "
+                >
+                    Description
+                </label>
+
+
+                <textarea
+                    id="description"
+                    name="description"
+                    rows="6"
+                    style="
+                        width:100%;
+                        padding:14px;
+                        border:1px solid #cbd5e1;
+                        border-radius:10px;
+                        resize:vertical;
+                        box-sizing:border-box;
+                    "
+                ><?= htmlspecialchars($currentDescription) ?></textarea>
+
+            </div>
+
+
+            <!-- =================================================
+                 STATUS
+            ================================================== -->
+
+            <div
+                style="
+                    margin-bottom:22px;
+                "
+            >
+
+                <label
+                    for="status"
+                    style="
+                        display:block;
+                        font-weight:700;
+                        margin-bottom:8px;
+                    "
+                >
+                    Product Status
+                </label>
+
+
+                <select
+                    id="status"
+                    name="status"
+                    style="
+                        width:100%;
+                        padding:14px;
+                        border:1px solid #cbd5e1;
+                        border-radius:10px;
+                        box-sizing:border-box;
+                    "
+                >
+
+                    <option
+                        value="Available"
+                        <?= $currentStatus === 'Available'
+                            ? 'selected'
+                            : ''
+                        ?>
                     >
-                        Cancel
-                    </a>
+                        Available
+                    </option>
 
-                    <button
-                        type="submit"
-                        class="btn btn-primary"
+
+                    <option
+                        value="Out of Stock"
+                        <?= $currentStatus === 'Out of Stock'
+                            ? 'selected'
+                            : ''
+                        ?>
                     >
-                        Update Product
-                    </button>
+                        Out of Stock
+                    </option>
 
-                </div>
 
-            </form>
+                    <option
+                        value="Hidden"
+                        <?= $currentStatus === 'Hidden'
+                            ? 'selected'
+                            : ''
+                        ?>
+                    >
+                        Hidden
+                    </option>
 
-        </div>
+                </select>
 
-    </main>
 
-</div>
+                <small
+                    style="
+                        display:block;
+                        margin-top:8px;
+                        color:#64748b;
+                    "
+                >
+                    Available and Out of Stock are automatically
+                    adjusted according to stock quantity.
+                    Hidden remains hidden.
+                </small>
 
-<?php
-if (file_exists('../includes/footer.php')) {
-    include '../includes/footer.php';
-}
-?>
+            </div>
+
+
+            <!-- =================================================
+                 CURRENT IMAGE
+            ================================================== -->
+
+            <div
+                style="
+                    margin-bottom:22px;
+                "
+            >
+
+                <label
+                    style="
+                        display:block;
+                        font-weight:700;
+                        margin-bottom:10px;
+                    "
+                >
+                    Current Product Image
+                </label>
+
+
+                <?php if (
+                    !empty($product['image'])
+                ): ?>
+
+
+                    <div
+                        style="
+                            display:inline-flex;
+                            padding:8px;
+                            background:#f8fafc;
+                            border:1px solid #e2e8f0;
+                            border-radius:14px;
+                        "
+                    >
+
+                        <img
+                            src="../uploads/products/<?= htmlspecialchars($product['image']) ?>"
+                            alt="<?= htmlspecialchars($product['product_name']) ?>"
+                            style="
+                                width:220px;
+                                height:220px;
+                                object-fit:cover;
+                                border-radius:10px;
+                                display:block;
+                            "
+                        >
+
+                    </div>
+
+
+                <?php else: ?>
+
+
+                    <div
+                        style="
+                            padding:30px;
+                            text-align:center;
+                            background:#f8fafc;
+                            border:1px dashed #cbd5e1;
+                            border-radius:12px;
+                            color:#64748b;
+                        "
+                    >
+
+                        No image uploaded.
+
+                    </div>
+
+
+                <?php endif; ?>
+
+            </div>
+
+
+            <!-- =================================================
+                 REPLACE IMAGE
+            ================================================== -->
+
+            <div
+                style="
+                    margin-bottom:25px;
+                "
+            >
+
+                <label
+                    for="image"
+                    style="
+                        display:block;
+                        font-weight:700;
+                        margin-bottom:8px;
+                    "
+                >
+                    Replace Product Image
+                </label>
+
+
+                <input
+                    type="file"
+                    id="image"
+                    name="image"
+                    accept=".jpg,.jpeg,.png,.webp"
+                >
+
+
+                <small
+                    style="
+                        display:block;
+                        margin-top:8px;
+                        color:#64748b;
+                    "
+                >
+                    JPG, PNG or WEBP. Maximum 5MB.
+                </small>
+
+            </div>
+
+
+            <!-- =================================================
+                 BUTTONS
+            ================================================== -->
+
+            <div
+                style="
+                    display:flex;
+                    gap:12px;
+                    justify-content:flex-end;
+                    flex-wrap:wrap;
+                "
+            >
+
+                <a
+                    href="products.php"
+                    class="btn"
+                    style="
+                        text-decoration:none;
+                    "
+                >
+                    Cancel
+                </a>
+
+
+                <button
+                    type="submit"
+                    class="btn"
+                    style="
+                        border:none;
+                        cursor:pointer;
+                        background:#2563eb;
+                        color:#ffffff;
+                    "
+                >
+                    Update Product
+                </button>
+
+            </div>
+
+
+        </form>
+
+    </section>
+
+
+</main>
+
 
 </body>
+
 </html>
