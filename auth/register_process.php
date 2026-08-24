@@ -8,14 +8,24 @@
 | auth/register_process.php
 |
 | Purpose:
-| - Process new registration
-| - Create customer/vendor account
-| - After successful registration:
-|   automatically open LOGIN modal
+| - Process registration
+| - Validate customer/vendor registration
+| - Check duplicate email
+| - Check duplicate phone
+| - Keep registration modal OPEN when error occurs
+| - Preserve entered information
+| - Redirect to login modal after successful registration
 |--------------------------------------------------------------------------
 */
 
 require_once dirname(__DIR__) . '/config.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| START SESSION
+|--------------------------------------------------------------------------
+*/
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -24,7 +34,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 /*
 |--------------------------------------------------------------------------
-| ONLY POST REQUEST
+| ONLY ALLOW POST REQUEST
 |--------------------------------------------------------------------------
 */
 
@@ -58,15 +68,20 @@ $role = strtolower(
 
 $password = $_POST['password'] ?? '';
 
-$confirmPassword =
-    $_POST['confirm_password'] ?? '';
+$confirmPassword = $_POST['confirm_password'] ?? '';
 
 $terms = isset($_POST['terms']);
 
 
 /*
 |--------------------------------------------------------------------------
-| KEEP OLD DATA
+| SAVE OLD FORM DATA
+|--------------------------------------------------------------------------
+|
+| We save the information so it can be displayed again
+| when the registration form is reopened after an error.
+|
+| Password is NOT saved.
 |--------------------------------------------------------------------------
 */
 
@@ -80,13 +95,27 @@ $_SESSION['register_old'] = [
 
 /*
 |--------------------------------------------------------------------------
-| HELPER - REDIRECT BACK TO REGISTER
+| REGISTER ERROR FUNCTION
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+|
+| When an error happens:
+|
+| 1. Save the error
+| 2. Save the entered data
+| 3. Tell the homepage to open register modal
+| 4. Redirect to index.php
+|
+| The JavaScript will automatically open the modal.
 |--------------------------------------------------------------------------
 */
 
 function registerError($message)
 {
     $_SESSION['register_error'] = $message;
+
+    $_SESSION['open_register_modal'] = true;
 
     header(
         'Location: ' .
@@ -154,6 +183,28 @@ if ($cleanPhone === '') {
 
 /*
 |--------------------------------------------------------------------------
+| VALIDATE PHONE FORMAT
+|--------------------------------------------------------------------------
+|
+| Optional basic validation.
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !preg_match(
+        '/^01[0-9]{8,9}$/',
+        $cleanPhone
+    )
+) {
+
+    registerError(
+        'Please enter a valid Malaysian phone number.'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | VALIDATE ROLE
 |--------------------------------------------------------------------------
 */
@@ -193,7 +244,7 @@ if (strlen($password) < 6) {
 
 /*
 |--------------------------------------------------------------------------
-| CONFIRM PASSWORD
+| VALIDATE CONFIRM PASSWORD
 |--------------------------------------------------------------------------
 */
 
@@ -207,14 +258,14 @@ if ($password !== $confirmPassword) {
 
 /*
 |--------------------------------------------------------------------------
-| TERMS
+| VALIDATE TERMS
 |--------------------------------------------------------------------------
 */
 
 if (!$terms) {
 
     registerError(
-        'You must agree to the terms and conditions.'
+        'You must agree to the Terms & Conditions.'
     );
 }
 
@@ -250,7 +301,7 @@ try {
     if ($stmt->fetch()) {
 
         registerError(
-            'This email is already registered.'
+            'This email is already registered. Please use another email.'
         );
     }
 
@@ -275,7 +326,7 @@ try {
     if ($stmt->fetch()) {
 
         registerError(
-            'This phone number is already registered.'
+            'This phone number is already registered. Please use another phone number.'
         );
     }
 
@@ -344,7 +395,6 @@ try {
 
         ':role' =>
             $role
-
     ]);
 
 
@@ -354,8 +404,7 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    $userId = (int)
-        $db->lastInsertId();
+    $userId = (int) $db->lastInsertId();
 
 
     if ($userId <= 0) {
@@ -390,8 +439,11 @@ try {
         ");
 
         $vendorStmt->execute([
+
             $userId,
+
             $name,
+
             'Pending'
         ]);
     }
@@ -414,22 +466,20 @@ try {
 
     unset(
         $_SESSION['register_old'],
-        $_SESSION['register_error']
+        $_SESSION['register_error'],
+        $_SESSION['open_register_modal']
     );
 
 
     /*
     |--------------------------------------------------------------------------
-    | IMPORTANT
-    |--------------------------------------------------------------------------
-    | Save success message and email.
-    |
-    | DO NOT LOGIN THE USER HERE.
+    | SUCCESS MESSAGE
     |--------------------------------------------------------------------------
     */
 
     $_SESSION['login_success'] =
         'Account created successfully. Please login.';
+
 
     $_SESSION['login_email'] =
         $email;
@@ -437,7 +487,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | REDIRECT TO LOGIN MODAL
+    | OPEN LOGIN MODAL
     |--------------------------------------------------------------------------
     */
 
@@ -471,7 +521,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | ERROR
+    | SAVE ERROR
     |--------------------------------------------------------------------------
     */
 
@@ -479,6 +529,21 @@ try {
         'Registration error: ' .
         $e->getMessage();
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | KEEP REGISTER MODAL OPEN
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION['open_register_modal'] = true;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RETURN TO REGISTER MODAL
+    |--------------------------------------------------------------------------
+    */
 
     header(
         'Location: ' .
