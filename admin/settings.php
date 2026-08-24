@@ -53,15 +53,42 @@ $stmt = $db->prepare("
     LIMIT 1
 ");
 
-$stmt->execute([$admin_id]);
+$stmt->execute([
+    $admin_id
+]);
 
-$admin = $stmt->fetch(PDO::FETCH_ASSOC);
+$admin = $stmt->fetch(
+    PDO::FETCH_ASSOC
+);
 
 if (!$admin) {
+
+    $_SESSION = [];
+
+    if (
+        ini_get('session.use_cookies')
+    ) {
+
+        $params =
+            session_get_cookie_params();
+
+        setcookie(
+            session_name(),
+            '',
+            time() - 42000,
+            $params['path'],
+            $params['domain'] ?? '',
+            $params['secure'],
+            $params['httponly']
+        );
+    }
+
     session_destroy();
+
     header("Location: ../index.php");
     exit;
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -74,17 +101,39 @@ if (
     isset($_POST['update_profile'])
 ) {
 
-    $name = trim($_POST['name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
+    $name =
+        trim(
+            $_POST['name'] ?? ''
+        );
 
-    if ($name === '' || $email === '') {
+    $email =
+        trim(
+            $_POST['email'] ?? ''
+        );
 
-        $error = "Name and email are required.";
+    $phone =
+        trim(
+            $_POST['phone'] ?? ''
+        );
 
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
-        $error = "Please enter a valid email address.";
+    if (
+        $name === '' ||
+        $email === ''
+    ) {
+
+        $error =
+            "Name and email are required.";
+
+    } elseif (
+        !filter_var(
+            $email,
+            FILTER_VALIDATE_EMAIL
+        )
+    ) {
+
+        $error =
+            "Please enter a valid email address.";
 
     } else {
 
@@ -109,7 +158,8 @@ if (
 
             if ($stmt->fetch()) {
 
-                $error = "This email is already being used.";
+                $error =
+                    "This email is already being used.";
 
             } else {
 
@@ -133,7 +183,9 @@ if (
                     ]);
 
                     if ($stmt->fetch()) {
-                        $error = "This phone number is already being used.";
+
+                        $error =
+                            "This phone number is already being used.";
                     }
                 }
 
@@ -153,13 +205,28 @@ if (
                     $stmt->execute([
                         $name,
                         $email,
-                        $phone !== '' ? $phone : null,
+                        $phone !== ''
+                            ? $phone
+                            : null,
                         $admin_id
                     ]);
 
 
-                    $_SESSION['name'] = $name;
-                    $_SESSION['email'] = $email;
+                    /*
+                     * Update session
+                     */
+
+                    $_SESSION['name'] =
+                        $name;
+
+                    $_SESSION['email'] =
+                        $email;
+
+                    $_SESSION['user_name'] =
+                        $name;
+
+                    $_SESSION['user_email'] =
+                        $email;
 
 
                     /*
@@ -185,25 +252,38 @@ if (
                     ]);
 
 
-                    $success = "Profile updated successfully.";
+                    $success =
+                        "Profile updated successfully.";
 
 
                     /*
                      * Refresh admin data
                      */
 
-                    $admin['name'] = $name;
-                    $admin['email'] = $email;
-                    $admin['phone'] = $phone;
+                    $admin['name'] =
+                        $name;
+
+                    $admin['email'] =
+                        $email;
+
+                    $admin['phone'] =
+                        $phone;
                 }
             }
 
         } catch (PDOException $e) {
 
-            $error = "Unable to update profile.";
+            error_log(
+                'HochipoHub Admin Profile Error: ' .
+                $e->getMessage()
+            );
+
+            $error =
+                "Unable to update profile.";
         }
     }
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -232,15 +312,23 @@ if (
         $confirm_password === ''
     ) {
 
-        $error = "All password fields are required.";
+        $error =
+            "All password fields are required.";
 
-    } elseif ($new_password !== $confirm_password) {
+    } elseif (
+        $new_password !==
+        $confirm_password
+    ) {
 
-        $error = "New passwords do not match.";
+        $error =
+            "New passwords do not match.";
 
-    } elseif (strlen($new_password) < 8) {
+    } elseif (
+        strlen($new_password) < 8
+    ) {
 
-        $error = "Password must contain at least 8 characters.";
+        $error =
+            "Password must contain at least 8 characters.";
 
     } else {
 
@@ -262,7 +350,10 @@ if (
                 $admin_id
             ]);
 
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $row =
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
 
 
             if (
@@ -273,7 +364,8 @@ if (
                 )
             ) {
 
-                $error = "Current password is incorrect.";
+                $error =
+                    "Current password is incorrect.";
 
             } else {
 
@@ -326,11 +418,17 @@ if (
 
         } catch (PDOException $e) {
 
+            error_log(
+                'HochipoHub Admin Password Error: ' .
+                $e->getMessage()
+            );
+
             $error =
                 "Unable to change password.";
         }
     }
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -349,7 +447,9 @@ if (
             : 0;
 
     $mfa_enabled =
-        $mfa_enabled === 1 ? 1 : 0;
+        $mfa_enabled === 1
+            ? 1
+            : 0;
 
 
     try {
@@ -370,6 +470,10 @@ if (
         $admin['mfa_enabled'] =
             $mfa_enabled;
 
+
+        /*
+         * Admin log
+         */
 
         $stmt = $db->prepare("
             INSERT INTO admin_logs
@@ -398,6 +502,11 @@ if (
                 : "MFA disabled.";
 
     } catch (PDOException $e) {
+
+        error_log(
+            'HochipoHub Admin MFA Error: ' .
+            $e->getMessage()
+        );
 
         $error =
             "Unable to update MFA setting.";
@@ -438,24 +547,35 @@ if (
 <div class="admin-wrapper">
 
     <?php
-
-    $sidebar =
+    /*
+     * CENTRAL ADMIN SIDEBAR
+     *
+     * Sidebar is maintained only in:
+     *
+     * includes/admin_sidebar.php
+     */
+    $admin_sidebar =
         dirname(__DIR__) .
         '/includes/admin_sidebar.php';
 
-    if (file_exists($sidebar)) {
-        require_once $sidebar;
+    if (file_exists($admin_sidebar)) {
+        require_once $admin_sidebar;
     }
-
     ?>
 
+
     <main class="admin-main">
+
+
+        <!-- TOP BAR -->
 
         <div class="admin-topbar">
 
             <div>
 
-                <h1>Settings</h1>
+                <h1>
+                    Settings
+                </h1>
 
                 <p>
                     Manage your administrator account.
@@ -466,23 +586,41 @@ if (
         </div>
 
 
+        <!-- SUCCESS -->
+
         <?php if ($success !== ''): ?>
 
             <div class="admin-alert success">
-                <?= htmlspecialchars($success) ?>
+
+                <?= htmlspecialchars(
+                    $success,
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>
+
             </div>
 
         <?php endif; ?>
 
+
+        <!-- ERROR -->
 
         <?php if ($error !== ''): ?>
 
             <div class="admin-alert error">
-                <?= htmlspecialchars($error) ?>
+
+                <?= htmlspecialchars(
+                    $error,
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>
+
             </div>
 
         <?php endif; ?>
 
+
+        <!-- PROFILE -->
 
         <section class="admin-panel">
 
@@ -524,7 +662,11 @@ if (
                     <input
                         type="text"
                         name="name"
-                        value="<?= htmlspecialchars($admin['name']) ?>"
+                        value="<?= htmlspecialchars(
+                            $admin['name'],
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>"
                         required
                     >
 
@@ -540,7 +682,11 @@ if (
                     <input
                         type="email"
                         name="email"
-                        value="<?= htmlspecialchars($admin['email']) ?>"
+                        value="<?= htmlspecialchars(
+                            $admin['email'],
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>"
                         required
                     >
 
@@ -556,7 +702,11 @@ if (
                     <input
                         type="text"
                         name="phone"
-                        value="<?= htmlspecialchars($admin['phone'] ?? '') ?>"
+                        value="<?= htmlspecialchars(
+                            $admin['phone'] ?? '',
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>"
                     >
 
                 </div>
@@ -573,6 +723,8 @@ if (
 
         </section>
 
+
+        <!-- CHANGE PASSWORD -->
 
         <section class="admin-panel">
 
@@ -614,6 +766,7 @@ if (
                     <input
                         type="password"
                         name="current_password"
+                        autocomplete="current-password"
                         required
                     >
 
@@ -630,6 +783,7 @@ if (
                         type="password"
                         name="new_password"
                         minlength="8"
+                        autocomplete="new-password"
                         required
                     >
 
@@ -646,6 +800,7 @@ if (
                         type="password"
                         name="confirm_password"
                         minlength="8"
+                        autocomplete="new-password"
                         required
                     >
 
@@ -663,6 +818,8 @@ if (
 
         </section>
 
+
+        <!-- MFA -->
 
         <section class="admin-panel">
 
@@ -693,10 +850,9 @@ if (
 
                     <p>
 
-                        <?=
-                            $admin['mfa_enabled']
-                                ? 'MFA is currently enabled.'
-                                : 'MFA is currently disabled.'
+                        <?= $admin['mfa_enabled']
+                            ? 'MFA is currently enabled.'
+                            : 'MFA is currently disabled.'
                         ?>
 
                     </p>
@@ -717,13 +873,17 @@ if (
                     <input
                         type="hidden"
                         name="mfa_enabled"
-                        value="<?= $admin['mfa_enabled'] ? 0 : 1 ?>"
+                        value="<?= $admin['mfa_enabled']
+                            ? 0
+                            : 1 ?>"
                     >
 
 
                     <button
                         type="submit"
-                        class="admin-btn <?= $admin['mfa_enabled'] ? 'danger' : 'primary' ?>"
+                        class="admin-btn <?= $admin['mfa_enabled']
+                            ? 'danger'
+                            : 'primary' ?>"
                     >
 
                         <?= $admin['mfa_enabled']
@@ -740,6 +900,8 @@ if (
         </section>
 
 
+        <!-- ACCOUNT INFORMATION -->
+
         <section class="admin-panel">
 
             <div class="panel-header">
@@ -754,29 +916,56 @@ if (
 
             </div>
 
+
             <div class="settings-info">
 
                 <p>
-                    <strong>User ID:</strong>
-                    #<?= (int) $admin['user_id'] ?>
+
+                    <strong>
+                        User ID:
+                    </strong>
+
+                    #<?= (int)
+                        $admin['user_id'] ?>
+
                 </p>
 
+
                 <p>
-                    <strong>Role:</strong>
+
+                    <strong>
+                        Role:
+                    </strong>
+
                     Administrator
+
                 </p>
 
+
                 <p>
-                    <strong>Account Created:</strong>
-                    <?= date(
-                        'd M Y, h:i A',
-                        strtotime($admin['created_at'])
-                    ) ?>
+
+                    <strong>
+                        Account Created:
+                    </strong>
+
+                    <?= !empty(
+                        $admin['created_at']
+                    )
+                        ? date(
+                            'd M Y, h:i A',
+                            strtotime(
+                                $admin['created_at']
+                            )
+                        )
+                        : '-'
+                    ?>
+
                 </p>
 
             </div>
 
         </section>
+
 
     </main>
 
