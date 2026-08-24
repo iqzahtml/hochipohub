@@ -9,20 +9,27 @@ require_once dirname(__DIR__) . '/includes/session.php';
 
 $db = getDB();
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+
 /*
 |--------------------------------------------------------------------------
 | ADMIN ACCESS
 |--------------------------------------------------------------------------
 */
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+if (
+    !isset($_SESSION['user_id']) ||
+    ($_SESSION['role'] ?? '') !== 'admin'
+) {
     header("Location: ../index.php");
     exit;
 }
+
+$admin_id = (int) $_SESSION['user_id'];
+
 
 /*
 |--------------------------------------------------------------------------
@@ -30,7 +37,10 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
 |--------------------------------------------------------------------------
 */
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['update_status'])
+) {
 
     $review_id = (int) ($_POST['review_id'] ?? 0);
     $status = $_POST['status'] ?? '';
@@ -58,9 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
                 $review_id
             ]);
 
-            /*
-             * Admin log
-             */
 
             $stmt = $db->prepare("
                 INSERT INTO admin_logs
@@ -74,18 +81,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
             ");
 
             $stmt->execute([
-                $_SESSION['user_id'],
+                $admin_id,
                 'Updated review status to ' . $status,
                 'review',
                 $review_id
             ]);
 
-            header("Location: reviews.php?success=status");
+
+            header(
+                "Location: reviews.php?success=status"
+            );
+
             exit;
 
         } catch (PDOException $e) {
 
-            header("Location: reviews.php?error=update");
+            header(
+                "Location: reviews.php?error=update"
+            );
+
             exit;
         }
     }
@@ -106,10 +120,6 @@ if (isset($_GET['delete'])) {
 
         try {
 
-            /*
-             * Get review image first
-             */
-
             $stmt = $db->prepare("
                 SELECT image
                 FROM reviews
@@ -120,18 +130,19 @@ if (isset($_GET['delete'])) {
                 $review_id
             ]);
 
-            $review = $stmt->fetch(PDO::FETCH_ASSOC);
+            $review =
+                $stmt->fetch(PDO::FETCH_ASSOC);
+
 
             if (!$review) {
 
-                header("Location: reviews.php?error=notfound");
+                header(
+                    "Location: reviews.php?error=notfound"
+                );
+
                 exit;
             }
 
-
-            /*
-             * Delete review
-             */
 
             $stmt = $db->prepare("
                 DELETE FROM reviews
@@ -143,13 +154,10 @@ if (isset($_GET['delete'])) {
             ]);
 
 
-            /*
-             * Delete image if it exists
-             */
-
             if (!empty($review['image'])) {
 
-                $imageFile = dirname(__DIR__) .
+                $imageFile =
+                    dirname(__DIR__) .
                     '/uploads/products/' .
                     basename($review['image']);
 
@@ -158,10 +166,6 @@ if (isset($_GET['delete'])) {
                 }
             }
 
-
-            /*
-             * Admin log
-             */
 
             $stmt = $db->prepare("
                 INSERT INTO admin_logs
@@ -175,19 +179,25 @@ if (isset($_GET['delete'])) {
             ");
 
             $stmt->execute([
-                $_SESSION['user_id'],
+                $admin_id,
                 'Deleted review',
                 'review',
                 $review_id
             ]);
 
 
-            header("Location: reviews.php?success=deleted");
+            header(
+                "Location: reviews.php?success=deleted"
+            );
+
             exit;
 
         } catch (PDOException $e) {
 
-            header("Location: reviews.php?error=delete");
+            header(
+                "Location: reviews.php?error=delete"
+            );
+
             exit;
         }
     }
@@ -200,13 +210,14 @@ if (isset($_GET['delete'])) {
 |--------------------------------------------------------------------------
 */
 
-$search = trim($_GET['search'] ?? '');
+$search =
+    trim($_GET['search'] ?? '');
 
-$rating_filter = (int) (
-    $_GET['rating'] ?? 0
-);
+$rating_filter =
+    (int) ($_GET['rating'] ?? 0);
 
-$status_filter = $_GET['status'] ?? '';
+$status_filter =
+    $_GET['status'] ?? '';
 
 
 /*
@@ -247,12 +258,6 @@ $sql = "
 $params = [];
 
 
-/*
-|--------------------------------------------------------------------------
-| SEARCH
-|--------------------------------------------------------------------------
-*/
-
 if ($search !== '') {
 
     $sql .= "
@@ -264,7 +269,8 @@ if ($search !== '') {
         )
     ";
 
-    $searchValue = '%' . $search . '%';
+    $searchValue =
+        '%' . $search . '%';
 
     $params[] = $searchValue;
     $params[] = $searchValue;
@@ -273,27 +279,19 @@ if ($search !== '') {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| RATING FILTER
-|--------------------------------------------------------------------------
-*/
-
-if ($rating_filter >= 1 && $rating_filter <= 5) {
+if (
+    $rating_filter >= 1 &&
+    $rating_filter <= 5
+) {
 
     $sql .= "
         AND r.rating = ?
     ";
 
-    $params[] = $rating_filter;
+    $params[] =
+        $rating_filter;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| STATUS FILTER
-|--------------------------------------------------------------------------
-*/
 
 if (
     $status_filter === 'Visible' ||
@@ -304,26 +302,23 @@ if (
         AND r.status = ?
     ";
 
-    $params[] = $status_filter;
+    $params[] =
+        $status_filter;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| ORDER
-|--------------------------------------------------------------------------
-*/
 
 $sql .= "
     ORDER BY r.review_date DESC
 ";
 
 
-$stmt = $db->prepare($sql);
+$stmt =
+    $db->prepare($sql);
 
 $stmt->execute($params);
 
-$reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$reviews =
+    $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 
 /*
@@ -337,7 +332,8 @@ $stmt = $db->query("
     FROM reviews
 ");
 
-$total_reviews = (int) $stmt->fetchColumn();
+$total_reviews =
+    (int) $stmt->fetchColumn();
 
 
 $stmt = $db->query("
@@ -346,7 +342,8 @@ $stmt = $db->query("
     WHERE status = 'Visible'
 ");
 
-$visible_reviews = (int) $stmt->fetchColumn();
+$visible_reviews =
+    (int) $stmt->fetchColumn();
 
 
 $stmt = $db->query("
@@ -355,7 +352,8 @@ $stmt = $db->query("
     WHERE status = 'Hidden'
 ");
 
-$hidden_reviews = (int) $stmt->fetchColumn();
+$hidden_reviews =
+    (int) $stmt->fetchColumn();
 
 
 $stmt = $db->query("
@@ -363,7 +361,8 @@ $stmt = $db->query("
     FROM reviews
 ");
 
-$average_rating = $stmt->fetchColumn();
+$average_rating =
+    $stmt->fetchColumn();
 
 if ($average_rating === null) {
     $average_rating = 0;
@@ -382,7 +381,9 @@ if ($average_rating === null) {
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Reviews | HochipoHub Admin</title>
+    <title>
+        Reviews | HochipoHub Admin
+    </title>
 
     <link
         rel="stylesheet"
@@ -400,7 +401,6 @@ if ($average_rating === null) {
 
 <div class="admin-wrapper">
 
-    <!-- SIDEBAR -->
 
     <?php
 
@@ -415,14 +415,12 @@ if ($average_rating === null) {
     ?>
 
 
-    <!-- MAIN -->
-
     <main class="admin-main">
 
 
-        <!-- TOP BAR -->
+        <!-- TOPBAR -->
 
-        <div class="admin-topbar">
+        <header class="admin-topbar">
 
             <div>
 
@@ -431,7 +429,7 @@ if ($average_rating === null) {
                 </h1>
 
                 <p>
-                    Monitor and manage customer reviews.
+                    Monitor customer feedback and manage review visibility.
                 </p>
 
             </div>
@@ -440,20 +438,22 @@ if ($average_rating === null) {
             <div class="admin-user">
 
                 <span>
-
                     <?= htmlspecialchars(
                         $_SESSION['name'] ??
                         'Administrator'
                     ) ?>
-
                 </span>
+
+                <small>
+                    Administrator
+                </small>
 
             </div>
 
-        </div>
+        </header>
 
 
-        <!-- SUCCESS -->
+        <!-- ALERT -->
 
         <?php if (isset($_GET['success'])): ?>
 
@@ -473,8 +473,6 @@ if ($average_rating === null) {
 
         <?php endif; ?>
 
-
-        <!-- ERROR -->
 
         <?php if (isset($_GET['error'])): ?>
 
@@ -499,7 +497,6 @@ if ($average_rating === null) {
 
         <section class="admin-stats">
 
-
             <div class="stat-card">
 
                 <span class="stat-label">
@@ -516,7 +513,7 @@ if ($average_rating === null) {
             <div class="stat-card">
 
                 <span class="stat-label">
-                    Visible
+                    Visible Reviews
                 </span>
 
                 <strong>
@@ -529,7 +526,7 @@ if ($average_rating === null) {
             <div class="stat-card">
 
                 <span class="stat-label">
-                    Hidden
+                    Hidden Reviews
                 </span>
 
                 <strong>
@@ -555,7 +552,6 @@ if ($average_rating === null) {
 
             </div>
 
-
         </section>
 
 
@@ -563,12 +559,27 @@ if ($average_rating === null) {
 
         <section class="admin-panel">
 
+            <div class="panel-header">
+
+                <div>
+
+                    <h2>
+                        Review Filters
+                    </h2>
+
+                    <p>
+                        Search reviews by customer, product, rating or status.
+                    </p>
+
+                </div>
+
+            </div>
+
 
             <form
                 method="GET"
                 class="admin-filter-form"
             >
-
 
                 <input
                     type="text"
@@ -584,14 +595,12 @@ if ($average_rating === null) {
                         All Ratings
                     </option>
 
-
                     <option
                         value="5"
                         <?= $rating_filter === 5 ? 'selected' : '' ?>
                     >
                         5 Stars
                     </option>
-
 
                     <option
                         value="4"
@@ -600,7 +609,6 @@ if ($average_rating === null) {
                         4 Stars
                     </option>
 
-
                     <option
                         value="3"
                         <?= $rating_filter === 3 ? 'selected' : '' ?>
@@ -608,14 +616,12 @@ if ($average_rating === null) {
                         3 Stars
                     </option>
 
-
                     <option
                         value="2"
                         <?= $rating_filter === 2 ? 'selected' : '' ?>
                     >
                         2 Stars
                     </option>
-
 
                     <option
                         value="1"
@@ -633,14 +639,12 @@ if ($average_rating === null) {
                         All Status
                     </option>
 
-
                     <option
                         value="Visible"
                         <?= $status_filter === 'Visible' ? 'selected' : '' ?>
                     >
                         Visible
                     </option>
-
 
                     <option
                         value="Hidden"
@@ -667,16 +671,14 @@ if ($average_rating === null) {
                     Reset
                 </a>
 
-
             </form>
 
         </section>
 
 
-        <!-- REVIEWS -->
+        <!-- REVIEWS TABLE -->
 
         <section class="admin-panel">
-
 
             <div class="panel-header">
 
@@ -698,9 +700,7 @@ if ($average_rating === null) {
 
             <div class="table-wrapper">
 
-
                 <table class="admin-table">
-
 
                     <thead>
 
@@ -729,9 +729,7 @@ if ($average_rating === null) {
 
                     <tbody>
 
-
                     <?php if (empty($reviews)): ?>
-
 
                         <tr>
 
@@ -739,56 +737,39 @@ if ($average_rating === null) {
                                 colspan="8"
                                 class="empty-state"
                             >
-
                                 No reviews found.
-
                             </td>
 
                         </tr>
-
 
                     <?php else: ?>
 
 
                         <?php foreach ($reviews as $item): ?>
 
-
                             <tr>
 
-
-                                <!-- ID -->
-
                                 <td>
-
                                     #<?= (int) $item['review_id'] ?>
-
                                 </td>
 
-
-                                <!-- CUSTOMER -->
 
                                 <td>
 
                                     <strong>
-
                                         <?= htmlspecialchars(
                                             $item['customer_name']
                                         ) ?>
-
                                     </strong>
 
                                     <small>
-
                                         <?= htmlspecialchars(
                                             $item['customer_email']
                                         ) ?>
-
                                     </small>
 
                                 </td>
 
-
-                                <!-- PRODUCT -->
 
                                 <td>
 
@@ -796,51 +777,46 @@ if ($average_rating === null) {
                                         href="../product_details.php?id=<?= (int) $item['product_id'] ?>"
                                         target="_blank"
                                     >
-
                                         <?= htmlspecialchars(
                                             $item['product_name']
                                         ) ?>
-
                                     </a>
 
                                 </td>
 
 
-                                <!-- RATING -->
-
                                 <td>
+
+                                    <?php
+                                    $rating =
+                                        (int) $item['rating'];
+                                    ?>
 
                                     <span class="rating-stars">
 
                                         <?php
-
-                                        $rating =
-                                            (int) $item['rating'];
-
                                         for (
                                             $i = 1;
                                             $i <= 5;
                                             $i++
                                         ):
-
                                         ?>
 
-                                            <?= $i <= $rating ? '★' : '☆' ?>
+                                            <?= $i <= $rating
+                                                ? '★'
+                                                : '☆'
+                                            ?>
 
                                         <?php endfor; ?>
 
                                     </span>
 
                                     <small>
-
                                         <?= $rating ?>/5
-
                                     </small>
 
                                 </td>
 
-
-                                <!-- REVIEW -->
 
                                 <td>
 
@@ -848,8 +824,7 @@ if ($average_rating === null) {
 
                                         <?= nl2br(
                                             htmlspecialchars(
-                                                $item['review'] ??
-                                                ''
+                                                $item['review'] ?? ''
                                             )
                                         ) ?>
 
@@ -859,31 +834,24 @@ if ($average_rating === null) {
                                     <?php if (!empty($item['image'])): ?>
 
                                         <?php
-
                                         $reviewImage =
                                             '../uploads/products/' .
                                             basename(
                                                 $item['image']
                                             );
-
                                         ?>
 
                                         <a
                                             href="<?= htmlspecialchars($reviewImage) ?>"
                                             target="_blank"
                                         >
-
                                             View Image
-
                                         </a>
 
                                     <?php endif; ?>
 
-
                                 </td>
 
-
-                                <!-- STATUS -->
 
                                 <td>
 
@@ -898,13 +866,11 @@ if ($average_rating === null) {
                                             value="<?= (int) $item['review_id'] ?>"
                                         >
 
-
                                         <input
                                             type="hidden"
                                             name="update_status"
                                             value="1"
                                         >
-
 
                                         <select
                                             name="status"
@@ -920,7 +886,6 @@ if ($average_rating === null) {
                                             >
                                                 Visible
                                             </option>
-
 
                                             <option
                                                 value="Hidden"
@@ -938,8 +903,6 @@ if ($average_rating === null) {
                                 </td>
 
 
-                                <!-- DATE -->
-
                                 <td>
 
                                     <?= date(
@@ -952,37 +915,27 @@ if ($average_rating === null) {
                                 </td>
 
 
-                                <!-- ACTION -->
-
                                 <td>
 
                                     <div class="table-actions">
-
 
                                         <a
                                             href="reviews.php?delete=<?= (int) $item['review_id'] ?>"
                                             class="admin-btn small danger"
                                             onclick="return confirm('Are you sure you want to permanently delete this review?');"
                                         >
-
                                             Delete
-
                                         </a>
-
 
                                     </div>
 
                                 </td>
 
-
                             </tr>
-
 
                         <?php endforeach; ?>
 
-
                     <?php endif; ?>
-
 
                     </tbody>
 

@@ -1,24 +1,100 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - ADMIN DASHBOARD
+|--------------------------------------------------------------------------
+| File:
+|     admin/dashboard.php
+|
+| Purpose:
+|     Admin-only dashboard.
+|
+| Compatible with:
+|     config.php
+|     includes/session.php
+|     auth/login_process.php
+|--------------------------------------------------------------------------
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| LOAD CONFIGURATION
+|--------------------------------------------------------------------------
+*/
+
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/includes/session.php';
-require_once dirname(__DIR__) . '/includes/functions.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| REQUIRE ADMIN
+|--------------------------------------------------------------------------
+|
+| config.php already provides:
+|
+|     requireAdmin()
+|
+| It checks:
+|
+|     user_id
+|     role = admin
+|
+|--------------------------------------------------------------------------
+*/
 
 requireAdmin();
 
-$pdo = getDB();
 
-$adminName = $_SESSION['user_name'] ?? $_SESSION['name'] ?? 'Administrator';
-$adminEmail = $_SESSION['user_email'] ?? $_SESSION['email'] ?? '';
+/*
+|--------------------------------------------------------------------------
+| GET ADMIN SESSION DATA
+|--------------------------------------------------------------------------
+|
+| login_process.php creates:
+|
+|     $_SESSION['user_id']
+|     $_SESSION['user_name']
+|     $_SESSION['user_email']
+|     $_SESSION['name']
+|     $_SESSION['email']
+|     $_SESSION['role']
+|     $_SESSION['user_role']
+|
+|--------------------------------------------------------------------------
+*/
 
-$totalUsers = 0;
-$totalVendors = 0;
-$totalProducts = 0;
-$totalOrders = 0;
-$pendingVendors = 0;
-$pendingOrders = 0;
-$pendingPayments = 0;
-$totalRevenue = 0.0;
+$adminId = getUserId();
+
+$adminName = getUserName();
+
+$adminEmail = getUserEmail();
+
+$adminRole = getUserRole();
+
+
+/*
+|--------------------------------------------------------------------------
+| EXTRA SAFETY CHECK
+|--------------------------------------------------------------------------
+|
+| Do NOT destroy the session here.
+| If something is wrong, simply redirect back to login.
+|--------------------------------------------------------------------------
+*/
+
+if (
+    empty($adminId) ||
+    $adminRole !== 'admin'
+) {
+
+    redirect(
+        BASE_URL . 'index.php?login=1'
+    );
+}
+
 
 /*
 |--------------------------------------------------------------------------
@@ -26,161 +102,141 @@ $totalRevenue = 0.0;
 |--------------------------------------------------------------------------
 */
 
-$queries = [
-    'totalUsers' => [
-        "SELECT COUNT(*) FROM users WHERE role = 'customer'",
-        'int'
-    ],
-    'totalVendors' => [
-        "SELECT COUNT(*) FROM vendors WHERE approval_status = 'Approved'",
-        'int'
-    ],
-    'totalProducts' => [
-        "SELECT COUNT(*) FROM products",
-        'int'
-    ],
-    'totalOrders' => [
-        "SELECT COUNT(*) FROM orders",
-        'int'
-    ],
-    'totalRevenue' => [
-        "SELECT COALESCE(SUM(total_amount), 0)
-         FROM orders
-         WHERE order_status = 'Completed'",
-        'float'
-    ],
-    'pendingVendors' => [
-        "SELECT COUNT(*)
-         FROM vendor_applications
-         WHERE status = 'Pending'",
-        'int'
-    ],
-    'pendingOrders' => [
-        "SELECT COUNT(*)
-         FROM orders
-         WHERE order_status = 'Pending'",
-        'int'
-    ],
-    'pendingPayments' => [
-        "SELECT COUNT(*)
-         FROM payments
-         WHERE payment_status = 'Pending'",
-        'int'
-    ]
+$dashboardStats = [
+    'users' => 0,
+    'vendors' => 0,
+    'customers' => 0,
+    'products' => 0
 ];
 
-foreach ($queries as $key => $q) {
+$dashboardError = null;
+
+
+/*
+|--------------------------------------------------------------------------
+| LOAD DATABASE STATISTICS
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    $pdo = getDB();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TOTAL USERS
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $pdo->query("
+        SELECT COUNT(*)
+        FROM users
+    ");
+
+    $dashboardStats['users'] =
+        (int) $stmt->fetchColumn();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TOTAL VENDORS
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $pdo->query("
+        SELECT COUNT(*)
+        FROM users
+        WHERE LOWER(role) = 'vendor'
+    ");
+
+    $dashboardStats['vendors'] =
+        (int) $stmt->fetchColumn();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TOTAL CUSTOMERS
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $pdo->query("
+        SELECT COUNT(*)
+        FROM users
+        WHERE LOWER(role) = 'customer'
+    ");
+
+    $dashboardStats['customers'] =
+        (int) $stmt->fetchColumn();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TOTAL PRODUCTS
+    |--------------------------------------------------------------------------
+    |
+    | Product table may not exist yet.
+    | If it does not exist, keep value as 0.
+    |--------------------------------------------------------------------------
+    */
 
     try {
 
-        $value = $pdo
-            ->query($q[0])
-            ->fetchColumn();
+        $stmt = $pdo->query("
+            SELECT COUNT(*)
+            FROM products
+        ");
 
-        $GLOBALS[$key] = $q[1] === 'float'
-            ? (float) $value
-            : (int) $value;
+        $dashboardStats['products'] =
+            (int) $stmt->fetchColumn();
 
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
 
-        error_log(
-            'Admin Dashboard ' .
-            $key .
-            ' Error: ' .
-            $e->getMessage()
-        );
+        $dashboardStats['products'] = 0;
+    }
+
+
+} catch (Throwable $e) {
+
+    /*
+    |--------------------------------------------------------------------------
+    | DATABASE ERROR
+    |--------------------------------------------------------------------------
+    */
+
+    error_log(
+        'HochipoHub Admin Dashboard Error: '
+        . $e->getMessage()
+    );
+
+
+    if (
+        defined('APP_DEBUG') &&
+        APP_DEBUG
+    ) {
+
+        $dashboardError =
+            $e->getMessage();
+
+    } else {
+
+        $dashboardError =
+            'Unable to load dashboard statistics.';
     }
 }
 
-/*
-|--------------------------------------------------------------------------
-| RECENT ORDERS
-|--------------------------------------------------------------------------
-*/
-
-$recentOrders = [];
-
-try {
-
-    $statement = $pdo->query(
-        "SELECT
-            o.order_id,
-            o.order_date,
-            o.total_amount,
-            o.order_status,
-            u.name AS customer_name
-         FROM orders o
-         INNER JOIN users u
-            ON o.customer_id = u.user_id
-         ORDER BY o.order_date DESC
-         LIMIT 5"
-    );
-
-    $recentOrders = $statement->fetchAll(PDO::FETCH_ASSOC);
-
-} catch (PDOException $e) {
-
-    error_log(
-        'Admin Dashboard Orders Error: ' .
-        $e->getMessage()
-    );
-}
 
 /*
 |--------------------------------------------------------------------------
-| RECENT VENDOR APPLICATIONS
+| PAGE TITLE
 |--------------------------------------------------------------------------
 */
 
-$recentApplications = [];
-
-try {
-
-    $statement = $pdo->query(
-        "SELECT
-            va.application_id,
-            va.business_name,
-            va.status,
-            va.created_at,
-            u.name AS applicant_name
-         FROM vendor_applications va
-         INNER JOIN users u
-            ON va.user_id = u.user_id
-         ORDER BY va.created_at DESC
-         LIMIT 5"
-    );
-
-    $recentApplications = $statement->fetchAll(PDO::FETCH_ASSOC);
-
-} catch (PDOException $e) {
-
-    error_log(
-        'Admin Dashboard Applications Error: ' .
-        $e->getMessage()
-    );
-}
-
-/*
-|--------------------------------------------------------------------------
-| STATUS CLASS
-|--------------------------------------------------------------------------
-*/
-
-function dashboardStatusClass($status)
-{
-    return 'status-' .
-        strtolower(
-            str_replace(
-                ' ',
-                '-',
-                trim((string) $status)
-            )
-        );
-}
+$pageTitle = 'Admin Dashboard';
 
 ?>
+<!DOCTYPE html>
 
-<!doctype html>
 <html lang="en">
 
 <head>
@@ -193,426 +249,1125 @@ function dashboardStatusClass($status)
     >
 
     <title>
-        Dashboard | <?= e(SITE_NAME) ?>
+        <?= e($pageTitle) ?>
+        -
+        <?= e(SITE_NAME) ?>
     </title>
 
-    <link
-        rel="stylesheet"
-        href="<?= BASE_URL ?>css/admin.css"
-    >
 
-    <link
-        rel="stylesheet"
-        href="<?= BASE_URL ?>css/responsive.css"
-    >
+    <style>
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESET
+        |--------------------------------------------------------------------------
+        */
+
+        * {
+            box-sizing: border-box;
+        }
+
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+
+        body {
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            background: #f5f7fb;
+
+            color: #1f2937;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | LAYOUT
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-layout {
+
+            min-height: 100vh;
+
+            display: flex;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIDEBAR
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-sidebar {
+
+            width: 250px;
+
+            min-height: 100vh;
+
+            background: #111827;
+
+            color: #ffffff;
+
+            padding: 24px 18px;
+
+            flex-shrink: 0;
+        }
+
+
+        .admin-brand {
+
+            font-size: 22px;
+
+            font-weight: 700;
+
+            margin-bottom: 35px;
+        }
+
+
+        .admin-brand span {
+
+            display: block;
+
+            font-size: 12px;
+
+            font-weight: 400;
+
+            opacity: 0.65;
+
+            margin-top: 5px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | NAVIGATION
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-nav {
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 8px;
+        }
+
+
+        .admin-nav a {
+
+            display: block;
+
+            padding: 12px 14px;
+
+            border-radius: 8px;
+
+            color: #d1d5db;
+
+            text-decoration: none;
+
+            transition:
+                background 0.2s ease,
+                color 0.2s ease;
+        }
+
+
+        .admin-nav a:hover {
+
+            background: #1f2937;
+
+            color: #ffffff;
+        }
+
+
+        .admin-nav a.active {
+
+            background: #2563eb;
+
+            color: #ffffff;
+        }
+
+
+        .admin-nav .logout {
+
+            margin-top: 25px;
+
+            color: #fca5a5;
+        }
+
+
+        .admin-nav .logout:hover {
+
+            background: #7f1d1d;
+
+            color: #ffffff;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-main {
+
+            flex: 1;
+
+            min-width: 0;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOP BAR
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-topbar {
+
+            background: #ffffff;
+
+            border-bottom:
+                1px solid #e5e7eb;
+
+            padding: 18px 28px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            gap: 20px;
+        }
+
+
+        .admin-topbar h1 {
+
+            margin: 0;
+
+            font-size: 24px;
+
+            color: #111827;
+        }
+
+
+        .admin-topbar p {
+
+            margin: 5px 0 0;
+
+            color: #6b7280;
+
+            font-size: 14px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ADMIN USER
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-user {
+
+            text-align: right;
+        }
+
+
+        .admin-user-name {
+
+            font-weight: 700;
+
+            color: #111827;
+        }
+
+
+        .admin-user-email {
+
+            margin-top: 3px;
+
+            font-size: 13px;
+
+            color: #6b7280;
+        }
+
+
+        .admin-user-role {
+
+            display: inline-block;
+
+            margin-top: 7px;
+
+            padding: 4px 9px;
+
+            border-radius: 999px;
+
+            background: #dbeafe;
+
+            color: #1d4ed8;
+
+            font-size: 11px;
+
+            font-weight: 700;
+
+            text-transform: uppercase;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CONTENT
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-content {
+
+            padding: 28px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | WELCOME CARD
+        |--------------------------------------------------------------------------
+        */
+
+        .welcome-card {
+
+            background: #ffffff;
+
+            border:
+                1px solid #e5e7eb;
+
+            border-radius: 12px;
+
+            padding: 24px;
+
+            margin-bottom: 24px;
+        }
+
+
+        .welcome-card h2 {
+
+            margin: 0 0 8px;
+
+            color: #111827;
+
+            font-size: 22px;
+        }
+
+
+        .welcome-card p {
+
+            margin: 0;
+
+            color: #6b7280;
+
+            font-size: 14px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ERROR
+        |--------------------------------------------------------------------------
+        */
+
+        .dashboard-error {
+
+            background: #fef2f2;
+
+            border:
+                1px solid #fecaca;
+
+            color: #991b1b;
+
+            padding: 14px 16px;
+
+            border-radius: 8px;
+
+            margin-bottom: 20px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATISTICS GRID
+        |--------------------------------------------------------------------------
+        */
+
+        .stats-grid {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    4,
+                    minmax(0, 1fr)
+                );
+
+            gap: 18px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STAT CARD
+        |--------------------------------------------------------------------------
+        */
+
+        .stat-card {
+
+            background: #ffffff;
+
+            border:
+                1px solid #e5e7eb;
+
+            border-radius: 12px;
+
+            padding: 22px;
+
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+
+        .stat-card:hover {
+
+            transform: translateY(-2px);
+
+            box-shadow:
+                0 8px 20px
+                rgba(0, 0, 0, 0.06);
+        }
+
+
+        .stat-label {
+
+            color: #6b7280;
+
+            font-size: 14px;
+
+            margin-bottom: 10px;
+        }
+
+
+        .stat-value {
+
+            color: #111827;
+
+            font-size: 30px;
+
+            font-weight: 700;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | QUICK LINKS
+        |--------------------------------------------------------------------------
+        */
+
+        .quick-section {
+
+            margin-top: 28px;
+        }
+
+
+        .quick-section h2 {
+
+            margin: 0 0 15px;
+
+            font-size: 19px;
+
+            color: #111827;
+        }
+
+
+        .quick-grid {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    3,
+                    minmax(0, 1fr)
+                );
+
+            gap: 16px;
+        }
+
+
+        .quick-card {
+
+            display: block;
+
+            background: #ffffff;
+
+            border:
+                1px solid #e5e7eb;
+
+            border-radius: 12px;
+
+            padding: 20px;
+
+            text-decoration: none;
+
+            color: #111827;
+
+            transition:
+                transform 0.2s ease,
+                border-color 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+
+        .quick-card:hover {
+
+            transform: translateY(-2px);
+
+            border-color: #93c5fd;
+
+            box-shadow:
+                0 8px 20px
+                rgba(0, 0, 0, 0.06);
+        }
+
+
+        .quick-card-title {
+
+            font-size: 16px;
+
+            font-weight: 700;
+
+            margin-bottom: 6px;
+        }
+
+
+        .quick-card-description {
+
+            color: #6b7280;
+
+            font-size: 13px;
+
+            line-height: 1.5;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FOOTER
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-footer {
+
+            margin-top: 35px;
+
+            padding-top: 20px;
+
+            border-top:
+                1px solid #e5e7eb;
+
+            color: #9ca3af;
+
+            font-size: 13px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSIVE
+        |--------------------------------------------------------------------------
+        */
+
+        @media (max-width: 1000px) {
+
+            .stats-grid {
+
+                grid-template-columns:
+                    repeat(
+                        2,
+                        minmax(0, 1fr)
+                    );
+            }
+
+
+            .quick-grid {
+
+                grid-template-columns:
+                    repeat(
+                        2,
+                        minmax(0, 1fr)
+                    );
+            }
+        }
+
+
+        @media (max-width: 700px) {
+
+            .admin-layout {
+
+                display: block;
+            }
+
+
+            .admin-sidebar {
+
+                width: 100%;
+
+                min-height: auto;
+            }
+
+
+            .admin-nav {
+
+                flex-direction: row;
+
+                flex-wrap: wrap;
+            }
+
+
+            .admin-nav a {
+
+                flex: 1;
+
+                min-width: 120px;
+
+                text-align: center;
+            }
+
+
+            .admin-topbar {
+
+                flex-direction: column;
+
+                align-items: flex-start;
+            }
+
+
+            .admin-user {
+
+                text-align: left;
+            }
+        }
+
+
+        @media (max-width: 500px) {
+
+            .admin-content {
+
+                padding: 18px;
+            }
+
+
+            .stats-grid {
+
+                grid-template-columns: 1fr;
+            }
+
+
+            .quick-grid {
+
+                grid-template-columns: 1fr;
+            }
+
+
+            .admin-topbar {
+
+                padding: 18px;
+            }
+        }
+
+    </style>
 
 </head>
 
-<body class="admin-body">
 
-    <?php require_once dirname(__DIR__) . '/includes/admin_sidebar.php'; ?>
+<body>
+
+
+<div class="admin-layout">
+
+
+    <!--
+    |--------------------------------------------------------------------------
+    | SIDEBAR
+    |--------------------------------------------------------------------------
+    -->
+
+    <aside class="admin-sidebar">
+
+
+        <div class="admin-brand">
+
+            <?= e(SITE_NAME) ?>
+
+            <span>
+                Administration Panel
+            </span>
+
+        </div>
+
+
+        <nav class="admin-nav">
+
+
+            <a
+                href="<?= e(
+                    BASE_URL . 'admin/dashboard.php'
+                ) ?>"
+                class="active"
+            >
+                Dashboard
+            </a>
+
+
+            <a
+                href="<?= e(
+                    BASE_URL . 'admin/users.php'
+                ) ?>"
+            >
+                Users
+            </a>
+
+
+            <a
+                href="<?= e(
+                    BASE_URL . 'admin/vendors.php'
+                ) ?>"
+            >
+                Vendors
+            </a>
+
+
+            <a
+                href="<?= e(
+                    BASE_URL . 'admin/products.php'
+                ) ?>"
+            >
+                Products
+            </a>
+
+
+            <a
+                href="<?= e(
+                    BASE_URL . 'admin/orders.php'
+                ) ?>"
+            >
+                Orders
+            </a>
+
+
+            <a
+                href="<?= e(
+                    BASE_URL . 'admin/settings.php'
+                ) ?>"
+            >
+                Settings
+            </a>
+
+
+            <a
+                href="<?= e(
+                    BASE_URL . 'auth/logout.php'
+                ) ?>"
+                class="logout"
+            >
+                Logout
+            </a>
+
+
+        </nav>
+
+
+    </aside>
+
+
+    <!--
+    |--------------------------------------------------------------------------
+    | MAIN CONTENT
+    |--------------------------------------------------------------------------
+    -->
 
     <main class="admin-main">
 
-        <!-- Header -->
 
-        <header class="admin-header">
+        <!--
+        |--------------------------------------------------------------------------
+        | TOP BAR
+        |--------------------------------------------------------------------------
+        -->
 
-            <div class="admin-header-left">
+        <header class="admin-topbar">
 
-                <button
-                    type="button"
-                    id="adminSidebarToggle"
-                    class="admin-sidebar-toggle"
-                    aria-label="Open sidebar"
-                    aria-expanded="false"
-                >
-                    ☰
-                </button>
 
-                <div>
+            <div>
 
-                    <h1>Dashboard</h1>
+                <h1>
+                    Admin Dashboard
+                </h1>
 
-                    <p>
-                        Welcome back, <?= e($adminName) ?>.
-                    </p>
+                <p>
+                    Manage your HochipoHub marketplace.
+                </p>
+
+            </div>
+
+
+            <div class="admin-user">
+
+
+                <div class="admin-user-name">
+
+                    <?= e(
+                        $adminName !== ''
+                            ? $adminName
+                            : 'Administrator'
+                    ) ?>
 
                 </div>
 
+
+                <div class="admin-user-email">
+
+                    <?= e(
+                        $adminEmail !== ''
+                            ? $adminEmail
+                            : 'No email available'
+                    ) ?>
+
+                </div>
+
+
+                <div class="admin-user-role">
+
+                    <?= e($adminRole) ?>
+
+                </div>
+
+
             </div>
 
-            <div class="admin-header-user">
-
-                <span>Administrator</span>
-
-                <strong>
-                    <?= e($adminName) ?>
-                </strong>
-
-            </div>
 
         </header>
 
+
+        <!--
+        |--------------------------------------------------------------------------
+        | CONTENT
+        |--------------------------------------------------------------------------
+        -->
+
         <section class="admin-content">
 
-            <!-- Statistics -->
 
-            <div class="admin-stats-grid">
+            <!--
+            |--------------------------------------------------------------------------
+            | WELCOME
+            |--------------------------------------------------------------------------
+            -->
 
-                <?php
-                foreach (
-                    [
-                        ['Total Customers', $totalUsers, 'users'],
-                        ['Approved Vendors', $totalVendors, 'store'],
-                        ['Total Products', $totalProducts, 'box'],
-                        ['Total Orders', $totalOrders, 'orders'],
-                        ['Total Revenue', 'RM ' . number_format($totalRevenue, 2), 'card']
-                    ] as $stat
-                ):
-                ?>
+            <div class="welcome-card">
 
-                    <div class="admin-stat-card">
+                <h2>
 
-                        <div class="admin-stat-icon">
+                    Welcome back,
+                    <?= e(
+                        $adminName !== ''
+                            ? $adminName
+                            : 'Administrator'
+                    ) ?>.
 
-                            <span aria-hidden="true">
-                                <?= adminSidebarIcon($stat[2]) ?>
-                            </span>
+                </h2>
 
-                        </div>
 
-                        <div class="admin-stat-info">
+                <p>
 
-                            <span>
-                                <?= e($stat[0]) ?>
-                            </span>
+                    You are successfully logged in
+                    as an administrator.
 
-                            <strong>
-                                <?= is_numeric($stat[1])
-                                    ? number_format($stat[1])
-                                    : e($stat[1])
-                                ?>
-                            </strong>
-
-                        </div>
-
-                    </div>
-
-                <?php endforeach; ?>
+                </p>
 
             </div>
 
-            <!-- Quick Overview -->
 
-            <div class="admin-section">
+            <!--
+            |--------------------------------------------------------------------------
+            | DATABASE ERROR
+            |--------------------------------------------------------------------------
+            -->
 
-                <div class="admin-section-header">
+            <?php if (
+                $dashboardError !== null
+            ): ?>
 
-                    <div>
+                <div class="dashboard-error">
 
-                        <h2>Quick Overview</h2>
+                    <?= e(
+                        $dashboardError
+                    ) ?>
 
-                        <p>
-                            Items that may require your attention.
-                        </p>
+                </div>
+
+            <?php endif; ?>
+
+
+            <!--
+            |--------------------------------------------------------------------------
+            | STATISTICS
+            |--------------------------------------------------------------------------
+            -->
+
+            <div class="stats-grid">
+
+
+                <!-- USERS -->
+
+                <div class="stat-card">
+
+                    <div class="stat-label">
+                        Total Users
+                    </div>
+
+                    <div class="stat-value">
+
+                        <?= e(
+                            $dashboardStats['users']
+                        ) ?>
 
                     </div>
 
                 </div>
 
-                <div class="admin-overview-grid">
 
-                    <a
-                        href="<?= BASE_URL ?>admin/vendors.php"
-                        class="admin-overview-card"
-                    >
+                <!-- VENDORS -->
 
-                        <div class="admin-overview-icon">
-                            <?= adminSidebarIcon('store') ?>
-                        </div>
+                <div class="stat-card">
 
-                        <div>
+                    <div class="stat-label">
+                        Vendors
+                    </div>
 
-                            <span>
-                                Pending Vendors
-                            </span>
+                    <div class="stat-value">
 
-                            <strong>
-                                <?= number_format($pendingVendors) ?>
-                            </strong>
-
-                        </div>
-
-                    </a>
-
-                    <a
-                        href="<?= BASE_URL ?>admin/orders.php"
-                        class="admin-overview-card"
-                    >
-
-                        <div class="admin-overview-icon">
-                            <?= adminSidebarIcon('orders') ?>
-                        </div>
-
-                        <div>
-
-                            <span>
-                                Pending Orders
-                            </span>
-
-                            <strong>
-                                <?= number_format($pendingOrders) ?>
-                            </strong>
-
-                        </div>
-
-                    </a>
-
-                    <a
-                        href="<?= BASE_URL ?>admin/payments.php"
-                        class="admin-overview-card"
-                    >
-
-                        <div class="admin-overview-icon">
-                            <?= adminSidebarIcon('card') ?>
-                        </div>
-
-                        <div>
-
-                            <span>
-                                Pending Payments
-                            </span>
-
-                            <strong>
-                                <?= number_format($pendingPayments) ?>
-                            </strong>
-
-                        </div>
-
-                    </a>
-
-                </div>
-
-            </div>
-
-            <!-- Recent Orders -->
-
-            <div class="admin-section">
-
-                <div class="admin-section-header">
-
-                    <div>
-
-                        <h2>Recent Orders</h2>
-
-                        <p>
-                            Latest customer orders.
-                        </p>
+                        <?= e(
+                            $dashboardStats['vendors']
+                        ) ?>
 
                     </div>
 
-                    <a
-                        class="admin-view-all"
-                        href="<?= BASE_URL ?>admin/orders.php"
-                    >
-                        View All
-                    </a>
-
                 </div>
 
-                <div class="admin-table-wrapper">
 
-                    <table class="admin-table">
+                <!-- CUSTOMERS -->
 
-                        <thead>
+                <div class="stat-card">
 
-                            <tr>
-                                <th>Order ID</th>
-                                <th>Customer</th>
-                                <th>Date</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-                            </tr>
+                    <div class="stat-label">
+                        Customers
+                    </div>
 
-                        </thead>
+                    <div class="stat-value">
 
-                        <tbody>
-
-                            <?php if (!$recentOrders): ?>
-
-                                <tr>
-
-                                    <td
-                                        colspan="5"
-                                        class="admin-empty"
-                                    >
-                                        No orders found.
-                                    </td>
-
-                                </tr>
-
-                            <?php else: ?>
-
-                                <?php foreach ($recentOrders as $order): ?>
-
-                                    <tr>
-
-                                        <td>
-                                            #<?= (int) $order['order_id'] ?>
-                                        </td>
-
-                                        <td>
-                                            <?= e($order['customer_name']) ?>
-                                        </td>
-
-                                        <td>
-                                            <?= e(
-                                                date(
-                                                    'd M Y, h:i A',
-                                                    strtotime($order['order_date'])
-                                                )
-                                            ) ?>
-                                        </td>
-
-                                        <td>
-                                            RM <?= number_format(
-                                                (float) $order['total_amount'],
-                                                2
-                                            ) ?>
-                                        </td>
-
-                                        <td>
-
-                                            <span
-                                                class="admin-status <?= dashboardStatusClass($order['order_status']) ?>"
-                                            >
-                                                <?= e($order['order_status']) ?>
-                                            </span>
-
-                                        </td>
-
-                                    </tr>
-
-                                <?php endforeach; ?>
-
-                            <?php endif; ?>
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            </div>
-
-            <!-- Vendor Applications -->
-
-            <div class="admin-section">
-
-                <div class="admin-section-header">
-
-                    <div>
-
-                        <h2>Vendor Applications</h2>
-
-                        <p>
-                            Latest vendor applications.
-                        </p>
+                        <?= e(
+                            $dashboardStats['customers']
+                        ) ?>
 
                     </div>
 
-                    <a
-                        class="admin-view-all"
-                        href="<?= BASE_URL ?>admin/vendors.php"
-                    >
-                        View All
-                    </a>
+                </div>
+
+
+                <!-- PRODUCTS -->
+
+                <div class="stat-card">
+
+                    <div class="stat-label">
+                        Products
+                    </div>
+
+                    <div class="stat-value">
+
+                        <?= e(
+                            $dashboardStats['products']
+                        ) ?>
+
+                    </div>
 
                 </div>
 
-                <div class="admin-table-wrapper">
-
-                    <table class="admin-table">
-
-                        <thead>
-
-                            <tr>
-                                <th>Applicant</th>
-                                <th>Business</th>
-                                <th>Date</th>
-                                <th>Status</th>
-                            </tr>
-
-                        </thead>
-
-                        <tbody>
-
-                            <?php if (!$recentApplications): ?>
-
-                                <tr>
-
-                                    <td
-                                        colspan="4"
-                                        class="admin-empty"
-                                    >
-                                        No vendor applications found.
-                                    </td>
-
-                                </tr>
-
-                            <?php else: ?>
-
-                                <?php foreach ($recentApplications as $application): ?>
-
-                                    <tr>
-
-                                        <td>
-                                            <?= e($application['applicant_name']) ?>
-                                        </td>
-
-                                        <td>
-                                            <?= e(
-                                                $application['business_name'] ?? '-'
-                                            ) ?>
-                                        </td>
-
-                                        <td>
-                                            <?= e(
-                                                date(
-                                                    'd M Y, h:i A',
-                                                    strtotime($application['created_at'])
-                                                )
-                                            ) ?>
-                                        </td>
-
-                                        <td>
-
-                                            <span
-                                                class="admin-status <?= dashboardStatusClass($application['status']) ?>"
-                                            >
-                                                <?= e($application['status']) ?>
-                                            </span>
-
-                                        </td>
-
-                                    </tr>
-
-                                <?php endforeach; ?>
-
-                            <?php endif; ?>
-
-                        </tbody>
-
-                    </table>
-
-                </div>
 
             </div>
+
+
+            <!--
+            |--------------------------------------------------------------------------
+            | QUICK ACTIONS
+            |--------------------------------------------------------------------------
+            -->
+
+            <div class="quick-section">
+
+
+                <h2>
+                    Quick Management
+                </h2>
+
+
+                <div class="quick-grid">
+
+
+                    <a
+                        href="<?= e(
+                            BASE_URL . 'admin/users.php'
+                        ) ?>"
+                        class="quick-card"
+                    >
+
+                        <div class="quick-card-title">
+                            Manage Users
+                        </div>
+
+                        <div class="quick-card-description">
+                            View and manage customer,
+                            vendor and administrator accounts.
+                        </div>
+
+                    </a>
+
+
+                    <a
+                        href="<?= e(
+                            BASE_URL . 'admin/vendors.php'
+                        ) ?>"
+                        class="quick-card"
+                    >
+
+                        <div class="quick-card-title">
+                            Manage Vendors
+                        </div>
+
+                        <div class="quick-card-description">
+                            Review and manage marketplace vendors.
+                        </div>
+
+                    </a>
+
+
+                    <a
+                        href="<?= e(
+                            BASE_URL . 'admin/products.php'
+                        ) ?>"
+                        class="quick-card"
+                    >
+
+                        <div class="quick-card-title">
+                            Manage Products
+                        </div>
+
+                        <div class="quick-card-description">
+                            View and manage products listed
+                            on the marketplace.
+                        </div>
+
+                    </a>
+
+
+                    <a
+                        href="<?= e(
+                            BASE_URL . 'admin/orders.php'
+                        ) ?>"
+                        class="quick-card"
+                    >
+
+                        <div class="quick-card-title">
+                            Manage Orders
+                        </div>
+
+                        <div class="quick-card-description">
+                            Monitor marketplace orders
+                            and transactions.
+                        </div>
+
+                    </a>
+
+
+                    <a
+                        href="<?= e(
+                            BASE_URL . 'admin/settings.php'
+                        ) ?>"
+                        class="quick-card"
+                    >
+
+                        <div class="quick-card-title">
+                            Admin Settings
+                        </div>
+
+                        <div class="quick-card-description">
+                            Configure administrator and
+                            marketplace settings.
+                        </div>
+
+                    </a>
+
+
+                    <a
+                        href="<?= e(
+                            BASE_URL . 'auth/logout.php'
+                        ) ?>"
+                        class="quick-card"
+                    >
+
+                        <div class="quick-card-title">
+                            Logout
+                        </div>
+
+                        <div class="quick-card-description">
+                            Sign out of the administrator account.
+                        </div>
+
+                    </a>
+
+
+                </div>
+
+
+            </div>
+
+
+            <!--
+            |--------------------------------------------------------------------------
+            | FOOTER
+            |--------------------------------------------------------------------------
+            -->
+
+            <div class="admin-footer">
+
+                HochipoHub Administration Panel
+
+            </div>
+
 
         </section>
 
+
     </main>
+
+
+</div>
+
 
 </body>
 

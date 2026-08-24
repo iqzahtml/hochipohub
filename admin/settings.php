@@ -13,6 +13,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
 /*
 |--------------------------------------------------------------------------
 | ADMIN ACCESS
@@ -27,10 +28,13 @@ if (
     exit;
 }
 
-$admin_id = (int) $_SESSION['user_id'];
+
+$admin_id =
+    (int) $_SESSION['user_id'];
 
 $success = '';
 $error = '';
+
 
 /*
 |--------------------------------------------------------------------------
@@ -53,15 +57,23 @@ $stmt = $db->prepare("
     LIMIT 1
 ");
 
-$stmt->execute([$admin_id]);
+$stmt->execute([
+    $admin_id
+]);
 
-$admin = $stmt->fetch(PDO::FETCH_ASSOC);
+$admin =
+    $stmt->fetch(PDO::FETCH_ASSOC);
+
 
 if (!$admin) {
+
     session_destroy();
+
     header("Location: ../index.php");
+
     exit;
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -74,24 +86,40 @@ if (
     isset($_POST['update_profile'])
 ) {
 
-    $name = trim($_POST['name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
+    $name =
+        trim($_POST['name'] ?? '');
 
-    if ($name === '' || $email === '') {
+    $email =
+        trim($_POST['email'] ?? '');
 
-        $error = "Name and email are required.";
+    $phone =
+        trim($_POST['phone'] ?? '');
 
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
-        $error = "Please enter a valid email address.";
+    if (
+        $name === '' ||
+        $email === ''
+    ) {
+
+        $error =
+            "Name and email are required.";
+
+    } elseif (
+        !filter_var(
+            $email,
+            FILTER_VALIDATE_EMAIL
+        )
+    ) {
+
+        $error =
+            "Please enter a valid email address.";
 
     } else {
 
         try {
 
             /*
-             * Check duplicate email
+             * Duplicate email
              */
 
             $stmt = $db->prepare("
@@ -107,14 +135,16 @@ if (
                 $admin_id
             ]);
 
+
             if ($stmt->fetch()) {
 
-                $error = "This email is already being used.";
+                $error =
+                    "This email is already being used.";
 
             } else {
 
                 /*
-                 * Check duplicate phone
+                 * Duplicate phone
                  */
 
                 if ($phone !== '') {
@@ -132,8 +162,11 @@ if (
                         $admin_id
                     ]);
 
+
                     if ($stmt->fetch()) {
-                        $error = "This phone number is already being used.";
+
+                        $error =
+                            "This phone number is already being used.";
                     }
                 }
 
@@ -153,13 +186,18 @@ if (
                     $stmt->execute([
                         $name,
                         $email,
-                        $phone !== '' ? $phone : null,
+                        $phone !== ''
+                            ? $phone
+                            : null,
                         $admin_id
                     ]);
 
 
-                    $_SESSION['name'] = $name;
-                    $_SESSION['email'] = $email;
+                    $_SESSION['name'] =
+                        $name;
+
+                    $_SESSION['email'] =
+                        $email;
 
 
                     /*
@@ -185,25 +223,29 @@ if (
                     ]);
 
 
-                    $success = "Profile updated successfully.";
+                    $success =
+                        "Profile updated successfully.";
 
 
-                    /*
-                     * Refresh admin data
-                     */
+                    $admin['name'] =
+                        $name;
 
-                    $admin['name'] = $name;
-                    $admin['email'] = $email;
-                    $admin['phone'] = $phone;
+                    $admin['email'] =
+                        $email;
+
+                    $admin['phone'] =
+                        $phone;
                 }
             }
 
         } catch (PDOException $e) {
 
-            $error = "Unable to update profile.";
+            $error =
+                "Unable to update profile.";
         }
     }
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -232,23 +274,26 @@ if (
         $confirm_password === ''
     ) {
 
-        $error = "All password fields are required.";
+        $error =
+            "All password fields are required.";
 
-    } elseif ($new_password !== $confirm_password) {
+    } elseif (
+        $new_password !== $confirm_password
+    ) {
 
-        $error = "New passwords do not match.";
+        $error =
+            "New passwords do not match.";
 
-    } elseif (strlen($new_password) < 8) {
+    } elseif (
+        strlen($new_password) < 8
+    ) {
 
-        $error = "Password must contain at least 8 characters.";
+        $error =
+            "Password must contain at least 8 characters.";
 
     } else {
 
         try {
-
-            /*
-             * Get current password
-             */
 
             $stmt = $db->prepare("
                 SELECT password
@@ -262,7 +307,8 @@ if (
                 $admin_id
             ]);
 
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $row =
+                $stmt->fetch(PDO::FETCH_ASSOC);
 
 
             if (
@@ -273,7 +319,8 @@ if (
                 )
             ) {
 
-                $error = "Current password is incorrect.";
+                $error =
+                    "Current password is incorrect.";
 
             } else {
 
@@ -332,6 +379,7 @@ if (
     }
 }
 
+
 /*
 |--------------------------------------------------------------------------
 | MFA TOGGLE
@@ -348,8 +396,11 @@ if (
             ? (int) $_POST['mfa_enabled']
             : 0;
 
+
     $mfa_enabled =
-        $mfa_enabled === 1 ? 1 : 0;
+        $mfa_enabled === 1
+            ? 1
+            : 0;
 
 
     try {
@@ -384,10 +435,13 @@ if (
 
         $stmt->execute([
             $admin_id,
+
             $mfa_enabled
                 ? 'Enabled MFA'
                 : 'Disabled MFA',
+
             'user',
+
             $admin_id
         ]);
 
@@ -437,6 +491,7 @@ if (
 
 <div class="admin-wrapper">
 
+
     <?php
 
     $sidebar =
@@ -449,27 +504,54 @@ if (
 
     ?>
 
+
     <main class="admin-main">
 
-        <div class="admin-topbar">
+
+        <!-- TOPBAR -->
+
+        <header class="admin-topbar">
 
             <div>
 
-                <h1>Settings</h1>
+                <h1>
+                    Settings
+                </h1>
 
                 <p>
-                    Manage your administrator account.
+                    Manage your administrator account and security.
                 </p>
 
             </div>
 
-        </div>
 
+            <div class="admin-user">
+
+                <span>
+                    <?= htmlspecialchars(
+                        $admin['name']
+                    ) ?>
+                </span>
+
+                <small>
+                    Administrator
+                </small>
+
+            </div>
+
+        </header>
+
+
+        <!-- ALERTS -->
 
         <?php if ($success !== ''): ?>
 
             <div class="admin-alert success">
-                <?= htmlspecialchars($success) ?>
+
+                <?= htmlspecialchars(
+                    $success
+                ) ?>
+
             </div>
 
         <?php endif; ?>
@@ -478,11 +560,17 @@ if (
         <?php if ($error !== ''): ?>
 
             <div class="admin-alert error">
-                <?= htmlspecialchars($error) ?>
+
+                <?= htmlspecialchars(
+                    $error
+                ) ?>
+
             </div>
 
         <?php endif; ?>
 
+
+        <!-- PROFILE -->
 
         <section class="admin-panel">
 
@@ -495,7 +583,7 @@ if (
                     </h2>
 
                     <p>
-                        Update your personal account information.
+                        Update your personal administrator account information.
                     </p>
 
                 </div>
@@ -524,7 +612,9 @@ if (
                     <input
                         type="text"
                         name="name"
-                        value="<?= htmlspecialchars($admin['name']) ?>"
+                        value="<?= htmlspecialchars(
+                            $admin['name']
+                        ) ?>"
                         required
                     >
 
@@ -540,7 +630,9 @@ if (
                     <input
                         type="email"
                         name="email"
-                        value="<?= htmlspecialchars($admin['email']) ?>"
+                        value="<?= htmlspecialchars(
+                            $admin['email']
+                        ) ?>"
                         required
                     >
 
@@ -556,7 +648,9 @@ if (
                     <input
                         type="text"
                         name="phone"
-                        value="<?= htmlspecialchars($admin['phone'] ?? '') ?>"
+                        value="<?= htmlspecialchars(
+                            $admin['phone'] ?? ''
+                        ) ?>"
                     >
 
                 </div>
@@ -574,6 +668,8 @@ if (
         </section>
 
 
+        <!-- PASSWORD -->
+
         <section class="admin-panel">
 
             <div class="panel-header">
@@ -585,7 +681,7 @@ if (
                     </h2>
 
                     <p>
-                        Use a strong password with at least 8 characters.
+                        Keep your administrator account protected with a strong password.
                     </p>
 
                 </div>
@@ -614,6 +710,7 @@ if (
                     <input
                         type="password"
                         name="current_password"
+                        autocomplete="current-password"
                         required
                     >
 
@@ -630,6 +727,7 @@ if (
                         type="password"
                         name="new_password"
                         minlength="8"
+                        autocomplete="new-password"
                         required
                     >
 
@@ -646,6 +744,7 @@ if (
                         type="password"
                         name="confirm_password"
                         minlength="8"
+                        autocomplete="new-password"
                         required
                     >
 
@@ -664,6 +763,8 @@ if (
         </section>
 
 
+        <!-- MFA -->
+
         <section class="admin-panel">
 
             <div class="panel-header">
@@ -675,7 +776,7 @@ if (
                     </h2>
 
                     <p>
-                        Manage MFA protection for your administrator account.
+                        Manage additional security protection for your administrator account.
                     </p>
 
                 </div>
@@ -695,8 +796,8 @@ if (
 
                         <?=
                             $admin['mfa_enabled']
-                                ? 'MFA is currently enabled.'
-                                : 'MFA is currently disabled.'
+                                ? 'MFA is currently enabled and protecting your account.'
+                                : 'MFA is currently disabled for your account.'
                         ?>
 
                     </p>
@@ -740,6 +841,8 @@ if (
         </section>
 
 
+        <!-- ACCOUNT INFORMATION -->
+
         <section class="admin-panel">
 
             <div class="panel-header">
@@ -750,33 +853,58 @@ if (
                         Account Information
                     </h2>
 
+                    <p>
+                        Basic information about this administrator account.
+                    </p>
+
                 </div>
 
             </div>
 
+
             <div class="settings-info">
 
                 <p>
-                    <strong>User ID:</strong>
+
+                    <strong>
+                        User ID
+                    </strong>
+
                     #<?= (int) $admin['user_id'] ?>
+
                 </p>
 
+
                 <p>
-                    <strong>Role:</strong>
+
+                    <strong>
+                        Role
+                    </strong>
+
                     Administrator
+
                 </p>
 
+
                 <p>
-                    <strong>Account Created:</strong>
+
+                    <strong>
+                        Account Created
+                    </strong>
+
                     <?= date(
                         'd M Y, h:i A',
-                        strtotime($admin['created_at'])
+                        strtotime(
+                            $admin['created_at']
+                        )
                     ) ?>
+
                 </p>
 
             </div>
 
         </section>
+
 
     </main>
 
