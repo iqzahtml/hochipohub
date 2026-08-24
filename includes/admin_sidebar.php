@@ -3,942 +3,514 @@
  * HOCHIPOHUB
  * Shared Admin Sidebar
  *
- * IMPORTANT:
- * This file contains ONLY the shared admin sidebar.
- * Do not create another sidebar manually inside admin pages.
+ * This file contains ONLY the shared admin navigation UI.
+ * Do not place another sidebar HTML inside individual admin pages.
  */
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-/*
-|--------------------------------------------------------------------------
-| CURRENT PAGE
-|--------------------------------------------------------------------------
-*/
+$currentPage = basename($_SERVER['PHP_SELF']);
 
-$currentPage = basename($_SERVER['PHP_SELF'] ?? '');
+$adminName = $_SESSION['name'] ?? 'Administrator';
+$adminEmail = $_SESSION['email'] ?? 'admin@hochipoHub.com';
 
+$menuItems = [
+    [
+        'label' => 'Dashboard',
+        'url'   => 'dashboard.php',
+        'icon'  => 'dashboard'
+    ],
+    [
+        'label' => 'Users',
+        'url'   => 'users.php',
+        'icon'  => 'users'
+    ],
+    [
+        'label' => 'Vendors',
+        'url'   => 'vendors.php',
+        'icon'  => 'vendors'
+    ],
+    [
+        'label' => 'Products',
+        'url'   => 'products.php',
+        'icon'  => 'products'
+    ],
+    [
+        'label' => 'Orders',
+        'url'   => 'orders.php',
+        'icon'  => 'orders'
+    ],
+    [
+        'label' => 'Payments',
+        'url'   => 'payments.php',
+        'icon'  => 'payments'
+    ],
+    [
+        'label' => 'Commission',
+        'url'   => 'commission.php',
+        'icon'  => 'commission'
+    ],
+    [
+        'label' => 'Reviews',
+        'url'   => 'reviews.php',
+        'icon'  => 'reviews'
+    ],
+    [
+        'label' => 'Settings',
+        'url'   => 'settings.php',
+        'icon'  => 'settings'
+    ]
+];
 
-/*
-|--------------------------------------------------------------------------
-| ADMIN USER
-|--------------------------------------------------------------------------
-*/
+function adminSidebarIcon(string $icon): string
+{
+    switch ($icon) {
 
-$adminName = trim(
-    $_SESSION['name'] ??
-    $_SESSION['user_name'] ??
-    'Administrator'
-);
+        case 'dashboard':
+            return '
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="3" width="7" height="7" rx="2"></rect>
+                    <rect x="14" y="3" width="7" height="7" rx="2"></rect>
+                    <rect x="3" y="14" width="7" height="7" rx="2"></rect>
+                    <rect x="14" y="14" width="7" height="7" rx="2"></rect>
+                </svg>
+            ';
 
-if ($adminName === '') {
-    $adminName = 'Administrator';
-}
+        case 'users':
+            return '
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            ';
 
-$adminEmail = trim(
-    $_SESSION['email'] ??
-    $_SESSION['user_email'] ??
-    ''
-);
+        case 'vendors':
+            return '
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 10h18"></path>
+                    <path d="M5 10v10h14V10"></path>
+                    <path d="M3 10l2-7h14l2 7"></path>
+                    <path d="M8 20v-6h8v6"></path>
+                </svg>
+            ';
 
-$adminInitial = strtoupper(
-    substr(
-        preg_replace(
-            '/[^a-zA-Z0-9]/',
-            '',
-            $adminName
-        ),
-        0,
-        1
-    )
-);
+        case 'products':
+            return '
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+            ';
 
-if ($adminInitial === '') {
-    $adminInitial = 'A';
-}
+        case 'orders':
+            return '
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 2h9l5 5v15H6z"></path>
+                    <path d="M14 2v6h6"></path>
+                    <path d="M9 13h6"></path>
+                    <path d="M9 17h6"></path>
+                </svg>
+            ';
 
+        case 'payments':
+            return '
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                    <line x1="6" y1="15" x2="10" y2="15"></line>
+                </svg>
+            ';
 
-/*
-|--------------------------------------------------------------------------
-| ACTIVE PAGE HELPER
-|--------------------------------------------------------------------------
-*/
+        case 'commission':
+            return '
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <path d="M8 15c1 1 2.2 1.5 4 1.5 2.2 0 3.5-1 3.5-2.5S14 11.5 12 11.5 8.5 10.5 8.5 9 10 6.5 12 6.5c1.5 0 2.7.4 3.5 1"></path>
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                </svg>
+            ';
 
-if (!function_exists('adminNavActive')) {
+        case 'reviews':
+            return '
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-9 8.5 9.1 9.1 0 0 1-4-.9L3 21l1.9-4.2A8.3 8.3 0 0 1 3 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z"></path>
+                    <path d="M8 12h.01"></path>
+                    <path d="M12 12h.01"></path>
+                    <path d="M16 12h.01"></path>
+                </svg>
+            ';
 
-    function adminNavActive(
-        string $page,
-        string $currentPage
-    ): string {
+        case 'settings':
+            return '
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20h-2.4v-.09a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.4 15a1.7 1.7 0 0 0-1.56-1.03H6v-2.4h.84A1.7 1.7 0 0 0 8.4 10a1.7 1.7 0 0 0-.34-1.88L8 8.06l1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 12.67 5.2V4h2.4v1.2a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 19.34 10a1.7 1.7 0 0 0 1.56 1.03H21v2.4h-.1A1.7 1.7 0 0 0 19.4 15z"></path>
+                </svg>
+            ';
 
-        return $page === $currentPage
-            ? 'active'
-            : '';
+        default:
+            return '
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9"></circle>
+                </svg>
+            ';
     }
 }
-
 ?>
 
-<!-- =========================================================
-     ADMIN SIDEBAR
-========================================================= -->
+<!-- MOBILE TOP BAR -->
+
+<div class="admin-mobile-bar">
+
+    <button
+        type="button"
+        class="admin-mobile-toggle"
+        id="adminMobileOpen"
+        aria-label="Open admin navigation"
+        aria-controls="adminSidebar"
+        aria-expanded="false"
+    >
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
+    <div class="admin-mobile-brand">
+        <strong>HochipoHub</strong>
+        <small>Admin Panel</small>
+    </div>
+
+</div>
+
+
+<!-- SIDEBAR OVERLAY -->
+
+<div
+    class="admin-sidebar-overlay"
+    id="adminSidebarOverlay"
+></div>
+
+
+<!-- SIDEBAR -->
 
 <aside
     class="admin-sidebar"
     id="adminSidebar"
-    aria-label="Admin navigation"
 >
 
-    <!-- =====================================================
-         BRAND
-    ====================================================== -->
+    <div class="admin-sidebar-inner">
 
-    <div class="admin-sidebar-brand">
+        <!-- BRAND -->
 
-        <a
-            href="dashboard.php"
-            class="admin-brand-link"
-            aria-label="HochipoHub Admin Dashboard"
-        >
+        <div class="admin-brand">
 
-            <div class="admin-brand-mark">
+            <a
+                href="dashboard.php"
+                class="admin-brand-link"
+            >
 
-                <span>H</span>
+                <div class="admin-brand-mark">
+                    H
+                </div>
+
+                <div class="admin-brand-text">
+
+                    <strong>
+                        HochipoHub
+                    </strong>
+
+                    <span>
+                        Administration Panel
+                    </span>
+
+                </div>
+
+            </a>
+
+
+            <button
+                type="button"
+                class="admin-sidebar-close"
+                id="adminSidebarClose"
+                aria-label="Close navigation"
+            >
+                &times;
+            </button>
+
+        </div>
+
+
+        <!-- ADMIN PROFILE -->
+
+        <div class="admin-sidebar-profile">
+
+            <div class="admin-avatar">
+
+                <?= htmlspecialchars(
+                    strtoupper(
+                        substr(
+                            trim($adminName),
+                            0,
+                            1
+                        )
+                    )
+                ) ?>
 
             </div>
 
-
-            <div class="admin-brand-text">
+            <div class="admin-profile-info">
 
                 <strong>
-                    HochipoHub
+                    <?= htmlspecialchars($adminName) ?>
                 </strong>
 
                 <span>
-                    ADMIN PANEL
+                    <?= htmlspecialchars($adminEmail) ?>
                 </span>
+
+                <small>
+                    <i></i>
+                    Administrator
+                </small>
 
             </div>
 
-        </a>
-
-
-        <!-- Mobile close -->
-
-        <button
-            type="button"
-            class="admin-sidebar-close"
-            id="adminSidebarClose"
-            aria-label="Close sidebar"
-        >
-
-            <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-            >
-
-                <path
-                    d="M6 6l12 12M18 6L6 18"
-                />
-
-            </svg>
-
-        </button>
-
-    </div>
-
-
-    <!-- =====================================================
-         ADMIN PROFILE
-    ====================================================== -->
-
-    <div class="admin-profile-card">
-
-        <div class="admin-profile-avatar">
-
-            <?= htmlspecialchars(
-                $adminInitial,
-                ENT_QUOTES,
-                'UTF-8'
-            ) ?>
-
         </div>
 
 
-        <div class="admin-profile-info">
+        <!-- NAVIGATION -->
 
-            <strong>
+        <nav class="admin-navigation">
 
-                <?= htmlspecialchars(
-                    $adminName,
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>
+            <div class="admin-nav-label">
+                MAIN MENU
+            </div>
 
-            </strong>
 
-            <span>
+            <ul>
 
-                Administrator
+                <?php foreach ($menuItems as $item): ?>
 
-            </span>
+                    <?php
+                    $isActive =
+                        $currentPage === $item['url'];
+                    ?>
 
-        </div>
+                    <li>
 
+                        <a
+                            href="<?= htmlspecialchars($item['url']) ?>"
+                            class="
+                                admin-nav-link
+                                <?= $isActive ? 'active' : '' ?>
+                            "
+                            <?= $isActive ? 'aria-current="page"' : '' ?>
+                        >
 
-        <span
-            class="admin-online-dot"
-            title="Online"
-        ></span>
+                            <span class="admin-nav-icon">
 
-    </div>
+                                <?= adminSidebarIcon(
+                                    $item['icon']
+                                ) ?>
 
+                            </span>
 
-    <!-- =====================================================
-         NAVIGATION
-    ====================================================== -->
+                            <span class="admin-nav-text">
+                                <?= htmlspecialchars($item['label']) ?>
+                            </span>
 
-    <div class="admin-nav-heading">
+                            <?php if ($isActive): ?>
 
-        <span>
-            MAIN MENU
-        </span>
+                                <span class="admin-nav-active-dot"></span>
 
-    </div>
+                            <?php endif; ?>
 
+                        </a>
 
-    <nav class="admin-nav">
+                    </li>
 
-        <!-- DASHBOARD -->
+                <?php endforeach; ?>
 
-        <a
-            href="dashboard.php"
-            class="<?= adminNavActive(
-                'dashboard.php',
-                $currentPage
-            ) ?>"
-        >
+            </ul>
 
-            <span class="admin-nav-icon">
+        </nav>
 
-                <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                >
 
-                    <rect
-                        x="3"
-                        y="3"
-                        width="7"
-                        height="7"
-                        rx="1.5"
-                    />
+        <!-- SIDEBAR FOOTER -->
 
-                    <rect
-                        x="14"
-                        y="3"
-                        width="7"
-                        height="7"
-                        rx="1.5"
-                    />
+        <div class="admin-sidebar-footer">
 
-                    <rect
-                        x="3"
-                        y="14"
-                        width="7"
-                        height="7"
-                        rx="1.5"
-                    />
+            <div class="admin-sidebar-tip">
 
-                    <rect
-                        x="14"
-                        y="14"
-                        width="7"
-                        height="7"
-                        rx="1.5"
-                    />
+                <div class="tip-icon">
+                    ✦
+                </div>
 
-                </svg>
+                <div>
 
-            </span>
+                    <strong>
+                        Admin Control
+                    </strong>
 
-            <span class="admin-nav-label">
-                Dashboard
-            </span>
+                    <span>
+                        Manage your marketplace from one place.
+                    </span>
 
-        </a>
+                </div>
 
+            </div>
 
-        <!-- USERS -->
 
-        <a
-            href="users.php"
-            class="<?= adminNavActive(
-                'users.php',
-                $currentPage
-            ) ?>"
-        >
-
-            <span class="admin-nav-icon">
-
-                <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                >
-
-                    <circle
-                        cx="9"
-                        cy="8"
-                        r="3"
-                    />
-
-                    <path
-                        d="M3.5 20c.6-3.1 2.4-5 5.5-5s4.9 1.9 5.5 5"
-                    />
-
-                    <path
-                        d="M16 11c2.5.1 4.1 1.6 4.5 4"
-                    />
-
-                    <path
-                        d="M16 5.2a3 3 0 0 1 0 5.6"
-                    />
-
-                </svg>
-
-            </span>
-
-            <span class="admin-nav-label">
-                Users
-            </span>
-
-        </a>
-
-
-        <!-- VENDORS -->
-
-        <a
-            href="vendors.php"
-            class="<?= adminNavActive(
-                'vendors.php',
-                $currentPage
-            ) ?>"
-        >
-
-            <span class="admin-nav-icon">
-
-                <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                >
-
-                    <path
-                        d="M4 10h16"
-                    />
-
-                    <path
-                        d="M5 10l1-5h12l1 5"
-                    />
-
-                    <path
-                        d="M6 10v9h12v-9"
-                    />
-
-                    <path
-                        d="M9 19v-5h6v5"
-                    />
-
-                    <path
-                        d="M4 10c0 1.2 1 2 2.2 2S8.5 11.2 8.5 10c0 1.2 1 2 2.3 2s2.3-.8 2.3-2c0 1.2 1 2 2.3 2s2.3-.8 2.3-2c0 1.2 1 2 2.3 2S20 11.2 20 10"
-                    />
-
-                </svg>
-
-            </span>
-
-            <span class="admin-nav-label">
-                Vendors
-            </span>
-
-        </a>
-
-
-        <!-- PRODUCTS -->
-
-        <a
-            href="products.php"
-            class="<?= adminNavActive(
-                'products.php',
-                $currentPage
-            ) ?>"
-        >
-
-            <span class="admin-nav-icon">
-
-                <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                >
-
-                    <path
-                        d="M4 7.5L12 3l8 4.5v9L12 21l-8-4.5z"
-                    />
-
-                    <path
-                        d="M4 7.5L12 12l8-4.5"
-                    />
-
-                    <path
-                        d="M12 12v9"
-                    />
-
-                </svg>
-
-            </span>
-
-            <span class="admin-nav-label">
-                Products
-            </span>
-
-        </a>
-
-
-        <!-- ORDERS -->
-
-        <a
-            href="orders.php"
-            class="<?= adminNavActive(
-                'orders.php',
-                $currentPage
-            ) ?>"
-        >
-
-            <span class="admin-nav-icon">
-
-                <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                >
-
-                    <path
-                        d="M5 5h14v15H5z"
-                    />
-
-                    <path
-                        d="M8 3v4M16 3v4"
-                    />
-
-                    <path
-                        d="M8 11h8M8 15h5"
-                    />
-
-                </svg>
-
-            </span>
-
-            <span class="admin-nav-label">
-                Orders
-            </span>
-
-        </a>
-
-
-        <!-- PAYMENTS -->
-
-        <a
-            href="payments.php"
-            class="<?= adminNavActive(
-                'payments.php',
-                $currentPage
-            ) ?>"
-        >
-
-            <span class="admin-nav-icon">
-
-                <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                >
-
-                    <rect
-                        x="3"
-                        y="5"
-                        width="18"
-                        height="14"
-                        rx="2"
-                    />
-
-                    <path
-                        d="M3 10h18"
-                    />
-
-                    <path
-                        d="M7 15h4"
-                    />
-
-                </svg>
-
-            </span>
-
-            <span class="admin-nav-label">
-                Payments
-            </span>
-
-        </a>
-
-
-        <!-- COMMISSION -->
-
-        <a
-            href="commission.php"
-            class="<?= adminNavActive(
-                'commission.php',
-                $currentPage
-            ) ?>"
-        >
-
-            <span class="admin-nav-icon">
-
-                <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                >
-
-                    <circle
-                        cx="12"
-                        cy="12"
-                        r="8"
-                    />
-
-                    <path
-                        d="M15 8.5c-.7-.7-1.7-1-3-1-1.8 0-3 .9-3 2.2 0 1.4 1.2 1.9 3 2.3 1.8.4 3 1 3 2.4 0 1.4-1.2 2.3-3 2.3-1.4 0-2.5-.4-3.2-1.2"
-                    />
-
-                    <path
-                        d="M12 6v12"
-                    />
-
-                </svg>
-
-            </span>
-
-            <span class="admin-nav-label">
-                Commission
-            </span>
-
-        </a>
-
-
-        <!-- REVIEWS -->
-
-        <a
-            href="reviews.php"
-            class="<?= adminNavActive(
-                'reviews.php',
-                $currentPage
-            ) ?>"
-        >
-
-            <span class="admin-nav-icon">
-
-                <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                >
-
-                    <path
-                        d="M4 5h16v11H8l-4 4z"
-                    />
-
-                    <path
-                        d="M8 9h8M8 12h5"
-                    />
-
-                </svg>
-
-            </span>
-
-            <span class="admin-nav-label">
-                Reviews
-            </span>
-
-        </a>
-
-
-        <!-- SETTINGS -->
-
-        <a
-            href="settings.php"
-            class="<?= adminNavActive(
-                'settings.php',
-                $currentPage
-            ) ?>"
-        >
-
-            <span class="admin-nav-icon">
-
-                <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                >
-
-                    <path
-                        d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"
-                    />
-
-                    <path
-                        d="M19 13.5a7.8 7.8 0 0 0 .1-1.5 7.8 7.8 0 0 0-.1-1.5l2-1.5-2-3.4-2.4 1a8.5 8.5 0 0 0-2.6-1.5L13.7 3h-3.4l-.3 2.6a8.5 8.5 0 0 0-2.6 1.5l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0-.1 1.5 7.8 7.8 0 0 0 .1 1.5l-2 1.5 2 3.4 2.4-1a8.5 8.5 0 0 0 2.6 1.5l.3 2.6h3.4l.3-2.6a8.5 8.5 0 0 0 2.6-1.5l2.4 1 2-3.4z"
-                    />
-
-                </svg>
-
-            </span>
-
-            <span class="admin-nav-label">
-                Settings
-            </span>
-
-        </a>
-
-    </nav>
-
-
-    <!-- =====================================================
-         SIDEBAR FOOTER
-    ====================================================== -->
-
-    <div class="admin-sidebar-spacer"></div>
-
-
-    <div class="admin-nav-heading admin-nav-heading-bottom">
-
-        <span>
-            ACCOUNT
-        </span>
-
-    </div>
-
-
-    <a
-        href="../auth/logout.php"
-        class="admin-logout"
-    >
-
-        <span class="admin-nav-icon">
-
-            <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
+            <a
+                href="../auth/logout.php"
+                class="admin-logout-link"
             >
 
-                <path
-                    d="M10 4H5v16h5"
-                />
+                <span class="admin-nav-icon">
 
-                <path
-                    d="M14 8l4 4-4 4"
-                />
+                    <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                    >
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
 
-                <path
-                    d="M8 12h10"
-                />
+                </span>
 
-            </svg>
+                <span>
+                    Logout
+                </span>
 
-        </span>
+            </a>
 
-        <span class="admin-nav-label">
-            Logout
-        </span>
+            <div class="admin-sidebar-copyright">
+                © <?= date('Y') ?> HochipoHub
+            </div>
 
-    </a>
-
-
-    <div class="admin-sidebar-footer">
-
-        <span>
-            HochipoHub
-        </span>
-
-        <small>
-            Admin Control Center
-        </small>
+        </div>
 
     </div>
 
 </aside>
 
 
-<!-- =========================================================
-     MOBILE OVERLAY
-========================================================= -->
-
-<div
-    class="admin-sidebar-overlay"
-    id="adminSidebarOverlay"
-    aria-hidden="true"
-></div>
-
-
-<!-- =========================================================
-     MOBILE SIDEBAR BUTTON
-========================================================= -->
-
-<button
-    type="button"
-    class="admin-mobile-sidebar-button"
-    id="adminMobileSidebarButton"
-    aria-label="Open admin navigation"
-    aria-controls="adminSidebar"
-    aria-expanded="false"
->
-
-    <svg
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-    >
-
-        <path d="M4 6h16M4 12h16M4 18h16" />
-
-    </svg>
-
-</button>
-
-
 <script>
 (function () {
 
-    function initAdminSidebar() {
+    const sidebar = document.getElementById('adminSidebar');
+    const overlay = document.getElementById('adminSidebarOverlay');
+    const openButton = document.getElementById('adminMobileOpen');
+    const closeButton = document.getElementById('adminSidebarClose');
 
-        const sidebar =
-            document.getElementById('adminSidebar');
+    if (!sidebar || !overlay || !openButton) {
+        return;
+    }
 
-        const overlay =
-            document.getElementById(
-                'adminSidebarOverlay'
-            );
+    function openSidebar() {
 
-        const mobileButton =
-            document.getElementById(
-                'adminMobileSidebarButton'
-            );
+        sidebar.classList.add('is-open');
+        overlay.classList.add('is-visible');
 
-        const closeButton =
-            document.getElementById(
-                'adminSidebarClose'
-            );
+        openButton.setAttribute(
+            'aria-expanded',
+            'true'
+        );
 
-        const headerButtons =
-            document.querySelectorAll(
-                '.admin-sidebar-toggle'
-            );
+        document.body.classList.add(
+            'admin-sidebar-open'
+        );
+    }
 
-        if (!sidebar) {
-            return;
+
+    function closeSidebar() {
+
+        sidebar.classList.remove('is-open');
+        overlay.classList.remove('is-visible');
+
+        openButton.setAttribute(
+            'aria-expanded',
+            'false'
+        );
+
+        document.body.classList.remove(
+            'admin-sidebar-open'
+        );
+    }
+
+
+    openButton.addEventListener(
+        'click',
+        openSidebar
+    );
+
+
+    if (closeButton) {
+
+        closeButton.addEventListener(
+            'click',
+            closeSidebar
+        );
+
+    }
+
+
+    overlay.addEventListener(
+        'click',
+        closeSidebar
+    );
+
+
+    document.addEventListener(
+        'keydown',
+        function (event) {
+
+            if (event.key === 'Escape') {
+                closeSidebar();
+            }
+
         }
+    );
 
 
-        function openSidebar() {
+    sidebar
+        .querySelectorAll('a')
+        .forEach(function (link) {
 
-            document.body.classList.add(
-                'admin-sidebar-open'
-            );
-
-            sidebar.classList.add(
-                'is-open'
-            );
-
-            if (overlay) {
-                overlay.classList.add(
-                    'is-visible'
-                );
-            }
-
-            if (mobileButton) {
-                mobileButton.setAttribute(
-                    'aria-expanded',
-                    'true'
-                );
-            }
-
-            headerButtons.forEach(
-                function (button) {
-
-                    button.setAttribute(
-                        'aria-expanded',
-                        'true'
-                    );
-
-                }
-            );
-        }
-
-
-        function closeSidebar() {
-
-            document.body.classList.remove(
-                'admin-sidebar-open'
-            );
-
-            sidebar.classList.remove(
-                'is-open'
-            );
-
-            if (overlay) {
-                overlay.classList.remove(
-                    'is-visible'
-                );
-            }
-
-            if (mobileButton) {
-                mobileButton.setAttribute(
-                    'aria-expanded',
-                    'false'
-                );
-            }
-
-            headerButtons.forEach(
-                function (button) {
-
-                    button.setAttribute(
-                        'aria-expanded',
-                        'false'
-                    );
-
-                }
-            );
-        }
-
-
-        if (mobileButton) {
-
-            mobileButton.addEventListener(
+            link.addEventListener(
                 'click',
                 function () {
 
                     if (
-                        sidebar.classList.contains(
-                            'is-open'
-                        )
+                        window.innerWidth <= 1100
                     ) {
                         closeSidebar();
-                    } else {
-                        openSidebar();
                     }
 
                 }
             );
-        }
+
+        });
 
 
-        if (closeButton) {
+    window.addEventListener(
+        'resize',
+        function () {
 
-            closeButton.addEventListener(
-                'click',
-                closeSidebar
-            );
-        }
-
-
-        if (overlay) {
-
-            overlay.addEventListener(
-                'click',
-                closeSidebar
-            );
-        }
-
-
-        headerButtons.forEach(
-            function (button) {
-
-                button.addEventListener(
-                    'click',
-                    function () {
-
-                        if (
-                            sidebar.classList.contains(
-                                'is-open'
-                            )
-                        ) {
-                            closeSidebar();
-                        } else {
-                            openSidebar();
-                        }
-
-                    }
-                );
-
+            if (
+                window.innerWidth > 1100
+            ) {
+                closeSidebar();
             }
-        );
 
-
-        document.addEventListener(
-            'keydown',
-            function (event) {
-
-                if (event.key === 'Escape') {
-                    closeSidebar();
-                }
-
-            }
-        );
-
-
-        sidebar
-            .querySelectorAll('a')
-            .forEach(
-                function (link) {
-
-                    link.addEventListener(
-                        'click',
-                        function () {
-
-                            if (
-                                window.innerWidth <= 900
-                            ) {
-                                closeSidebar();
-                            }
-
-                        }
-                    );
-
-                }
-            );
-
-
-        window.addEventListener(
-            'resize',
-            function () {
-
-                if (
-                    window.innerWidth > 900
-                ) {
-                    closeSidebar();
-                }
-
-            }
-        );
-
-    }
-
-
-    if (
-        document.readyState === 'loading'
-    ) {
-
-        document.addEventListener(
-            'DOMContentLoaded',
-            initAdminSidebar
-        );
-
-    } else {
-
-        initAdminSidebar();
-
-    }
+        }
+    );
 
 })();
 </script>
