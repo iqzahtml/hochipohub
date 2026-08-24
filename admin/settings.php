@@ -13,6 +13,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
 /*
 |--------------------------------------------------------------------------
 | ADMIN ACCESS
@@ -27,10 +28,13 @@ if (
     exit;
 }
 
-$admin_id = (int) $_SESSION['user_id'];
+
+$admin_id =
+    (int) $_SESSION['user_id'];
 
 $success = '';
 $error = '';
+
 
 /*
 |--------------------------------------------------------------------------
@@ -57,35 +61,16 @@ $stmt->execute([
     $admin_id
 ]);
 
-$admin = $stmt->fetch(
-    PDO::FETCH_ASSOC
-);
+$admin =
+    $stmt->fetch(PDO::FETCH_ASSOC);
+
 
 if (!$admin) {
-
-    $_SESSION = [];
-
-    if (
-        ini_get('session.use_cookies')
-    ) {
-
-        $params =
-            session_get_cookie_params();
-
-        setcookie(
-            session_name(),
-            '',
-            time() - 42000,
-            $params['path'],
-            $params['domain'] ?? '',
-            $params['secure'],
-            $params['httponly']
-        );
-    }
 
     session_destroy();
 
     header("Location: ../index.php");
+
     exit;
 }
 
@@ -102,19 +87,13 @@ if (
 ) {
 
     $name =
-        trim(
-            $_POST['name'] ?? ''
-        );
+        trim($_POST['name'] ?? '');
 
     $email =
-        trim(
-            $_POST['email'] ?? ''
-        );
+        trim($_POST['email'] ?? '');
 
     $phone =
-        trim(
-            $_POST['phone'] ?? ''
-        );
+        trim($_POST['phone'] ?? '');
 
 
     if (
@@ -140,7 +119,7 @@ if (
         try {
 
             /*
-             * Check duplicate email
+             * Duplicate email
              */
 
             $stmt = $db->prepare("
@@ -156,6 +135,7 @@ if (
                 $admin_id
             ]);
 
+
             if ($stmt->fetch()) {
 
                 $error =
@@ -164,7 +144,7 @@ if (
             } else {
 
                 /*
-                 * Check duplicate phone
+                 * Duplicate phone
                  */
 
                 if ($phone !== '') {
@@ -181,6 +161,7 @@ if (
                         $phone,
                         $admin_id
                     ]);
+
 
                     if ($stmt->fetch()) {
 
@@ -212,20 +193,10 @@ if (
                     ]);
 
 
-                    /*
-                     * Update session
-                     */
-
                     $_SESSION['name'] =
                         $name;
 
                     $_SESSION['email'] =
-                        $email;
-
-                    $_SESSION['user_name'] =
-                        $name;
-
-                    $_SESSION['user_email'] =
                         $email;
 
 
@@ -256,10 +227,6 @@ if (
                         "Profile updated successfully.";
 
 
-                    /*
-                     * Refresh admin data
-                     */
-
                     $admin['name'] =
                         $name;
 
@@ -272,11 +239,6 @@ if (
             }
 
         } catch (PDOException $e) {
-
-            error_log(
-                'HochipoHub Admin Profile Error: ' .
-                $e->getMessage()
-            );
 
             $error =
                 "Unable to update profile.";
@@ -316,8 +278,7 @@ if (
             "All password fields are required.";
 
     } elseif (
-        $new_password !==
-        $confirm_password
+        $new_password !== $confirm_password
     ) {
 
         $error =
@@ -334,10 +295,6 @@ if (
 
         try {
 
-            /*
-             * Get current password
-             */
-
             $stmt = $db->prepare("
                 SELECT password
                 FROM users
@@ -351,9 +308,7 @@ if (
             ]);
 
             $row =
-                $stmt->fetch(
-                    PDO::FETCH_ASSOC
-                );
+                $stmt->fetch(PDO::FETCH_ASSOC);
 
 
             if (
@@ -418,11 +373,6 @@ if (
 
         } catch (PDOException $e) {
 
-            error_log(
-                'HochipoHub Admin Password Error: ' .
-                $e->getMessage()
-            );
-
             $error =
                 "Unable to change password.";
         }
@@ -445,6 +395,7 @@ if (
         isset($_POST['mfa_enabled'])
             ? (int) $_POST['mfa_enabled']
             : 0;
+
 
     $mfa_enabled =
         $mfa_enabled === 1
@@ -471,10 +422,6 @@ if (
             $mfa_enabled;
 
 
-        /*
-         * Admin log
-         */
-
         $stmt = $db->prepare("
             INSERT INTO admin_logs
             (
@@ -488,10 +435,13 @@ if (
 
         $stmt->execute([
             $admin_id,
+
             $mfa_enabled
                 ? 'Enabled MFA'
                 : 'Disabled MFA',
+
             'user',
+
             $admin_id
         ]);
 
@@ -502,11 +452,6 @@ if (
                 : "MFA disabled.";
 
     } catch (PDOException $e) {
-
-        error_log(
-            'HochipoHub Admin MFA Error: ' .
-            $e->getMessage()
-        );
 
         $error =
             "Unable to update MFA setting.";
@@ -546,30 +491,26 @@ if (
 
 <div class="admin-wrapper">
 
+
     <?php
-    /*
-     * CENTRAL ADMIN SIDEBAR
-     *
-     * Sidebar is maintained only in:
-     *
-     * includes/admin_sidebar.php
-     */
-    $admin_sidebar =
+
+    $sidebar =
         dirname(__DIR__) .
         '/includes/admin_sidebar.php';
 
-    if (file_exists($admin_sidebar)) {
-        require_once $admin_sidebar;
+    if (file_exists($sidebar)) {
+        require_once $sidebar;
     }
+
     ?>
 
 
     <main class="admin-main">
 
 
-        <!-- TOP BAR -->
+        <!-- TOPBAR -->
 
-        <div class="admin-topbar">
+        <header class="admin-topbar">
 
             <div>
 
@@ -578,24 +519,37 @@ if (
                 </h1>
 
                 <p>
-                    Manage your administrator account.
+                    Manage your administrator account and security.
                 </p>
 
             </div>
 
-        </div>
+
+            <div class="admin-user">
+
+                <span>
+                    <?= htmlspecialchars(
+                        $admin['name']
+                    ) ?>
+                </span>
+
+                <small>
+                    Administrator
+                </small>
+
+            </div>
+
+        </header>
 
 
-        <!-- SUCCESS -->
+        <!-- ALERTS -->
 
         <?php if ($success !== ''): ?>
 
             <div class="admin-alert success">
 
                 <?= htmlspecialchars(
-                    $success,
-                    ENT_QUOTES,
-                    'UTF-8'
+                    $success
                 ) ?>
 
             </div>
@@ -603,16 +557,12 @@ if (
         <?php endif; ?>
 
 
-        <!-- ERROR -->
-
         <?php if ($error !== ''): ?>
 
             <div class="admin-alert error">
 
                 <?= htmlspecialchars(
-                    $error,
-                    ENT_QUOTES,
-                    'UTF-8'
+                    $error
                 ) ?>
 
             </div>
@@ -633,7 +583,7 @@ if (
                     </h2>
 
                     <p>
-                        Update your personal account information.
+                        Update your personal administrator account information.
                     </p>
 
                 </div>
@@ -663,9 +613,7 @@ if (
                         type="text"
                         name="name"
                         value="<?= htmlspecialchars(
-                            $admin['name'],
-                            ENT_QUOTES,
-                            'UTF-8'
+                            $admin['name']
                         ) ?>"
                         required
                     >
@@ -683,9 +631,7 @@ if (
                         type="email"
                         name="email"
                         value="<?= htmlspecialchars(
-                            $admin['email'],
-                            ENT_QUOTES,
-                            'UTF-8'
+                            $admin['email']
                         ) ?>"
                         required
                     >
@@ -703,9 +649,7 @@ if (
                         type="text"
                         name="phone"
                         value="<?= htmlspecialchars(
-                            $admin['phone'] ?? '',
-                            ENT_QUOTES,
-                            'UTF-8'
+                            $admin['phone'] ?? ''
                         ) ?>"
                     >
 
@@ -724,7 +668,7 @@ if (
         </section>
 
 
-        <!-- CHANGE PASSWORD -->
+        <!-- PASSWORD -->
 
         <section class="admin-panel">
 
@@ -737,7 +681,7 @@ if (
                     </h2>
 
                     <p>
-                        Use a strong password with at least 8 characters.
+                        Keep your administrator account protected with a strong password.
                     </p>
 
                 </div>
@@ -832,7 +776,7 @@ if (
                     </h2>
 
                     <p>
-                        Manage MFA protection for your administrator account.
+                        Manage additional security protection for your administrator account.
                     </p>
 
                 </div>
@@ -850,9 +794,10 @@ if (
 
                     <p>
 
-                        <?= $admin['mfa_enabled']
-                            ? 'MFA is currently enabled.'
-                            : 'MFA is currently disabled.'
+                        <?=
+                            $admin['mfa_enabled']
+                                ? 'MFA is currently enabled and protecting your account.'
+                                : 'MFA is currently disabled for your account.'
                         ?>
 
                     </p>
@@ -873,17 +818,13 @@ if (
                     <input
                         type="hidden"
                         name="mfa_enabled"
-                        value="<?= $admin['mfa_enabled']
-                            ? 0
-                            : 1 ?>"
+                        value="<?= $admin['mfa_enabled'] ? 0 : 1 ?>"
                     >
 
 
                     <button
                         type="submit"
-                        class="admin-btn <?= $admin['mfa_enabled']
-                            ? 'danger'
-                            : 'primary' ?>"
+                        class="admin-btn <?= $admin['mfa_enabled'] ? 'danger' : 'primary' ?>"
                     >
 
                         <?= $admin['mfa_enabled']
@@ -912,6 +853,10 @@ if (
                         Account Information
                     </h2>
 
+                    <p>
+                        Basic information about this administrator account.
+                    </p>
+
                 </div>
 
             </div>
@@ -922,11 +867,10 @@ if (
                 <p>
 
                     <strong>
-                        User ID:
+                        User ID
                     </strong>
 
-                    #<?= (int)
-                        $admin['user_id'] ?>
+                    #<?= (int) $admin['user_id'] ?>
 
                 </p>
 
@@ -934,7 +878,7 @@ if (
                 <p>
 
                     <strong>
-                        Role:
+                        Role
                     </strong>
 
                     Administrator
@@ -945,20 +889,15 @@ if (
                 <p>
 
                     <strong>
-                        Account Created:
+                        Account Created
                     </strong>
 
-                    <?= !empty(
-                        $admin['created_at']
-                    )
-                        ? date(
-                            'd M Y, h:i A',
-                            strtotime(
-                                $admin['created_at']
-                            )
+                    <?= date(
+                        'd M Y, h:i A',
+                        strtotime(
+                            $admin['created_at']
                         )
-                        : '-'
-                    ?>
+                    ) ?>
 
                 </p>
 
