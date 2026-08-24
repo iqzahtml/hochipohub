@@ -30,9 +30,7 @@ $registerOld =
         aria-labelledby="registerModalTitle"
     >
 
-        <!-- =================================================
-             CLOSE REGISTER
-        ================================================== -->
+        <!-- CLOSE REGISTER -->
 
         <button
             type="button"
@@ -44,9 +42,7 @@ $registerOld =
         </button>
 
 
-        <!-- =================================================
-             HEADER
-        ================================================== -->
+        <!-- HEADER -->
 
         <div class="auth-modal-header">
 
@@ -69,9 +65,7 @@ $registerOld =
         </div>
 
 
-        <!-- =================================================
-             ERROR MESSAGE
-        ================================================== -->
+        <!-- ERROR MESSAGE -->
 
         <?php if (!empty($_SESSION['register_error'])): ?>
 
@@ -90,9 +84,7 @@ $registerOld =
         <?php endif; ?>
 
 
-        <!-- =================================================
-             REGISTER FORM
-        ================================================== -->
+        <!-- REGISTER FORM -->
 
         <form
             action="<?= htmlspecialchars(
@@ -106,9 +98,7 @@ $registerOld =
         >
 
 
-            <!-- =================================================
-                 CSRF
-            ================================================== -->
+            <!-- CSRF -->
 
             <?php if (function_exists('csrfToken')): ?>
 
@@ -137,9 +127,7 @@ $registerOld =
             <?php endif; ?>
 
 
-            <!-- =================================================
-                 FULL NAME
-            ================================================== -->
+            <!-- FULL NAME -->
 
             <div class="form-group">
 
@@ -165,14 +153,9 @@ $registerOld =
             </div>
 
 
-            <!-- =================================================
-                 EMAIL + PHONE
-            ================================================== -->
+            <!-- EMAIL + PHONE -->
 
             <div class="form-grid-2">
-
-
-                <!-- EMAIL -->
 
                 <div class="form-group">
 
@@ -196,8 +179,6 @@ $registerOld =
 
                 </div>
 
-
-                <!-- PHONE -->
 
                 <div class="form-group">
 
@@ -224,9 +205,7 @@ $registerOld =
             </div>
 
 
-            <!-- =================================================
-                 ACCOUNT TYPE
-            ================================================== -->
+            <!-- ACCOUNT TYPE -->
 
             <div class="form-group">
 
@@ -271,9 +250,7 @@ $registerOld =
             </div>
 
 
-            <!-- =================================================
-                 PASSWORD
-            ================================================== -->
+            <!-- PASSWORD -->
 
             <div class="form-group">
 
@@ -308,9 +285,7 @@ $registerOld =
             </div>
 
 
-            <!-- =================================================
-                 CONFIRM PASSWORD
-            ================================================== -->
+            <!-- CONFIRM PASSWORD -->
 
             <div class="form-group">
 
@@ -345,14 +320,9 @@ $registerOld =
             </div>
 
 
-            <!-- =================================================
+            <!-- =====================================================
                  TERMS CHECKBOX
-                 
-                 IMPORTANT:
-                 Use DIV instead of LABEL.
-                 This prevents the Terms button from
-                 accidentally triggering the checkbox.
-            ================================================== -->
+            ====================================================== -->
 
             <div class="checkbox-row">
 
@@ -362,11 +332,12 @@ $registerOld =
                     name="terms"
                     value="1"
                     required
+                    disabled
                 >
 
                 <span>
 
-                    I agree to the
+                    I agree to
 
                     <button
                         type="button"
@@ -381,9 +352,9 @@ $registerOld =
             </div>
 
 
-            <!-- =================================================
+            <!-- =====================================================
                  CREATE ACCOUNT BUTTON
-            ================================================== -->
+            ====================================================== -->
 
             <button
                 type="submit"
@@ -401,9 +372,7 @@ $registerOld =
             </button>
 
 
-            <!-- =================================================
-                 LOGIN
-            ================================================== -->
+            <!-- LOGIN -->
 
             <p class="auth-switch">
 
@@ -430,16 +399,11 @@ $registerOld =
 
 <!-- =========================================================
      TERMS & CONDITIONS POPUP
-
-     IMPORTANT:
-     This is OUTSIDE registerModal.
-
-     Register stays open behind it.
 ========================================================= -->
 
 <div
-    class="terms-overlay"
     id="termsModal"
+    class="terms-overlay"
     aria-hidden="true"
 >
 
@@ -450,10 +414,7 @@ $registerOld =
         aria-labelledby="termsModalTitle"
     >
 
-
-        <!-- =================================================
-             TERMS HEADER
-        ================================================== -->
+        <!-- TERMS HEADER -->
 
         <div class="terms-modal-header">
 
@@ -476,12 +437,14 @@ $registerOld =
         </div>
 
 
-        <!-- =================================================
+        <!-- =====================================================
              TERMS CONTENT
-        ================================================== -->
+        ====================================================== -->
 
-        <div class="terms-content">
-
+        <div
+            class="terms-content"
+            id="termsContent"
+        >
 
             <h3>
                 1. Acceptance of Terms
@@ -610,14 +573,15 @@ $registerOld =
         </div>
 
 
-        <!-- =================================================
-             I UNDERSTAND BUTTON
-        ================================================== -->
+        <!-- =====================================================
+             AGREE BUTTON
+        ====================================================== -->
 
         <button
             type="button"
             class="terms-agree-button"
             id="termsAgreeButton"
+            disabled
         >
 
             <span>
@@ -637,53 +601,413 @@ $registerOld =
 
 
 <!-- =========================================================
-     REGISTER JAVASCRIPT
+     TERMS JAVASCRIPT
 ========================================================= -->
 
 <script>
 
-document.addEventListener(
-    'DOMContentLoaded',
-    function () {
+(function () {
+
+    'use strict';
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | GET ELEMENTS
-        |--------------------------------------------------------------------------
-        */
+    /* =====================================================
+       RUN AFTER PAGE LOAD
+    ===================================================== */
+
+    function initTermsSystem() {
 
         const registerModal =
-            document.getElementById(
-                'registerModal'
-            );
+            document.getElementById('registerModal');
 
         const termsModal =
-            document.getElementById(
-                'termsModal'
-            );
+            document.getElementById('termsModal');
 
         const openTermsButton =
-            document.getElementById(
-                'openTermsModal'
-            );
+            document.getElementById('openTermsModal');
 
         const agreeTermsButton =
-            document.getElementById(
-                'termsAgreeButton'
-            );
+            document.getElementById('termsAgreeButton');
 
         const termsCheckbox =
-            document.getElementById(
-                'registerTerms'
+            document.getElementById('registerTerms');
+
+        const termsContent =
+            document.getElementById('termsContent');
+
+
+        /* =================================================
+           CHECK ELEMENTS
+        ================================================= */
+
+        if (!openTermsButton) {
+
+            console.error(
+                'HOCHIPOHUB ERROR: openTermsModal not found.'
             );
 
+            return;
+        }
 
-        /*
-        |--------------------------------------------------------------------------
-        | PASSWORD TOGGLE FUNCTION
-        |--------------------------------------------------------------------------
-        */
+
+        if (!termsModal) {
+
+            console.error(
+                'HOCHIPOHUB ERROR: termsModal not found.'
+            );
+
+            return;
+        }
+
+
+        if (!termsContent) {
+
+            console.error(
+                'HOCHIPOHUB ERROR: termsContent not found.'
+            );
+
+            return;
+        }
+
+
+        if (!agreeTermsButton) {
+
+            console.error(
+                'HOCHIPOHUB ERROR: termsAgreeButton not found.'
+            );
+
+            return;
+        }
+
+
+        console.log(
+            'HOCHIPOHUB Terms System Ready'
+        );
+
+
+        /* =================================================
+           TERMS STATUS
+        ================================================= */
+
+        let termsHaveBeenRead = false;
+
+
+        /* =================================================
+           OPEN TERMS
+        ================================================= */
+
+        openTermsButton.addEventListener(
+            'click',
+            function (event) {
+
+                event.preventDefault();
+
+                event.stopPropagation();
+
+
+                console.log(
+                    'Terms & Conditions button clicked'
+                );
+
+
+                /* -----------------------------------------
+                   RESET READING
+                ----------------------------------------- */
+
+                termsHaveBeenRead = false;
+
+
+                /* -----------------------------------------
+                   DISABLE AGREE
+                ----------------------------------------- */
+
+                agreeTermsButton.disabled = true;
+
+
+                /* -----------------------------------------
+                   START FROM TOP
+                ----------------------------------------- */
+
+                termsContent.scrollTop = 0;
+
+
+                /* -----------------------------------------
+                   OPEN TERMS
+                ----------------------------------------- */
+
+                termsModal.classList.add('show');
+
+                termsModal.setAttribute(
+                    'aria-hidden',
+                    'false'
+                );
+
+
+                /* -----------------------------------------
+                   KEEP REGISTER OPEN
+                ----------------------------------------- */
+
+                if (registerModal) {
+
+                    registerModal.classList.add(
+                        'active'
+                    );
+
+                    registerModal.setAttribute(
+                        'aria-hidden',
+                        'false'
+                    );
+
+                }
+
+
+                /* -----------------------------------------
+                   BODY
+                ----------------------------------------- */
+
+                document.body.classList.add(
+                    'terms-open'
+                );
+
+            }
+        );
+
+
+        /* =================================================
+           CHECK SCROLL
+        ================================================= */
+
+        termsContent.addEventListener(
+            'scroll',
+            function () {
+
+                const scrollTop =
+                    termsContent.scrollTop;
+
+                const clientHeight =
+                    termsContent.clientHeight;
+
+                const scrollHeight =
+                    termsContent.scrollHeight;
+
+
+                const reachedBottom =
+                    scrollTop + clientHeight >=
+                    scrollHeight - 10;
+
+
+                if (reachedBottom) {
+
+                    termsHaveBeenRead = true;
+
+                    agreeTermsButton.disabled =
+                        false;
+
+
+                    console.log(
+                        'Terms completely read.'
+                    );
+
+                }
+
+            }
+        );
+
+
+        /* =================================================
+           AGREE BUTTON
+        ================================================= */
+
+        agreeTermsButton.addEventListener(
+            'click',
+            function (event) {
+
+                event.preventDefault();
+
+                event.stopPropagation();
+
+
+                if (!termsHaveBeenRead) {
+
+                    alert(
+                        'Please read all Terms & Conditions first.'
+                    );
+
+                    return;
+                }
+
+
+                /* -----------------------------------------
+                   ENABLE CHECKBOX
+                ----------------------------------------- */
+
+                if (termsCheckbox) {
+
+                    termsCheckbox.disabled =
+                        false;
+
+                }
+
+
+                /* -----------------------------------------
+                   CLOSE TERMS
+                ----------------------------------------- */
+
+                termsModal.classList.remove(
+                    'show'
+                );
+
+                termsModal.setAttribute(
+                    'aria-hidden',
+                    'true'
+                );
+
+
+                document.body.classList.remove(
+                    'terms-open'
+                );
+
+
+                /* -----------------------------------------
+                   KEEP REGISTER OPEN
+                ----------------------------------------- */
+
+                if (registerModal) {
+
+                    registerModal.classList.add(
+                        'active'
+                    );
+
+                    registerModal.setAttribute(
+                        'aria-hidden',
+                        'false'
+                    );
+
+                }
+
+
+                /* -----------------------------------------
+                   FOCUS CHECKBOX
+                ----------------------------------------- */
+
+                setTimeout(
+                    function () {
+
+                        if (termsCheckbox) {
+
+                            termsCheckbox.focus();
+
+                        }
+
+                    },
+                    100
+                );
+
+            }
+        );
+
+
+        /* =================================================
+           CHECKBOX
+        ================================================= */
+
+        if (termsCheckbox) {
+
+            termsCheckbox.addEventListener(
+                'click',
+                function (event) {
+
+                    if (!termsHaveBeenRead) {
+
+                        event.preventDefault();
+
+                        alert(
+                            'Please read all Terms & Conditions first.'
+                        );
+
+                    }
+
+                }
+            );
+
+        }
+
+
+        /* =================================================
+           CLICK OUTSIDE TERMS
+        ================================================= */
+
+        termsModal.addEventListener(
+            'click',
+            function (event) {
+
+                if (
+                    event.target === termsModal
+                ) {
+
+                    termsModal.classList.remove(
+                        'show'
+                    );
+
+                    termsModal.setAttribute(
+                        'aria-hidden',
+                        'true'
+                    );
+
+                    document.body.classList.remove(
+                        'terms-open'
+                    );
+
+                }
+
+            }
+        );
+
+
+        /* =================================================
+           ESCAPE
+        ================================================= */
+
+        document.addEventListener(
+            'keydown',
+            function (event) {
+
+                if (
+                    event.key !== 'Escape'
+                ) {
+
+                    return;
+                }
+
+
+                if (
+                    termsModal.classList.contains(
+                        'show'
+                    )
+                ) {
+
+                    termsModal.classList.remove(
+                        'show'
+                    );
+
+                    termsModal.setAttribute(
+                        'aria-hidden',
+                        'true'
+                    );
+
+                    document.body.classList.remove(
+                        'terms-open'
+                    );
+
+                }
+
+            }
+        );
+
+
+        /* =================================================
+           PASSWORD TOGGLE
+        ================================================= */
 
         function setupPasswordToggle(
             inputId,
@@ -691,23 +1015,15 @@ document.addEventListener(
         ) {
 
             const input =
-                document.getElementById(
-                    inputId
-                );
+                document.getElementById(inputId);
 
             const button =
-                document.getElementById(
-                    buttonId
-                );
+                document.getElementById(buttonId);
 
 
-            if (
-                !input ||
-                !button
-            ) {
+            if (!input || !button) {
 
                 return;
-
             }
 
 
@@ -767,327 +1083,46 @@ document.addEventListener(
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | PASSWORD 1
-        |--------------------------------------------------------------------------
-        */
-
         setupPasswordToggle(
             'registerPassword',
             'registerPasswordToggle'
         );
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | PASSWORD 2
-        |--------------------------------------------------------------------------
-        */
-
         setupPasswordToggle(
             'registerConfirmPassword',
             'registerConfirmPasswordToggle'
         );
 
+    }
 
-        /*
-        |--------------------------------------------------------------------------
-        | OPEN TERMS
-        |--------------------------------------------------------------------------
-        */
 
-        if (openTermsButton) {
+    /* =====================================================
+       INITIALIZE
+    ===================================================== */
 
-            openTermsButton.addEventListener(
-                'click',
-                function (event) {
-
-                    event.preventDefault();
-
-                    event.stopPropagation();
-
-
-                    /*
-                    |----------------------------------------------------------
-                    | MAKE SURE REGISTER STAYS OPEN
-                    |----------------------------------------------------------
-                    */
-
-                    if (registerModal) {
-
-                        registerModal.classList.add(
-                            'active'
-                        );
-
-                        registerModal.setAttribute(
-                            'aria-hidden',
-                            'false'
-                        );
-
-                    }
-
-
-                    /*
-                    |----------------------------------------------------------
-                    | OPEN TERMS ON TOP
-                    |----------------------------------------------------------
-                    */
-
-                    if (termsModal) {
-
-                        termsModal.classList.add(
-                            'show'
-                        );
-
-                        termsModal.setAttribute(
-                            'aria-hidden',
-                            'false'
-                        );
-
-                    }
-
-
-                    /*
-                    |----------------------------------------------------------
-                    | PREVENT BACKGROUND SCROLL
-                    |----------------------------------------------------------
-                    */
-
-                    document.body.classList.add(
-                        'terms-open'
-                    );
-
-                }
-            );
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | I UNDERSTAND & AGREE
-        |--------------------------------------------------------------------------
-        */
-
-        if (agreeTermsButton) {
-
-            agreeTermsButton.addEventListener(
-                'click',
-                function (event) {
-
-                    event.preventDefault();
-
-                    event.stopPropagation();
-
-
-                    /*
-                    |----------------------------------------------------------
-                    | CHECK TERMS
-                    |----------------------------------------------------------
-                    */
-
-                    if (termsCheckbox) {
-
-                        termsCheckbox.checked =
-                            true;
-
-
-                        /*
-                        |------------------------------------------------------
-                        | TRIGGER CHANGE EVENT
-                        |------------------------------------------------------
-                        */
-
-                        termsCheckbox.dispatchEvent(
-                            new Event(
-                                'change',
-                                {
-                                    bubbles: true
-                                }
-                            )
-                        );
-
-                    }
-
-
-                    /*
-                    |----------------------------------------------------------
-                    | CLOSE TERMS ONLY
-                    |----------------------------------------------------------
-                    */
-
-                    if (termsModal) {
-
-                        termsModal.classList.remove(
-                            'show'
-                        );
-
-                        termsModal.setAttribute(
-                            'aria-hidden',
-                            'true'
-                        );
-
-                    }
-
-
-                    /*
-                    |----------------------------------------------------------
-                    | KEEP REGISTER OPEN
-                    |----------------------------------------------------------
-                    */
-
-                    if (registerModal) {
-
-                        registerModal.classList.add(
-                            'active'
-                        );
-
-                        registerModal.setAttribute(
-                            'aria-hidden',
-                            'false'
-                        );
-
-                    }
-
-
-                    /*
-                    |----------------------------------------------------------
-                    | REMOVE TERMS SCROLL LOCK
-                    |----------------------------------------------------------
-                    */
-
-                    document.body.classList.remove(
-                        'terms-open'
-                    );
-
-
-                    /*
-                    |----------------------------------------------------------
-                    | RETURN TO REGISTER
-                    |----------------------------------------------------------
-                    */
-
-                    setTimeout(
-                        function () {
-
-                            const nameInput =
-                                document.getElementById(
-                                    'registerName'
-                                );
-
-                            if (nameInput) {
-
-                                nameInput.focus();
-
-                            }
-
-                        },
-                        100
-                    );
-
-                }
-            );
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CLICK OUTSIDE TERMS
-        |--------------------------------------------------------------------------
-        */
-
-        if (termsModal) {
-
-            termsModal.addEventListener(
-                'click',
-                function (event) {
-
-                    if (
-                        event.target ===
-                        termsModal
-                    ) {
-
-                        termsModal.classList.remove(
-                            'show'
-                        );
-
-                        termsModal.setAttribute(
-                            'aria-hidden',
-                            'true'
-                        );
-
-                        document.body.classList.remove(
-                            'terms-open'
-                        );
-
-                    }
-
-                }
-            );
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | ESCAPE KEY
-        |--------------------------------------------------------------------------
-        */
+    if (
+        document.readyState ===
+        'loading'
+    ) {
 
         document.addEventListener(
-            'keydown',
-            function (event) {
-
-                if (
-                    event.key !==
-                    'Escape'
-                ) {
-
-                    return;
-
-                }
-
-
-                if (
-                    termsModal &&
-                    termsModal.classList.contains(
-                        'show'
-                    )
-                ) {
-
-                    termsModal.classList.remove(
-                        'show'
-                    );
-
-                    termsModal.setAttribute(
-                        'aria-hidden',
-                        'true'
-                    );
-
-                    document.body.classList.remove(
-                        'terms-open'
-                    );
-
-                }
-
-            }
+            'DOMContentLoaded',
+            initTermsSystem
         );
 
+    } else {
+
+        initTermsSystem();
+
     }
-);
+
+})();
 
 </script>
 
 
 <?php
-
-/*
-|--------------------------------------------------------------------------
-| CLEAR OLD REGISTER DATA
-|--------------------------------------------------------------------------
-*/
 
 unset(
     $_SESSION['register_old']
