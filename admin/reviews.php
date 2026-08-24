@@ -19,10 +19,15 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+if (
+    !isset($_SESSION['user_id']) ||
+    ($_SESSION['role'] ?? '') !== 'admin'
+) {
     header("Location: ../index.php");
     exit;
 }
+
+$admin_id = (int) $_SESSION['user_id'];
 
 /*
 |--------------------------------------------------------------------------
@@ -30,7 +35,10 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
 |--------------------------------------------------------------------------
 */
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['update_status'])
+) {
 
     $review_id = (int) ($_POST['review_id'] ?? 0);
     $status = $_POST['status'] ?? '';
@@ -74,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
             ");
 
             $stmt->execute([
-                $_SESSION['user_id'],
+                $admin_id,
                 'Updated review status to ' . $status,
                 'review',
                 $review_id
@@ -85,10 +93,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
 
         } catch (PDOException $e) {
 
+            error_log(
+                'HochipoHub Admin Review Status Error: ' .
+                $e->getMessage()
+            );
+
             header("Location: reviews.php?error=update");
             exit;
         }
     }
+
+    header("Location: reviews.php?error=update");
+    exit;
 }
 
 
@@ -114,6 +130,7 @@ if (isset($_GET['delete'])) {
                 SELECT image
                 FROM reviews
                 WHERE review_id = ?
+                LIMIT 1
             ");
 
             $stmt->execute([
@@ -149,11 +166,15 @@ if (isset($_GET['delete'])) {
 
             if (!empty($review['image'])) {
 
-                $imageFile = dirname(__DIR__) .
+                $imageFile =
+                    dirname(__DIR__) .
                     '/uploads/products/' .
                     basename($review['image']);
 
-                if (file_exists($imageFile)) {
+                if (
+                    is_file($imageFile) &&
+                    file_exists($imageFile)
+                ) {
                     @unlink($imageFile);
                 }
             }
@@ -175,7 +196,7 @@ if (isset($_GET['delete'])) {
             ");
 
             $stmt->execute([
-                $_SESSION['user_id'],
+                $admin_id,
                 'Deleted review',
                 'review',
                 $review_id
@@ -187,10 +208,18 @@ if (isset($_GET['delete'])) {
 
         } catch (PDOException $e) {
 
+            error_log(
+                'HochipoHub Admin Delete Review Error: ' .
+                $e->getMessage()
+            );
+
             header("Location: reviews.php?error=delete");
             exit;
         }
     }
+
+    header("Location: reviews.php?error=delete");
+    exit;
 }
 
 
@@ -200,7 +229,9 @@ if (isset($_GET['delete'])) {
 |--------------------------------------------------------------------------
 */
 
-$search = trim($_GET['search'] ?? '');
+$search = trim(
+    $_GET['search'] ?? ''
+);
 
 $rating_filter = (int) (
     $_GET['rating'] ?? 0
@@ -279,7 +310,10 @@ if ($search !== '') {
 |--------------------------------------------------------------------------
 */
 
-if ($rating_filter >= 1 && $rating_filter <= 5) {
+if (
+    $rating_filter >= 1 &&
+    $rating_filter <= 5
+) {
 
     $sql .= "
         AND r.rating = ?
@@ -323,7 +357,9 @@ $stmt = $db->prepare($sql);
 
 $stmt->execute($params);
 
-$reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$reviews = $stmt->fetchAll(
+    PDO::FETCH_ASSOC
+);
 
 
 /*
@@ -382,7 +418,9 @@ if ($average_rating === null) {
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Reviews | HochipoHub Admin</title>
+    <title>
+        Reviews | HochipoHub Admin
+    </title>
 
     <link
         rel="stylesheet"
@@ -400,10 +438,16 @@ if ($average_rating === null) {
 
 <div class="admin-wrapper">
 
-    <!-- SIDEBAR -->
-
     <?php
-
+    /*
+     * CENTRAL ADMIN SIDEBAR
+     *
+     * Sidebar is maintained only in:
+     *
+     * includes/admin_sidebar.php
+     *
+     * Do not duplicate sidebar HTML here.
+     */
     $admin_sidebar =
         dirname(__DIR__) .
         '/includes/admin_sidebar.php';
@@ -411,7 +455,6 @@ if ($average_rating === null) {
     if (file_exists($admin_sidebar)) {
         require_once $admin_sidebar;
     }
-
     ?>
 
 
@@ -443,7 +486,9 @@ if ($average_rating === null) {
 
                     <?= htmlspecialchars(
                         $_SESSION['name'] ??
-                        'Administrator'
+                        'Administrator',
+                        ENT_QUOTES,
+                        'UTF-8'
                     ) ?>
 
                 </span>
@@ -483,6 +528,14 @@ if ($average_rating === null) {
                 <?php if ($_GET['error'] === 'notfound'): ?>
 
                     Review not found.
+
+                <?php elseif ($_GET['error'] === 'update'): ?>
+
+                    Unable to update review status.
+
+                <?php elseif ($_GET['error'] === 'delete'): ?>
+
+                    Unable to delete review.
 
                 <?php else: ?>
 
@@ -546,11 +599,14 @@ if ($average_rating === null) {
                 </span>
 
                 <strong>
+
                     <?= number_format(
                         (float) $average_rating,
                         1
                     ) ?>
+
                     / 5
+
                 </strong>
 
             </div>
@@ -574,7 +630,11 @@ if ($average_rating === null) {
                     type="text"
                     name="search"
                     placeholder="Search customer, product or review..."
-                    value="<?= htmlspecialchars($search) ?>"
+                    value="<?= htmlspecialchars(
+                        $search,
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>"
                 >
 
 
@@ -587,7 +647,9 @@ if ($average_rating === null) {
 
                     <option
                         value="5"
-                        <?= $rating_filter === 5 ? 'selected' : '' ?>
+                        <?= $rating_filter === 5
+                            ? 'selected'
+                            : '' ?>
                     >
                         5 Stars
                     </option>
@@ -595,7 +657,9 @@ if ($average_rating === null) {
 
                     <option
                         value="4"
-                        <?= $rating_filter === 4 ? 'selected' : '' ?>
+                        <?= $rating_filter === 4
+                            ? 'selected'
+                            : '' ?>
                     >
                         4 Stars
                     </option>
@@ -603,7 +667,9 @@ if ($average_rating === null) {
 
                     <option
                         value="3"
-                        <?= $rating_filter === 3 ? 'selected' : '' ?>
+                        <?= $rating_filter === 3
+                            ? 'selected'
+                            : '' ?>
                     >
                         3 Stars
                     </option>
@@ -611,7 +677,9 @@ if ($average_rating === null) {
 
                     <option
                         value="2"
-                        <?= $rating_filter === 2 ? 'selected' : '' ?>
+                        <?= $rating_filter === 2
+                            ? 'selected'
+                            : '' ?>
                     >
                         2 Stars
                     </option>
@@ -619,7 +687,9 @@ if ($average_rating === null) {
 
                     <option
                         value="1"
-                        <?= $rating_filter === 1 ? 'selected' : '' ?>
+                        <?= $rating_filter === 1
+                            ? 'selected'
+                            : '' ?>
                     >
                         1 Star
                     </option>
@@ -636,7 +706,9 @@ if ($average_rating === null) {
 
                     <option
                         value="Visible"
-                        <?= $status_filter === 'Visible' ? 'selected' : '' ?>
+                        <?= $status_filter === 'Visible'
+                            ? 'selected'
+                            : '' ?>
                     >
                         Visible
                     </option>
@@ -644,7 +716,9 @@ if ($average_rating === null) {
 
                     <option
                         value="Hidden"
-                        <?= $status_filter === 'Hidden' ? 'selected' : '' ?>
+                        <?= $status_filter === 'Hidden'
+                            ? 'selected'
+                            : '' ?>
                     >
                         Hidden
                     </option>
@@ -687,8 +761,11 @@ if ($average_rating === null) {
                     </h2>
 
                     <p>
+
                         <?= count($reviews) ?>
+
                         review(s) found
+
                     </p>
 
                 </div>
@@ -706,21 +783,37 @@ if ($average_rating === null) {
 
                     <tr>
 
-                        <th>ID</th>
+                        <th>
+                            ID
+                        </th>
 
-                        <th>Customer</th>
+                        <th>
+                            Customer
+                        </th>
 
-                        <th>Product</th>
+                        <th>
+                            Product
+                        </th>
 
-                        <th>Rating</th>
+                        <th>
+                            Rating
+                        </th>
 
-                        <th>Review</th>
+                        <th>
+                            Review
+                        </th>
 
-                        <th>Status</th>
+                        <th>
+                            Status
+                        </th>
 
-                        <th>Date</th>
+                        <th>
+                            Date
+                        </th>
 
-                        <th>Action</th>
+                        <th>
+                            Action
+                        </th>
 
                     </tr>
 
@@ -760,7 +853,8 @@ if ($average_rating === null) {
 
                                 <td>
 
-                                    #<?= (int) $item['review_id'] ?>
+                                    #<?= (int)
+                                        $item['review_id'] ?>
 
                                 </td>
 
@@ -772,7 +866,9 @@ if ($average_rating === null) {
                                     <strong>
 
                                         <?= htmlspecialchars(
-                                            $item['customer_name']
+                                            $item['customer_name'],
+                                            ENT_QUOTES,
+                                            'UTF-8'
                                         ) ?>
 
                                     </strong>
@@ -780,7 +876,9 @@ if ($average_rating === null) {
                                     <small>
 
                                         <?= htmlspecialchars(
-                                            $item['customer_email']
+                                            $item['customer_email'],
+                                            ENT_QUOTES,
+                                            'UTF-8'
                                         ) ?>
 
                                     </small>
@@ -795,10 +893,13 @@ if ($average_rating === null) {
                                     <a
                                         href="../product_details.php?id=<?= (int) $item['product_id'] ?>"
                                         target="_blank"
+                                        rel="noopener noreferrer"
                                     >
 
                                         <?= htmlspecialchars(
-                                            $item['product_name']
+                                            $item['product_name'],
+                                            ENT_QUOTES,
+                                            'UTF-8'
                                         ) ?>
 
                                     </a>
@@ -825,7 +926,9 @@ if ($average_rating === null) {
 
                                         ?>
 
-                                            <?= $i <= $rating ? '★' : '☆' ?>
+                                            <?= $i <= $rating
+                                                ? '★'
+                                                : '☆' ?>
 
                                         <?php endfor; ?>
 
@@ -848,8 +951,9 @@ if ($average_rating === null) {
 
                                         <?= nl2br(
                                             htmlspecialchars(
-                                                $item['review'] ??
-                                                ''
+                                                $item['review'] ?? '',
+                                                ENT_QUOTES,
+                                                'UTF-8'
                                             )
                                         ) ?>
 
@@ -869,8 +973,13 @@ if ($average_rating === null) {
                                         ?>
 
                                         <a
-                                            href="<?= htmlspecialchars($reviewImage) ?>"
+                                            href="<?= htmlspecialchars(
+                                                $reviewImage,
+                                                ENT_QUOTES,
+                                                'UTF-8'
+                                            ) ?>"
                                             target="_blank"
+                                            rel="noopener noreferrer"
                                         >
 
                                             View Image
@@ -942,12 +1051,17 @@ if ($average_rating === null) {
 
                                 <td>
 
-                                    <?= date(
-                                        'd M Y',
-                                        strtotime(
-                                            $item['review_date']
+                                    <?= !empty(
+                                        $item['review_date']
+                                    )
+                                        ? date(
+                                            'd M Y',
+                                            strtotime(
+                                                $item['review_date']
+                                            )
                                         )
-                                    ) ?>
+                                        : '-'
+                                    ?>
 
                                 </td>
 
