@@ -3,6 +3,7 @@
 /*
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - ADMIN COMMISSION
+|--------------------------------------------------------------------------
 | File: admin/commission.php
 |--------------------------------------------------------------------------
 */
@@ -11,16 +12,19 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/database/db.php';
 
 /*
 |--------------------------------------------------------------------------
-| DATABASE CONNECTION
+| DATABASE
 |--------------------------------------------------------------------------
 */
 
-$conn = $db;
+require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
+
+
+$db = getDB();
+
 
 /*
 |--------------------------------------------------------------------------
@@ -29,19 +33,29 @@ $conn = $db;
 */
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ../index.php");
+
+    header('Location: ../index.php');
     exit;
 }
+
 
 if (
     !isset($_SESSION['role']) ||
-    strtolower(trim($_SESSION['role'])) !== 'admin'
+    strtolower(
+        trim(
+            $_SESSION['role']
+        )
+    ) !== 'admin'
 ) {
-    header("Location: ../index.php");
+
+    header('Location: ../index.php');
     exit;
 }
 
-$admin_id = (int) $_SESSION['user_id'];
+
+$adminId =
+    (int) $_SESSION['user_id'];
+
 
 /*
 |--------------------------------------------------------------------------
@@ -49,9 +63,9 @@ $admin_id = (int) $_SESSION['user_id'];
 |--------------------------------------------------------------------------
 */
 
-if (!function_exists('commission_e')) {
+if (!function_exists('commissionEscape')) {
 
-    function commission_e($value)
+    function commissionEscape($value): string
     {
         return htmlspecialchars(
             (string) $value,
@@ -61,30 +75,37 @@ if (!function_exists('commission_e')) {
     }
 }
 
-if (!function_exists('commission_money')) {
 
-    function commission_money($amount)
+if (!function_exists('commissionMoney')) {
+
+    function commissionMoney($amount): string
     {
-        return 'RM ' . number_format(
-            (float) $amount,
-            2
-        );
+        return 'RM ' .
+            number_format(
+                (float) $amount,
+                2
+            );
     }
 }
 
-if (!function_exists('commission_date')) {
 
-    function commission_date($date)
+if (!function_exists('commissionDate')) {
+
+    function commissionDate($date): string
     {
         if (!$date) {
             return '-';
         }
 
-        $timestamp = strtotime($date);
+
+        $timestamp =
+            strtotime($date);
+
 
         if (!$timestamp) {
             return '-';
         }
+
 
         return date(
             'd M Y, h:i A',
@@ -93,20 +114,28 @@ if (!function_exists('commission_date')) {
     }
 }
 
-if (!function_exists('commission_status_class')) {
 
-    function commission_status_class($status)
+if (!function_exists('commissionStatusClass')) {
+
+    function commissionStatusClass($status): string
     {
-        return 'commission-status-' .
+        $status =
             strtolower(
-                str_replace(
-                    ' ',
-                    '-',
-                    trim((string) $status)
+                trim(
+                    (string) $status
                 )
             );
+
+
+        if ($status === 'paid') {
+            return 'paid';
+        }
+
+
+        return 'pending';
     }
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -114,21 +143,32 @@ if (!function_exists('commission_status_class')) {
 |--------------------------------------------------------------------------
 */
 
-$statusFilter = $_GET['status'] ?? 'all';
+$statusFilter =
+    $_GET['status']
+    ?? 'all';
+
 
 $allowedStatuses = [
+
     'all',
     'Pending',
     'Paid'
+
 ];
 
-if (!in_array(
-    $statusFilter,
-    $allowedStatuses,
-    true
-)) {
-    $statusFilter = 'all';
+
+if (
+    !in_array(
+        $statusFilter,
+        $allowedStatuses,
+        true
+    )
+) {
+
+    $statusFilter =
+        'all';
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -136,9 +176,12 @@ if (!in_array(
 |--------------------------------------------------------------------------
 */
 
-$search = trim(
-    $_GET['search'] ?? ''
-);
+$search =
+    trim(
+        $_GET['search']
+        ?? ''
+    );
+
 
 /*
 |--------------------------------------------------------------------------
@@ -147,10 +190,14 @@ $search = trim(
 */
 
 $summary = [
+
     'total' => 0,
     'pending' => 0,
-    'paid' => 0
+    'paid' => 0,
+    'records' => 0
+
 ];
+
 
 /*
 |--------------------------------------------------------------------------
@@ -160,33 +207,63 @@ $summary = [
 
 try {
 
-    $result = $conn->query("
-        SELECT
-            COALESCE(
-                SUM(commission_amount),
-                0
-            ) AS total
-        FROM commission
-    ");
+    $stmt =
+        $db->query("
+            SELECT
+                COALESCE(
+                    SUM(commission_amount),
+                    0
+                )
 
-    if ($result) {
+            FROM commission
+        ");
 
-        $row = $result->fetch(PDO::FETCH_ASSOC);
 
-        if ($row) {
+    $summary['total'] =
+        (float)
+        $stmt->fetchColumn();
 
-            $summary['total'] =
-                (float) (
-                    $row['total']
-                    ?? 0
-                );
-        }
-    }
-
-} catch (PDOException $e) {
-
-    $summary['total'] = 0;
 }
+
+catch (Throwable $e) {
+
+    $summary['total'] =
+        0;
+
+
+    error_log(
+        $e->getMessage()
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL RECORDS
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    $stmt =
+        $db->query("
+            SELECT COUNT(*)
+            FROM commission
+        ");
+
+
+    $summary['records'] =
+        (int)
+        $stmt->fetchColumn();
+
+}
+
+catch (Throwable $e) {
+
+    $summary['records'] =
+        0;
+}
+
 
 /*
 |--------------------------------------------------------------------------
@@ -196,46 +273,68 @@ try {
 
 try {
 
-    $result = $conn->query("
-        SELECT
-            status,
-            COUNT(*) AS total
-        FROM commission
-        GROUP BY status
-    ");
+    $stmt =
+        $db->query("
+            SELECT
+                status,
+                COUNT(*) AS total
 
-    if ($result) {
+            FROM commission
 
-        while (
-            $row =
-            $result->fetch(PDO::FETCH_ASSOC)
-        ) {
+            GROUP BY status
+        ");
 
-            $status = $row['status'] ?? '';
 
-            $count = (int) (
-                $row['total'] ?? 0
+    while (
+        $row =
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        )
+    ) {
+
+        $status =
+            $row['status']
+            ?? '';
+
+
+        $count =
+            (int) (
+                $row['total']
+                ?? 0
             );
 
-            if ($status === 'Pending') {
 
-                $summary['pending'] =
-                    $count;
-            }
+        if ($status === 'Pending') {
 
-            if ($status === 'Paid') {
+            $summary['pending'] =
+                $count;
+        }
 
-                $summary['paid'] =
-                    $count;
-            }
+
+        if ($status === 'Paid') {
+
+            $summary['paid'] =
+                $count;
         }
     }
 
-} catch (PDOException $e) {
-
-    $summary['pending'] = 0;
-    $summary['paid'] = 0;
 }
+
+catch (Throwable $e) {
+
+    $summary['pending'] =
+        0;
+
+
+    $summary['paid'] =
+        0;
+
+
+    error_log(
+        $e->getMessage()
+    );
+}
+
 
 /*
 |--------------------------------------------------------------------------
@@ -244,6 +343,7 @@ try {
 */
 
 $commissionRows = [];
+
 
 $sql = "
     SELECT
@@ -273,7 +373,9 @@ $sql = "
     WHERE 1 = 1
 ";
 
+
 $params = [];
+
 
 /*
 |--------------------------------------------------------------------------
@@ -287,9 +389,11 @@ if ($statusFilter !== 'all') {
         AND c.status = :status
     ";
 
+
     $params[':status'] =
         $statusFilter;
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -300,15 +404,25 @@ if ($statusFilter !== 'all') {
 if ($search !== '') {
 
     $sql .= "
-        AND (
-            CAST(c.commission_id AS CHAR)
-                LIKE :search1
+        AND
+        (
+            CAST(
+                c.commission_id
+                AS CHAR
+            )
+            LIKE :search1
 
-            OR CAST(c.order_id AS CHAR)
-                LIKE :search2
+            OR CAST(
+                c.order_id
+                AS CHAR
+            )
+            LIKE :search2
 
-            OR CAST(c.vendor_id AS CHAR)
-                LIKE :search3
+            OR CAST(
+                c.vendor_id
+                AS CHAR
+            )
+            LIKE :search3
 
             OR v.business_name
                 LIKE :search4
@@ -321,27 +435,37 @@ if ($search !== '') {
         )
     ";
 
+
     $searchValue =
-        '%' . $search . '%';
+        '%' .
+        $search .
+        '%';
+
 
     $params[':search1'] =
         $searchValue;
 
+
     $params[':search2'] =
         $searchValue;
+
 
     $params[':search3'] =
         $searchValue;
 
+
     $params[':search4'] =
         $searchValue;
+
 
     $params[':search5'] =
         $searchValue;
 
+
     $params[':search6'] =
         $searchValue;
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -350,35 +474,45 @@ if ($search !== '') {
 */
 
 $sql .= "
-    ORDER BY c.created_at DESC
+    ORDER BY
+        c.created_at DESC,
+        c.commission_id DESC
+
     LIMIT 100
 ";
 
+
 /*
 |--------------------------------------------------------------------------
-| EXECUTE COMMISSION QUERY
+| EXECUTE QUERY
 |--------------------------------------------------------------------------
 */
 
 try {
 
     $stmt =
-        $conn->prepare($sql);
+        $db->prepare(
+            $sql
+        );
 
-    $stmt->execute($params);
 
-    while (
-        $row =
-        $stmt->fetch(PDO::FETCH_ASSOC)
-    ) {
+    $stmt->execute(
+        $params
+    );
 
-        $commissionRows[] =
-            $row;
-    }
 
-} catch (PDOException $e) {
+    $commissionRows =
+        $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        );
 
-    $commissionRows = [];
+}
+
+catch (Throwable $e) {
+
+    $commissionRows =
+        [];
+
 
     error_log(
         'Commission query error: ' .
@@ -387,7 +521,6 @@ try {
 }
 
 ?>
-
 <!DOCTYPE html>
 
 <html lang="en">
@@ -405,6 +538,32 @@ try {
         Commission | HochipoHub Admin
     </title>
 
+
+    <!-- ============================================================
+         POPPINS
+    ============================================================= -->
+
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
+
+    <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossorigin
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
+
+
+    <!-- ============================================================
+         PROJECT CSS
+    ============================================================= -->
+
     <link
         rel="stylesheet"
         href="../css/admin.css"
@@ -415,1173 +574,781 @@ try {
         href="../css/responsive.css"
     >
 
+
     <style>
 
-        /* =========================================================
-           GLOBAL
-        ========================================================= */
-
-        * {
-            box-sizing: border-box;
-        }
-
-        html {
-            scroll-behavior: smooth;
-        }
-
-        body {
-            margin: 0;
-            font-family:
-                "Poppins",
-                Arial,
-                Helvetica,
-                sans-serif;
-            background: #eef4ff;
-            color: #0f172a;
-        }
-
         /*
-        IMPORTANT:
-        Keep sidebar typography consistent with this page.
+        |--------------------------------------------------------------------------
+        | ROOT
+        |--------------------------------------------------------------------------
         */
 
-        .admin-layout,
-        .admin-layout *,
+        :root {
+
+            --commission-sidebar-width:
+                260px;
+
+            --commission-blue:
+                #2563eb;
+
+            --commission-navy:
+                #08265a;
+
+            --commission-border:
+                #dce7f3;
+
+            --commission-text:
+                #0b2d63;
+
+            --commission-muted:
+                #8294b3;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESET
+        |--------------------------------------------------------------------------
+        */
+
+        * {
+
+            box-sizing:
+                border-box;
+
+        }
+
+
+        html,
+        body {
+
+            margin:
+                0;
+
+            padding:
+                0;
+
+            min-height:
+                100%;
+
+            font-family:
+                'Poppins',
+                sans-serif;
+
+            background:
+                #eef5fd;
+
+        }
+
+
+        body {
+
+            overflow-x:
+                hidden;
+
+        }
+
+
+        button,
+        input,
+        select {
+
+            font-family:
+                inherit;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIDEBAR FONT
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-wrapper,
+        .admin-wrapper *,
         .admin-sidebar,
-        .admin-sidebar * {
+        .admin-sidebar *,
+        .sidebar,
+        .sidebar * {
+
             font-family:
-                "Poppins",
-                Arial,
-                Helvetica,
-                sans-serif;
+                'Poppins',
+                sans-serif !important;
+
         }
 
-        .admin-main {
-            min-width: 0;
-        }
 
-        /* =========================================================
-           PAGE
-        ========================================================= */
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN
+        |--------------------------------------------------------------------------
+        */
 
-        .commission-page {
+        .commission-main {
 
-            min-height: 100vh;
+            min-height:
+                100vh;
 
-            padding:
-                34px
-                36px
-                50px;
+            margin-left:
+                var(
+                    --commission-sidebar-width
+                );
+
+            width:
+                calc(
+                    100% -
+                    var(
+                        --commission-sidebar-width
+                    )
+                );
 
             background:
 
                 radial-gradient(
-                    circle at 95% 0%,
-                    rgba(37, 99, 235, 0.18),
-                    transparent 26%
+                    circle at 90% 2%,
+                    rgba(
+                        37,
+                        99,
+                        235,
+                        .12
+                    ),
+                    transparent 24%
                 ),
 
-                radial-gradient(
-                    circle at 70% 80%,
-                    rgba(59, 130, 246, 0.08),
-                    transparent 30%
-                ),
-
                 linear-gradient(
                     135deg,
-                    #f8fbff 0%,
-                    #eef5ff 48%,
-                    #f8fbff 100%
-                );
-        }
-
-        .commission-container {
-
-            width: 100%;
-
-            max-width: 1550px;
-
-            margin: 0 auto;
-        }
-
-        /* =========================================================
-           HEADER
-        ========================================================= */
-
-        .commission-header {
-
-            position: relative;
-
-            display: flex;
-
-            justify-content: space-between;
-
-            align-items: center;
-
-            gap: 24px;
-
-            margin-bottom: 30px;
-
-            padding: 28px 30px;
-
-            border:
-                1px solid
-                rgba(191, 219, 254, 0.8);
-
-            border-radius: 26px;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #ffffff 0%,
-                    #f4f8ff 100%
+                    #f4f8fd,
+                    #eaf3ff
                 );
 
-            box-shadow:
-                0 18px 45px
-                rgba(30, 64, 175, 0.09);
-
-            overflow: hidden;
         }
 
-        .commission-header::before {
 
-            content: "";
+        /*
+        |--------------------------------------------------------------------------
+        | CONTENT
+        |--------------------------------------------------------------------------
+        */
 
-            position: absolute;
+        .commission-content {
 
-            width: 220px;
-            height: 220px;
+            width:
+                100%;
 
-            right: -80px;
-            top: -120px;
-
-            border-radius: 50%;
-
-            background:
-                rgba(37, 99, 235, 0.12);
-
-            pointer-events: none;
-        }
-
-        .commission-header-left {
-
-            position: relative;
-            z-index: 1;
-
-            display: flex;
-
-            align-items: center;
-
-            gap: 18px;
-        }
-
-        .commission-header-icon {
-
-            width: 64px;
-            height: 64px;
-
-            flex-shrink: 0;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            border-radius: 20px;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #0f4cdb,
-                    #2563eb,
-                    #38bdf8
-                );
-
-            color: #ffffff;
-
-            font-size: 28px;
-
-            font-weight: 900;
-
-            box-shadow:
-                0 14px 30px
-                rgba(37, 99, 235, 0.28);
-
-            position: relative;
-        }
-
-        .commission-header-icon::after {
-
-            content: "";
-
-            position: absolute;
-
-            inset: 2px;
-
-            border-radius: 18px;
-
-            border:
-                1px solid
-                rgba(255,255,255,0.28);
-        }
-
-        .commission-header h1 {
-
-            margin: 0;
-
-            color: #0b1f49;
-
-            font-size: 32px;
-
-            line-height: 1.1;
-
-            font-weight: 900;
-
-            letter-spacing: -0.7px;
-        }
-
-        .commission-header p {
+            max-width:
+                1450px;
 
             margin:
-                7px
-                0
-                0;
-
-            color: #64748b;
-
-            font-size: 13px;
-
-            font-weight: 500;
-        }
-
-        .commission-admin-badge {
-
-            position: relative;
-
-            z-index: 2;
-
-            display: inline-flex;
-
-            align-items: center;
-
-            gap: 8px;
+                0 auto;
 
             padding:
-                11px
-                17px;
+                38px
+                35px
+                70px;
 
-            border-radius: 999px;
-
-            background:
-                #eaf2ff;
-
-            border:
-                1px solid
-                #bfdbfe;
-
-            color:
-                #1d4ed8;
-
-            font-size: 11px;
-
-            font-weight: 900;
-
-            letter-spacing: 0.5px;
-
-            box-shadow:
-                0 7px 18px
-                rgba(37,99,235,0.08);
         }
 
-        .commission-admin-badge::before {
 
-            content: "";
+        /*
+        |--------------------------------------------------------------------------
+        | HERO
+        |--------------------------------------------------------------------------
+        */
 
-            width: 7px;
-            height: 7px;
+        .commission-hero {
 
-            border-radius: 50%;
+            position:
+                relative;
 
-            background: #22c55e;
+            min-height:
+                155px;
 
-            box-shadow:
-                0 0 0 4px
-                rgba(34,197,94,0.12);
-        }
-
-        /* =========================================================
-           SUMMARY CARDS
-        ========================================================= */
-
-        .commission-summary {
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(3, minmax(0, 1fr));
-
-            gap: 18px;
-
-            margin-bottom: 24px;
-        }
-
-        .commission-stat {
-
-            position: relative;
-
-            min-height: 150px;
-
-            overflow: hidden;
-
-            padding: 25px;
-
-            border-radius: 22px;
-
-            border:
-                1px solid
-                rgba(191,219,254,0.8);
-
-            background:
-                rgba(255,255,255,0.96);
-
-            box-shadow:
-                0 12px 30px
-                rgba(15,23,42,0.06);
-
-            transition:
-                transform .25s ease,
-                box-shadow .25s ease,
-                border-color .25s ease;
-        }
-
-        .commission-stat:hover {
-
-            transform:
-                translateY(-5px);
-
-            border-color:
-                #93c5fd;
-
-            box-shadow:
-                0 20px 42px
-                rgba(37,99,235,0.13);
-        }
-
-        .commission-stat::before {
-
-            content: "";
-
-            position: absolute;
-
-            left: 0;
-            top: 0;
-
-            width: 100%;
-            height: 4px;
-
-            background:
-                linear-gradient(
-                    90deg,
-                    #1d4ed8,
-                    #38bdf8
-                );
-        }
-
-        .commission-stat::after {
-
-            content: "";
-
-            position: absolute;
-
-            width: 130px;
-            height: 130px;
-
-            right: -55px;
-            bottom: -65px;
-
-            border-radius: 50%;
-
-            background:
-                rgba(37,99,235,0.07);
-        }
-
-        .commission-stat-label {
-
-            position: relative;
-
-            z-index: 2;
-
-            display: block;
-
-            margin-bottom: 10px;
-
-            color: #64748b;
-
-            font-size: 11px;
-
-            font-weight: 900;
-
-            text-transform: uppercase;
-
-            letter-spacing: 0.8px;
-        }
-
-        .commission-stat-value {
-
-            position: relative;
-
-            z-index: 2;
-
-            display: block;
-
-            font-size: 30px;
-
-            line-height: 1.15;
-
-            font-weight: 900;
-
-            letter-spacing: -0.5px;
-        }
-
-        .commission-stat-value.blue {
-
-            color:
-                #1d4ed8;
-        }
-
-        .commission-stat-value.yellow {
-
-            color:
-                #d97706;
-        }
-
-        .commission-stat-value.green {
-
-            color:
-                #059669;
-        }
-
-        .commission-stat-sub {
-
-            position: relative;
-
-            z-index: 2;
-
-            display: block;
-
-            margin-top: 8px;
-
-            color: #94a3b8;
-
-            font-size: 11px;
-
-            font-weight: 600;
-        }
-
-        /* =========================================================
-           FILTER
-        ========================================================= */
-
-        .commission-filter {
-
-            display: flex;
-
-            align-items: center;
-
-            gap: 10px;
-
-            margin-bottom: 22px;
-
-            padding: 14px;
-
-            border:
-                1px solid
-                #dbeafe;
-
-            border-radius: 18px;
-
-            background:
-                rgba(255,255,255,0.92);
-
-            box-shadow:
-                0 10px 28px
-                rgba(15,23,42,0.05);
-        }
-
-        .commission-search {
-
-            display: flex;
-
-            flex: 1;
-
-            gap: 9px;
-        }
-
-        .commission-search input,
-        .commission-filter select {
-
-            min-height: 46px;
-
-            border:
-                1px solid
-                #cbd5e1;
-
-            border-radius: 12px;
-
-            background:
-                #ffffff;
-
-            color:
-                #1e293b;
-
-            font-family:
-                "Poppins",
-                Arial,
-                sans-serif;
-
-            font-size: 12px;
-
-            font-weight: 600;
-
-            transition:
-                border-color .2s ease,
-                box-shadow .2s ease,
-                background .2s ease;
-        }
-
-        .commission-search input {
-
-            width: 100%;
-
-            padding:
-                0
-                15px;
-        }
-
-        .commission-search input::placeholder {
-
-            color:
-                #94a3b8;
-        }
-
-        .commission-filter select {
-
-            min-width: 155px;
-
-            padding:
-                0
-                13px;
-
-            cursor: pointer;
-        }
-
-        .commission-search input:hover,
-        .commission-filter select:hover {
-
-            border-color:
-                #93c5fd;
-        }
-
-        .commission-search input:focus,
-        .commission-filter select:focus {
-
-            outline: none;
-
-            border-color:
-                #2563eb;
-
-            box-shadow:
-                0 0 0 4px
-                rgba(37,99,235,0.10);
-
-            background:
-                #fbfdff;
-        }
-
-        .commission-btn {
-
-            min-height: 46px;
-
-            padding:
-                0
-                20px;
-
-            border: none;
-
-            border-radius: 12px;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #1d4ed8,
-                    #2563eb
-                );
-
-            color:
-                #ffffff;
-
-            font-family:
-                "Poppins",
-                Arial,
-                sans-serif;
-
-            font-size: 11px;
-
-            font-weight: 900;
-
-            letter-spacing: 0.5px;
-
-            cursor: pointer;
-
-            box-shadow:
-                0 8px 18px
-                rgba(37,99,235,0.20);
-
-            transition:
-                transform .2s ease,
-                box-shadow .2s ease;
-        }
-
-        .commission-btn:hover {
-
-            transform:
-                translateY(-2px);
-
-            box-shadow:
-                0 12px 25px
-                rgba(37,99,235,0.28);
-        }
-
-        .commission-reset {
-
-            display: inline-flex;
-
-            align-items: center;
-
-            justify-content: center;
-
-            min-height: 46px;
-
-            padding:
-                0
-                17px;
-
-            border:
-                1px solid
-                #cbd5e1;
-
-            border-radius: 12px;
-
-            color:
-                #475569;
-
-            font-size: 11px;
-
-            font-weight: 900;
-
-            text-decoration: none;
-
-            background:
-                #ffffff;
-
-            transition:
-                all .2s ease;
-        }
-
-        .commission-reset:hover {
-
-            color:
-                #1d4ed8;
-
-            border-color:
-                #93c5fd;
-
-            background:
-                #eff6ff;
-
-            transform:
-                translateY(-1px);
-        }
-
-        /* =========================================================
-           MAIN CARD
-        ========================================================= */
-
-        .commission-card {
-
-            overflow: hidden;
-
-            border:
-                1px solid
-                #dbeafe;
-
-            border-radius: 22px;
-
-            background:
-                #ffffff;
-
-            box-shadow:
-                0 16px 40px
-                rgba(15,23,42,0.07);
-        }
-
-        .commission-card-header {
-
-            display: flex;
-
-            justify-content: space-between;
-
-            align-items: center;
-
-            gap: 20px;
-
-            padding:
-                23px
-                25px;
-
-            border-bottom:
-                1px solid
-                #e5edf9;
-
-            background:
-                linear-gradient(
-                    135deg,
-                    #ffffff,
-                    #f8fbff
-                );
-        }
-
-        .commission-card-header h2 {
-
-            margin: 0;
-
-            color:
-                #0b1f49;
-
-            font-size: 18px;
-
-            font-weight: 900;
-
-            letter-spacing:
-                -0.3px;
-        }
-
-        .commission-card-header p {
-
-            margin:
-                5px
-                0
-                0;
-
-            color:
-                #64748b;
-
-            font-size: 11px;
-
-            font-weight: 500;
-        }
-
-        .commission-record-count {
-
-            display: inline-flex;
-
-            align-items: center;
-
-            padding:
-                8px
-                12px;
-
-            border-radius: 999px;
-
-            background:
-                #eff6ff;
-
-            color:
-                #2563eb;
-
-            border:
-                1px solid
-                #dbeafe;
-
-            font-size: 10px;
-
-            font-weight: 900;
-
-            white-space: nowrap;
-        }
-
-        /* =========================================================
-           TABLE
-        ========================================================= */
-
-        .commission-table-wrapper {
-
-            width: 100%;
-
-            overflow-x: auto;
-        }
-
-        .commission-table {
-
-            width: 100%;
-
-            min-width: 930px;
-
-            border-collapse: separate;
-
-            border-spacing: 0;
-        }
-
-        .commission-table th {
-
-            padding:
-                15px
-                18px;
-
-            background:
-                #f1f6ff;
-
-            color:
-                #64748b;
-
-            font-size: 10px;
-
-            font-weight: 900;
-
-            text-align: left;
-
-            text-transform:
-                uppercase;
-
-            letter-spacing:
-                0.7px;
-
-            white-space:
-                nowrap;
-
-            border-bottom:
-                1px solid
-                #dbeafe;
-        }
-
-        .commission-table th:first-child {
-
-            padding-left:
-                25px;
-        }
-
-        .commission-table td {
-
-            padding:
-                17px
-                18px;
-
-            border-bottom:
-                1px solid
-                #eef2f7;
-
-            color:
-                #334155;
-
-            font-size: 12px;
-
-            font-weight: 500;
-
-            vertical-align:
-                middle;
-        }
-
-        .commission-table td:first-child {
-
-            padding-left:
-                25px;
-        }
-
-        .commission-table tbody tr {
-
-            transition:
-                background .18s ease,
-                transform .18s ease;
-        }
-
-        .commission-table tbody tr:hover {
-
-            background:
-                #f8fbff;
-        }
-
-        .commission-table tbody tr:last-child td {
-
-            border-bottom:
-                none;
-        }
-
-        /* =========================================================
-           ID
-        ========================================================= */
-
-        .commission-id {
-
-            display: inline-flex;
-
-            align-items: center;
-
-            padding:
-                6px
-                9px;
-
-            border-radius:
-                9px;
-
-            background:
-                #eaf2ff;
-
-            border:
-                1px solid
-                #dbeafe;
-
-            color:
-                #1d4ed8;
-
-            font-size:
-                11px;
-
-            font-weight:
-                900;
-        }
-
-        /* =========================================================
-           ORDER
-        ========================================================= */
-
-        .commission-order {
-
-            color:
-                #475569;
-
-            font-weight:
-                800;
-        }
-
-        /* =========================================================
-           VENDOR
-        ========================================================= */
-
-        .commission-vendor {
+            overflow:
+                hidden;
 
             display:
-                block;
-
-            color:
-                #0f172a;
-
-            font-size:
-                12px;
-
-            font-weight:
-                900;
-        }
-
-        .commission-owner {
-
-            display:
-                block;
-
-            margin-top:
-                4px;
-
-            color:
-                #94a3b8;
-
-            font-size:
-                10px;
-
-            font-weight:
-                600;
-        }
-
-        /* =========================================================
-           RATE
-        ========================================================= */
-
-        .commission-rate {
-
-            display:
-                inline-flex;
+                flex;
 
             align-items:
                 center;
 
+            justify-content:
+                space-between;
+
             padding:
-                6px
-                9px;
+                34px
+                38px;
 
-            border-radius:
-                8px;
-
-            background:
-                #f1f5f9;
+            margin-bottom:
+                26px;
 
             color:
-                #475569;
+                #ffffff;
+
+            background:
+
+                linear-gradient(
+                    110deg,
+                    #08265a 0%,
+                    #123c8c 47%,
+                    #2480ed 100%
+                );
+
+            border-radius:
+                26px;
+
+            box-shadow:
+
+                0
+                20px
+                45px
+                rgba(
+                    18,
+                    70,
+                    150,
+                    .15
+                );
+
+        }
+
+
+        .commission-hero::before {
+
+            content:
+                "";
+
+            position:
+                absolute;
+
+            width:
+                260px;
+
+            height:
+                260px;
+
+            right:
+                -70px;
+
+            top:
+                -140px;
+
+            border-radius:
+                50%;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .07
+                );
+
+        }
+
+
+        .commission-hero::after {
+
+            content:
+                "";
+
+            position:
+                absolute;
+
+            width:
+                170px;
+
+            height:
+                170px;
+
+            right:
+                155px;
+
+            bottom:
+                -110px;
+
+            border-radius:
+                50%;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .045
+                );
+
+        }
+
+
+        .commission-hero-text {
+
+            position:
+                relative;
+
+            z-index:
+                2;
+
+        }
+
+
+        .commission-hero h1 {
+
+            margin:
+                0
+                0
+                8px;
+
+            color:
+                #ffffff;
+
+            font-size:
+                38px;
+
+            line-height:
+                1.05;
+
+            font-weight:
+                800;
+
+            letter-spacing:
+                -1.5px;
+
+        }
+
+
+        .commission-hero p {
+
+            margin:
+                0;
+
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .82
+                );
+
+            font-size:
+                14px;
+
+            font-weight:
+                500;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | HERO EMOJI
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-hero-icon {
+
+            position:
+                relative;
+
+            z-index:
+                2;
+
+            width:
+                82px;
+
+            height:
+                82px;
+
+            flex-shrink:
+                0;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            border:
+                1px solid
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .26
+                );
+
+            border-radius:
+                22px;
+
+            background:
+
+                linear-gradient(
+                    145deg,
+                    rgba(
+                        255,
+                        255,
+                        255,
+                        .20
+                    ),
+                    rgba(
+                        255,
+                        255,
+                        255,
+                        .10
+                    )
+                );
+
+            box-shadow:
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .25
+                ),
+
+                0
+                12px
+                30px
+                rgba(
+                    0,
+                    35,
+                    100,
+                    .18
+                );
+
+            font-size:
+                34px;
+
+            line-height:
+                1;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATS
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-stats {
+
+            display:
+                grid;
+
+            grid-template-columns:
+
+                repeat(
+                    4,
+                    minmax(
+                        0,
+                        1fr
+                    )
+                );
+
+            gap:
+                18px;
+
+            margin-bottom:
+                30px;
+
+        }
+
+
+        .commission-stat {
+
+            position:
+                relative;
+
+            min-height:
+                150px;
+
+            overflow:
+                hidden;
+
+            padding:
+                26px
+                24px;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid
+                var(
+                    --commission-border
+                );
+
+            border-top:
+                4px solid
+                #2563eb;
+
+            border-radius:
+                20px;
+
+            box-shadow:
+
+                0
+                12px
+                28px
+                rgba(
+                    20,
+                    60,
+                    120,
+                    .055
+                );
+
+        }
+
+
+        .commission-stat::after {
+
+            content:
+                "";
+
+            position:
+                absolute;
+
+            right:
+                -29px;
+
+            bottom:
+                -45px;
+
+            width:
+                110px;
+
+            height:
+                110px;
+
+            border-radius:
+                50%;
+
+            background:
+                #edf4ff;
+
+        }
+
+
+        .commission-stat.records {
+
+            border-top-color:
+                #8b5cf6;
+
+        }
+
+
+        .commission-stat.records::after {
+
+            background:
+                #f4efff;
+
+        }
+
+
+        .commission-stat.pending {
+
+            border-top-color:
+                #f59e0b;
+
+        }
+
+
+        .commission-stat.pending::after {
+
+            background:
+                #fff7df;
+
+        }
+
+
+        .commission-stat.paid {
+
+            border-top-color:
+                #16a34a;
+
+        }
+
+
+        .commission-stat.paid::after {
+
+            background:
+                #eaf9ef;
+
+        }
+
+
+        .commission-stat-label {
+
+            position:
+                relative;
+
+            z-index:
+                2;
+
+            display:
+                block;
+
+            margin-bottom:
+                15px;
+
+            color:
+                #61728e;
 
             font-size:
                 10px;
 
             font-weight:
-                900;
+                800;
+
+            letter-spacing:
+                .75px;
+
+            text-transform:
+                uppercase;
+
         }
 
-        /* =========================================================
-           AMOUNT
-        ========================================================= */
 
-        .commission-amount {
+        .commission-stat-value {
 
-            color:
-                #059669;
+            position:
+                relative;
 
-            font-size:
-                12px;
-
-            font-weight:
-                900;
-
-            white-space:
-                nowrap;
-        }
-
-        /* =========================================================
-           STATUS
-        ========================================================= */
-
-        .commission-status {
+            z-index:
+                2;
 
             display:
-                inline-flex;
+                block;
+
+            color:
+                #0b326d;
+
+            font-size:
+                32px;
+
+            line-height:
+                1;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .commission-stat-value.money {
+
+            font-size:
+                25px;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PANEL
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-panel {
+
+            overflow:
+                hidden;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid
+                var(
+                    --commission-border
+                );
+
+            border-radius:
+                24px;
+
+            box-shadow:
+
+                0
+                14px
+                35px
+                rgba(
+                    24,
+                    64,
+                    120,
+                    .055
+                );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PANEL HEADER
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-panel-header {
+
+            min-height:
+                110px;
+
+            padding:
+                26px
+                30px;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                space-between;
+
+            gap:
+                20px;
+
+            border-bottom:
+                1px solid
+                #e7edf5;
+
+        }
+
+
+        .commission-panel-title {
+
+            display:
+                flex;
 
             align-items:
                 center;
 
             gap:
-                6px;
+                16px;
 
-            padding:
-                7px
-                11px;
-
-            border-radius:
-                999px;
-
-            font-size:
-                10px;
-
-            font-weight:
-                900;
-
-            white-space:
-                nowrap;
         }
 
-        .commission-status::before {
 
-            content:
-                "";
+        .commission-panel-icon {
 
             width:
-                6px;
+                53px;
 
             height:
-                6px;
+                53px;
 
-            border-radius:
-                50%;
-        }
-
-        .commission-status-pending {
-
-            background:
-                #fff7df;
-
-            color:
-                #b45309;
-
-            border:
-                1px solid
-                #fde68a;
-        }
-
-        .commission-status-pending::before {
-
-            background:
-                #f59e0b;
-        }
-
-        .commission-status-paid {
-
-            background:
-                #ecfdf5;
-
-            color:
-                #047857;
-
-            border:
-                1px solid
-                #a7f3d0;
-        }
-
-        .commission-status-paid::before {
-
-            background:
-                #10b981;
-        }
-
-        /* =========================================================
-           DATE
-        ========================================================= */
-
-        .commission-date {
-
-            color:
-                #64748b;
-
-            font-size:
-                10px;
-
-            font-weight:
-                600;
-
-            white-space:
-                nowrap;
-        }
-
-        /* =========================================================
-           EMPTY
-        ========================================================= */
-
-        .commission-empty {
-
-            padding:
-                80px
-                20px;
-
-            text-align:
-                center;
-        }
-
-        .commission-empty-icon {
-
-            width:
-                70px;
-
-            height:
-                70px;
-
-            margin:
-                0
-                auto
-                17px;
+            flex-shrink:
+                0;
 
             display:
                 flex;
@@ -1593,540 +1360,1240 @@ try {
                 center;
 
             border-radius:
-                22px;
+                16px;
 
             background:
+
                 linear-gradient(
                     135deg,
-                    #eaf2ff,
-                    #dbeafe
+                    #1476e8,
+                    #1d95f3
                 );
+
+            font-size:
+                22px;
+
+            line-height:
+                1;
+
+            box-shadow:
+
+                0
+                9px
+                20px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .22
+                );
+
+        }
+
+
+        .commission-panel-header h2 {
+
+            margin:
+                0
+                0
+                5px;
+
+            color:
+                #092e65;
+
+            font-size:
+                20px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .commission-panel-header p {
+
+            margin:
+                0;
+
+            color:
+                #8999b4;
+
+            font-size:
+                11px;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | COUNT
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-count {
+
+            min-height:
+                36px;
+
+            padding:
+                0
+                16px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            color:
+                #2563eb;
+
+            background:
+                #eff6ff;
 
             border:
                 1px solid
-                #bfdbfe;
+                #d6e7ff;
+
+            border-radius:
+                999px;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-filter-wrapper {
+
+            padding:
+                22px
+                28px;
+
+            background:
+                #fbfdff;
+
+            border-bottom:
+                1px solid
+                #edf1f6;
+
+        }
+
+
+        .commission-filter {
+
+            display:
+                grid;
+
+            grid-template-columns:
+
+                minmax(
+                    260px,
+                    1.6fr
+                )
+
+                minmax(
+                    160px,
+                    .55fr
+                )
+
+                auto
+                auto;
+
+            gap:
+                10px;
+
+        }
+
+
+        .commission-filter input,
+        .commission-filter select {
+
+            width:
+                100%;
+
+            height:
+                43px;
+
+            padding:
+                0
+                13px;
+
+            outline:
+                none;
+
+            color:
+                #26354e;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid
+                #d8e3ef;
+
+            border-radius:
+                10px;
+
+            font-size:
+                10px;
+
+        }
+
+
+        .commission-filter input::placeholder {
+
+            color:
+                #96a5b9;
+
+        }
+
+
+        .commission-filter input:focus,
+        .commission-filter select:focus {
+
+            border-color:
+                #3b82f6;
+
+            box-shadow:
+
+                0
+                0
+                0
+                3px
+                rgba(
+                    59,
+                    130,
+                    246,
+                    .08
+                );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | BUTTON
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-btn {
+
+            min-height:
+                43px;
+
+            padding:
+                0
+                17px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            border-radius:
+                10px;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+            text-decoration:
+                none;
+
+            cursor:
+                pointer;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        .commission-btn-primary {
+
+            color:
+                #ffffff;
+
+            border:
+                0;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #1d65d8
+                );
+
+            box-shadow:
+
+                0
+                7px
+                15px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .20
+                );
+
+        }
+
+
+        .commission-btn-secondary {
+
+            color:
+                #66758b;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid
+                #d7e2ee;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TABLE WRAPPER
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-table-wrapper {
+
+            width:
+                100%;
+
+            overflow-x:
+                auto;
+
+        }
+
+
+        .commission-table {
+
+            width:
+                100%;
+
+            min-width:
+                1000px;
+
+            border-collapse:
+                collapse;
+
+        }
+
+
+        .commission-table thead {
+
+            background:
+                #f6f9fd;
+
+        }
+
+
+        .commission-table th {
+
+            height:
+                44px;
+
+            padding:
+                0
+                16px;
+
+            color:
+                #65758f;
+
+            border-bottom:
+                1px solid
+                #dfe7f0;
+
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+            text-align:
+                left;
+
+            letter-spacing:
+                .55px;
+
+            text-transform:
+                uppercase;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        .commission-table td {
+
+            padding:
+                16px;
+
+            color:
+                #435169;
+
+            border-bottom:
+                1px solid
+                #edf1f6;
+
+            font-size:
+                9px;
+
+            vertical-align:
+                middle;
+
+        }
+
+
+        .commission-table tbody tr:hover {
+
+            background:
+                #f9fbff;
+
+        }
+
+
+        .commission-table tbody tr:last-child td {
+
+            border-bottom:
+                0;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ID
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-id {
+
+            color:
+                #8796ac;
+
+            font-size:
+                9px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ORDER
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-order {
 
             color:
                 #2563eb;
 
             font-size:
-                29px;
+                9px;
 
             font-weight:
-                900;
+                800;
 
-            box-shadow:
-                0 12px 25px
-                rgba(37,99,235,0.10);
         }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | VENDOR
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-vendor {
+
+            min-width:
+                170px;
+
+        }
+
+
+        .commission-vendor strong {
+
+            display:
+                block;
+
+            margin-bottom:
+                3px;
+
+            color:
+                #112b55;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .commission-vendor small {
+
+            display:
+                block;
+
+            max-width:
+                180px;
+
+            overflow:
+                hidden;
+
+            color:
+                #8897ac;
+
+            font-size:
+                8px;
+
+            text-overflow:
+                ellipsis;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RATE
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-rate {
+
+            min-height:
+                27px;
+
+            padding:
+                0
+                9px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            color:
+                #52647f;
+
+            background:
+                #f1f5f9;
+
+            border:
+                1px solid
+                #e2e8f0;
+
+            border-radius:
+                999px;
+
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | AMOUNT
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-amount {
+
+            color:
+                #15803d;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATUS
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-status {
+
+            min-height:
+                27px;
+
+            padding:
+                0
+                9px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            gap:
+                5px;
+
+            border-radius:
+                999px;
+
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .commission-status::before {
+
+            content:
+                "";
+
+            width:
+                5px;
+
+            height:
+                5px;
+
+            border-radius:
+                50%;
+
+        }
+
+
+        .commission-status.pending {
+
+            color:
+                #a16207;
+
+            background:
+                #fffbea;
+
+        }
+
+
+        .commission-status.pending::before {
+
+            background:
+                #eab308;
+
+        }
+
+
+        .commission-status.paid {
+
+            color:
+                #15803d;
+
+            background:
+                #ecfdf3;
+
+        }
+
+
+        .commission-status.paid::before {
+
+            background:
+                #22c55e;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | DATE
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-date {
+
+            color:
+                #7c8ca3;
+
+            font-size:
+                8px;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | EMPTY STATE
+        |--------------------------------------------------------------------------
+        */
+
+        .commission-empty {
+
+            padding:
+                75px
+                20px;
+
+            text-align:
+                center;
+
+        }
+
+
+        .commission-empty-icon {
+
+            width:
+                62px;
+
+            height:
+                62px;
+
+            margin:
+                0
+                auto
+                15px;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            background:
+                #eff6ff;
+
+            border:
+                1px solid
+                #dbeafe;
+
+            border-radius:
+                17px;
+
+            font-size:
+                28px;
+
+        }
+
 
         .commission-empty h3 {
 
             margin:
-                0;
+                0
+                0
+                6px;
 
             color:
-                #0f172a;
+                #49617f;
 
             font-size:
-                17px;
+                14px;
 
             font-weight:
-                900;
+                800;
+
         }
+
 
         .commission-empty p {
 
             max-width:
-                450px;
+                430px;
 
             margin:
-                8px
-                auto
-                0;
+                0 auto;
 
             color:
-                #64748b;
+                #94a3b8;
 
             font-size:
-                12px;
+                10px;
 
             line-height:
-                1.7;
+                1.6;
+
         }
 
-        /* =========================================================
-           SCROLLBAR
-        ========================================================= */
 
-        .commission-table-wrapper::-webkit-scrollbar {
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSIVE
+        |--------------------------------------------------------------------------
+        */
 
-            height:
-                8px;
-        }
+        @media (max-width: 1200px) {
 
-        .commission-table-wrapper::-webkit-scrollbar-track {
-
-            background:
-                #eef4ff;
-        }
-
-        .commission-table-wrapper::-webkit-scrollbar-thumb {
-
-            background:
-                #93c5fd;
-
-            border-radius:
-                999px;
-        }
-
-        .commission-table-wrapper::-webkit-scrollbar-thumb:hover {
-
-            background:
-                #60a5fa;
-        }
-
-        /* =========================================================
-           RESPONSIVE
-        ========================================================= */
-
-        @media (max-width: 1100px) {
-
-            .commission-summary {
+            .commission-stats {
 
                 grid-template-columns:
-                    repeat(3, minmax(0, 1fr));
+
+                    repeat(
+                        2,
+                        1fr
+                    );
+
             }
 
-            .commission-page {
-
-                padding:
-                    25px;
-            }
-        }
-
-        @media (max-width: 900px) {
-
-            .commission-summary {
-
-                grid-template-columns:
-                    repeat(2, minmax(0, 1fr));
-            }
-
-            .commission-header {
-
-                align-items:
-                    flex-start;
-
-                flex-direction:
-                    column;
-            }
-
-            .commission-admin-badge {
-
-                align-self:
-                    flex-start;
-            }
 
             .commission-filter {
 
-                flex-wrap:
-                    wrap;
+                grid-template-columns:
+
+                    1fr
+                    1fr;
+
             }
 
-            .commission-search {
+
+            .commission-filter input {
+
+                grid-column:
+                    1 / -1;
+
+            }
+
+        }
+
+
+        @media (max-width: 900px) {
+
+            :root {
+
+                --commission-sidebar-width:
+                    0px;
+
+            }
+
+
+            .commission-main {
+
+                margin-left:
+                    0;
 
                 width:
                     100%;
-                flex-basis:
-                    100%;
+
             }
 
-            .commission-filter select {
 
-                flex:
-                    1;
+            .commission-content {
+
+                padding:
+                    25px
+                    20px
+                    50px;
+
             }
+
+
+            .commission-hero {
+
+                min-height:
+                    140px;
+
+                padding:
+                    28px;
+
+            }
+
+
+            .commission-hero h1 {
+
+                font-size:
+                    31px;
+
+            }
+
+
+            .commission-hero-icon {
+
+                width:
+                    67px;
+
+                height:
+                    67px;
+
+                font-size:
+                    28px;
+
+            }
+
         }
+
 
         @media (max-width: 650px) {
 
-            .commission-page {
+            .commission-content {
 
                 padding:
-                    18px;
+                    18px
+                    13px
+                    40px;
+
             }
 
-            .commission-header {
+
+            .commission-hero {
+
+                min-height:
+                    auto;
 
                 padding:
-                    22px;
-            }
-
-            .commission-header-left {
-
-                align-items:
-                    flex-start;
-            }
-
-            .commission-header-icon {
-
-                width:
-                    52px;
-
-                height:
-                    52px;
+                    25px
+                    21px;
 
                 border-radius:
-                    16px;
+                    20px;
 
-                font-size:
-                    23px;
             }
 
-            .commission-header h1 {
+
+            .commission-hero h1 {
 
                 font-size:
-                    25px;
+                    27px;
+
             }
 
-            .commission-header p {
+
+            .commission-hero p {
+
+                max-width:
+                    230px;
 
                 font-size:
                     11px;
+
             }
 
-            .commission-summary {
+
+            .commission-hero-icon {
+
+                width:
+                    55px;
+
+                height:
+                    55px;
+
+                border-radius:
+                    15px;
+
+                font-size:
+                    24px;
+
+            }
+
+
+            .commission-stats {
 
                 grid-template-columns:
                     1fr;
+
+                gap:
+                    12px;
+
             }
+
 
             .commission-stat {
 
                 min-height:
-                    130px;
+                    120px;
+
             }
 
-            .commission-filter {
+
+            .commission-panel-header {
 
                 flex-direction:
                     column;
-
-                align-items:
-                    stretch;
-            }
-
-            .commission-search {
-
-                flex-direction:
-                    column;
-            }
-
-            .commission-btn,
-            .commission-reset,
-            .commission-filter select {
-
-                width:
-                    100%;
-            }
-
-            .commission-card-header {
 
                 align-items:
                     flex-start;
 
-                flex-direction:
-                    column;
-
                 padding:
-                    20px;
-            }
-        }
+                    20px
+                    17px;
 
-        @media (max-width: 420px) {
-
-            .commission-page {
-
-                padding:
-                    13px;
             }
 
-            .commission-header {
 
-                padding:
-                    18px;
+            .commission-filter {
+
+                grid-template-columns:
+                    1fr;
+
             }
 
-            .commission-header-left {
 
-                gap:
-                    12px;
+            .commission-filter input {
+
+                grid-column:
+                    auto;
+
             }
 
-            .commission-header h1 {
 
-                font-size:
-                    22px;
+            .commission-btn {
+
+                width:
+                    100%;
+
             }
 
-            .commission-stat {
-
-                padding:
-                    20px;
-            }
-
-            .commission-stat-value {
-
-                font-size:
-                    25px;
-            }
         }
 
     </style>
 
 </head>
 
+
 <body>
 
-<div class="admin-layout">
 
-    <!-- =========================================================
-         SIDEBAR
-         
-         IMPORTANT:
-         DO NOT ADD ANOTHER MANUAL SIDEBAR HERE.
-         admin_sidebar.php is the ONLY sidebar.
-    ========================================================== -->
+<div class="admin-wrapper">
+
 
     <?php
-    require_once dirname(__DIR__) . '/includes/admin_sidebar.php';
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN SIDEBAR
+    |--------------------------------------------------------------------------
+    */
+
+    require_once __DIR__ .
+        '/../includes/admin_sidebar.php';
+
     ?>
 
 
-    <!-- =========================================================
-         MAIN CONTENT
-    ========================================================== -->
-
-    <main class="admin-main">
-
-        <div class="commission-page">
-
-            <div class="commission-container">
+    <main class="commission-main">
 
 
-                <!-- =================================================
-                     HEADER
-                ================================================== -->
-
-                <header class="commission-header">
-
-                    <div class="commission-header-left">
-
-                        <div class="commission-header-icon">
-                            %
-                        </div>
-
-                        <div>
-
-                            <h1>
-                                Commission
-                            </h1>
-
-                            <p>
-                                Monitor commission generated from vendor transactions.
-                            </p>
-
-                        </div>
-
-                    </div>
+        <div class="commission-content">
 
 
-                    <div class="commission-admin-badge">
-                        ADMIN CONTROL
-                    </div>
+            <!-- =====================================================
+                 HERO
+            ====================================================== -->
 
-                </header>
-
-
-                <!-- =================================================
-                     SUMMARY
-                ================================================== -->
-
-                <section class="commission-summary">
+            <section class="commission-hero">
 
 
-                    <!-- TOTAL -->
+                <div class="commission-hero-text">
 
-                    <div class="commission-stat">
+                    <h1>
+                        Commission
+                    </h1>
 
-                        <span class="commission-stat-label">
-                            Total Commission
-                        </span>
+                    <p>
+                        Monitor commission generated from HochipoHub vendor transactions.
+                    </p>
 
-                        <strong
-                            class="
-                                commission-stat-value
-                                blue
-                            "
-                        >
+                </div>
 
-                            <?= commission_money(
+
+                <div class="commission-hero-icon">
+
+                    💰
+
+                </div>
+
+
+            </section>
+
+
+            <!-- =====================================================
+                 STATISTICS
+            ====================================================== -->
+
+            <section class="commission-stats">
+
+
+                <!-- TOTAL COMMISSION -->
+
+                <div class="commission-stat">
+
+                    <span class="commission-stat-label">
+
+                        Total Commission
+
+                    </span>
+
+
+                    <strong
+                        class="
+                            commission-stat-value
+                            money
+                        "
+                    >
+
+                        <?= commissionEscape(
+                            commissionMoney(
                                 $summary['total']
-                            ) ?>
+                            )
+                        ) ?>
 
-                        </strong>
+                    </strong>
 
-                        <span class="commission-stat-sub">
-                            Overall commission generated
-                        </span>
-
-                    </div>
+                </div>
 
 
-                    <!-- PENDING -->
+                <!-- TOTAL RECORDS -->
 
-                    <div class="commission-stat">
-
-                        <span class="commission-stat-label">
-                            Pending
-                        </span>
-
-                        <strong
-                            class="
-                                commission-stat-value
-                                yellow
-                            "
-                        >
-
-                            <?= number_format(
-                                $summary['pending']
-                            ) ?>
-
-                        </strong>
-
-                        <span class="commission-stat-sub">
-                            Commission awaiting payment
-                        </span>
-
-                    </div>
-
-
-                    <!-- PAID -->
-
-                    <div class="commission-stat">
-
-                        <span class="commission-stat-label">
-                            Paid
-                        </span>
-
-                        <strong
-                            class="
-                                commission-stat-value
-                                green
-                            "
-                        >
-
-                            <?= number_format(
-                                $summary['paid']
-                            ) ?>
-
-                        </strong>
-
-                        <span class="commission-stat-sub">
-                            Successfully paid commissions
-                        </span>
-
-                    </div>
-
-                </section>
-
-
-                <!-- =================================================
-                     FILTER
-                ================================================== -->
-
-                <form
-                    method="GET"
-                    class="commission-filter"
+                <div
+                    class="
+                        commission-stat
+                        records
+                    "
                 >
 
-                    <div class="commission-search">
+                    <span class="commission-stat-label">
 
-                        <input
-                            type="text"
-                            name="search"
-                            placeholder="Search commission, order, vendor..."
-                            value="<?= commission_e(
-                                $search
-                            ) ?>"
-                        >
+                        Total Records
 
-                        <button
-                            type="submit"
-                            class="commission-btn"
-                        >
-                            SEARCH
-                        </button>
-
-                    </div>
+                    </span>
 
 
-                    <select
-                        name="status"
-                        onchange="this.form.submit()"
-                    >
+                    <strong class="commission-stat-value">
 
-                        <option
-                            value="all"
-                            <?= $statusFilter === 'all'
-                                ? 'selected'
-                                : '' ?>
-                        >
-                            All Status
-                        </option>
+                        <?= number_format(
+                            $summary['records']
+                        ) ?>
 
-                        <option
-                            value="Pending"
-                            <?= $statusFilter === 'Pending'
-                                ? 'selected'
-                                : '' ?>
-                        >
-                            Pending
-                        </option>
+                    </strong>
 
-                        <option
-                            value="Paid"
-                            <?= $statusFilter === 'Paid'
-                                ? 'selected'
-                                : '' ?>
-                        >
-                            Paid
-                        </option>
-
-                    </select>
+                </div>
 
 
-                    <a
-                        href="commission.php"
-                        class="commission-reset"
-                    >
-                        RESET
-                    </a>
+                <!-- PENDING -->
 
-                </form>
+                <div
+                    class="
+                        commission-stat
+                        pending
+                    "
+                >
+
+                    <span class="commission-stat-label">
+
+                        Pending
+
+                    </span>
+
+
+                    <strong class="commission-stat-value">
+
+                        <?= number_format(
+                            $summary['pending']
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <!-- PAID -->
+
+                <div
+                    class="
+                        commission-stat
+                        paid
+                    "
+                >
+
+                    <span class="commission-stat-label">
+
+                        Paid
+
+                    </span>
+
+
+                    <strong class="commission-stat-value">
+
+                        <?= number_format(
+                            $summary['paid']
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+            </section>
+
+
+            <!-- =====================================================
+                 COMMISSION PANEL
+            ====================================================== -->
+
+            <section class="commission-panel">
 
 
                 <!-- =================================================
-                     COMMISSION RECORDS
+                     PANEL HEADER
                 ================================================== -->
 
-                <section class="commission-card">
+                <div class="commission-panel-header">
 
 
-                    <!-- CARD HEADER -->
+                    <div class="commission-panel-title">
 
-                    <div class="commission-card-header">
+
+                        <div class="commission-panel-icon">
+
+                            💸
+
+                        </div>
+
 
                         <div>
 
@@ -2135,104 +2602,250 @@ try {
                             </h2>
 
                             <p>
-                                Latest vendor commission activity.
+                                Review commission generated from vendor orders.
                             </p>
 
                         </div>
 
-
-                        <span class="commission-record-count">
-
-                            <?= number_format(
-                                count($commissionRows)
-                            ) ?>
-
-                            records
-
-                        </span>
 
                     </div>
 
 
-                    <!-- =================================================
-                         EMPTY STATE
-                    ================================================== -->
+                    <span class="commission-count">
 
-                    <?php if (empty($commissionRows)): ?>
+                        <?= number_format(
+                            count(
+                                $commissionRows
+                            )
+                        ) ?>
 
-                        <div class="commission-empty">
+                        records
 
-                            <div class="commission-empty-icon">
-                                %
-                            </div>
+                    </span>
 
-                            <h3>
-                                No commission records found
-                            </h3>
 
-                            <p>
-                                Commission records will appear here when
-                                vendor transactions generate commission.
-                            </p>
+                </div>
+
+
+                <!-- =================================================
+                     FILTER
+                ================================================== -->
+
+                <div class="commission-filter-wrapper">
+
+
+                    <form
+                        method="GET"
+                        action="commission.php"
+                        class="commission-filter"
+                    >
+
+
+                        <!-- SEARCH -->
+
+                        <input
+                            type="search"
+                            name="search"
+                            value="<?= commissionEscape(
+                                $search
+                            ) ?>"
+                            placeholder="Search commission, order, vendor or owner..."
+                            autocomplete="off"
+                        >
+
+
+                        <!-- STATUS -->
+
+                        <select
+                            name="status"
+                            aria-label="Filter commission status"
+                        >
+
+                            <option
+                                value="all"
+                                <?= $statusFilter === 'all'
+                                    ? 'selected'
+                                    : '' ?>
+                            >
+
+                                All Status
+
+                            </option>
+
+
+                            <option
+                                value="Pending"
+                                <?= $statusFilter === 'Pending'
+                                    ? 'selected'
+                                    : '' ?>
+                            >
+
+                                Pending
+
+                            </option>
+
+
+                            <option
+                                value="Paid"
+                                <?= $statusFilter === 'Paid'
+                                    ? 'selected'
+                                    : '' ?>
+                            >
+
+                                Paid
+
+                            </option>
+
+
+                        </select>
+
+
+                        <!-- SEARCH BUTTON -->
+
+                        <button
+                            type="submit"
+                            class="
+                                commission-btn
+                                commission-btn-primary
+                            "
+                        >
+
+                            Search
+
+                        </button>
+
+
+                        <!-- RESET -->
+
+                        <a
+                            href="commission.php"
+                            class="
+                                commission-btn
+                                commission-btn-secondary
+                            "
+                        >
+
+                            Reset
+
+                        </a>
+
+
+                    </form>
+
+
+                </div>
+
+
+                <!-- =================================================
+                     EMPTY
+                ================================================== -->
+
+                <?php if (
+                    empty(
+                        $commissionRows
+                    )
+                ): ?>
+
+
+                    <div class="commission-empty">
+
+
+                        <div class="commission-empty-icon">
+
+                            🧾
 
                         </div>
 
 
-                    <?php else: ?>
+                        <h3>
+
+                            No commission records found
+
+                        </h3>
 
 
-                        <!-- =================================================
-                             TABLE
-                        ================================================== -->
+                        <p>
 
-                        <div class="commission-table-wrapper">
+                            Commission records will appear here when vendor transactions generate marketplace commission.
 
-                            <table class="commission-table">
-
-                                <thead>
-
-                                    <tr>
-
-                                        <th>
-                                            ID
-                                        </th>
-
-                                        <th>
-                                            Order
-                                        </th>
-
-                                        <th>
-                                            Vendor
-                                        </th>
-
-                                        <th>
-                                            Rate
-                                        </th>
-
-                                        <th>
-                                            Commission
-                                        </th>
-
-                                        <th>
-                                            Status
-                                        </th>
-
-                                        <th>
-                                            Date
-                                        </th>
-
-                                    </tr>
-
-                                </thead>
+                        </p>
 
 
-                                <tbody>
+                    </div>
+
+
+                <?php else: ?>
+
+
+                    <!-- =================================================
+                         TABLE
+                    ================================================== -->
+
+                    <div class="commission-table-wrapper">
+
+
+                        <table class="commission-table">
+
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>
+                                        ID
+                                    </th>
+
+                                    <th>
+                                        Order
+                                    </th>
+
+                                    <th>
+                                        Vendor
+                                    </th>
+
+                                    <th>
+                                        Rate
+                                    </th>
+
+                                    <th>
+                                        Commission
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
+
+                                    <th>
+                                        Date
+                                    </th>
+
+                                </tr>
+
+                            </thead>
+
+
+                            <tbody>
 
 
                                 <?php foreach (
                                     $commissionRows
                                     as $row
                                 ): ?>
+
+
+                                    <?php
+
+                                    $rowStatus =
+                                        $row['status']
+                                        ?? 'Pending';
+
+
+                                    $statusClass =
+                                        commissionStatusClass(
+                                            $rowStatus
+                                        );
+
+                                    ?>
 
 
                                     <tr>
@@ -2244,13 +2857,12 @@ try {
 
                                             <span class="commission-id">
 
-                                                #
-
-                                                <?= (int)
+                                                #<?= (int)
                                                     (
                                                         $row[
                                                             'commission_id'
-                                                        ] ?? 0
+                                                        ]
+                                                        ?? 0
                                                     ) ?>
 
                                             </span>
@@ -2264,13 +2876,12 @@ try {
 
                                             <span class="commission-order">
 
-                                                #
-
-                                                <?= (int)
+                                                #<?= (int)
                                                     (
                                                         $row[
                                                             'order_id'
-                                                        ] ?? 0
+                                                        ]
+                                                        ?? 0
                                                     ) ?>
 
                                             </span>
@@ -2282,42 +2893,75 @@ try {
 
                                         <td>
 
-                                            <span class="commission-vendor">
 
-                                                <?= commission_e(
+                                            <div class="commission-vendor">
+
+
+                                                <strong>
+
+                                                    <?= commissionEscape(
+                                                        !empty(
+                                                            $row[
+                                                                'business_name'
+                                                            ]
+                                                        )
+                                                            ? $row[
+                                                                'business_name'
+                                                            ]
+                                                            : 'Unknown Vendor'
+                                                    ) ?>
+
+                                                </strong>
+
+
+                                                <?php if (
                                                     !empty(
-                                                        $row[
-                                                            'business_name'
-                                                        ]
-                                                    )
-                                                        ? $row[
-                                                            'business_name'
-                                                        ]
-                                                        : 'Unknown Vendor'
-                                                ) ?>
-
-                                            </span>
-
-
-                                            <?php if (
-                                                !empty(
-                                                    $row[
-                                                        'vendor_owner'
-                                                    ]
-                                                )
-                                            ): ?>
-
-                                                <span class="commission-owner">
-
-                                                    <?= commission_e(
                                                         $row[
                                                             'vendor_owner'
                                                         ]
-                                                    ) ?>
+                                                    )
+                                                ): ?>
 
-                                                </span>
 
-                                            <?php endif; ?>
+                                                    <small>
+
+                                                        <?= commissionEscape(
+                                                            $row[
+                                                                'vendor_owner'
+                                                            ]
+                                                        ) ?>
+
+                                                    </small>
+
+
+                                                <?php endif; ?>
+
+
+                                                <?php if (
+                                                    !empty(
+                                                        $row[
+                                                            'vendor_email'
+                                                        ]
+                                                    )
+                                                ): ?>
+
+
+                                                    <small>
+
+                                                        <?= commissionEscape(
+                                                            $row[
+                                                                'vendor_email'
+                                                            ]
+                                                        ) ?>
+
+                                                    </small>
+
+
+                                                <?php endif; ?>
+
+
+                                            </div>
+
 
                                         </td>
 
@@ -2333,7 +2977,8 @@ try {
                                                     (
                                                         $row[
                                                             'commission_rate'
-                                                        ] ?? 0
+                                                        ]
+                                                        ?? 0
                                                     ),
                                                     2
                                                 ) ?>%
@@ -2349,10 +2994,13 @@ try {
 
                                             <span class="commission-amount">
 
-                                                <?= commission_money(
-                                                    $row[
-                                                        'commission_amount'
-                                                    ] ?? 0
+                                                <?= commissionEscape(
+                                                    commissionMoney(
+                                                        $row[
+                                                            'commission_amount'
+                                                        ]
+                                                        ?? 0
+                                                    )
                                                 ) ?>
 
                                             </span>
@@ -2364,27 +3012,16 @@ try {
 
                                         <td>
 
-                                            <?php
-
-                                            $rowStatus =
-                                                $row[
-                                                    'status'
-                                                ] ?? 'Pending';
-
-                                            ?>
-
                                             <span
                                                 class="
                                                     commission-status
-                                                    <?= commission_e(
-                                                        commission_status_class(
-                                                            $rowStatus
-                                                        )
+                                                    <?= commissionEscape(
+                                                        $statusClass
                                                     ) ?>
                                                 "
                                             >
 
-                                                <?= commission_e(
+                                                <?= commissionEscape(
                                                     $rowStatus
                                                 ) ?>
 
@@ -2399,11 +3036,12 @@ try {
 
                                             <span class="commission-date">
 
-                                                <?= commission_e(
-                                                    commission_date(
+                                                <?= commissionEscape(
+                                                    commissionDate(
                                                         $row[
                                                             'created_at'
-                                                        ] ?? null
+                                                        ]
+                                                        ?? null
                                                     )
                                                 ) ?>
 
@@ -2418,26 +3056,179 @@ try {
                                 <?php endforeach; ?>
 
 
-                                </tbody>
-
-                            </table>
-
-                        </div>
+                            </tbody>
 
 
-                    <?php endif; ?>
+                        </table>
 
 
-                </section>
+                    </div>
 
 
-            </div>
+                <?php endif; ?>
+
+
+            </section>
+
 
         </div>
 
+
     </main>
 
+
 </div>
+
+
+<script>
+
+    /*
+    |--------------------------------------------------------------------------
+    | SIDEBAR WIDTH SYNC
+    |--------------------------------------------------------------------------
+    */
+
+    function syncCommissionSidebar() {
+
+        const main =
+            document.querySelector(
+                '.commission-main'
+            );
+
+
+        if (!main) {
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MOBILE
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            window.innerWidth <= 900
+        ) {
+
+            document.documentElement
+                .style
+                .setProperty(
+                    '--commission-sidebar-width',
+                    '0px'
+                );
+
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FIND SIDEBAR
+        |--------------------------------------------------------------------------
+        */
+
+        const sidebar =
+            document.querySelector(
+                '.admin-sidebar'
+            ) ||
+            document.querySelector(
+                '.dashboard-sidebar'
+            ) ||
+            document.querySelector(
+                '.sidebar'
+            ) ||
+            document.querySelector(
+                'aside'
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FALLBACK WIDTH
+        |--------------------------------------------------------------------------
+        */
+
+        if (!sidebar) {
+
+            document.documentElement
+                .style
+                .setProperty(
+                    '--commission-sidebar-width',
+                    '260px'
+                );
+
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | REAL SIDEBAR WIDTH
+        |--------------------------------------------------------------------------
+        */
+
+        const rect =
+            sidebar
+                .getBoundingClientRect();
+
+
+        if (rect.right > 0) {
+
+            document.documentElement
+                .style
+                .setProperty(
+                    '--commission-sidebar-width',
+                    rect.right + 'px'
+                );
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD
+    |--------------------------------------------------------------------------
+    */
+
+    document.addEventListener(
+        'DOMContentLoaded',
+        function () {
+
+            syncCommissionSidebar();
+
+
+            setTimeout(
+                syncCommissionSidebar,
+                100
+            );
+
+
+            setTimeout(
+                syncCommissionSidebar,
+                400
+            );
+
+        }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESIZE
+    |--------------------------------------------------------------------------
+    */
+
+    window.addEventListener(
+        'resize',
+        syncCommissionSidebar
+    );
+
+</script>
+
 
 </body>
 
