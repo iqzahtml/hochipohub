@@ -6,25 +6,25 @@
 |--------------------------------------------------------------------------
 | File: admin/reviews.php
 |--------------------------------------------------------------------------
-| Admin review management page.
-| Uses PDO connection from database/db.php.
-|--------------------------------------------------------------------------
 */
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/database/db.php';
 
 /*
 |--------------------------------------------------------------------------
-| DATABASE CONNECTION
+| DATABASE
 |--------------------------------------------------------------------------
 */
 
-$db = $db;
+require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
+
+
+$db = getDB();
+
 
 /*
 |--------------------------------------------------------------------------
@@ -34,13 +34,21 @@ $db = $db;
 
 if (
     !isset($_SESSION['user_id']) ||
-    strtolower(trim($_SESSION['role'] ?? '')) !== 'admin'
+    strtolower(
+        trim(
+            $_SESSION['role']
+            ?? ''
+        )
+    ) !== 'admin'
 ) {
-    header("Location: ../index.php");
+
+    header('Location: ../index.php');
     exit;
 }
 
-$admin_id = (int) $_SESSION['user_id'];
+
+$adminId =
+    (int) $_SESSION['user_id'];
 
 
 /*
@@ -49,9 +57,9 @@ $admin_id = (int) $_SESSION['user_id'];
 |--------------------------------------------------------------------------
 */
 
-if (!function_exists('review_e')) {
+if (!function_exists('reviewEscape')) {
 
-    function review_e($value)
+    function reviewEscape($value): string
     {
         return htmlspecialchars(
             (string) $value,
@@ -61,19 +69,24 @@ if (!function_exists('review_e')) {
     }
 }
 
-if (!function_exists('review_date')) {
 
-    function review_date($date)
+if (!function_exists('reviewDate')) {
+
+    function reviewDate($date): string
     {
         if (!$date) {
             return '-';
         }
 
-        $timestamp = strtotime($date);
+
+        $timestamp =
+            strtotime($date);
+
 
         if (!$timestamp) {
             return '-';
         }
+
 
         return date(
             'd M Y, h:i A',
@@ -82,14 +95,129 @@ if (!function_exists('review_date')) {
     }
 }
 
-if (!function_exists('review_status_class')) {
 
-    function review_status_class($status)
+if (!function_exists('reviewStatusClass')) {
+
+    function reviewStatusClass($status): string
     {
-        return 'review-status-' .
+        $status =
             strtolower(
-                trim((string) $status)
+                trim(
+                    (string) $status
+                )
             );
+
+
+        if ($status === 'hidden') {
+            return 'hidden';
+        }
+
+
+        return 'visible';
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CSRF
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !isset($_SESSION['csrf_token']) ||
+    empty($_SESSION['csrf_token'])
+) {
+
+    $_SESSION['csrf_token'] =
+        bin2hex(
+            random_bytes(32)
+        );
+}
+
+
+$csrfToken =
+    $_SESSION['csrf_token'];
+
+
+/*
+|--------------------------------------------------------------------------
+| FLASH MESSAGE
+|--------------------------------------------------------------------------
+*/
+
+$message = '';
+$messageType = '';
+
+
+if (isset($_GET['success'])) {
+
+    if ($_GET['success'] === 'status') {
+
+        $message =
+            'Review status updated successfully.';
+
+        $messageType =
+            'success';
+    }
+
+    elseif ($_GET['success'] === 'deleted') {
+
+        $message =
+            'Review deleted successfully.';
+
+        $messageType =
+            'success';
+    }
+}
+
+
+if (isset($_GET['error'])) {
+
+    $messageType =
+        'error';
+
+
+    switch ($_GET['error']) {
+
+        case 'notfound':
+
+            $message =
+                'Review not found.';
+
+            break;
+
+
+        case 'update':
+
+            $message =
+                'Unable to update review status.';
+
+            break;
+
+
+        case 'delete':
+
+            $message =
+                'Unable to delete review.';
+
+            break;
+
+
+        case 'security':
+
+            $message =
+                'Invalid security token. Please refresh and try again.';
+
+            break;
+
+
+        default:
+
+            $message =
+                'Unable to process the request.';
+
+            break;
     }
 }
 
@@ -105,53 +233,132 @@ if (
     isset($_POST['update_status'])
 ) {
 
-    $review_id =
-        (int) ($_POST['review_id'] ?? 0);
+    $submittedToken =
+        $_POST['csrf_token']
+        ?? '';
 
-    $status =
-        trim($_POST['status'] ?? '');
-
-    $allowed_status = [
-        'Visible',
-        'Hidden'
-    ];
 
     if (
-        $review_id > 0 &&
-        in_array(
+        empty($submittedToken) ||
+        !hash_equals(
+            $csrfToken,
+            $submittedToken
+        )
+    ) {
+
+        header(
+            'Location: reviews.php?error=security'
+        );
+
+        exit;
+    }
+
+
+    $reviewId =
+        (int) (
+            $_POST['review_id']
+            ?? 0
+        );
+
+
+    $status =
+        trim(
+            $_POST['status']
+            ?? ''
+        );
+
+
+    $allowedStatuses = [
+
+        'Visible',
+        'Hidden'
+
+    ];
+
+
+    if (
+        $reviewId <= 0 ||
+        !in_array(
             $status,
-            $allowed_status,
+            $allowedStatuses,
             true
         )
     ) {
 
-        try {
+        header(
+            'Location: reviews.php?error=update'
+        );
 
-            /*
-            |--------------------------------------------------------------------------
-            | UPDATE STATUS
-            |--------------------------------------------------------------------------
-            */
+        exit;
+    }
 
-            $stmt = $db->prepare("
+
+    try {
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK REVIEW
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $db->prepare("
+                SELECT review_id
+                FROM reviews
+                WHERE review_id = ?
+                LIMIT 1
+            ");
+
+
+        $stmt->execute([
+            $reviewId
+        ]);
+
+
+        if (
+            !$stmt->fetch(
+                PDO::FETCH_ASSOC
+            )
+        ) {
+
+            header(
+                'Location: reviews.php?error=notfound'
+            );
+
+            exit;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE STATUS
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $db->prepare("
                 UPDATE reviews
+
                 SET status = ?
+
                 WHERE review_id = ?
             ");
 
-            $stmt->execute([
-                $status,
-                $review_id
-            ]);
+
+        $stmt->execute([
+            $status,
+            $reviewId
+        ]);
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | ADMIN LOG
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | ADMIN LOG
+        |--------------------------------------------------------------------------
+        */
 
-            $log = $db->prepare("
+        $log =
+            $db->prepare("
                 INSERT INTO admin_logs
                 (
                     admin_id,
@@ -159,35 +366,52 @@ if (
                     target_type,
                     target_id
                 )
-                VALUES (?, ?, ?, ?)
+
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    ?
+                )
             ");
 
-            $log->execute([
-                $admin_id,
-                'Updated review status to ' . $status,
-                'review',
-                $review_id
-            ]);
+
+        $log->execute([
+
+            $adminId,
+
+            'Updated review status to ' .
+            $status,
+
+            'review',
+
+            $reviewId
+
+        ]);
 
 
-            header(
-                "Location: reviews.php?success=status"
-            );
+        header(
+            'Location: reviews.php?success=status'
+        );
 
-            exit;
+        exit;
 
-        } catch (PDOException $e) {
+    }
 
-            error_log('Review status update error: ' .
-                $e->getMessage()
-            );
+    catch (Throwable $e) {
 
-            header(
-                "Location: reviews.php?error=update"
-            );
+        error_log(
+            'Review status update error: ' .
+            $e->getMessage()
+        );
 
-            exit;
-        }
+
+        header(
+            'Location: reviews.php?error=update'
+        );
+
+        exit;
     }
 }
 
@@ -198,98 +422,126 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if (isset($_GET['delete'])) {
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['delete_review'])
+) {
 
-    $review_id =
-        (int) $_GET['delete'];
+    $submittedToken =
+        $_POST['csrf_token']
+        ?? '';
 
-    if ($review_id > 0) {
 
-        try {
+    if (
+        empty($submittedToken) ||
+        !hash_equals(
+            $csrfToken,
+            $submittedToken
+        )
+    ) {
 
-            /*
-            |--------------------------------------------------------------------------
-            | GET REVIEW IMAGE
-            |--------------------------------------------------------------------------
-            */
+        header(
+            'Location: reviews.php?error=security'
+        );
 
-            $stmt = $db->prepare("
-                SELECT image
+        exit;
+    }
+
+
+    $reviewId =
+        (int) (
+            $_POST['review_id']
+            ?? 0
+        );
+
+
+    if ($reviewId <= 0) {
+
+        header(
+            'Location: reviews.php?error=delete'
+        );
+
+        exit;
+    }
+
+
+    try {
+
+        $db->beginTransaction();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | GET REVIEW
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $db->prepare("
+                SELECT
+                    review_id,
+                    image
+
                 FROM reviews
+
                 WHERE review_id = ?
+
+                LIMIT 1
+
+                FOR UPDATE
             ");
 
-            $stmt->execute([
-                $review_id
-            ]);
 
-            $review =
-                $stmt->fetch(
-                    PDO::FETCH_ASSOC
-                );
+        $stmt->execute([
+            $reviewId
+        ]);
 
 
-            if (!$review) {
-
-                header(
-                    "Location: reviews.php?error=notfound"
-                );
-
-                exit;
-            }
+        $review =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | DELETE REVIEW
-            |--------------------------------------------------------------------------
-            */
+        if (!$review) {
 
-            $stmt = $db->prepare("
+            $db->rollBack();
+
+
+            header(
+                'Location: reviews.php?error=notfound'
+            );
+
+            exit;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | DELETE REVIEW
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $db->prepare("
                 DELETE FROM reviews
                 WHERE review_id = ?
             ");
 
-            $stmt->execute([
-                $review_id
-            ]);
+
+        $stmt->execute([
+            $reviewId
+        ]);
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | DELETE REVIEW IMAGE
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | ADMIN LOG
+        |--------------------------------------------------------------------------
+        */
 
-            if (!empty($review['image'])) {
-
-                $imageFile =
-                    dirname(__DIR__) .
-                    '/uploads/products/' .
-                    basename(
-                        $review['image']
-                    );
-
-                if (
-                    file_exists(
-                        $imageFile
-                    )
-                ) {
-
-                    @unlink(
-                        $imageFile
-                    );
-                }
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | ADMIN LOG
-            |--------------------------------------------------------------------------
-            */
-
-            $log = $db->prepare("
+        $log =
+            $db->prepare("
                 INSERT INTO admin_logs
                 (
                     admin_id,
@@ -297,36 +549,91 @@ if (isset($_GET['delete'])) {
                     target_type,
                     target_id
                 )
-                VALUES (?, ?, ?, ?)
+
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    ?
+                )
             ");
 
-            $log->execute([
-                $admin_id,
-                'Deleted review',
-                'review',
-                $review_id
-            ]);
+
+        $log->execute([
+
+            $adminId,
+
+            'Deleted review',
+
+            'review',
+
+            $reviewId
+
+        ]);
 
 
-            header(
-                "Location: reviews.php?success=deleted"
-            );
+        $db->commit();
 
-            exit;
 
-        } catch (PDOException $e) {
+        /*
+        |--------------------------------------------------------------------------
+        | DELETE REVIEW IMAGE
+        |--------------------------------------------------------------------------
+        */
 
-            error_log(
-                'Review deletion error: ' .
-                $e->getMessage()
-            );
+        if (
+            !empty(
+                $review['image']
+            )
+        ) {
 
-            header(
-                "Location: reviews.php?error=delete"
-            );
+            $imageFile =
+                __DIR__ .
+                '/../uploads/products/' .
+                basename(
+                    $review['image']
+                );
 
-            exit;
+
+            if (
+                file_exists($imageFile) &&
+                is_file($imageFile)
+            ) {
+
+                @unlink(
+                    $imageFile
+                );
+            }
         }
+
+
+        header(
+            'Location: reviews.php?success=deleted'
+        );
+
+        exit;
+
+    }
+
+    catch (Throwable $e) {
+
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+
+
+        error_log(
+            'Review deletion error: ' .
+            $e->getMessage()
+        );
+
+
+        header(
+            'Location: reviews.php?error=delete'
+        );
+
+        exit;
     }
 }
 
@@ -339,16 +646,21 @@ if (isset($_GET['delete'])) {
 
 $search =
     trim(
-        $_GET['search'] ?? ''
+        $_GET['search']
+        ?? ''
     );
 
-$rating_filter =
+
+$ratingFilter =
     (int) (
-        $_GET['rating'] ?? 0
+        $_GET['rating']
+        ?? 0
     );
 
-$status_filter =
-    $_GET['status'] ?? '';
+
+$statusFilter =
+    $_GET['status']
+    ?? '';
 
 
 /*
@@ -386,6 +698,7 @@ $sql = "
     WHERE 1 = 1
 ";
 
+
 $params = [];
 
 
@@ -398,7 +711,8 @@ $params = [];
 if ($search !== '') {
 
     $sql .= "
-        AND (
+        AND
+        (
             p.product_name LIKE ?
             OR u.name LIKE ?
             OR u.email LIKE ?
@@ -406,8 +720,12 @@ if ($search !== '') {
         )
     ";
 
+
     $searchValue =
-        '%' . $search . '%';
+        '%' .
+        $search .
+        '%';
+
 
     $params[] =
         $searchValue;
@@ -430,16 +748,17 @@ if ($search !== '') {
 */
 
 if (
-    $rating_filter >= 1 &&
-    $rating_filter <= 5
+    $ratingFilter >= 1 &&
+    $ratingFilter <= 5
 ) {
 
     $sql .= "
         AND r.rating = ?
     ";
 
+
     $params[] =
-        $rating_filter;
+        $ratingFilter;
 }
 
 
@@ -450,16 +769,17 @@ if (
 */
 
 if (
-    $status_filter === 'Visible' ||
-    $status_filter === 'Hidden'
+    $statusFilter === 'Visible' ||
+    $statusFilter === 'Hidden'
 ) {
 
     $sql .= "
         AND r.status = ?
     ";
 
+
     $params[] =
-        $status_filter;
+        $statusFilter;
 }
 
 
@@ -470,7 +790,9 @@ if (
 */
 
 $sql .= "
-    ORDER BY r.review_date DESC
+    ORDER BY
+        r.review_date DESC,
+        r.review_id DESC
 ";
 
 
@@ -482,26 +804,37 @@ $sql .= "
 
 $reviews = [];
 
+
 try {
 
     $stmt =
-        $db->prepare($sql);
+        $db->prepare(
+            $sql
+        );
 
-    $stmt->execute($params);
+
+    $stmt->execute(
+        $params
+    );
+
 
     $reviews =
         $stmt->fetchAll(
             PDO::FETCH_ASSOC
         );
 
-} catch (PDOException $e) {
+}
+
+catch (Throwable $e) {
+
+    $reviews =
+        [];
+
 
     error_log(
         'Reviews query error: ' .
         $e->getMessage()
     );
-
-    $reviews = [];
 }
 
 
@@ -511,10 +844,10 @@ try {
 |--------------------------------------------------------------------------
 */
 
-$total_reviews = 0;
-$visible_reviews = 0;
-$hidden_reviews = 0;
-$average_rating = 0;
+$totalReviews = 0;
+$visibleReviews = 0;
+$hiddenReviews = 0;
+$averageRating = 0;
 
 
 /*
@@ -525,17 +858,23 @@ $average_rating = 0;
 
 try {
 
-    $stmt = $db->query("
-        SELECT COUNT(*)
-        FROM reviews
-    ");
+    $stmt =
+        $db->query("
+            SELECT COUNT(*)
+            FROM reviews
+        ");
 
-    $total_reviews =
-        (int) $stmt->fetchColumn();
 
-} catch (PDOException $e) {
+    $totalReviews =
+        (int)
+        $stmt->fetchColumn();
 
-    $total_reviews = 0;
+}
+
+catch (Throwable $e) {
+
+    $totalReviews =
+        0;
 }
 
 
@@ -547,18 +886,24 @@ try {
 
 try {
 
-    $stmt = $db->query("
-        SELECT COUNT(*)
-        FROM reviews
-        WHERE status = 'Visible'
-    ");
+    $stmt =
+        $db->query("
+            SELECT COUNT(*)
+            FROM reviews
+            WHERE status = 'Visible'
+        ");
 
-    $visible_reviews =
-        (int) $stmt->fetchColumn();
 
-} catch (PDOException $e) {
+    $visibleReviews =
+        (int)
+        $stmt->fetchColumn();
 
-    $visible_reviews = 0;
+}
+
+catch (Throwable $e) {
+
+    $visibleReviews =
+        0;
 }
 
 
@@ -570,18 +915,24 @@ try {
 
 try {
 
-    $stmt = $db->query("
-        SELECT COUNT(*)
-        FROM reviews
-        WHERE status = 'Hidden'
-    ");
+    $stmt =
+        $db->query("
+            SELECT COUNT(*)
+            FROM reviews
+            WHERE status = 'Hidden'
+        ");
 
-    $hidden_reviews =
-        (int) $stmt->fetchColumn();
 
-} catch (PDOException $e) {
+    $hiddenReviews =
+        (int)
+        $stmt->fetchColumn();
 
-    $hidden_reviews = 0;
+}
+
+catch (Throwable $e) {
+
+    $hiddenReviews =
+        0;
 }
 
 
@@ -593,30 +944,37 @@ try {
 
 try {
 
-    $stmt = $db->query("
-        SELECT ROUND(
-            AVG(rating),
-            1
-        )FROM reviews
-    ");
+    $stmt =
+        $db->query("
+            SELECT
+                ROUND(
+                    AVG(rating),
+                    1
+                )
 
-    $average_rating =
+            FROM reviews
+        ");
+
+
+    $averageRating =
         $stmt->fetchColumn();
 
-    if (
-        $average_rating === null
-    ) {
 
-        $average_rating = 0;
+    if ($averageRating === null) {
+
+        $averageRating =
+            0;
     }
 
-} catch (PDOException $e) {
+}
 
-    $average_rating = 0;
+catch (Throwable $e) {
+
+    $averageRating =
+        0;
 }
 
 ?>
-
 <!DOCTYPE html>
 
 <html lang="en">
@@ -635,11 +993,30 @@ try {
     </title>
 
 
-    <!--
-    |--------------------------------------------------------------------------
-    | SAME ADMIN CSS
-    |--------------------------------------------------------------------------
-    -->
+    <!-- ============================================================
+         POPPINS
+    ============================================================= -->
+
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
+
+    <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossorigin
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
+
+
+    <!-- ============================================================
+         PROJECT CSS
+    ============================================================= -->
 
     <link
         rel="stylesheet"
@@ -656,143 +1033,458 @@ try {
 
         /*
         |--------------------------------------------------------------------------
-        | REVIEW PAGE
+        | ROOT
         |--------------------------------------------------------------------------
         */
 
-        * {
-            box-sizing: border-box;
-        }
+        :root {
 
-        body {
-            margin: 0;
-        }
+            --review-sidebar-width:
+                260px;
 
-        .review-page {
-            min-height: 100vh;
+            --review-blue:
+                #2563eb;
 
-            padding: 35px;
+            --review-navy:
+                #08265a;
 
-            background:
-                radial-gradient(
-                    circle at top right,
-                    rgba(
-                        37,
-                        99,
-                        235,
-                        .10
-                    ),
-                    transparent 30%
-                ),
-                #f8fafc;
-        }
+            --review-border:
+                #dce7f3;
 
-        .review-container {
-            width: 100%;
-            max-width: 1500px;
-            margin: 0 auto;
+            --review-text:
+                #0b2d63;
+
+            --review-muted:
+                #8294b3;
+
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | HEADER
+        | RESET
         |--------------------------------------------------------------------------
         */
 
-        .review-header {
-            display: flex;
+        * {
+
+            box-sizing:
+                border-box;
+
+        }
+
+
+        html,
+        body {
+
+            margin:
+                0;
+
+            padding:
+                0;
+
+            min-height:
+                100%;
+
+            font-family:
+                'Poppins',
+                sans-serif;
+
+            background:
+                #eef5fd;
+
+        }
+
+
+        body {
+
+            overflow-x:
+                hidden;
+
+        }
+
+
+        button,
+        input,
+        select {
+
+            font-family:
+                inherit;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIDEBAR FONT
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-wrapper,
+        .admin-wrapper *,
+        .admin-sidebar,
+        .admin-sidebar *,
+        .sidebar,
+        .sidebar * {
+
+            font-family:
+                'Poppins',
+                sans-serif !important;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN
+        |--------------------------------------------------------------------------
+        */
+
+        .reviews-main {
+
+            min-height:
+                100vh;
+
+            margin-left:
+                var(
+                    --review-sidebar-width
+                );
+
+            width:
+                calc(
+                    100% -
+                    var(
+                        --review-sidebar-width
+                    )
+                );
+
+            background:
+
+                radial-gradient(
+                    circle at 90% 2%,
+                    rgba(
+                        37,
+                        99,
+                        235,
+                        .12
+                    ),
+                    transparent 24%
+                ),
+
+                linear-gradient(
+                    135deg,
+                    #f4f8fd,
+                    #eaf3ff
+                );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CONTENT
+        |--------------------------------------------------------------------------
+        */
+
+        .reviews-content {
+
+            width:
+                100%;
+
+            max-width:
+                1450px;
+
+            margin:
+                0 auto;
+
+            padding:
+                38px
+                35px
+                70px;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | HERO
+        |--------------------------------------------------------------------------
+        */
+
+        .reviews-hero {
+
+            position:
+                relative;
+
+            min-height:
+                155px;
+
+            overflow:
+                hidden;
+
+            display:
+                flex;
+
+            align-items:
+                center;
 
             justify-content:
                 space-between;
 
-            align-items: center;
+            padding:
+                34px
+                38px;
 
-            gap: 20px;
+            margin-bottom:
+                26px;
 
-            margin-bottom: 28px;
-        }
-
-        .review-header-left {
-            display: flex;
-
-            align-items: center;
-
-            gap: 16px;
-        }
-
-        .review-header-icon {
-            width: 58px;
-            height: 58px;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            border-radius: 18px;
+            color:
+                #ffffff;
 
             background:
+
                 linear-gradient(
-                    135deg,
-                    #2563eb,
-                    #4f46e5
+                    110deg,
+                    #08265a 0%,
+                    #123c8c 47%,
+                    #2480ed 100%
                 );
 
-            color: #ffffff;
-
-            font-size: 25px;
-            font-weight: 900;
+            border-radius:
+                26px;
 
             box-shadow:
-                0 10px 25px
+
+                0
+                20px
+                45px
                 rgba(
-                    37,
-                    99,
-                    235,
-                    .20
+                    18,
+                    70,
+                    150,
+                    .15
                 );
+
         }
 
-        .review-header h1 {
-            margin: 0;
 
-            color: #0f172a;
+        .reviews-hero::before {
 
-            font-size: 32px;
+            content:
+                "";
 
-            font-weight: 900;
+            position:
+                absolute;
 
-            line-height: 1.1;
+            width:
+                260px;
+
+            height:
+                260px;
+
+            right:
+                -70px;
+
+            top:
+                -140px;
+
+            border-radius:
+                50%;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .07
+                );
+
         }
 
-        .review-header p {
-            margin: 7px 0 0;
 
-            color: #64748b;
+        .reviews-hero::after {
 
-            font-size: 14px;
+            content:
+                "";
+
+            position:
+                absolute;
+
+            width:
+                170px;
+
+            height:
+                170px;
+
+            right:
+                155px;
+
+            bottom:
+                -110px;
+
+            border-radius:
+                50%;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .045
+                );
+
         }
 
-        .review-admin-badge {
-            display: inline-flex;
 
-            align-items: center;
-            justify-content: center;
+        .reviews-hero-text {
 
-            padding: 10px 16px;
+            position:
+                relative;
 
-            border-radius: 999px;
+            z-index:
+                2;
 
-            background: #eff6ff;
+        }
 
-            border: 1px solid #bfdbfe;
 
-            color: #2563eb;
+        .reviews-hero h1 {
 
-            font-size: 12px;
+            margin:
+                0
+                0
+                8px;
 
-            font-weight: 900;
+            color:
+                #ffffff;
+
+            font-size:
+                38px;
+
+            line-height:
+                1.05;
+
+            font-weight:
+                800;
+
+            letter-spacing:
+                -1.5px;
+
+        }
+
+
+        .reviews-hero p {
+
+            margin:
+                0;
+
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .82
+                );
+
+            font-size:
+                14px;
+
+            font-weight:
+                500;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | HERO ICON
+        |--------------------------------------------------------------------------
+        */
+
+        .reviews-hero-icon {
+
+            position:
+                relative;
+
+            z-index:
+                2;
+
+            width:
+                82px;
+
+            height:
+                82px;
+
+            flex-shrink:
+                0;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            border:
+                1px solid
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .26
+                );
+
+            border-radius:
+                22px;
+
+            background:
+
+                linear-gradient(
+                    145deg,
+                    rgba(
+                        255,
+                        255,
+                        255,
+                        .20
+                    ),
+                    rgba(
+                        255,
+                        255,
+                        255,
+                        .10
+                    )
+                );
+
+            box-shadow:
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .25
+                ),
+
+                0
+                12px
+                30px
+                rgba(
+                    0,
+                    35,
+                    100,
+                    .18
+                );
+
+            font-size:
+                34px;
+
+            line-height:
+                1;
+
         }
 
 
@@ -802,30 +1494,54 @@ try {
         |--------------------------------------------------------------------------
         */
 
-        .review-alert {
-            padding: 14px 18px;
+        .reviews-alert {
 
-            margin-bottom: 20px;
+            margin-bottom:
+                22px;
 
-            border-radius: 12px;
+            padding:
+                14px
+                17px;
 
-            font-size: 13px;
+            border-radius:
+                12px;
 
-            font-weight: 800;
+            font-size:
+                11px;
+
+            font-weight:
+                600;
+
         }
 
-        .review-alert.success {
-            background: #ecfdf5;border: 1px solid #a7f3d0;
 
-            color: #047857;
+        .reviews-alert.success {
+
+            color:
+                #166534;
+
+            background:
+                #ecfdf5;
+
+            border:
+                1px solid
+                #bbf7d0;
+
         }
 
-        .review-alert.error {
-            background: #fef2f2;
 
-            border: 1px solid #fecaca;
+        .reviews-alert.error {
 
-            color: #b91c1c;
+            color:
+                #991b1b;
+
+            background:
+                #fff1f2;
+
+            border:
+                1px solid
+                #fecdd3;
+
         }
 
 
@@ -835,369 +1551,637 @@ try {
         |--------------------------------------------------------------------------
         */
 
-        .review-stats {
-            display: grid;
+        .reviews-stats {
+
+            display:
+                grid;
 
             grid-template-columns:
+
                 repeat(
                     4,
-                    minmax(0, 1fr)
+                    minmax(
+                        0,
+                        1fr
+                    )
                 );
 
-            gap: 18px;
+            gap:
+                18px;
 
-            margin-bottom: 24px;
+            margin-bottom:
+                30px;
+
         }
+
 
         .review-stat {
-            position: relative;
 
-            overflow: hidden;
+            position:
+                relative;
 
-            padding: 24px;
+            min-height:
+                150px;
 
-            background: #ffffff;
+            overflow:
+                hidden;
+
+            padding:
+                26px
+                24px;
+
+            background:
+                #ffffff;
 
             border:
-                1px solid #e2e8f0;
-
-            border-radius: 20px;
-
-            box-shadow:
-                0 8px 25px
-                rgba(
-                    15,
-                    23,
-                    42,
-                    .05
+                1px solid
+                var(
+                    --review-border
                 );
 
-            transition:
-                transform .2s ease,
-                box-shadow .2s ease;
-        }
+            border-top:
+                4px solid
+                #2563eb;
 
-        .review-stat:hover {
-            transform:
-                translateY(-3px);
+            border-radius:
+                20px;
 
             box-shadow:
-                0 14px 32px
+
+                0
+                12px
+                28px
                 rgba(
-                    15,
-                    23,
-                    42,
-                    .08
+                    20,
+                    60,
+                    120,
+                    .055
                 );
+
         }
+
 
         .review-stat::after {
-            content: "";
 
-            position: absolute;
+            content:
+                "";
 
-            width: 100px;
-            height: 100px;
+            position:
+                absolute;
 
-            right: -35px;
-            bottom: -45px;
+            right:
+                -29px;
 
-            border-radius: 50%;
+            bottom:
+                -45px;
 
-            background: #eff6ff;
+            width:
+                110px;
+
+            height:
+                110px;
+
+            border-radius:
+                50%;
+
+            background:
+                #edf4ff;
+
         }
+
+
+        .review-stat.visible {
+
+            border-top-color:
+                #16a34a;
+
+        }
+
+
+        .review-stat.visible::after {
+
+            background:
+                #eaf9ef;
+
+        }
+
+
+        .review-stat.hidden {
+
+            border-top-color:
+                #ef4444;
+
+        }
+
+
+        .review-stat.hidden::after {
+
+            background:
+                #fff0f1;
+
+        }
+
+
+        .review-stat.rating {
+
+            border-top-color:
+                #f59e0b;
+
+        }
+
+
+        .review-stat.rating::after {
+
+            background:
+                #fff7df;
+
+        }
+
 
         .review-stat-label {
-            position: relative;
 
-            z-index: 1;
+            position:
+                relative;
 
-            display: block;
+            z-index:
+                2;
 
-            margin-bottom: 10px;
+            display:
+                block;
 
-            color: #64748b;
+            margin-bottom:
+                15px;
 
-            font-size: 12px;
+            color:
+                #61728e;
 
-            font-weight: 900;
+            font-size:
+                10px;
 
-            text-transform: uppercase;
+            font-weight:
+                800;
 
-            letter-spacing: .5px;
+            letter-spacing:
+                .75px;
+
+            text-transform:
+                uppercase;
+
         }
+
 
         .review-stat-value {
-            position: relative;
 
-            z-index: 1;
+            position:
+                relative;
 
-            display: block;
+            z-index:
+                2;
 
-            color: #0f172a;
+            display:
+                block;
 
-            font-size: 28px;
+            color:
+                #0b326d;
 
-            font-weight: 900;
-        }
+            font-size:
+                32px;
 
-        .review-stat-value.blue {
-            color: #2563eb;
-        }
+            line-height:
+                1;
 
-        .review-stat-value.green {
-            color: #059669;
-        }
+            font-weight:
+                800;
 
-        .review-stat-value.red {
-            color: #dc2626;
-        }
-
-        .review-stat-value.yellow {
-            color: #d97706;
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | FILTER CARD
+        | PANEL
         |--------------------------------------------------------------------------
         */
 
-        .review-filter-card {
-            padding: 20px;
+        .reviews-panel {
 
-            margin-bottom: 20px;
+            overflow:
+                hidden;
 
-            background: #ffffff;
-
-            border:
-                1px solid #e2e8f0;
-
-            border-radius: 18px;
-
-            box-shadow:
-                0 6px 20px
-                rgba(
-                    15,
-                    23,
-                    42,
-                    .04
-                );
-        }
-
-        .review-filter-header {
-            margin-bottom: 15px;
-        }
-
-        .review-filter-header h2 {
-            margin: 0;
-
-            color: #0f172a;
-
-            font-size: 17px;
-
-            font-weight: 900;
-        }
-
-        .review-filter-header p {
-            margin: 5px 0 0;
-
-            color: #64748b;
-
-            font-size: 12px;
-        }
-
-        .review-filter-form {
-            display: grid;
-
-            grid-template-columns:
-                minmax(220px, 1fr)
-                160px
-                160px
-                auto
-                auto;
-
-            gap: 10px;
-
-            align-items: center;
-        }
-
-        .review-filter-form input,
-        .review-filter-form select {
-            width: 100%;
-
-            min-height: 42px;
-
-            padding: 0 13px;
-
-            border:1px solid #cbd5e1;
-
-            border-radius: 10px;
-
-            background: #ffffff;
-
-            color: #334155;
-
-            font-family: inherit;
-
-            font-size: 13px;
-        }
-
-        .review-filter-form input:focus,
-        .review-filter-form select:focus {
-            outline: none;
-
-            border-color: #2563eb;
-
-            box-shadow:
-                0 0 0 3px
-                rgba(
-                    37,
-                    99,
-                    235,
-                    .10
-                );
-        }
-
-        .review-filter-btn {
-            min-height: 42px;
-
-            padding: 0 18px;
-
-            border: 0;
-
-            border-radius: 10px;
-
-            background: #2563eb;
-
-            color: #ffffff;
-
-            font-family: inherit;
-
-            font-size: 12px;
-
-            font-weight: 900;
-
-            cursor: pointer;
-
-            transition:
-                background .2s ease;
-        }
-
-        .review-filter-btn:hover {
-            background: #1d4ed8;
-        }
-
-        .review-reset-btn {
-            min-height: 42px;
-
-            padding: 0 16px;
-
-            display: inline-flex;
-
-            align-items: center;
-            justify-content: center;
+            background:
+                #ffffff;
 
             border:
-                1px solid #cbd5e1;
+                1px solid
+                var(
+                    --review-border
+                );
 
-            border-radius: 10px;
+            border-radius:
+                24px;
 
-            background: #ffffff;
+            box-shadow:
 
-            color: #64748b;
+                0
+                14px
+                35px
+                rgba(
+                    24,
+                    64,
+                    120,
+                    .055
+                );
 
-            text-decoration: none;
-
-            font-size: 12px;
-
-            font-weight: 900;
-        }
-
-        .review-reset-btn:hover {
-            background: #f8fafc;
-
-            border-color: #93c5fd;
-
-            color: #2563eb;
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | MAIN CARD
+        | PANEL HEADER
         |--------------------------------------------------------------------------
         */
 
-        .review-card {
-            overflow: hidden;
+        .reviews-panel-header {
 
-            background: #ffffff;
+            min-height:
+                110px;
 
-            border:
-                1px solid #e2e8f0;
+            padding:
+                26px
+                30px;
 
-            border-radius: 20px;
+            display:
+                flex;
 
-            box-shadow:
-                0 10px 30px
-                rgba(
-                    15,
-                    23,
-                    42,
-                    .06
-                );
-        }
-
-        .review-card-header {
-            display: flex;
+            align-items:
+                center;
 
             justify-content:
                 space-between;
 
-            align-items: center;
-
-            gap: 20px;
-
-            padding: 22px 24px;
+            gap:
+                20px;
 
             border-bottom:
-                1px solid #e2e8f0;
+                1px solid
+                #e7edf5;
+
         }
 
-        .review-card-header h2 {
-            margin: 0;
 
-            color: #0f172a;
+        .reviews-panel-title {
 
-            font-size: 18px;
+            display:
+                flex;
 
-            font-weight: 900;
+            align-items:
+                center;
+
+            gap:
+                16px;
+
         }
 
-        .review-card-header p {
-            margin: 5px 0 0;
 
-            color: #64748b;
+        .reviews-panel-icon {
 
-            font-size: 12px;
+            width:
+                53px;
+
+            height:
+                53px;
+
+            flex-shrink:
+                0;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            border-radius:
+                16px;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #1476e8,
+                    #1d95f3
+                );
+
+            font-size:
+                22px;
+
+            line-height:
+                1;
+
+            box-shadow:
+
+                0
+                9px
+                20px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .22
+                );
+
         }
 
-        .review-record-count {
-            padding: 7px 11px;
 
-            border-radius: 999px;
+        .reviews-panel-header h2 {
 
-            background: #f1f5f9;
+            margin:
+                0
+                0
+                5px;
 
-            color: #475569;
+            color:
+                #092e65;
 
-            font-size: 11px;
+            font-size:
+                20px;
 
-            font-weight: 900;
+            font-weight:
+                800;
 
-            white-space: nowrap;
+        }
+
+
+        .reviews-panel-header p {
+
+            margin:
+                0;
+
+            color:
+                #8999b4;
+
+            font-size:
+                11px;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | COUNT
+        |--------------------------------------------------------------------------
+        */
+
+        .reviews-count {
+
+            min-height:
+                36px;
+
+            padding:
+                0
+                16px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            color:
+                #2563eb;
+
+            background:
+                #eff6ff;
+
+            border:
+                1px solid
+                #d6e7ff;
+
+            border-radius:
+                999px;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER
+        |--------------------------------------------------------------------------
+        */
+
+        .reviews-filter-wrapper {
+
+            padding:
+                22px
+                28px;
+
+            background:
+                #fbfdff;
+
+            border-bottom:
+                1px solid
+                #edf1f6;
+
+        }
+
+
+        .reviews-filter {
+
+            display:
+                grid;
+
+            grid-template-columns:
+
+                minmax(
+                    250px,
+                    1.5fr
+                )
+
+                minmax(
+                    150px,
+                    .5fr
+                )
+
+                minmax(
+                    150px,
+                    .5fr
+                )
+
+                auto
+                auto;
+
+            gap:
+                10px;
+
+        }
+
+
+        .reviews-filter input,
+        .reviews-filter select {
+
+            width:
+                100%;
+
+            height:
+                43px;
+
+            padding:
+                0
+                13px;
+
+            outline:
+                none;
+
+            color:
+                #26354e;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid
+                #d8e3ef;
+
+            border-radius:
+                10px;
+
+            font-size:
+                10px;
+
+        }
+
+
+        .reviews-filter input::placeholder {
+
+            color:
+                #96a5b9;
+
+        }
+
+
+        .reviews-filter input:focus,
+        .reviews-filter select:focus {
+
+            border-color:
+                #3b82f6;
+
+            box-shadow:
+
+                0
+                0
+                0
+                3px
+                rgba(
+                    59,
+                    130,
+                    246,
+                    .08
+                );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | BUTTON
+        |--------------------------------------------------------------------------
+        */
+
+        .review-btn {
+
+            min-height:
+                43px;
+
+            padding:
+                0
+                17px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            border-radius:
+                10px;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+            text-decoration:
+                none;
+
+            cursor:
+                pointer;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        .review-btn-primary {
+
+            color:
+                #ffffff;
+
+            border:
+                0;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #1d65d8
+                );
+
+            box-shadow:
+
+                0
+                7px
+                15px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .20
+                );
+
+        }
+
+
+        .review-btn-secondary {
+
+            color:
+                #66758b;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid
+                #d7e2ee;
+
         }
 
 
@@ -1207,61 +2191,110 @@ try {
         |--------------------------------------------------------------------------
         */
 
-        .review-table-wrapper {
-            width: 100%;
+        .reviews-table-wrapper {
 
-            overflow-x: auto;
+            width:
+                100%;
+
+            overflow-x:
+                auto;
+
         }
 
-        .review-table {
-            width: 100%;
 
-            min-width: 1250px;
+        .reviews-table {
+
+            width:
+                100%;
+
+            min-width:
+                1250px;
 
             border-collapse:
                 collapse;
+
         }
 
-        .review-table th {
-            padding: 15px 18px;
 
-            background: #f8fafc;
+        .reviews-table thead {
 
-            color: #64748b;
+            background:
+                #f6f9fd;
 
-            font-size: 11px;
+        }
 
-            font-weight: 900;
 
-            text-align: left;
+        .reviews-table th {
+
+            height:
+                44px;
+
+            padding:
+                0
+                16px;
+
+            color:
+                #65758f;
+
+            border-bottom:
+                1px solid
+                #dfe7f0;
+
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+            text-align:
+                left;
+
+            letter-spacing:
+                .55px;
 
             text-transform:
                 uppercase;
 
-            letter-spacing: .5px;
+            white-space:
+                nowrap;
 
-            white-space: nowrap;
         }
 
-        .review-table td {
-            padding: 17px 18px;
 
-            border-top:
-                1px solid #f1f5f9;
+        .reviews-table td {
 
-            color: #334155;
+            padding:
+                16px;
 
-            font-size: 13px;
+            color:
+                #435169;
 
-            vertical-align: middle;}
+            border-bottom:
+                1px solid
+                #edf1f6;
 
-        .review-table tbody tr {
-            transition:
-                background .15s ease;
+            font-size:
+                9px;
+
+            vertical-align:
+                middle;
+
         }
 
-        .review-table tbody tr:hover td {
-            background: #f8fafc;
+
+        .reviews-table tbody tr:hover {
+
+            background:
+                #f9fbff;
+
+        }
+
+
+        .reviews-table tbody tr:last-child td {
+
+            border-bottom:
+                0;
+
         }
 
 
@@ -1272,21 +2305,13 @@ try {
         */
 
         .review-id {
-            display: inline-flex;
 
-            align-items: center;
+            color:
+                #8796ac;
 
-            padding: 6px 9px;
+            font-weight:
+                800;
 
-            border-radius: 8px;
-
-            background: #eff6ff;
-
-            color: #2563eb;
-
-            font-weight: 900;
-
-            white-space: nowrap;
         }
 
 
@@ -1296,22 +2321,57 @@ try {
         |--------------------------------------------------------------------------
         */
 
-        .review-customer strong {
-            display: block;
+        .review-customer {
 
-            color: #0f172a;
+            min-width:
+                170px;
 
-            font-weight: 900;
         }
 
+
+        .review-customer strong {
+
+            display:
+                block;
+
+            margin-bottom:
+                3px;
+
+            color:
+                #112b55;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+        }
+
+
         .review-customer small {
-            display: block;
 
-            margin-top: 4px;
+            display:
+                block;
 
-            color: #94a3b8;
+            max-width:
+                190px;
 
-            font-size: 11px;
+            overflow:
+                hidden;
+
+            color:
+                #8897ac;
+
+            font-size:
+                8px;
+
+            text-overflow:
+                ellipsis;
+
+            white-space:
+                nowrap;
+
         }
 
 
@@ -1322,63 +2382,103 @@ try {
         */
 
         .review-product {
-            display: flex;
 
-            align-items: center;
+            display:
+                flex;
 
-            gap: 10px;
+            align-items:
+                center;
 
-            min-width: 190px;
+            gap:
+                10px;
+
+            min-width:
+                200px;
+
         }
+
 
         .review-product-image {
-            width: 44px;
-            height: 44px;
 
-            flex-shrink: 0;
+            width:
+                44px;
 
-            overflow: hidden;
+            height:
+                44px;
 
-            display: flex;
+            flex-shrink:
+                0;
 
-            align-items: center;
-            justify-content: center;
+            overflow:
+                hidden;
 
-            border-radius: 10px;
+            display:
+                flex;
 
-            background: #f1f5f9;
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            background:
+                #eff6ff;
 
             border:
-                1px solid #e2e8f0;
+                1px solid
+                #dbeafe;
+
+            border-radius:
+                10px;
+
+            font-size:
+                17px;
+
         }
+
 
         .review-product-image img {
-            width: 100%;
-            height: 100%;
 
-            object-fit: cover;
+            width:
+                100%;
+
+            height:
+                100%;
+
+            object-fit:
+                cover;
+
         }
 
-        .review-product-image-empty {
-            color: #94a3b8;
-
-            font-size: 16px;
-
-            font-weight: 900;
-        }
 
         .review-product-name {
-            color: #2563eb;
 
-            font-weight: 900;
+            max-width:
+                180px;
 
-            text-decoration: none;
+            color:
+                #2563eb;
 
-            line-height: 1.35;
+            font-size:
+                9px;
+
+            font-weight:
+                800;
+
+            line-height:
+                1.4;
+
+            text-decoration:
+                none;
+
         }
 
+
         .review-product-name:hover {
-            text-decoration: underline;
+
+            text-decoration:
+                underline;
+
         }
 
 
@@ -1389,31 +2489,50 @@ try {
         */
 
         .review-rating {
-            min-width: 90px;
+
+            min-width:
+                100px;
+
         }
+
 
         .review-stars {
-            display: block;
 
-            color: #f59e0b;
+            display:
+                block;
 
-            font-size: 15px;
+            color:
+                #f59e0b;
 
-            letter-spacing: 1px;
+            font-size:
+                13px;
 
-            white-space: nowrap;
+            letter-spacing:
+                1px;
+
+            white-space:
+                nowrap;
+
         }
 
+
         .review-rating-number {
-            display: block;
 
-            margin-top: 3px;
+            display:
+                block;
 
-            color: #94a3b8;
+            margin-top:
+                3px;
 
-            font-size: 11px;
+            color:
+                #94a3b8;
 
-            font-weight: 700;
+            font-size:
+                8px;
+
+            font-weight:
+                700;
+
         }
 
 
@@ -1424,133 +2543,242 @@ try {
         */
 
         .review-content {
-            max-width: 330px;
+
+            max-width:
+                300px;
+
         }
+
 
         .review-text {
-            display: -webkit-box;
 
-            overflow: hidden;
+            display:
+                -webkit-box;
 
-            -webkit-box-orient: vertical;
+            overflow:
+                hidden;
 
-            -webkit-line-clamp: 3;
+            -webkit-box-orient:
+                vertical;
 
-            color: #475569;
+            -webkit-line-clamp:
+                3;
 
-            line-height: 1.55;
+            color:
+                #526176;
 
-            word-break: break-word;
+            font-size:
+                9px;
+
+            line-height:
+                1.55;
+
+            word-break:
+                break-word;
+
         }
+
 
         .review-image-link {
-            display: inline-flex;
 
-            margin-top: 8px;
+            display:
+                inline-flex;
 
-            padding: 5px 9px;
+            margin-top:
+                7px;
 
-            border-radius: 7px;
+            padding:
+                5px
+                8px;
 
-            background: #eff6ff;
+            color:
+                #2563eb;
 
-            color: #2563eb;
+            background:
+                #eff6ff;
 
-            font-size: 10px;
+            border:
+                1px solid
+                #dbeafe;
 
-            font-weight: 900;
+            border-radius:
+                7px;
 
-            text-decoration: none;
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+            text-decoration:
+                none;
+
         }
 
-        .review-image-link:hover {
-            background: #dbeafe;
-        }/*
+
+        /*
         |--------------------------------------------------------------------------
         | STATUS
         |--------------------------------------------------------------------------
         */
 
         .review-status {
-            display: inline-flex;
 
-            align-items: center;
-            justify-content: center;
+            min-height:
+                27px;
 
-            padding: 6px 10px;
+            padding:
+                0
+                9px;
 
-            border-radius: 999px;
+            display:
+                inline-flex;
 
-            font-size: 11px;
+            align-items:
+                center;
 
-            font-weight: 900;
+            gap:
+                5px;
 
-            white-space: nowrap;
+            border-radius:
+                999px;
+
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
         }
 
-        .review-status-visible {
-            background: #dcfce7;
 
-            color: #166534;
+        .review-status::before {
+
+            content:
+                "";
+
+            width:
+                5px;
+
+            height:
+                5px;
+
+            border-radius:
+                50%;
+
         }
 
-        .review-status-hidden {
-            background: #fee2e2;
 
-            color: #991b1b;
+        .review-status.visible {
+
+            color:
+                #15803d;
+
+            background:
+                #ecfdf3;
+
+        }
+
+
+        .review-status.visible::before {
+
+            background:
+                #22c55e;
+
+        }
+
+
+        .review-status.hidden {
+
+            color:
+                #b91c1c;
+
+            background:
+                #fff1f2;
+
+        }
+
+
+        .review-status.hidden::before {
+
+            background:
+                #ef4444;
+
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | STATUS FORM
+        | STATUS SELECT
         |--------------------------------------------------------------------------
         */
 
         .review-status-form {
-            margin: 0;
+
+            margin:
+                0;
+
         }
+
 
         .review-status-select {
-            min-width: 105px;
 
-            padding: 8px 10px;
+            min-width:
+                105px;
+
+            height:
+                34px;
+
+            padding:
+                0
+                9px;
+
+            outline:
+                none;
+
+            color:
+                #334155;
+
+            background:
+                #ffffff;
 
             border:
-                1px solid #cbd5e1;
+                1px solid
+                #d7e2ef;
 
-            border-radius: 9px;
+            border-radius:
+                9px;
 
-            background: #ffffff;
+            font-size:
+                8px;
 
-            color: #334155;
+            font-weight:
+                800;
 
-            font-family: inherit;
+            cursor:
+                pointer;
 
-            font-size: 12px;
-
-            font-weight: 800;
-
-            cursor: pointer;
         }
 
-        .review-status-select:hover {
-            border-color: #94a3b8;
-        }
 
         .review-status-select:focus {
-            outline: none;
 
-            border-color: #2563eb;
+            border-color:
+                #3b82f6;
 
             box-shadow:
-                0 0 0 3px
+
+                0
+                0
+                0
+                3px
                 rgba(
-                    37,
-                    99,
-                    235,
-                    .10
+                    59,
+                    130,
+                    246,
+                    .08
                 );
+
         }
 
 
@@ -1561,54 +2789,81 @@ try {
         */
 
         .review-date {
-            color: #64748b;
 
-            font-size: 12px;
+            color:
+                #7c8ca3;
 
-            white-space: nowrap;
+            font-size:
+                8px;
+
+            white-space:
+                nowrap;
+
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | ACTION
+        | DELETE
         |--------------------------------------------------------------------------
         */
 
-        .review-delete-btn {
-            display: inline-flex;
+        .review-delete-form {
 
-            align-items: center;
-            justify-content: center;
+            margin:
+                0;
 
-            min-height: 34px;
-
-            padding: 0 12px;
-
-            border:
-                1px solid #fecaca;
-
-            border-radius: 9px;
-
-            background: #fff1f2;
-
-            color: #dc2626;
-
-            font-size: 11px;
-
-            font-weight: 900;
-
-            text-decoration: none;
-
-            transition:
-                background .2s ease,
-                border-color .2s ease;
         }
 
-        .review-delete-btn:hover {
-            background: #fee2e2;
 
-            border-color: #fca5a5;
+        .review-delete-btn {
+
+            min-height:
+                32px;
+
+            padding:
+                0
+                11px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            color:
+                #b91c1c;
+
+            background:
+                #fff1f2;
+
+            border:
+                1px solid
+                #fecdd3;
+
+            border-radius:
+                8px;
+
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+            cursor:
+                pointer;
+
+        }
+
+
+        .review-delete-btn:hover {
+
+            background:
+                #fee2e2;
+
         }
 
 
@@ -1618,143 +2873,319 @@ try {
         |--------------------------------------------------------------------------
         */
 
-        .review-empty {
-            padding: 75px 20px;
+        .reviews-empty {
 
-            text-align: center;
+            padding:
+                75px
+                20px;
+
+            text-align:
+                center;
+
         }
 
-        .review-empty-icon {
-            width: 64px;
-            height: 64px;
+
+        .reviews-empty-icon {
+
+            width:
+                62px;
+
+            height:
+                62px;
 
             margin:
-                0 auto 16px;
+                0
+                auto
+                15px;
 
-            display: flex;
+            display:
+                flex;
 
-            align-items: center;
-            justify-content: center;
+            align-items:
+                center;
 
-            border-radius: 20px;
+            justify-content:
+                center;
 
-            background: #eff6ff;
+            background:
+                #eff6ff;
 
-            color: #2563eb;
+            border:
+                1px solid
+                #dbeafe;
 
-            font-size: 25px;
+            border-radius:
+                17px;
 
-            font-weight: 900;
+            font-size:
+                28px;
+
         }
 
-        .review-empty h3 {
-            margin: 0;
 
-            color: #0f172a;
-
-            font-size: 17px;
-
-            font-weight: 900;
-        }
-
-        .review-empty p {
-            max-width: 430px;
+        .reviews-empty h3 {
 
             margin:
-                8px auto 0;
+                0
+                0
+                6px;
 
-            color: #64748b;
+            color:
+                #49617f;
 
-            font-size: 13px;
+            font-size:
+                14px;
 
-            line-height: 1.6;
+            font-weight:
+                800;
+
         }
 
 
-        /*|--------------------------------------------------------------------------
+        .reviews-empty p {
+
+            max-width:
+                430px;
+
+            margin:
+                0 auto;
+
+            color:
+                #94a3b8;
+
+            font-size:
+                10px;
+
+            line-height:
+                1.6;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
         | RESPONSIVE
         |--------------------------------------------------------------------------
         */
 
-        @media (max-width: 1100px) {
+        @media (max-width: 1200px) {
 
-            .review-stats {
+            .reviews-stats {
+
                 grid-template-columns:
+
                     repeat(
                         2,
-                        minmax(0, 1fr)
+                        1fr
                     );
+
             }
 
-            .review-filter-form {
+
+            .reviews-filter {
+
                 grid-template-columns:
+
                     1fr
-                    1fr
-                    1fr
-                    auto
+                    1fr;
+
+            }
+
+
+            .reviews-filter input {
+
+                grid-column:
+                    1 / -1;
+
+            }
+
+        }
+
+
+        @media (max-width: 900px) {
+
+            :root {
+
+                --review-sidebar-width:
+                    0px;
+
+            }
+
+
+            .reviews-main {
+
+                margin-left:
+                    0;
+
+                width:
+                    100%;
+
+            }
+
+
+            .reviews-content {
+
+                padding:
+                    25px
+                    20px
+                    50px;
+
+            }
+
+
+            .reviews-hero {
+
+                min-height:
+                    140px;
+
+                padding:
+                    28px;
+
+            }
+
+
+            .reviews-hero h1 {
+
+                font-size:
+                    31px;
+
+            }
+
+
+            .reviews-hero-icon {
+
+                width:
+                    67px;
+
+                height:
+                    67px;
+
+                font-size:
+                    28px;
+
+            }
+
+        }
+
+
+        @media (max-width: 650px) {
+
+            .reviews-content {
+
+                padding:
+                    18px
+                    13px
+                    40px;
+
+            }
+
+
+            .reviews-hero {
+
+                min-height:
                     auto;
+
+                padding:
+                    25px
+                    21px;
+
+                border-radius:
+                    20px;
+
             }
 
-        }
 
+            .reviews-hero h1 {
 
-        @media (max-width: 800px) {
+                font-size:
+                    27px;
 
-            .review-page {
-                padding: 20px;
             }
 
-            .review-header {
-                flex-direction: column;
 
-                align-items: flex-start;
+            .reviews-hero p {
+
+                max-width:
+                    230px;
+
+                font-size:
+                    11px;
+
             }
 
-            .review-header-left {
-                align-items: flex-start;
+
+            .reviews-hero-icon {
+
+                width:
+                    55px;
+
+                height:
+                    55px;
+
+                border-radius:
+                    15px;
+
+                font-size:
+                    24px;
+
             }
 
-            .review-stats {
-                grid-template-columns: 1fr;
+
+            .reviews-stats {
+
+                grid-template-columns:
+                    1fr;
+
+                gap:
+                    12px;
+
             }
 
-            .review-filter-form {
-                grid-template-columns: 1fr;
+
+            .review-stat {
+
+                min-height:
+                    120px;
+
             }
 
-            .review-filter-btn,
-            .review-reset-btn {
-                width: 100%;
+
+            .reviews-panel-header {
+
+                flex-direction:
+                    column;
+
+                align-items:
+                    flex-start;
+
+                padding:
+                    20px
+                    17px;
+
             }
 
-            .review-card-header {
-                align-items: flex-start;
 
-                flex-direction: column;
+            .reviews-filter {
+
+                grid-template-columns:
+                    1fr;
+
             }
 
-        }
 
+            .reviews-filter input {
 
-        @media (max-width: 500px) {
+                grid-column:
+                    auto;
 
-            .review-page {
-                padding: 15px;
             }
 
-            .review-header h1 {
-                font-size: 26px;
-            }
 
-            .review-header-icon {
-                width: 50px;
-                height: 50px;
+            .review-btn {
 
-                border-radius: 15px;
-            }
+                width:
+                    100%;
 
-            .review-header-left {
-                gap: 12px;
             }
 
         }
@@ -1766,427 +3197,226 @@ try {
 
 <body>
 
-<div class="admin-layout">
 
+<div class="admin-wrapper">
 
-    <!-- ==========================================================
-         SIDEBAR
-    =========================================================== -->
 
     <?php
-        require_once
-            dirname(__DIR__) .
-            '/includes/admin_sidebar.php';
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN SIDEBAR
+    |--------------------------------------------------------------------------
+    */
+
+    require_once __DIR__ .
+        '/../includes/admin_sidebar.php';
+
     ?>
 
 
-    <!-- ==========================================================
-         MAIN
-    =========================================================== -->
-
-    <main class="admin-main">
-
-        <div class="review-page">
-
-            <div class="review-container">
+    <main class="reviews-main">
 
 
-                <!-- ==================================================
-                     HEADER
+        <div class="reviews-content">
+
+
+            <!-- =====================================================
+                 HERO
+            ====================================================== -->
+
+            <section class="reviews-hero">
+
+
+                <div class="reviews-hero-text">
+
+                    <h1>
+                        Reviews
+                    </h1>
+
+                    <p>
+                        Monitor customer feedback and manage review visibility.
+                    </p>
+
+                </div>
+
+
+                <div class="reviews-hero-icon">
+
+                    ⭐
+
+                </div>
+
+
+            </section>
+
+
+            <!-- =====================================================
+                 MESSAGE
+            ====================================================== -->
+
+            <?php if ($message !== ''): ?>
+
+
+                <div
+                    class="
+                        reviews-alert
+                        <?= reviewEscape(
+                            $messageType
+                        ) ?>
+                    "
+                >
+
+                    <?= reviewEscape(
+                        $message
+                    ) ?>
+
+                </div>
+
+
+            <?php endif; ?>
+
+
+            <!-- =====================================================
+                 STATISTICS
+            ====================================================== -->
+
+            <section class="reviews-stats">
+
+
+                <!-- TOTAL -->
+
+                <div class="review-stat">
+
+                    <span class="review-stat-label">
+
+                        Total Reviews
+
+                    </span>
+
+
+                    <strong class="review-stat-value">
+
+                        <?= number_format(
+                            $totalReviews
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <!-- VISIBLE -->
+
+                <div
+                    class="
+                        review-stat
+                        visible
+                    "
+                >
+
+                    <span class="review-stat-label">
+
+                        Visible Reviews
+
+                    </span>
+
+
+                    <strong class="review-stat-value">
+
+                        <?= number_format(
+                            $visibleReviews
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <!-- HIDDEN -->
+
+                <div
+                    class="
+                        review-stat
+                        hidden
+                    "
+                >
+
+                    <span class="review-stat-label">
+
+                        Hidden Reviews
+
+                    </span>
+
+
+                    <strong class="review-stat-value">
+
+                        <?= number_format(
+                            $hiddenReviews
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <!-- RATING -->
+
+                <div
+                    class="
+                        review-stat
+                        rating
+                    "
+                >
+
+                    <span class="review-stat-label">
+
+                        Average Rating
+
+                    </span>
+
+
+                    <strong class="review-stat-value">
+
+                        <?= number_format(
+                            (float)
+                            $averageRating,
+                            1
+                        ) ?>
+
+                        / 5
+
+                    </strong>
+
+                </div>
+
+
+            </section>
+
+
+            <!-- =====================================================
+                 REVIEW PANEL
+            ====================================================== -->
+
+            <section class="reviews-panel">
+
+
+                <!-- =================================================
+                     PANEL HEADER
                 ================================================== -->
 
-                <header class="review-header">
+                <div class="reviews-panel-header">
 
-                    <div class="review-header-left">
 
-                        <div class="review-header-icon">
-                            ★
+                    <div class="reviews-panel-title">
+
+
+                        <div class="reviews-panel-icon">
+
+                            💬
+
                         </div>
 
-                        <div>
-
-                            <h1>
-                                Reviews
-                            </h1>
-
-                            <p>
-                                Monitor customer feedback and manage review visibility.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="review-admin-badge">
-                        ADMIN CONTROL
-                    </div>
-
-                </header>
-
-
-                <!-- ==================================================
-                     ALERT
-                ================================================== -->
-
-                <?php if (
-                    isset($_GET['success'])
-                ): ?>
-
-                    <div class="review-alert success">
-
-                        <?php if (
-                            $_GET['success'] === 'status'
-                        ): ?>
-
-                            Review status updated successfully.
-
-                        <?php elseif (
-                            $_GET['success'] === 'deleted'
-                        ): ?>
-
-                            Review deleted successfully.
-
-                        <?php endif; ?>
-
-                    </div><?php endif; ?>
-
-
-                <?php if (
-                    isset($_GET['error'])
-                ): ?>
-
-                    <div class="review-alert error">
-
-                        <?php if (
-                            $_GET['error'] === 'notfound'
-                        ): ?>
-
-                            Review not found.
-
-                        <?php elseif (
-                            $_GET['error'] === 'update'
-                        ): ?>
-
-                            Unable to update review status.
-
-                        <?php elseif (
-                            $_GET['error'] === 'delete'
-                        ): ?>
-
-                            Unable to delete review.
-
-                        <?php else: ?>
-
-                            Unable to process the request.
-
-                        <?php endif; ?>
-
-                    </div>
-
-                <?php endif; ?>
-
-
-                <!-- ==================================================
-                     STATISTICS
-                ================================================== -->
-
-                <section class="review-stats">
-
-
-                    <!-- TOTAL -->
-
-                    <div class="review-stat">
-
-                        <span
-                            class="
-                                review-stat-label
-                            "
-                        >
-                            Total Reviews
-                        </span>
-
-                        <strong
-                            class="
-                                review-stat-value
-                                blue
-                            "
-                        >
-                            <?= number_format(
-                                $total_reviews
-                            ) ?>
-                        </strong>
-
-                    </div>
-
-
-                    <!-- VISIBLE -->
-
-                    <div class="review-stat">
-
-                        <span
-                            class="
-                                review-stat-label
-                            "
-                        >
-                            Visible Reviews
-                        </span>
-
-                        <strong
-                            class="
-                                review-stat-value
-                                green
-                            "
-                        >
-                            <?= number_format(
-                                $visible_reviews
-                            ) ?>
-                        </strong>
-
-                    </div>
-
-
-                    <!-- HIDDEN -->
-
-                    <div class="review-stat">
-
-                        <span
-                            class="
-                                review-stat-label
-                            "
-                        >
-                            Hidden Reviews
-                        </span>
-
-                        <strong
-                            class="
-                                review-stat-value
-                                red
-                            "
-                        >
-                            <?= number_format(
-                                $hidden_reviews
-                            ) ?>
-                        </strong>
-
-                    </div>
-
-
-                    <!-- AVERAGE -->
-
-                    <div class="review-stat">
-
-                        <span
-                            class="
-                                review-stat-label
-                            "
-                        >
-                            Average Rating
-                        </span>
-
-                        <strong
-                            class="
-                                review-stat-value
-                                yellow
-                            "
-                        >
-                            <?= number_format(
-                                (float)
-                                $average_rating,
-                                1) ?>
-
-                            / 5
-                        </strong>
-
-                    </div>
-
-
-                </section>
-
-
-                <!-- ==================================================
-                     FILTER
-                ================================================== -->
-
-                <section class="review-filter-card">
-
-
-                    <div
-                        class="
-                            review-filter-header
-                        "
-                    >
-
-                        <h2>
-                            Review Filters
-                        </h2>
-
-                        <p>
-                            Search reviews by customer, product, rating or status.
-                        </p>
-
-                    </div>
-
-
-                    <form
-                        method="GET"
-                        class="review-filter-form"
-                    >
-
-
-                        <!-- SEARCH -->
-
-                        <input
-                            type="text"
-                            name="search"
-                            placeholder="Search customer, product or review..."
-                            value="<?= review_e(
-                                $search
-                            ) ?>"
-                        >
-
-
-                        <!-- RATING -->
-
-                        <select name="rating">
-
-                            <option value="">
-                                All Ratings
-                            </option>
-
-                            <option
-                                value="5"
-                                <?= (
-                                    $rating_filter === 5
-                                )
-                                    ? 'selected'
-                                    : '' ?>
-                            >
-                                5 Stars
-                            </option>
-
-                            <option
-                                value="4"
-                                <?= (
-                                    $rating_filter === 4
-                                )
-                                    ? 'selected'
-                                    : '' ?>
-                            >
-                                4 Stars
-                            </option>
-
-                            <option
-                                value="3"
-                                <?= (
-                                    $rating_filter === 3
-                                )
-                                    ? 'selected'
-                                    : '' ?>
-                            >
-                                3 Stars
-                            </option>
-
-                            <option
-                                value="2"
-                                <?= (
-                                    $rating_filter === 2
-                                )
-                                    ? 'selected'
-                                    : '' ?>
-                            >
-                                2 Stars
-                            </option>
-
-                            <option
-                                value="1"
-                                <?= (
-                                    $rating_filter === 1
-                                )
-                                    ? 'selected'
-                                    : '' ?>
-                            >
-                                1 Star
-                            </option>
-
-                        </select>
-
-
-                        <!-- STATUS -->
-
-                        <select name="status">
-
-                            <option value="">
-                                All Status
-                            </option>
-
-                            <option
-                                value="Visible"
-                                <?= (
-                                    $status_filter ===
-                                    'Visible')
-                                    ? 'selected'
-                                    : '' ?>
-                            >
-                                Visible
-                            </option>
-
-                            <option
-                                value="Hidden"
-                                <?= (
-                                    $status_filter ===
-                                    'Hidden'
-                                )
-                                    ? 'selected'
-                                    : '' ?>
-                            >
-                                Hidden
-                            </option>
-
-                        </select>
-
-
-                        <!-- SEARCH BUTTON -->
-
-                        <button
-                            type="submit"
-                            class="
-                                review-filter-btn
-                            "
-                        >
-                            SEARCH
-                        </button>
-
-
-                        <!-- RESET -->
-
-                        <a
-                            href="reviews.php"
-                            class="
-                                review-reset-btn
-                            "
-                        >
-                            RESET
-                        </a>
-
-
-                    </form>
-
-                </section>
-
-
-                <!-- ==================================================
-                     REVIEW CARD
-                ================================================== -->
-
-                <section class="review-card">
-
-
-                    <div
-                        class="
-                            review-card-header
-                        "
-                    >
 
                         <div>
 
@@ -2195,129 +3425,335 @@ try {
                             </h2>
 
                             <p>
-                                Latest customer feedback and review activity.
+                                Search, filter and manage marketplace reviews.
                             </p>
 
                         </div>
 
-
-                        <span
-                            class="
-                                review-record-count
-                            "
-                        >
-
-                            <?= number_format(
-                                count($reviews)
-                            ) ?>
-
-                            records
-
-                        </span>
 
                     </div>
 
 
-                    <!-- ==================================================
-                         EMPTY
-                    ================================================== -->
+                    <span class="reviews-count">
 
-                    <?php if (
-                        empty($reviews)
-                    ): ?>
+                        <?= number_format(
+                            count(
+                                $reviews
+                            )
+                        ) ?>
 
-                        <div
+                        reviews
+
+                    </span>
+
+
+                </div>
+
+
+                <!-- =================================================
+                     FILTER
+                ================================================== -->
+
+                <div class="reviews-filter-wrapper">
+
+
+                    <form
+                        method="GET"
+                        action="reviews.php"
+                        class="reviews-filter"
+                    >
+
+
+                        <!-- SEARCH -->
+
+                        <input
+                            type="search"
+                            name="search"
+                            value="<?= reviewEscape(
+                                $search
+                            ) ?>"
+                            placeholder="Search customer, product or review..."
+                            autocomplete="off"
+                        >
+
+
+                        <!-- RATING -->
+
+                        <select
+                            name="rating"
+                            aria-label="Filter rating"
+                        >
+
+                            <option value="0">
+
+                                All Ratings
+
+                            </option>
+
+
+                            <?php for (
+                                $ratingOption = 5;
+                                $ratingOption >= 1;
+                                $ratingOption--
+                            ): ?>
+
+
+                                <option
+                                    value="<?= $ratingOption ?>"
+                                    <?= $ratingFilter ===
+                                        $ratingOption
+                                            ? 'selected'
+                                            : '' ?>
+                                >
+
+                                    <?= $ratingOption ?>
+
+                                    <?= $ratingOption === 1
+                                        ? 'Star'
+                                        : 'Stars' ?>
+
+                                </option>
+
+
+                            <?php endfor; ?>
+
+
+                        </select>
+
+
+                        <!-- STATUS -->
+
+                        <select
+                            name="status"
+                            aria-label="Filter status"
+                        >
+
+                            <option value="">
+
+                                All Status
+
+                            </option>
+
+
+                            <option
+                                value="Visible"
+                                <?= $statusFilter ===
+                                    'Visible'
+                                        ? 'selected'
+                                        : '' ?>
+                            >
+
+                                Visible
+
+                            </option>
+
+
+                            <option
+                                value="Hidden"
+                                <?= $statusFilter ===
+                                    'Hidden'
+                                        ? 'selected'
+                                        : '' ?>
+                            >
+
+                                Hidden
+
+                            </option>
+
+
+                        </select>
+
+
+                        <!-- SEARCH -->
+
+                        <button
+                            type="submit"
                             class="
-                                review-empty
+                                review-btn
+                                review-btn-primary
                             "
                         >
 
-                            <div
-                                class="
-                                    review-empty-icon
-                                "
-                            >
-                                ★
-                            </div>
+                            Search
 
-                            <h3>
-                                No reviews found
-                            </h3>
+                        </button>
 
-                            <p>
-                                Customer reviews will appear here when users submit feedback for their purchased products.
-                            </p>
+
+                        <!-- RESET -->
+
+                        <a
+                            href="reviews.php"
+                            class="
+                                review-btn
+                                review-btn-secondary
+                            "
+                        >
+
+                            Reset
+
+                        </a>
+
+
+                    </form>
+
+
+                </div>
+
+
+                <!-- =================================================
+                     EMPTY
+                ================================================== -->
+
+                <?php if (
+                    empty(
+                        $reviews
+                    )
+                ): ?>
+
+
+                    <div class="reviews-empty">
+
+
+                        <div class="reviews-empty-icon">
+
+                            📝
 
                         </div>
 
 
-                    <?php else: ?>
+                        <h3>
+
+                            No reviews found
+
+                        </h3>
 
 
-                        <!-- ==================================================
-                             TABLE
-                        ================================================== -->
+                        <p>
 
-                        <div
-                            class="
-                                review-table-wrapper
-                            "
-                        >
+                            Customer reviews will appear here when users submit feedback for their purchased products.
 
-                            <table
-                                class="review-table
-                                "
-                            >
+                        </p>
 
 
-                                <thead>
-
-                                    <tr>
-
-                                        <th>
-                                            ID
-                                        </th>
-
-                                        <th>
-                                            Customer
-                                        </th>
-
-                                        <th>
-                                            Product
-                                        </th>
-
-                                        <th>
-                                            Rating
-                                        </th>
-
-                                        <th>
-                                            Review
-                                        </th>
-
-                                        <th>
-                                            Status
-                                        </th>
-
-                                        <th>
-                                            Date
-                                        </th>
-
-                                        <th>
-                                            Action
-                                        </th>
-
-                                    </tr>
-
-                                </thead>
+                    </div>
 
 
-                                <tbody>
+                <?php else: ?>
+
+
+                    <!-- =================================================
+                         TABLE
+                    ================================================== -->
+
+                    <div class="reviews-table-wrapper">
+
+
+                        <table class="reviews-table">
+
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>
+                                        ID
+                                    </th>
+
+                                    <th>
+                                        Customer
+                                    </th>
+
+                                    <th>
+                                        Product
+                                    </th>
+
+                                    <th>
+                                        Rating
+                                    </th>
+
+                                    <th>
+                                        Review
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
+
+                                    <th>
+                                        Date
+                                    </th>
+
+                                    <th>
+                                        Action
+                                    </th>
+
+                                </tr>
+
+                            </thead>
+
+
+                            <tbody>
 
 
                                 <?php foreach (
                                     $reviews
                                     as $item
                                 ): ?>
+
+
+                                    <?php
+
+                                    $reviewId =
+                                        (int)
+                                        (
+                                            $item[
+                                                'review_id'
+                                            ]
+                                            ?? 0
+                                        );
+
+
+                                    $rating =
+                                        (int)
+                                        (
+                                            $item[
+                                                'rating'
+                                            ]
+                                            ?? 0
+                                        );
+
+
+                                    $status =
+                                        $item[
+                                            'status'
+                                        ]
+                                        ?? 'Visible';
+
+
+                                    $statusClass =
+                                        reviewStatusClass(
+                                            $status
+                                        );
+
+
+                                    $productImage =
+                                        trim(
+                                            $item[
+                                                'product_image'
+                                            ]
+                                            ?? ''
+                                        );
+
+
+                                    $reviewImage =
+                                        trim(
+                                            $item[
+                                                'image'
+                                            ]
+                                            ?? ''
+                                        );
+
+                                    ?>
 
 
                                     <tr>
@@ -2327,20 +3763,9 @@ try {
 
                                         <td>
 
-                                            <span
-                                                class="
-                                                    review-id
-                                                "
-                                            >
+                                            <span class="review-id">
 
-                                                #
-
-                                                <?= (int)
-                                                    (
-                                                        $item[
-                                                            'review_id'
-                                                        ] ?? 0
-                                                    ) ?>
+                                                #<?= $reviewId ?>
 
                                             </span>
 
@@ -2351,33 +3776,34 @@ try {
 
                                         <td>
 
-                                            <div
-                                                class="
-                                                    review-customer
-                                                "
-                                            >
+
+                                            <div class="review-customer">
 
                                                 <strong>
 
-                                                    <?= review_e(
+                                                    <?= reviewEscape(
                                                         $item[
                                                             'customer_name'
                                                         ]
+                                                        ?? 'Unknown Customer'
                                                     ) ?>
 
                                                 </strong>
 
+
                                                 <small>
 
-                                                    <?= review_e(
+                                                    <?= reviewEscape(
                                                         $item[
                                                             'customer_email'
                                                         ]
+                                                        ?? '-'
                                                     ) ?>
 
                                                 </small>
 
                                             </div>
+
 
                                         </td>
 
@@ -2386,104 +3812,76 @@ try {
 
                                         <td>
 
-                                            <divclass="
-                                                    review-product
-                                                "
-                                            >
+
+                                            <div class="review-product">
 
 
-                                                <!-- PRODUCT IMAGE -->
-
-                                                <div
-                                                    class="
-                                                        review-product-image
-                                                    "
-                                                >
-
-                                                    <?php
-
-                                                    $productImage =
-                                                        '';
-
-                                                    if (
-                                                        !empty(
-                                                            $item[
-                                                                'product_image'
-                                                            ]
-                                                        )
-                                                    ) {
-
-                                                        $productImage =
-                                                            '../uploads/products/' .
-                                                            basename(
-                                                                $item[
-                                                                    'product_image'
-                                                                ]
-                                                            );
-                                                    }
-
-                                                    ?>
+                                                <div class="review-product-image">
 
 
                                                     <?php if (
-                                                        $productImage &&
-                                                        file_exists(
-                                                            dirname(
-                                                                DIR
-                                                            ) .
-                                                            '/uploads/products/' .
-                                                            basename(
-                                                                $item[
-                                                                    'product_image'
-                                                                ]
-                                                            )
-                                                        )
+                                                        $productImage !== ''
                                                     ): ?>
 
+
                                                         <img
-                                                            src="<?= review_e(
-                                                                $productImage
+                                                            src="<?= reviewEscape(
+                                                                '../uploads/products/' .
+                                                                rawurlencode(
+                                                                    basename(
+                                                                        $productImage
+                                                                    )
+                                                                )
                                                             ) ?>"
-                                                            alt="<?= review_e(
+                                                            alt="<?= reviewEscape(
                                                                 $item[
                                                                     'product_name'
                                                                 ]
+                                                                ?? 'Product'
                                                             ) ?>"
+                                                            onerror="
+                                                                this.style.display='none';
+                                                                this.parentElement.innerHTML='📦';
+                                                            "
                                                         >
+
 
                                                     <?php else: ?>
 
-                                                        <span
-                                                            class="
-                                                                review-product-image-empty
-                                                            "
-                                                        >
-                                                            ▪
-                                                        </span><?php endif; ?>
+
+                                                        📦
+
+
+                                                    <?php endif; ?>
+
 
                                                 </div>
 
 
-                                                <!-- PRODUCT NAME -->
-
                                                 <a
-                                                    href="../product_details.php?id=<?= (int) $item['product_id'] ?>"
+                                                    href="../product_details.php?id=<?= (int)
+                                                        (
+                                                            $item[
+                                                                'product_id'
+                                                            ]
+                                                            ?? 0
+                                                        ) ?>"
                                                     target="_blank"
-                                                    class="
-                                                        review-product-name
-                                                    "
+                                                    class="review-product-name"
                                                 >
 
-                                                    <?= review_e(
+                                                    <?= reviewEscape(
                                                         $item[
                                                             'product_name'
                                                         ]
+                                                        ?? 'Unknown Product'
                                                     ) ?>
 
                                                 </a>
 
 
                                             </div>
+
 
                                         </td>
 
@@ -2492,64 +3890,40 @@ try {
 
                                         <td>
 
-                                            <?php
 
-                                            $rating =
-                                                (int)
-                                                (
-                                                    $item[
-                                                        'rating'
-                                                    ] ?? 0
-                                                );
+                                            <div class="review-rating">
 
-                                            ?>
 
-                                            <div
-                                                class="
-                                                    review-rating
-                                                "
-                                            >
+                                                <span class="review-stars">
 
-                                                <span
-                                                    class="
-                                                        review-stars
-                                                    "
-                                                >
 
-                                                    <?php
-
-                                                    for (
+                                                    <?php for (
                                                         $i = 1;
                                                         $i <= 5;
                                                         $i++
-                                                    ):
+                                                    ): ?>
 
-                                                    ?>
 
-                                                        <?= (
-                                                            $i <=
-                                                            $rating
-                                                        )
+                                                        <?= $i <= $rating
                                                             ? '★'
-                                                            : '☆'
-                                                        ?>
+                                                            : '☆' ?>
+
 
                                                     <?php endfor; ?>
+
 
                                                 </span>
 
 
-                                                <span
-                                                    class="
-                                                        review-rating-number
-                                                    "
-                                                >
+                                                <span class="review-rating-number">
 
                                                     <?= $rating ?>/5
 
                                                 </span>
 
+
                                             </div>
+
 
                                         </td>
 
@@ -2558,22 +3932,18 @@ try {
 
                                         <td>
 
-                                            <div
-                                                class="
-                                                    review-content"
-                                            >
 
-                                                <div
-                                                    class="
-                                                        review-text
-                                                    "
-                                                >
+                                            <div class="review-content">
+
+
+                                                <div class="review-text">
 
                                                     <?= nl2br(
-                                                        review_e(
+                                                        reviewEscape(
                                                             $item[
                                                                 'review'
-                                                            ] ?? ''
+                                                            ]
+                                                            ?? ''
                                                         )
                                                     ) ?>
 
@@ -2581,41 +3951,33 @@ try {
 
 
                                                 <?php if (
-                                                    !empty(
-                                                        $item[
-                                                            'image'
-                                                        ]
-                                                    )
+                                                    $reviewImage !== ''
                                                 ): ?>
 
-                                                    <?php
-
-                                                    $reviewImage =
-                                                        '../uploads/products/' .
-                                                        basename(
-                                                            $item[
-                                                                'image'
-                                                            ]
-                                                        );
-
-                                                    ?>
 
                                                     <a
-                                                        href="<?= review_e(
-                                                            $reviewImage
+                                                        href="<?= reviewEscape(
+                                                            '../uploads/products/' .
+                                                            rawurlencode(
+                                                                basename(
+                                                                    $reviewImage
+                                                                )
+                                                            )
                                                         ) ?>"
                                                         target="_blank"
-                                                        class="
-                                                            review-image-link
-                                                        "
+                                                        class="review-image-link"
                                                     >
-                                                        VIEW IMAGE
+
+                                                        View Image
+
                                                     </a>
+
 
                                                 <?php endif; ?>
 
 
                                             </div>
+
 
                                         </td>
 
@@ -2624,21 +3986,29 @@ try {
 
                                         <td>
 
+
                                             <form
                                                 method="POST"
-                                                class="
-                                                    review-status-form
-                                                "
+                                                action="reviews.php"
+                                                class="review-status-form"
                                             >
+
+
+                                                <input
+                                                    type="hidden"
+                                                    name="csrf_token"
+                                                    value="<?= reviewEscape(
+                                                        $csrfToken
+                                                    ) ?>"
+                                                >
+
 
                                                 <input
                                                     type="hidden"
                                                     name="review_id"
-                                                    value="<?= (int)
-                                                        $item[
-                                                            'review_id'
-                                                        ] ?>"
+                                                    value="<?= $reviewId ?>"
                                                 >
+
 
                                                 <input
                                                     type="hidden"
@@ -2647,74 +4017,80 @@ try {
                                                 >
 
 
-                                                <selectname="status"
-                                                    class="
-                                                        review-status-select
+                                                <select
+                                                    name="status"
+                                                    class="review-status-select"
+                                                    onchange="
+                                                        if (
+                                                            confirm(
+                                                                'Change review status to ' +
+                                                                this.value +
+                                                                '?'
+                                                            )
+                                                        ) {
+                                                            this.form.submit();
+                                                        } else {
+                                                            window.location.reload();
+                                                        }
                                                     "
-                                                    onchange="this.form.submit()"
                                                 >
 
                                                     <option
                                                         value="Visible"
-                                                        <?= (
-                                                            $item[
-                                                                'status'
-                                                            ] ===
+                                                        <?= $status ===
                                                             'Visible'
-                                                        )
-                                                            ? 'selected'
-                                                            : '' ?>
+                                                                ? 'selected'
+                                                                : '' ?>
                                                     >
+
                                                         Visible
+
                                                     </option>
+
 
                                                     <option
                                                         value="Hidden"
-                                                        <?= (
-                                                            $item[
-                                                                'status'
-                                                            ] ===
+                                                        <?= $status ===
                                                             'Hidden'
-                                                        )
-                                                            ? 'selected'
-                                                            : '' ?>
+                                                                ? 'selected'
+                                                                : '' ?>
                                                     >
+
                                                         Hidden
+
                                                     </option>
 
+
                                                 </select>
+
 
                                             </form>
 
 
                                             <div
                                                 style="
-                                                    margin-top:7px;
+                                                    margin-top:
+                                                        7px;
                                                 "
                                             >
 
                                                 <span
                                                     class="
                                                         review-status
-                                                        <?= review_e(
-                                                            review_status_class(
-                                                                $item[
-                                                                    'status'
-                                                                ]
-                                                            )
+                                                        <?= reviewEscape(
+                                                            $statusClass
                                                         ) ?>
                                                     "
                                                 >
 
-                                                    <?= review_e(
-                                                        $item[
-                                                            'status'
-                                                        ]
+                                                    <?= reviewEscape(
+                                                        $status
                                                     ) ?>
 
                                                 </span>
 
                                             </div>
+
 
                                         </td>
 
@@ -2723,15 +4099,14 @@ try {
 
                                         <td>
 
-                                            <span
-                                                class="
-                                                    review-date
-                                                "
-                                            ><?= review_e(
-                                                    review_date(
+                                            <span class="review-date">
+
+                                                <?= reviewEscape(
+                                                    reviewDate(
                                                         $item[
                                                             'review_date'
                                                         ]
+                                                        ?? null
                                                     )
                                                 ) ?>
 
@@ -2744,22 +4119,54 @@ try {
 
                                         <td>
 
-                                            <a
-                                                href="reviews.php?delete=<?= (int)
-                                                    $item[
-                                                        'review_id'
-                                                    ] ?>"
-                                                class="
-                                                    review-delete-btn
-                                                "
-                                                onclick="
+
+                                            <form
+                                                method="POST"
+                                                action="reviews.php"
+                                                class="review-delete-form"
+                                                onsubmit="
                                                     return confirm(
                                                         'Are you sure you want to permanently delete this review?'
                                                     );
                                                 "
                                             >
-                                                DELETE
-                                            </a>
+
+
+                                                <input
+                                                    type="hidden"
+                                                    name="csrf_token"
+                                                    value="<?= reviewEscape(
+                                                        $csrfToken
+                                                    ) ?>"
+                                                >
+
+
+                                                <input
+                                                    type="hidden"
+                                                    name="delete_review"
+                                                    value="1"
+                                                >
+
+
+                                                <input
+                                                    type="hidden"
+                                                    name="review_id"
+                                                    value="<?= $reviewId ?>"
+                                                >
+
+
+                                                <button
+                                                    type="submit"
+                                                    class="review-delete-btn"
+                                                >
+
+                                                    Delete
+
+                                                </button>
+
+
+                                            </form>
+
 
                                         </td>
 
@@ -2770,27 +4177,178 @@ try {
                                 <?php endforeach; ?>
 
 
-                                </tbody>
-
-                            </table>
-
-                        </div>
+                            </tbody>
 
 
-                    <?php endif; ?>
+                        </table>
 
 
-                </section>
+                    </div>
 
 
-            </div>
+                <?php endif; ?>
+
+
+            </section>
+
 
         </div>
+
 
     </main>
 
 
 </div>
+
+
+<script>
+
+    /*
+    |--------------------------------------------------------------------------
+    | SIDEBAR WIDTH SYNC
+    |--------------------------------------------------------------------------
+    */
+
+    function syncReviewsSidebar() {
+
+        const main =
+            document.querySelector(
+                '.reviews-main'
+            );
+
+
+        if (!main) {
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MOBILE
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            window.innerWidth <= 900
+        ) {
+
+            document.documentElement
+                .style
+                .setProperty(
+                    '--review-sidebar-width',
+                    '0px'
+                );
+
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FIND SIDEBAR
+        |--------------------------------------------------------------------------
+        */
+
+        const sidebar =
+            document.querySelector(
+                '.admin-sidebar'
+            ) ||
+            document.querySelector(
+                '.dashboard-sidebar'
+            ) ||
+            document.querySelector(
+                '.sidebar'
+            ) ||
+            document.querySelector(
+                'aside'
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FALLBACK
+        |--------------------------------------------------------------------------
+        */
+
+        if (!sidebar) {
+
+            document.documentElement
+                .style
+                .setProperty(
+                    '--review-sidebar-width',
+                    '260px'
+                );
+
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | REAL SIDEBAR WIDTH
+        |--------------------------------------------------------------------------
+        */
+
+        const rect =
+            sidebar
+                .getBoundingClientRect();
+
+
+        if (rect.right > 0) {
+
+            document.documentElement
+                .style
+                .setProperty(
+                    '--review-sidebar-width',
+                    rect.right + 'px'
+                );
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD
+    |--------------------------------------------------------------------------
+    */
+
+    document.addEventListener(
+        'DOMContentLoaded',
+        function () {
+
+            syncReviewsSidebar();
+
+
+            setTimeout(
+                syncReviewsSidebar,
+                100
+            );
+
+
+            setTimeout(
+                syncReviewsSidebar,
+                400
+            );
+
+        }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESIZE
+    |--------------------------------------------------------------------------
+    */
+
+    window.addEventListener(
+        'resize',
+        syncReviewsSidebar
+    );
+
+</script>
 
 
 </body>
