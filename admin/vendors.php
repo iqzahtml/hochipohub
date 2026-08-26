@@ -456,10 +456,6 @@ $suspended_vendors = (int) $db
 
     <title>Vendors | HochipoHub Admin</title>
 
-    <!-- =========================================================
-         POPPINS FONT
-    ========================================================== -->
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
 
     <link
@@ -485,10 +481,6 @@ $suspended_vendors = (int) $db
 
     <style>
 
-        /* =========================================================
-           POPPINS - GLOBAL PAGE FONT
-        ========================================================= */
-
         html,
         body,
         button,
@@ -502,20 +494,12 @@ $suspended_vendors = (int) $db
         }
 
         .vendors-page,
-        .vendors-page *,
-        .vendors-topbar,
-        .vendors-topbar * {
+        .vendors-page * {
 
             font-family:
                 'Poppins',
                 sans-serif;
         }
-
-
-        /* =========================================================
-           HOCHIPOHUB VENDORS PAGE
-           PREMIUM BLUE ADMIN UI
-        ========================================================= */
 
         .vendors-page {
 
@@ -535,18 +519,13 @@ $suspended_vendors = (int) $db
             padding: 0 34px 55px;
         }
 
-
-        /* =========================================================
-           HEADER
-        ========================================================= */
-
         .vendors-topbar {
 
             min-height: 92px;
 
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-start;
 
             margin: 0 -34px 28px;
             padding: 0 34px;
@@ -588,11 +567,6 @@ $suspended_vendors = (int) $db
 
             font-weight: 500;
         }
-
-
-        /* =========================================================
-           HERO
-        ========================================================= */
 
         .vendors-hero {
 
@@ -798,11 +772,6 @@ $suspended_vendors = (int) $db
             text-transform: uppercase;
         }
 
-
-        /* =========================================================
-           STATISTICS
-        ========================================================= */
-
         .vendors-stats {
 
             display: grid;
@@ -946,11 +915,6 @@ $suspended_vendors = (int) $db
             background: #fef2f2;
         }
 
-
-        /* =========================================================
-           PANEL
-        ========================================================= */
-
         .vendors-panel {
 
             overflow: hidden;
@@ -1051,11 +1015,6 @@ $suspended_vendors = (int) $db
             font-weight: 800;
         }
 
-
-        /* =========================================================
-           ALERT
-        ========================================================= */
-
         .vendors-alert {
 
             display: flex;
@@ -1092,11 +1051,6 @@ $suspended_vendors = (int) $db
 
             border: 1px solid #fecaca;
         }
-
-
-        /* =========================================================
-           TABLE
-        ========================================================= */
 
         .vendors-table-wrapper {
 
@@ -1167,11 +1121,6 @@ $suspended_vendors = (int) $db
             border-bottom: none;
         }
 
-
-        /* =========================================================
-           VENDOR PERSON
-        ========================================================= */
-
         .vendor-person {
 
             display: flex;
@@ -1230,11 +1179,6 @@ $suspended_vendors = (int) $db
 
             font-size: 10px;
         }
-
-
-        /* =========================================================
-           BUSINESS
-        ========================================================= */
 
         .vendor-business strong {
 
@@ -1296,11 +1240,6 @@ $suspended_vendors = (int) $db
 
             font-weight: 600;
         }
-
-
-        /* =========================================================
-           STATUS SELECT
-        ========================================================= */
 
         .vendor-status-form {
 
@@ -1380,11 +1319,6 @@ $suspended_vendors = (int) $db
 
             border-color: #fecaca;
         }
-
-
-        /* =========================================================
-           FILTER
-        ========================================================= */
 
         .vendors-filter {
 
@@ -1586,11 +1520,6 @@ $suspended_vendors = (int) $db
             background: var(--blue-light);
         }
 
-
-        /* =========================================================
-           APPLICATION ACTIONS
-        ========================================================= */
-
         .application-actions {
 
             display: flex;
@@ -1663,11 +1592,6 @@ $suspended_vendors = (int) $db
             border-color: #dc2626;
         }
 
-
-        /* =========================================================
-           EMPTY STATE
-        ========================================================= */
-
         .vendor-empty {
 
             padding: 55px 20px !important;
@@ -1724,11 +1648,6 @@ $suspended_vendors = (int) $db
             color: #9aa6b7;
         }
 
-
-        /* =========================================================
-           DATE
-        ========================================================= */
-
         .vendor-date {
 
             color: #64748b;
@@ -1739,11 +1658,6 @@ $suspended_vendors = (int) $db
 
             white-space: nowrap;
         }
-
-
-        /* =========================================================
-           RESPONSIVE
-        ========================================================= */
 
         @media (max-width: 1200px) {
 
@@ -1774,7 +1688,6 @@ $suspended_vendors = (int) $db
             }
         }
 
-
         @media (max-width: 900px) {
 
             .vendors-hero {
@@ -1802,7 +1715,6 @@ $suspended_vendors = (int) $db
                 flex: 1;
             }
         }
-
 
         @media (max-width: 650px) {
 
@@ -1858,13 +1770,6 @@ $suspended_vendors = (int) $db
                 gap: 12px;
             }
 
-            .vendors-section-heading {
-
-                align-items: flex-start;
-
-                flex-direction: column;
-            }
-
             .vendors-panel-header {
 
                 align-items: flex-start;
@@ -1906,34 +1811,19 @@ $suspended_vendors = (int) $db
 
 </head>
 
-
 <body>
 
 <div class="admin-wrapper">
 
     <?php require_once dirname(__DIR__) . '/includes/admin_sidebar.php'; ?>
 
-
     <main class="admin-main">
 
-
-        <!-- =====================================================
-             PAGE HEADER
-        ====================================================== -->
+        <!-- PAGE HEADER -->
 
         <header class="vendors-topbar">
 
             <div class="vendors-header-left">
-
-                <button
-                    type="button"
-                    id="adminSidebarToggle"
-                    class="admin-sidebar-toggle"
-                    aria-label="Open sidebar"
-                    aria-expanded="false"
-                >
-                    ☰
-                </button>
 
                 <div class="vendors-header-text">
 
@@ -1949,13 +1839,9 @@ $suspended_vendors = (int) $db
 
         </header>
 
-
         <div class="vendors-page">
 
-
-            <!-- =================================================
-                 ALERT
-            ================================================== -->
+            <!-- ALERT -->
 
             <?php if (isset($_GET['success'])): ?>
 
@@ -1998,7 +1884,6 @@ $suspended_vendors = (int) $db
 
             <?php endif; ?>
 
-
             <?php if (isset($_GET['error'])): ?>
 
                 <div class="vendors-alert error">
@@ -2030,10 +1915,7 @@ $suspended_vendors = (int) $db
 
             <?php endif; ?>
 
-
-            <!-- =================================================
-                 HERO
-            ================================================== -->
+            <!-- HERO -->
 
             <section class="vendors-hero">
 
@@ -2060,7 +1942,6 @@ $suspended_vendors = (int) $db
 
                 </div>
 
-
                 <div class="vendors-hero-number">
 
                     <strong>
@@ -2075,13 +1956,9 @@ $suspended_vendors = (int) $db
 
             </section>
 
-
-            <!-- =================================================
-                 STATISTICS
-            ================================================== -->
+            <!-- STATISTICS -->
 
             <div class="vendors-stats">
-
 
                 <!-- TOTAL -->
 
@@ -2130,7 +2007,6 @@ $suspended_vendors = (int) $db
 
                 </div>
 
-
                 <!-- APPROVED -->
 
                 <div class="vendor-stat-card">
@@ -2168,7 +2044,6 @@ $suspended_vendors = (int) $db
 
                 </div>
 
-
                 <!-- PENDING -->
 
                 <div class="vendor-stat-card pending">
@@ -2205,7 +2080,6 @@ $suspended_vendors = (int) $db
                     </span>
 
                 </div>
-
 
                 <!-- SUSPENDED -->
 
@@ -2246,16 +2120,11 @@ $suspended_vendors = (int) $db
 
                 </div>
 
-
             </div>
 
-
-            <!-- =================================================
-                 PENDING APPLICATIONS
-            ================================================== -->
+            <!-- PENDING APPLICATIONS -->
 
             <section class="vendors-panel">
-
 
                 <div class="vendors-panel-header">
 
@@ -2286,7 +2155,6 @@ $suspended_vendors = (int) $db
 
                         </div>
 
-
                         <div>
 
                             <h2>
@@ -2301,7 +2169,6 @@ $suspended_vendors = (int) $db
 
                     </div>
 
-
                     <div class="vendor-count-badge">
 
                         <?= count($applications) ?>
@@ -2311,7 +2178,6 @@ $suspended_vendors = (int) $db
                     </div>
 
                 </div>
-
 
                 <div class="vendors-table-wrapper">
 
@@ -2337,9 +2203,7 @@ $suspended_vendors = (int) $db
 
                         </thead>
 
-
                         <tbody>
-
 
                         <?php if (!$applications): ?>
 
@@ -2383,7 +2247,6 @@ $suspended_vendors = (int) $db
 
                         <?php else: ?>
 
-
                             <?php foreach ($applications as $a): ?>
 
                                 <?php
@@ -2401,7 +2264,6 @@ $suspended_vendors = (int) $db
 
                                 <tr>
 
-
                                     <td>
 
                                         <span class="vendor-id">
@@ -2409,7 +2271,6 @@ $suspended_vendors = (int) $db
                                         </span>
 
                                     </td>
-
 
                                     <td>
 
@@ -2439,7 +2300,6 @@ $suspended_vendors = (int) $db
 
                                     </td>
 
-
                                     <td>
 
                                         <div class="vendor-business">
@@ -2455,7 +2315,6 @@ $suspended_vendors = (int) $db
                                         </div>
 
                                     </td>
-
 
                                     <td>
 
@@ -2473,7 +2332,6 @@ $suspended_vendors = (int) $db
 
                                     </td>
 
-
                                     <td>
 
                                         <span class="vendor-date">
@@ -2489,11 +2347,9 @@ $suspended_vendors = (int) $db
 
                                     </td>
 
-
                                     <td>
 
                                         <div class="application-actions">
-
 
                                             <form method="POST">
 
@@ -2531,7 +2387,6 @@ $suspended_vendors = (int) $db
                                                 </button>
 
                                             </form>
-
 
                                             <form method="POST">
 
@@ -2572,19 +2427,15 @@ $suspended_vendors = (int) $db
 
                                             </form>
 
-
                                         </div>
 
                                     </td>
-
 
                                 </tr>
 
                             <?php endforeach; ?>
 
-
                         <?php endif; ?>
-
 
                         </tbody>
 
@@ -2594,13 +2445,9 @@ $suspended_vendors = (int) $db
 
             </section>
 
-
-            <!-- =================================================
-                 SEARCH / FILTER
-            ================================================== -->
+            <!-- SEARCH / FILTER -->
 
             <section class="vendors-panel">
-
 
                 <div class="vendors-panel-header">
 
@@ -2625,7 +2472,6 @@ $suspended_vendors = (int) $db
 
                         </div>
 
-
                         <div>
 
                             <h2>
@@ -2642,12 +2488,10 @@ $suspended_vendors = (int) $db
 
                 </div>
 
-
                 <form
                     method="GET"
                     class="vendors-filter"
                 >
-
 
                     <div class="vendors-search">
 
@@ -2666,7 +2510,6 @@ $suspended_vendors = (int) $db
                             <path d="m20 20-4-4"/>
                         </svg>
 
-
                         <input
                             type="text"
                             name="search"
@@ -2675,7 +2518,6 @@ $suspended_vendors = (int) $db
                         >
 
                     </div>
-
 
                     <select name="status">
 
@@ -2698,7 +2540,6 @@ $suspended_vendors = (int) $db
                         <?php endforeach; ?>
 
                     </select>
-
 
                     <button
                         type="submit"
@@ -2726,7 +2567,6 @@ $suspended_vendors = (int) $db
 
                     </button>
 
-
                     <a
                         href="vendors.php"
                         class="vendors-reset"
@@ -2734,18 +2574,13 @@ $suspended_vendors = (int) $db
                         Reset
                     </a>
 
-
                 </form>
 
             </section>
 
-
-            <!-- =================================================
-                 VENDOR LIST
-            ================================================== -->
+            <!-- VENDOR LIST -->
 
             <section class="vendors-panel">
-
 
                 <div class="vendors-panel-header">
 
@@ -2776,7 +2611,6 @@ $suspended_vendors = (int) $db
 
                         </div>
 
-
                         <div>
 
                             <h2>
@@ -2792,7 +2626,6 @@ $suspended_vendors = (int) $db
 
                     </div>
 
-
                     <div class="vendor-count-badge">
 
                         <?= number_format(count($vendors)) ?>
@@ -2802,7 +2635,6 @@ $suspended_vendors = (int) $db
                     </div>
 
                 </div>
-
 
                 <div class="vendors-table-wrapper">
 
@@ -2830,9 +2662,7 @@ $suspended_vendors = (int) $db
 
                         </thead>
 
-
                         <tbody>
-
 
                         <?php if (!$vendors): ?>
 
@@ -2878,7 +2708,6 @@ $suspended_vendors = (int) $db
 
                         <?php else: ?>
 
-
                             <?php foreach ($vendors as $v): ?>
 
                                 <?php
@@ -2901,7 +2730,6 @@ $suspended_vendors = (int) $db
 
                                 <tr>
 
-
                                     <!-- ID -->
 
                                     <td>
@@ -2911,7 +2739,6 @@ $suspended_vendors = (int) $db
                                         </span>
 
                                     </td>
-
 
                                     <!-- BUSINESS -->
 
@@ -2932,7 +2759,6 @@ $suspended_vendors = (int) $db
                                         </div>
 
                                     </td>
-
 
                                     <!-- OWNER -->
 
@@ -2960,7 +2786,6 @@ $suspended_vendors = (int) $db
 
                                     </td>
 
-
                                     <!-- CATEGORY -->
 
                                     <td>
@@ -2975,7 +2800,6 @@ $suspended_vendors = (int) $db
 
                                     </td>
 
-
                                     <!-- DELIVERY -->
 
                                     <td>
@@ -2989,7 +2813,6 @@ $suspended_vendors = (int) $db
                                         </span>
 
                                     </td>
-
 
                                     <!-- STATUS -->
 
@@ -3046,7 +2869,6 @@ $suspended_vendors = (int) $db
 
                                     </td>
 
-
                                     <!-- JOINED -->
 
                                     <td>
@@ -3066,14 +2888,11 @@ $suspended_vendors = (int) $db
 
                                     </td>
 
-
                                 </tr>
 
                             <?php endforeach; ?>
 
-
                         <?php endif; ?>
-
 
                         </tbody>
 
@@ -3083,48 +2902,13 @@ $suspended_vendors = (int) $db
 
             </section>
 
-
         </div>
 
     </main>
 
 </div>
 
-
 <script>
-
-document.addEventListener('DOMContentLoaded', function () {
-
-    const toggle =
-        document.getElementById('adminSidebarToggle');
-
-    if (!toggle) {
-        return;
-    }
-
-    toggle.addEventListener('click', function () {
-
-        const wrapper =
-            document.querySelector('.admin-wrapper');
-
-        if (!wrapper) {
-            return;
-        }
-
-        wrapper.classList.toggle('sidebar-open');
-
-        const isOpen =
-            wrapper.classList.contains('sidebar-open');
-
-        toggle.setAttribute(
-            'aria-expanded',
-            isOpen ? 'true' : 'false'
-        );
-
-    });
-
-});
-
 
 /*
 |--------------------------------------------------------------------------
@@ -3168,7 +2952,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 </script>
-
 
 </body>
 
