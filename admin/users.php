@@ -12,7 +12,6 @@ $db = getDB();
 */
 
 if (!function_exists('e')) {
-
     function e($value)
     {
         return htmlspecialchars(
@@ -22,7 +21,6 @@ if (!function_exists('e')) {
         );
     }
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -34,7 +32,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | ADMIN ACCESS
@@ -45,15 +42,11 @@ if (
     !isset($_SESSION['user_id']) ||
     ($_SESSION['role'] ?? '') !== 'admin'
 ) {
-
     header('Location: ../index.php');
-
     exit;
 }
 
-
 $admin_id = (int) $_SESSION['user_id'];
-
 
 /*
 |--------------------------------------------------------------------------
@@ -65,13 +58,9 @@ if (
     $_SERVER['REQUEST_METHOD'] === 'POST' &&
     isset($_POST['update_user'])
 ) {
-
     $user_id = (int) ($_POST['user_id'] ?? 0);
-
     $role = $_POST['role'] ?? '';
-
     $status = $_POST['status'] ?? '';
-
 
     /*
     |--------------------------------------------------------------------------
@@ -101,14 +90,9 @@ if (
             true
         )
     ) {
-
-        header(
-            'Location: users.php?error=invalid'
-        );
-
+        header('Location: users.php?error=invalid');
         exit;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -117,14 +101,9 @@ if (
     */
 
     if ($user_id === $admin_id) {
-
-        header(
-            'Location: users.php?error=self'
-        );
-
+        header('Location: users.php?error=self');
         exit;
     }
-
 
     try {
 
@@ -145,16 +124,10 @@ if (
             $user_id
         ]);
 
-
         if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
-
-            header(
-                'Location: users.php?error=notfound'
-            );
-
+            header('Location: users.php?error=notfound');
             exit;
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -174,7 +147,6 @@ if (
             $status,
             $user_id
         ]);
-
 
         /*
         |--------------------------------------------------------------------------
@@ -206,27 +178,17 @@ if (
             $user_id
         ]);
 
-
-        header(
-            'Location: users.php?success=updated'
-        );
-
+        header('Location: users.php?success=updated');
         exit;
 
     } catch (PDOException $e) {
 
-        error_log(
-            $e->getMessage()
-        );
+        error_log($e->getMessage());
 
-        header(
-            'Location: users.php?error=update'
-        );
-
+        header('Location: users.php?error=update');
         exit;
     }
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -234,14 +196,9 @@ if (
 |--------------------------------------------------------------------------
 */
 
-$search = trim(
-    $_GET['search'] ?? ''
-);
-
+$search = trim($_GET['search'] ?? '');
 $role_filter = $_GET['role'] ?? '';
-
 $status_filter = $_GET['status'] ?? '';
-
 
 /*
 |--------------------------------------------------------------------------
@@ -251,40 +208,24 @@ $status_filter = $_GET['status'] ?? '';
 
 $sql = "
     SELECT
-
         u.user_id,
-
         u.name,
-
         u.email,
-
         u.phone,
-
         u.role,
-
         u.status,
-
         u.mfa_enabled,
-
         u.created_at,
-
         v.vendor_id,
-
         v.business_name,
-
         v.approval_status
-
     FROM users u
-
     LEFT JOIN vendors v
         ON u.user_id = v.user_id
-
     WHERE 1 = 1
 ";
 
-
 $params = [];
-
 
 /*
 |--------------------------------------------------------------------------
@@ -304,7 +245,6 @@ if ($search !== '') {
 
     $v = "%{$search}%";
 
-
     array_push(
         $params,
         $v,
@@ -312,7 +252,6 @@ if ($search !== '') {
         $v
     );
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -338,7 +277,6 @@ if (
 
     $params[] = $role_filter;
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -366,7 +304,6 @@ if (
     $params[] = $status_filter;
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | ORDER
@@ -378,15 +315,10 @@ $sql .= "
         u.created_at DESC
 ";
 
-
 $stmt = $db->prepare($sql);
-
 $stmt->execute($params);
 
-$users = $stmt->fetchAll(
-    PDO::FETCH_ASSOC
-);
-
+$users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 /*
 |--------------------------------------------------------------------------
@@ -401,7 +333,6 @@ $total_users = (int) $db
     )
     ->fetchColumn();
 
-
 $total_customers = (int) $db
     ->query(
         "SELECT COUNT(*)
@@ -410,7 +341,6 @@ $total_customers = (int) $db
     )
     ->fetchColumn();
 
-
 $total_vendors = (int) $db
     ->query(
         "SELECT COUNT(*)
@@ -418,7 +348,6 @@ $total_vendors = (int) $db
          WHERE role = 'vendor'"
     )
     ->fetchColumn();
-
 
 $total_admins = (int) $db
     ->query(
@@ -432,25 +361,20 @@ $total_admins = (int) $db
 
 <!doctype html>
 
-<html
-    lang="en"
->
+<html lang="en">
 
 <head>
 
     <meta charset="UTF-8">
-
 
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
 
-
     <title>
         Users | HochipoHub Admin
     </title>
-
 
     <!-- FONT -->
 
@@ -470,7 +394,6 @@ $total_admins = (int) $db
         rel="stylesheet"
     >
 
-
     <!-- EXISTING ADMIN CSS -->
 
     <link
@@ -478,12 +401,10 @@ $total_admins = (int) $db
         href="../css/admin.css"
     >
 
-
     <link
         rel="stylesheet"
         href="../css/responsive.css"
     >
-
 
     <style>
 
@@ -492,59 +413,24 @@ $total_admins = (int) $db
        BLUE ADMIN THEME
     ========================================================= */
 
-
     :root {
-
-        --users-navy:
-            #071a3d;
-
-        --users-navy-2:
-            #0b2454;
-
-        --users-blue:
-            #2563eb;
-
-        --users-blue-dark:
-            #1d4ed8;
-
-        --users-blue-light:
-            #3b82f6;
-
-        --users-blue-soft:
-            #eff6ff;
-
-        --users-blue-pale:
-            #dbeafe;
-
-        --users-bg:
-            #f5f8fd;
-
-        --users-white:
-            #ffffff;
-
-        --users-text:
-            #0f172a;
-
-        --users-text-2:
-            #1e293b;
-
-        --users-muted:
-            #64748b;
-
-        --users-muted-2:
-            #94a3b8;
-
-        --users-border:
-            #e2e8f0;
-
-        --users-border-blue:
-            #bfdbfe;
-
-        --users-shadow:
-            0 10px 30px
-            rgba(15, 23, 42, .055);
+        --users-navy: #071a3d;
+        --users-navy-2: #0b2454;
+        --users-blue: #2563eb;
+        --users-blue-dark: #1d4ed8;
+        --users-blue-light: #3b82f6;
+        --users-blue-soft: #eff6ff;
+        --users-blue-pale: #dbeafe;
+        --users-bg: #f5f8fd;
+        --users-white: #ffffff;
+        --users-text: #0f172a;
+        --users-text-2: #1e293b;
+        --users-muted: #64748b;
+        --users-muted-2: #94a3b8;
+        --users-border: #e2e8f0;
+        --users-border-blue: #bfdbfe;
+        --users-shadow: 0 10px 30px rgba(15, 23, 42, .055);
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -553,23 +439,15 @@ $total_admins = (int) $db
     */
 
     * {
-
-        box-sizing:
-            border-box;
+        box-sizing: border-box;
     }
-
 
     html {
-
-        scroll-behavior:
-            smooth;
+        scroll-behavior: smooth;
     }
 
-
     body {
-
-        margin:
-            0;
+        margin: 0;
 
         background:
             linear-gradient(
@@ -578,8 +456,7 @@ $total_admins = (int) $db
                 #f3f7fd 100%
             );
 
-        color:
-            var(--users-text);
+        color: var(--users-text);
 
         font-family:
             "Poppins",
@@ -592,15 +469,11 @@ $total_admins = (int) $db
             sans-serif;
     }
 
-
     button,
     input,
     select {
-
-        font-family:
-            inherit;
+        font-family: inherit;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -609,26 +482,17 @@ $total_admins = (int) $db
     */
 
     .admin-wrapper {
-
-        min-height:
-            100vh;
-
-        background:
-            var(--users-bg);
+        min-height: 100vh;
+        background: var(--users-bg);
     }
-
 
     /*
     |--------------------------------------------------------------------------
     | BLUE SIDEBAR OVERRIDE
     |--------------------------------------------------------------------------
-    |
-    | This keeps this page consistent with the new blue theme.
-    |
     */
 
     .admin-sidebar {
-
         background:
             linear-gradient(
                 180deg,
@@ -638,12 +502,8 @@ $total_admins = (int) $db
             ) !important;
     }
 
-
-    .admin-sidebar
-    .admin-nav-item.active,
-    .admin-sidebar
-    .admin-menu-item.active {
-
+    .admin-sidebar .admin-nav-item.active,
+    .admin-sidebar .admin-menu-item.active {
         background:
             linear-gradient(
                 135deg,
@@ -651,10 +511,8 @@ $total_admins = (int) $db
                 #1d4ed8
             ) !important;
 
-        color:
-            #ffffff !important;
+        color: #ffffff !important;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -663,20 +521,12 @@ $total_admins = (int) $db
     */
 
     .admin-main {
-
-        min-width:
-            0;
-
-        min-height:
-            100vh;
-
-        padding-bottom:
-            50px;
-
-        background:
-            transparent;
+        min-width: 0;
+        min-height: 100vh;
+        padding-left: 0;
+        padding-bottom: 50px;
+        background: transparent;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -685,188 +535,58 @@ $total_admins = (int) $db
     */
 
     .admin-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
 
-        position:
-            sticky;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
 
-        top:
-            0;
+        min-height: 92px;
 
-        z-index:
-            50;
+        padding: 20px 38px;
 
-        display:
-            flex;
-
-        align-items:
-            center;
-
-        justify-content:
-            space-between;
-
-        min-height:
-            92px;
-
-        padding:
-            20px
-            38px;
-
-        background:
-            rgba(
-                255,
-                255,
-                255,
-                .94
-            );
+        background: rgba(255, 255, 255, .94);
 
         border-bottom:
             1px solid
-            rgba(
-                226,
-                232,
-                240,
-                .9
-            );
+            rgba(226, 232, 240, .9);
 
-        backdrop-filter:
-            blur(16px);
+        backdrop-filter: blur(16px);
     }
-
 
     .admin-header-left {
-
-        display:
-            flex;
-
-        align-items:
-            center;
-
-        gap:
-            17px;
-
-        min-width:
-            0;
+        display: flex;
+        align-items: center;
+        gap: 17px;
+        min-width: 0;
     }
-
 
     .admin-header-left > div:last-child {
-
-        min-width:
-            0;
+        min-width: 0;
     }
-
 
     .admin-topbar h1 {
+        margin: 0;
 
-        margin:
-            0;
+        color: var(--users-text);
 
-        color:
-            var(--users-text);
+        font-size: 29px;
+        line-height: 1.15;
+        font-weight: 800;
 
-        font-size:
-            29px;
-
-        line-height:
-            1.15;
-
-        font-weight:
-            800;
-
-        letter-spacing:
-            -.8px;
+        letter-spacing: -.8px;
     }
-
 
     .admin-topbar p {
+        margin: 6px 0 0;
 
-        margin:
-            6px
-            0
-            0;
+        color: var(--users-muted);
 
-        color:
-            var(--users-muted);
-
-        font-size:
-            12px;
-
-        font-weight:
-            500;
+        font-size: 12px;
+        font-weight: 500;
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | MOBILE SIDEBAR BUTTON
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-sidebar-toggle {
-
-        width:
-            42px;
-
-        height:
-            42px;
-
-        display:
-            inline-flex;
-
-        align-items:
-            center;
-
-        justify-content:
-            center;
-
-        border:
-            1px solid
-            var(--users-border);
-
-        border-radius:
-            12px;
-
-        background:
-            #ffffff;
-
-        color:
-            var(--users-navy);
-
-        font-size:
-            19px;
-
-        cursor:
-            pointer;
-
-        box-shadow:
-            0 4px 12px
-            rgba(
-                15,
-                23,
-                42,
-                .05
-            );
-
-        transition:
-            .2s ease;
-    }
-
-
-    .admin-sidebar-toggle:hover {
-
-        color:
-            var(--users-blue);
-
-        border-color:
-            var(--users-border-blue);
-
-        background:
-            var(--users-blue-soft);
-
-        transform:
-            translateY(-1px);
-    }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -874,29 +594,16 @@ $total_admins = (int) $db
     |--------------------------------------------------------------------------
     */
 
-    .admin-main {
-
-        padding-left:
-            0;
-    }
-
-
     .admin-main > section,
     .admin-main > .admin-alert {
+        width: min(
+            calc(100% - 76px),
+            1480px
+        );
 
-        width:
-            min(
-                calc(100% - 76px),
-                1480px
-            );
-
-        margin-left:
-            auto;
-
-        margin-right:
-            auto;
+        margin-left: auto;
+        margin-right: auto;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -905,63 +612,36 @@ $total_admins = (int) $db
     */
 
     .admin-alert {
+        margin-top: 22px;
+        margin-bottom: 0;
 
-        margin-top:
-            22px;
-
-        margin-bottom:
-            0;
-
-        padding:
-            13px
-            17px;
+        padding: 13px 17px;
 
         border:
             1px solid
             var(--users-border-blue);
 
-        border-radius:
-            13px;
+        border-radius: 13px;
 
-        background:
-            var(--users-blue-soft);
+        background: var(--users-blue-soft);
 
-        color:
-            var(--users-blue-dark);
+        color: var(--users-blue-dark);
 
-        font-size:
-            11px;
-
-        font-weight:
-            600;
+        font-size: 11px;
+        font-weight: 600;
     }
-
 
     .admin-alert.success {
-
-        border-color:
-            #bfdbfe;
-
-        background:
-            #eff6ff;
-
-        color:
-            #1d4ed8;
+        border-color: #bfdbfe;
+        background: #eff6ff;
+        color: #1d4ed8;
     }
-
 
     .admin-alert.error {
-
-        border-color:
-            #93c5fd;
-
-        background:
-            #eff6ff;
-
-        color:
-            #1e40af;
+        border-color: #93c5fd;
+        background: #eff6ff;
+        color: #1e40af;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -970,56 +650,37 @@ $total_admins = (int) $db
     */
 
     .admin-stats {
-
-        display:
-            grid;
+        display: grid;
 
         grid-template-columns:
             repeat(
                 4,
-                minmax(
-                    0,
-                    1fr
-                )
+                minmax(0, 1fr)
             );
 
-        gap:
-            15px;
+        gap: 15px;
 
-        margin-top:
-            28px;
-
-        margin-bottom:
-            22px;
+        margin-top: 28px;
+        margin-bottom: 22px;
     }
 
-
     .stat-card {
+        position: relative;
+        overflow: hidden;
 
-        position:
-            relative;
+        min-height: 135px;
 
-        overflow:
-            hidden;
-
-        min-height:
-            135px;
-
-        padding:
-            20px;
+        padding: 20px;
 
         border:
             1px solid
             var(--users-border);
 
-        border-radius:
-            18px;
+        border-radius: 18px;
 
-        background:
-            #ffffff;
+        background: #ffffff;
 
-        box-shadow:
-            var(--users-shadow);
+        box-shadow: var(--users-shadow);
 
         transition:
             transform .22s ease,
@@ -1027,39 +688,24 @@ $total_admins = (int) $db
             border-color .22s ease;
     }
 
-
     .stat-card::after {
+        content: "";
 
-        content:
-            "";
+        position: absolute;
 
-        position:
-            absolute;
+        right: -38px;
+        bottom: -48px;
 
-        right:
-            -38px;
+        width: 115px;
+        height: 115px;
 
-        bottom:
-            -48px;
+        border-radius: 50%;
 
-        width:
-            115px;
-
-        height:
-            115px;
-
-        border-radius:
-            50%;
-
-        background:
-            var(--users-blue-soft);
+        background: var(--users-blue-soft);
     }
 
-
     .stat-card:hover {
-
-        transform:
-            translateY(-3px);
+        transform: translateY(-3px);
 
         border-color:
             var(--users-border-blue);
@@ -1074,26 +720,16 @@ $total_admins = (int) $db
             );
     }
 
-
     .stat-card::before {
+        content: "";
 
-        content:
-            "";
+        position: absolute;
 
-        position:
-            absolute;
+        top: 0;
+        left: 0;
 
-        top:
-            0;
-
-        left:
-            0;
-
-        width:
-            100%;
-
-        height:
-            3px;
+        width: 100%;
+        height: 3px;
 
         background:
             linear-gradient(
@@ -1103,65 +739,37 @@ $total_admins = (int) $db
             );
     }
 
-
     .stat-label {
+        position: relative;
+        z-index: 1;
 
-        position:
-            relative;
+        display: block;
 
-        z-index:
-            1;
+        margin-bottom: 9px;
 
-        display:
-            block;
+        color: var(--users-muted);
 
-        margin-bottom:
-            9px;
+        font-size: 10px;
+        font-weight: 600;
 
-        color:
-            var(--users-muted);
-
-        font-size:
-            10px;
-
-        font-weight:
-            600;
-
-        text-transform:
-            uppercase;
-
-        letter-spacing:
-            .55px;
+        text-transform: uppercase;
+        letter-spacing: .55px;
     }
-
 
     .stat-card strong {
+        position: relative;
+        z-index: 1;
 
-        position:
-            relative;
+        display: block;
 
-        z-index:
-            1;
+        color: var(--users-text);
 
-        display:
-            block;
+        font-size: 30px;
+        line-height: 1;
+        font-weight: 800;
 
-        color:
-            var(--users-text);
-
-        font-size:
-            30px;
-
-        line-height:
-            1;
-
-        font-weight:
-            800;
-
-        letter-spacing:
-            -1px;
+        letter-spacing: -1px;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1170,44 +778,26 @@ $total_admins = (int) $db
     */
 
     .stat-card .stat-label::before {
+        display: inline-flex;
 
-        display:
-            inline-flex;
+        align-items: center;
+        justify-content: center;
 
-        align-items:
-            center;
+        width: 25px;
+        height: 25px;
 
-        justify-content:
-            center;
+        margin-right: 8px;
 
-        width:
-            25px;
+        border-radius: 8px;
 
-        height:
-            25px;
+        background: var(--users-blue-soft);
+        color: var(--users-blue);
 
-        margin-right:
-            8px;
+        content: "•";
 
-        border-radius:
-            8px;
-
-        background:
-            var(--users-blue-soft);
-
-        color:
-            var(--users-blue);
-
-        content:
-            "•";
-
-        font-size:
-            18px;
-
-        vertical-align:
-            middle;
+        font-size: 18px;
+        vertical-align: middle;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1216,27 +806,20 @@ $total_admins = (int) $db
     */
 
     .admin-panel {
+        overflow: hidden;
 
-        overflow:
-            hidden;
-
-        margin-bottom:
-            22px;
+        margin-bottom: 22px;
 
         border:
             1px solid
             var(--users-border);
 
-        border-radius:
-            18px;
+        border-radius: 18px;
 
-        background:
-            #ffffff;
+        background: #ffffff;
 
-        box-shadow:
-            var(--users-shadow);
+        box-shadow: var(--users-shadow);
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1245,97 +828,59 @@ $total_admins = (int) $db
     */
 
     .admin-filter-form {
-
-        display:
-            grid;
+        display: grid;
 
         grid-template-columns:
-            minmax(
-                260px,
-                1.8fr
-            )
-            minmax(
-                150px,
-                .7fr
-            )
-            minmax(
-                150px,
-                .7fr
-            )
+            minmax(260px, 1.8fr)
+            minmax(150px, .7fr)
+            minmax(150px, .7fr)
             auto
             auto;
 
-        align-items:
-            center;
+        align-items: center;
 
-        gap:
-            10px;
+        gap: 10px;
 
-        padding:
-            18px;
+        padding: 18px;
     }
-
 
     .admin-filter-form input,
     .admin-filter-form select {
+        width: 100%;
+        min-height: 43px;
 
-        width:
-            100%;
-
-        min-height:
-            43px;
-
-        padding:
-            0
-            13px;
+        padding: 0 13px;
 
         border:
             1px solid
             var(--users-border);
 
-        border-radius:
-            11px;
+        border-radius: 11px;
 
-        outline:
-            none;
+        outline: none;
 
-        background:
-            #ffffff;
+        background: #ffffff;
 
-        color:
-            var(--users-text-2);
+        color: var(--users-text-2);
 
-        font-size:
-            11px;
+        font-size: 11px;
+        font-weight: 500;
 
-        font-weight:
-            500;
-
-        transition:
-            .2s ease;
+        transition: .2s ease;
     }
-
 
     .admin-filter-form input::placeholder {
-
-        color:
-            #94a3b8;
+        color: #94a3b8;
     }
-
 
     .admin-filter-form input:hover,
     .admin-filter-form select:hover {
-
-        border-color:
-            #cbd5e1;
+        border-color: #cbd5e1;
     }
-
 
     .admin-filter-form input:focus,
     .admin-filter-form select:focus {
-
-        border-color:
-            var(--users-blue);
+        border-color: var(--users-blue);
 
         box-shadow:
             0 0 0 3px
@@ -1347,7 +892,6 @@ $total_admins = (int) $db
             );
     }
 
-
     /*
     |--------------------------------------------------------------------------
     | BUTTONS
@@ -1355,44 +899,28 @@ $total_admins = (int) $db
     */
 
     .admin-btn {
+        min-height: 42px;
 
-        min-height:
-            42px;
+        display: inline-flex;
 
-        display:
-            inline-flex;
+        align-items: center;
+        justify-content: center;
 
-        align-items:
-            center;
-
-        justify-content:
-            center;
-
-        padding:
-            0
-            17px;
+        padding: 0 17px;
 
         border:
             1px solid
             transparent;
 
-        border-radius:
-            11px;
+        border-radius: 11px;
 
-        font-size:
-            10px;
+        font-size: 10px;
+        font-weight: 700;
 
-        font-weight:
-            700;
+        text-decoration: none;
 
-        text-decoration:
-            none;
-
-        cursor:
-            pointer;
-
-        white-space:
-            nowrap;
+        cursor: pointer;
+        white-space: nowrap;
 
         transition:
             transform .2s ease,
@@ -1401,9 +929,7 @@ $total_admins = (int) $db
             border-color .2s ease;
     }
 
-
     .admin-btn.primary {
-
         background:
             linear-gradient(
                 135deg,
@@ -1411,8 +937,7 @@ $total_admins = (int) $db
                 #1d4ed8
             );
 
-        color:
-            #ffffff;
+        color: #ffffff;
 
         box-shadow:
             0 7px 17px
@@ -1424,9 +949,7 @@ $total_admins = (int) $db
             );
     }
 
-
     .admin-btn.primary:hover {
-
         background:
             linear-gradient(
                 135deg,
@@ -1434,8 +957,7 @@ $total_admins = (int) $db
                 #1e40af
             );
 
-        transform:
-            translateY(-1px);
+        transform: translateY(-1px);
 
         box-shadow:
             0 10px 22px
@@ -1447,35 +969,24 @@ $total_admins = (int) $db
             );
     }
 
-
     .admin-btn.secondary {
+        background: #f8fafc;
 
-        background:
-            #f8fafc;
+        border-color: var(--users-border);
 
-        border-color:
-            var(--users-border);
-
-        color:
-            var(--users-muted);
+        color: var(--users-muted);
     }
 
-
     .admin-btn.secondary:hover {
-
-        background:
-            var(--users-blue-soft);
+        background: var(--users-blue-soft);
 
         border-color:
             var(--users-border-blue);
 
-        color:
-            var(--users-blue-dark);
+        color: var(--users-blue-dark);
 
-        transform:
-            translateY(-1px);
+        transform: translateY(-1px);
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1484,21 +995,14 @@ $total_admins = (int) $db
     */
 
     .panel-header {
+        display: flex;
 
-        display:
-            flex;
+        align-items: center;
+        justify-content: space-between;
 
-        align-items:
-            center;
+        gap: 15px;
 
-        justify-content:
-            space-between;
-
-        gap:
-            15px;
-
-        padding:
-            20px 21px;
+        padding: 20px 21px;
 
         border-bottom:
             1px solid
@@ -1512,43 +1016,25 @@ $total_admins = (int) $db
             );
     }
 
-
     .panel-header h2 {
+        margin: 0;
 
-        margin:
-            0;
+        color: var(--users-text);
 
-        color:
-            var(--users-text);
+        font-size: 17px;
+        font-weight: 800;
 
-        font-size:
-            17px;
-
-        font-weight:
-            800;
-
-        letter-spacing:
-            -.35px;
+        letter-spacing: -.35px;
     }
-
 
     .panel-header p {
+        margin: 5px 0 0;
 
-        margin:
-            5px
-            0
-            0;
+        color: var(--users-muted);
 
-        color:
-            var(--users-muted);
-
-        font-size:
-            9px;
-
-        font-weight:
-            500;
+        font-size: 9px;
+        font-weight: 500;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1557,14 +1043,9 @@ $total_admins = (int) $db
     */
 
     .table-wrapper {
-
-        width:
-            100%;
-
-        overflow-x:
-            auto;
+        width: 100%;
+        overflow-x: auto;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1573,127 +1054,77 @@ $total_admins = (int) $db
     */
 
     .admin-table {
+        width: 100%;
+        min-width: 1000px;
 
-        width:
-            100%;
-
-        min-width:
-            1000px;
-
-        border-collapse:
-            collapse;
-
-        border-spacing:
-            0;
+        border-collapse: collapse;
+        border-spacing: 0;
     }
-
 
     .admin-table thead {
-
-        background:
-            #f7faff;
+        background: #f7faff;
     }
 
-
     .admin-table th {
-
-        padding:
-            13px
-            15px;
+        padding: 13px 15px;
 
         border-bottom:
             1px solid
             var(--users-border);
 
-        color:
-            #64748b;
+        color: #64748b;
 
-        font-size:
-            8px;
+        font-size: 8px;
+        font-weight: 800;
 
-        font-weight:
-            800;
+        letter-spacing: .65px;
 
-        letter-spacing:
-            .65px;
+        text-align: left;
+        text-transform: uppercase;
 
-        text-align:
-            left;
-
-        text-transform:
-            uppercase;
-
-        white-space:
-            nowrap;
+        white-space: nowrap;
     }
-
 
     .admin-table th:first-child {
-
-        padding-left:
-            21px;
+        padding-left: 21px;
     }
 
-
     .admin-table td {
-
-        padding:
-            15px;
+        padding: 15px;
 
         border-bottom:
             1px solid
             #edf1f6;
 
-        color:
-            var(--users-text-2);
+        color: var(--users-text-2);
 
-        font-size:
-            10px;
+        font-size: 10px;
+        font-weight: 500;
 
-        font-weight:
-            500;
+        vertical-align: middle;
 
-        vertical-align:
-            middle;
-
-        white-space:
-            nowrap;
+        white-space: nowrap;
     }
-
 
     .admin-table td:first-child {
+        padding-left: 21px;
 
-        padding-left:
-            21px;
+        color: #94a3b8;
 
-        color:
-            #94a3b8;
-
-        font-weight:
-            700;
+        font-weight: 700;
     }
-
 
     .admin-table tbody tr {
-
-        transition:
-            background .18s ease;
+        transition: background .18s ease;
     }
-
 
     .admin-table tbody tr:hover {
-
-        background:
-            #f8fbff;
+        background: #f8fbff;
     }
-
 
     .admin-table tbody tr:last-child td {
-
-        border-bottom:
-            0;
+        border-bottom: 0;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1702,62 +1133,36 @@ $total_admins = (int) $db
     */
 
     .admin-table td:nth-child(2) {
-
-        min-width:
-            220px;
-
-        white-space:
-            normal;
+        min-width: 220px;
+        white-space: normal;
     }
-
 
     .admin-table td:nth-child(2) strong {
+        display: block;
 
-        display:
-            block;
+        margin-bottom: 3px;
 
-        margin-bottom:
-            3px;
+        color: var(--users-text);
 
-        color:
-            var(--users-text);
-
-        font-size:
-            11px;
-
-        font-weight:
-            750;
+        font-size: 11px;
+        font-weight: 750;
     }
-
 
     .admin-table td:nth-child(2) small {
+        display: block;
 
-        display:
-            block;
+        margin-top: 2px;
 
-        margin-top:
-            2px;
+        color: var(--users-muted);
 
-        color:
-            var(--users-muted);
-
-        font-size:
-            8px;
-
-        font-weight:
-            500;
+        font-size: 8px;
+        font-weight: 500;
     }
-
 
     .admin-table td:nth-child(2) small:last-child {
-
-        color:
-            var(--users-blue);
-
-        font-weight:
-            600;
+        color: var(--users-blue);
+        font-weight: 600;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1766,76 +1171,48 @@ $total_admins = (int) $db
     */
 
     .inline-form {
+        display: inline-flex;
 
-        display:
-            inline-flex;
+        align-items: center;
 
-        align-items:
-            center;
-
-        margin:
-            0;
+        margin: 0;
     }
 
-
     .inline-form select {
+        min-width: 110px;
+        height: 34px;
 
-        min-width:
-            110px;
-
-        height:
-            34px;
-
-        padding:
-            0 30px 0 10px;
+        padding: 0 30px 0 10px;
 
         border:
             1px solid
             #dbe3ef;
 
-        border-radius:
-            9px;
+        border-radius: 9px;
 
-        outline:
-            none;
+        outline: none;
 
-        background:
-            #ffffff;
+        background: #ffffff;
 
-        color:
-            var(--users-text-2);
+        color: var(--users-text-2);
 
-        font-family:
-            inherit;
+        font-family: inherit;
 
-        font-size:
-            9px;
+        font-size: 9px;
+        font-weight: 600;
 
-        font-weight:
-            600;
+        cursor: pointer;
 
-        cursor:
-            pointer;
-
-        transition:
-            .2s ease;
+        transition: .2s ease;
     }
-
 
     .inline-form select:hover {
-
-        border-color:
-            #93c5fd;
-
-        background:
-            #f8fbff;
+        border-color: #93c5fd;
+        background: #f8fbff;
     }
 
-
     .inline-form select:focus {
-
-        border-color:
-            var(--users-blue);
+        border-color: var(--users-blue);
 
         box-shadow:
             0 0 0 3px
@@ -1846,7 +1223,6 @@ $total_admins = (int) $db
                 .10
             );
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1855,42 +1231,29 @@ $total_admins = (int) $db
     */
 
     .admin-table td > span:not(.admin-status) {
+        display: inline-flex;
 
-        display:
-            inline-flex;
+        align-items: center;
 
-        align-items:
-            center;
+        min-height: 30px;
 
-        min-height:
-            30px;
-
-        padding:
-            0 10px;
+        padding: 0 10px;
 
         border:
             1px solid
             var(--users-border-blue);
 
-        border-radius:
-            8px;
+        border-radius: 8px;
 
-        background:
-            var(--users-blue-soft);
+        background: var(--users-blue-soft);
 
-        color:
-            var(--users-blue-dark);
+        color: var(--users-blue-dark);
 
-        font-size:
-            9px;
+        font-size: 9px;
+        font-weight: 700;
 
-        font-weight:
-            700;
-
-        text-transform:
-            capitalize;
+        text-transform: capitalize;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1899,62 +1262,41 @@ $total_admins = (int) $db
     */
 
     .admin-status {
+        display: inline-flex;
 
-        display:
-            inline-flex;
+        align-items: center;
 
-        align-items:
-            center;
+        gap: 6px;
 
-        gap:
-            6px;
+        min-height: 30px;
 
-        min-height:
-            30px;
-
-        padding:
-            0 10px;
+        padding: 0 10px;
 
         border:
             1px solid
             var(--users-border-blue);
 
-        border-radius:
-            999px;
+        border-radius: 999px;
 
-        background:
-            var(--users-blue-soft);
+        background: var(--users-blue-soft);
 
-        color:
-            var(--users-blue-dark);
+        color: var(--users-blue-dark);
 
-        font-size:
-            8px;
+        font-size: 8px;
+        font-weight: 750;
 
-        font-weight:
-            750;
-
-        text-transform:
-            capitalize;
+        text-transform: capitalize;
     }
 
-
     .admin-status::before {
+        content: "";
 
-        content:
-            "";
+        width: 6px;
+        height: 6px;
 
-        width:
-            6px;
+        border-radius: 50%;
 
-        height:
-            6px;
-
-        border-radius:
-            50%;
-
-        background:
-            var(--users-blue);
+        background: var(--users-blue);
 
         box-shadow:
             0 0 0 3px
@@ -1966,7 +1308,6 @@ $total_admins = (int) $db
             );
     }
 
-
     /*
     |--------------------------------------------------------------------------
     | SELECT STATUS BLUE THEME
@@ -1974,11 +1315,8 @@ $total_admins = (int) $db
     */
 
     .admin-table select {
-
-        color:
-            var(--users-text-2);
+        color: var(--users-text-2);
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1987,45 +1325,28 @@ $total_admins = (int) $db
     */
 
     .admin-table td:nth-child(6) {
+        color: var(--users-blue-dark);
 
-        color:
-            var(--users-blue-dark);
-
-        font-size:
-            9px;
-
-        font-weight:
-            650;
+        font-size: 9px;
+        font-weight: 650;
     }
-
 
     .admin-table td:nth-child(6)::before {
+        content: "";
 
-        content:
-            "";
+        display: inline-block;
 
-        display:
-            inline-block;
+        width: 6px;
+        height: 6px;
 
-        width:
-            6px;
+        margin-right: 6px;
 
-        height:
-            6px;
+        border-radius: 50%;
 
-        margin-right:
-            6px;
+        background: var(--users-blue);
 
-        border-radius:
-            50%;
-
-        background:
-            var(--users-blue);
-
-        vertical-align:
-            middle;
+        vertical-align: middle;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -2034,47 +1355,32 @@ $total_admins = (int) $db
     */
 
     .admin-btn.small {
+        min-height: 32px;
 
-        min-height:
-            32px;
-
-        padding:
-            0 12px;
+        padding: 0 12px;
 
         border:
             1px solid
             #bfdbfe;
 
-        border-radius:
-            9px;
+        border-radius: 9px;
 
-        background:
-            #eff6ff;
+        background: #eff6ff;
 
-        color:
-            #1d4ed8;
+        color: #1d4ed8;
 
-        font-size:
-            9px;
-
-        font-weight:
-            750;
+        font-size: 9px;
+        font-weight: 750;
     }
 
-
     .admin-btn.small:hover {
+        border-color: #93c5fd;
 
-        border-color:
-            #93c5fd;
+        background: #dbeafe;
 
-        background:
-            #dbeafe;
+        color: #1e40af;
 
-        color:
-            #1e40af;
-
-        transform:
-            translateY(-1px);
+        transform: translateY(-1px);
 
         box-shadow:
             0 5px 14px
@@ -2086,7 +1392,6 @@ $total_admins = (int) $db
             );
     }
 
-
     /*
     |--------------------------------------------------------------------------
     | EMPTY STATE
@@ -2094,23 +1399,15 @@ $total_admins = (int) $db
     */
 
     .empty-state {
+        padding: 55px 20px !important;
 
-        padding:
-            55px 20px !important;
+        color: #94a3b8 !important;
 
-        color:
-            #94a3b8 !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
 
-        font-size:
-            11px !important;
-
-        font-weight:
-            600 !important;
-
-        text-align:
-            center;
+        text-align: center;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -2119,35 +1416,21 @@ $total_admins = (int) $db
     */
 
     .table-wrapper::-webkit-scrollbar {
-
-        height:
-            8px;
+        height: 8px;
     }
-
 
     .table-wrapper::-webkit-scrollbar-track {
-
-        background:
-            #f1f5f9;
+        background: #f1f5f9;
     }
-
 
     .table-wrapper::-webkit-scrollbar-thumb {
-
-        border-radius:
-            999px;
-
-        background:
-            #bfdbfe;
+        border-radius: 999px;
+        background: #bfdbfe;
     }
-
 
     .table-wrapper::-webkit-scrollbar-thumb:hover {
-
-        background:
-            #93c5fd;
+        background: #93c5fd;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -2159,43 +1442,25 @@ $total_admins = (int) $db
 
         .admin-main > section,
         .admin-main > .admin-alert {
-
-            width:
-                calc(
-                    100% - 48px
-                );
+            width: calc(100% - 48px);
         }
 
-
         .admin-stats {
-
             grid-template-columns:
                 repeat(
                     2,
-                    minmax(
-                        0,
-                        1fr
-                    )
+                    minmax(0, 1fr)
                 );
         }
 
-
         .admin-filter-form {
-
-            grid-template-columns:
-                1fr 1fr;
-
+            grid-template-columns: 1fr 1fr;
         }
-
 
         .admin-filter-form input {
-
-            grid-column:
-                1 / -1;
+            grid-column: 1 / -1;
         }
-
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -2206,41 +1471,23 @@ $total_admins = (int) $db
     @media (max-width: 900px) {
 
         .admin-topbar {
-
-            min-height:
-                78px;
-
-            padding:
-                16px
-                24px;
+            min-height: 78px;
+            padding: 16px 24px;
         }
-
 
         .admin-topbar h1 {
-
-            font-size:
-                24px;
+            font-size: 24px;
         }
-
 
         .admin-topbar p {
-
-            font-size:
-                10px;
+            font-size: 10px;
         }
-
 
         .admin-main > section,
         .admin-main > .admin-alert {
-
-            width:
-                calc(
-                    100% - 36px
-                );
+            width: calc(100% - 36px);
         }
-
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -2251,106 +1498,60 @@ $total_admins = (int) $db
     @media (max-width: 650px) {
 
         .admin-topbar {
-
-            padding:
-                14px
-                17px;
+            padding: 14px 17px;
         }
-
 
         .admin-header-left {
-
-            gap:
-                11px;
+            gap: 11px;
         }
-
 
         .admin-topbar h1 {
-
-            font-size:
-                21px;
+            font-size: 21px;
         }
-
 
         .admin-topbar p {
-
-            margin-top:
-                4px;
-
-            font-size:
-                9px;
+            margin-top: 4px;
+            font-size: 9px;
         }
-
 
         .admin-main > section,
         .admin-main > .admin-alert {
-
-            width:
-                calc(
-                    100% - 24px
-                );
+            width: calc(100% - 24px);
         }
-
 
         .admin-stats {
+            grid-template-columns: 1fr;
 
-            grid-template-columns:
-                1fr;
+            gap: 11px;
 
-            gap:
-                11px;
-
-            margin-top:
-                18px;
+            margin-top: 18px;
         }
-
 
         .stat-card {
-
-            min-height:
-                115px;
+            min-height: 115px;
         }
-
 
         .admin-filter-form {
-
-            grid-template-columns:
-                1fr;
-
-            padding:
-                14px;
+            grid-template-columns: 1fr;
+            padding: 14px;
         }
-
 
         .admin-filter-form input {
-
-            grid-column:
-                auto;
+            grid-column: auto;
         }
-
 
         .admin-filter-form .admin-btn {
-
-            width:
-                100%;
+            width: 100%;
         }
-
 
         .panel-header {
-
-            padding:
-                17px;
+            padding: 17px;
         }
-
 
         .panel-header h2 {
-
-            font-size:
-                15px;
+            font-size: 15px;
         }
-
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -2361,65 +1562,36 @@ $total_admins = (int) $db
     @media (max-width: 450px) {
 
         .admin-topbar h1 {
-
-            font-size:
-                19px;
+            font-size: 19px;
         }
-
 
         .admin-topbar p {
-
-            display:
-                none;
+            display: none;
         }
-
-
-        .admin-sidebar-toggle {
-
-            width:
-                38px;
-
-            height:
-                38px;
-        }
-
 
         .stat-card {
-
-            padding:
-                17px;
+            padding: 17px;
         }
-
 
         .stat-card strong {
-
-            font-size:
-                27px;
+            font-size: 27px;
         }
-
     }
 
     </style>
 
 </head>
 
-
 <body>
-
 
 <div class="admin-wrapper">
 
-
     <?php
-
     require_once dirname(__DIR__) .
         '/includes/admin_sidebar.php';
-
     ?>
 
-
     <main class="admin-main">
-
 
         <!-- =====================================================
              HEADER
@@ -2427,20 +1599,7 @@ $total_admins = (int) $db
 
         <header class="admin-topbar">
 
-
             <div class="admin-header-left">
-
-
-                <button
-                    type="button"
-                    id="adminSidebarToggle"
-                    class="admin-sidebar-toggle"
-                    aria-label="Open sidebar"
-                    aria-expanded="false"
-                >
-                    ☰
-                </button>
-
 
                 <div>
 
@@ -2454,12 +1613,9 @@ $total_admins = (int) $db
 
                 </div>
 
-
             </div>
 
-
         </header>
-
 
         <!-- =====================================================
              SUCCESS MESSAGE
@@ -2468,13 +1624,10 @@ $total_admins = (int) $db
         <?php if (isset($_GET['success'])): ?>
 
             <div class="admin-alert success">
-
                 User updated successfully.
-
             </div>
 
         <?php endif; ?>
-
 
         <!-- =====================================================
              ERROR MESSAGE
@@ -2488,23 +1641,14 @@ $total_admins = (int) $db
 
                 $err = $_GET['error'];
 
-
                 echo $err === 'self'
-
                     ? 'You cannot modify your own administrator account from this page.'
-
                     : (
-
                         $err === 'notfound'
-
                             ? 'User not found.'
-
                             : (
-
                                 $err === 'invalid'
-
                                     ? 'Invalid user information.'
-
                                     : 'Unable to process the request.'
                             )
                     );
@@ -2515,78 +1659,52 @@ $total_admins = (int) $db
 
         <?php endif; ?>
 
-
         <!-- =====================================================
              STATISTICS
         ====================================================== -->
 
         <section class="admin-stats">
 
-
             <?php
 
             $statistics = [
-
                 [
                     'Total Users',
                     $total_users
                 ],
-
                 [
                     'Customers',
                     $total_customers
                 ],
-
                 [
                     'Vendors',
                     $total_vendors
                 ],
-
                 [
                     'Admins',
                     $total_admins
                 ]
-
             ];
 
             ?>
 
-
-            <?php foreach (
-                $statistics
-                as $s
-            ): ?>
-
+            <?php foreach ($statistics as $s): ?>
 
                 <div class="stat-card">
 
-
                     <span class="stat-label">
-
-                        <?= e(
-                            $s[0]
-                        ) ?>
-
+                        <?= e($s[0]) ?>
                     </span>
 
-
                     <strong>
-
-                        <?= number_format(
-                            $s[1]
-                        ) ?>
-
+                        <?= number_format($s[1]) ?>
                     </strong>
-
 
                 </div>
 
-
             <?php endforeach; ?>
 
-
         </section>
-
 
         <!-- =====================================================
              SEARCH & FILTER
@@ -2594,12 +1712,10 @@ $total_admins = (int) $db
 
         <section class="admin-panel">
 
-
             <form
                 method="GET"
                 class="admin-filter-form"
             >
-
 
                 <input
                     type="text"
@@ -2608,7 +1724,6 @@ $total_admins = (int) $db
                     value="<?= e($search) ?>"
                     autocomplete="off"
                 >
-
 
                 <select
                     name="role"
@@ -2619,7 +1734,6 @@ $total_admins = (int) $db
                         All Roles
                     </option>
 
-
                     <?php foreach (
                         [
                             'customer',
@@ -2629,7 +1743,6 @@ $total_admins = (int) $db
                         as $r
                     ): ?>
 
-
                         <option
                             value="<?= e($r) ?>"
                             <?= $role_filter === $r
@@ -2637,19 +1750,12 @@ $total_admins = (int) $db
                                 : ''
                             ?>
                         >
-
-                            <?= ucfirst(
-                                e($r)
-                            ) ?>
-
+                            <?= ucfirst(e($r)) ?>
                         </option>
-
 
                     <?php endforeach; ?>
 
-
                 </select>
-
 
                 <select
                     name="status"
@@ -2659,7 +1765,6 @@ $total_admins = (int) $db
                     <option value="">
                         All Status
                     </option>
-
 
                     <?php foreach (
                         [
@@ -2671,7 +1776,6 @@ $total_admins = (int) $db
                         as $s
                     ): ?>
 
-
                         <option
                             value="<?= e($s) ?>"
                             <?= $status_filter === $s
@@ -2679,45 +1783,30 @@ $total_admins = (int) $db
                                 : ''
                             ?>
                         >
-
-                            <?= ucfirst(
-                                e($s)
-                            ) ?>
-
+                            <?= ucfirst(e($s)) ?>
                         </option>
-
 
                     <?php endforeach; ?>
 
-
                 </select>
-
 
                 <button
                     class="admin-btn primary"
                     type="submit"
                 >
-
                     Search
-
                 </button>
-
 
                 <a
                     class="admin-btn secondary"
                     href="users.php"
                 >
-
                     Reset
-
                 </a>
-
 
             </form>
 
-
         </section>
-
 
         <!-- =====================================================
              USER LIST
@@ -2725,9 +1814,7 @@ $total_admins = (int) $db
 
         <section class="admin-panel">
 
-
             <div class="panel-header">
-
 
                 <div>
 
@@ -2735,28 +1822,18 @@ $total_admins = (int) $db
                         User List
                     </h2>
 
-
                     <p>
-
-                        <?= number_format(
-                            count($users)
-                        ) ?>
-
+                        <?= number_format(count($users)) ?>
                         user(s) found
-
                     </p>
 
                 </div>
 
-
             </div>
-
 
             <div class="table-wrapper">
 
-
                 <table class="admin-table">
-
 
                     <thead>
 
@@ -2798,12 +1875,9 @@ $total_admins = (int) $db
 
                     </thead>
 
-
                     <tbody>
 
-
                     <?php if (!$users): ?>
-
 
                         <tr>
 
@@ -2811,61 +1885,35 @@ $total_admins = (int) $db
                                 colspan="8"
                                 class="empty-state"
                             >
-
                                 No users found.
-
                             </td>
 
                         </tr>
 
-
                     <?php else: ?>
 
-
-                        <?php foreach (
-                            $users
-                            as $u
-                        ): ?>
-
+                        <?php foreach ($users as $u): ?>
 
                             <tr>
-
 
                                 <!-- ID -->
 
                                 <td>
-
                                     #
-
-                                    <?= (int)
-                                        $u['user_id']
-                                    ?>
-
+                                    <?= (int) $u['user_id'] ?>
                                 </td>
-
 
                                 <!-- USER -->
 
                                 <td>
 
-
                                     <strong>
-
-                                        <?= e(
-                                            $u['name']
-                                        ) ?>
-
+                                        <?= e($u['name']) ?>
                                     </strong>
 
-
                                     <small>
-
-                                        <?= e(
-                                            $u['email']
-                                        ) ?>
-
+                                        <?= e($u['email']) ?>
                                     </small>
-
 
                                     <?php if (
                                         !empty(
@@ -2873,66 +1921,43 @@ $total_admins = (int) $db
                                         )
                                     ): ?>
 
-
                                         <small>
-
                                             <?= e(
-                                                $u[
-                                                    'business_name'
-                                                ]
+                                                $u['business_name']
                                             ) ?>
-
                                         </small>
-
 
                                     <?php endif; ?>
 
-
                                 </td>
-
 
                                 <!-- PHONE -->
 
                                 <td>
-
                                     <?= e(
-                                        $u['phone'] ??
-                                        '-'
+                                        $u['phone'] ?? '-'
                                     ) ?>
-
                                 </td>
-
 
                                 <!-- ROLE -->
 
                                 <td>
 
-
                                     <?php if (
-                                        (int)
-                                        $u['user_id']
-                                        ===
+                                        (int) $u['user_id'] ===
                                         $admin_id
                                     ): ?>
 
-
                                         <span>
-
-                                            <?= e(
-                                                $u['role']
-                                            ) ?>
-
+                                            <?= e($u['role']) ?>
                                         </span>
 
-
                                     <?php else: ?>
-
 
                                         <form
                                             method="POST"
                                             class="inline-form"
                                         >
-
 
                                             <input
                                                 type="hidden"
@@ -2940,31 +1965,23 @@ $total_admins = (int) $db
                                                 value="1"
                                             >
 
-
                                             <input
                                                 type="hidden"
                                                 name="user_id"
-                                                value="<?= (int)
-                                                    $u['user_id']
-                                                ?>"
+                                                value="<?= (int) $u['user_id'] ?>"
                                             >
-
 
                                             <input
                                                 type="hidden"
                                                 name="status"
-                                                value="<?= e(
-                                                    $u['status']
-                                                ) ?>"
+                                                value="<?= e($u['status']) ?>"
                                             >
-
 
                                             <select
                                                 name="role"
                                                 onchange="this.form.submit()"
                                                 aria-label="Change role"
                                             >
-
 
                                                 <?php foreach (
                                                     [
@@ -2975,7 +1992,6 @@ $total_admins = (int) $db
                                                     as $r
                                                 ): ?>
 
-
                                                     <option
                                                         value="<?= e($r) ?>"
                                                         <?= $u['role'] === $r
@@ -2983,61 +1999,40 @@ $total_admins = (int) $db
                                                             : ''
                                                         ?>
                                                     >
-
-                                                        <?= ucfirst(
-                                                            e($r)
-                                                        ) ?>
-
+                                                        <?= ucfirst(e($r)) ?>
                                                     </option>
-
 
                                                 <?php endforeach; ?>
 
-
                                             </select>
-
 
                                         </form>
 
-
                                     <?php endif; ?>
 
-
                                 </td>
-
 
                                 <!-- STATUS -->
 
                                 <td>
 
-
                                     <?php if (
-                                        (int)
-                                        $u['user_id']
-                                        ===
+                                        (int) $u['user_id'] ===
                                         $admin_id
                                     ): ?>
-
 
                                         <span
                                             class="admin-status status-active"
                                         >
-
-                                            <?= e(
-                                                $u['status']
-                                            ) ?>
-
+                                            <?= e($u['status']) ?>
                                         </span>
 
-
                                     <?php else: ?>
-
 
                                         <form
                                             method="POST"
                                             class="inline-form"
                                         >
-
 
                                             <input
                                                 type="hidden"
@@ -3045,31 +2040,23 @@ $total_admins = (int) $db
                                                 value="1"
                                             >
 
-
                                             <input
                                                 type="hidden"
                                                 name="user_id"
-                                                value="<?= (int)
-                                                    $u['user_id']
-                                                ?>"
+                                                value="<?= (int) $u['user_id'] ?>"
                                             >
-
 
                                             <input
                                                 type="hidden"
                                                 name="role"
-                                                value="<?= e(
-                                                    $u['role']
-                                                ) ?>"
+                                                value="<?= e($u['role']) ?>"
                                             >
-
 
                                             <select
                                                 name="status"
                                                 onchange="this.form.submit()"
                                                 aria-label="Change status"
                                             >
-
 
                                                 <?php foreach (
                                                     [
@@ -3081,7 +2068,6 @@ $total_admins = (int) $db
                                                     as $s
                                                 ): ?>
 
-
                                                     <option
                                                         value="<?= e($s) ?>"
                                                         <?= $u['status'] === $s
@@ -3089,28 +2075,18 @@ $total_admins = (int) $db
                                                             : ''
                                                         ?>
                                                     >
-
-                                                        <?= ucfirst(
-                                                            e($s)
-                                                        ) ?>
-
+                                                        <?= ucfirst(e($s)) ?>
                                                     </option>
-
 
                                                 <?php endforeach; ?>
 
-
                                             </select>
-
 
                                         </form>
 
-
                                     <?php endif; ?>
 
-
                                 </td>
-
 
                                 <!-- MFA -->
 
@@ -3124,7 +2100,6 @@ $total_admins = (int) $db
                                     ?>
 
                                 </td>
-
 
                                 <!-- JOINED -->
 
@@ -3143,7 +2118,6 @@ $total_admins = (int) $db
 
                                     ?>
 
-
                                     <?= $createdTimestamp
                                         ? e(
                                             date(
@@ -3156,52 +2130,37 @@ $total_admins = (int) $db
 
                                 </td>
 
-
                                 <!-- ACTION -->
 
                                 <td>
-
 
                                     <a
                                         class="admin-btn small"
                                         href="../profile.php?id=<?= (int) $u['user_id'] ?>"
                                         target="_blank"
                                     >
-
                                         View
-
                                     </a>
-
 
                                 </td>
 
-
                             </tr>
-
 
                         <?php endforeach; ?>
 
-
                     <?php endif; ?>
-
 
                     </tbody>
 
-
                 </table>
-
 
             </div>
 
-
         </section>
-
 
     </main>
 
-
 </div>
-
 
 </body>
 
