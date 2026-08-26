@@ -15,12 +15,13 @@ if (session_status() === PHP_SESSION_NONE) {
 
 /*
 |--------------------------------------------------------------------------
-| CONFIG + DATABASE
+| DATABASE
 |--------------------------------------------------------------------------
 */
 
-require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/database/db.php';
+require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
+
 
 $db = getDB();
 
@@ -31,37 +32,29 @@ $db = getDB();
 |--------------------------------------------------------------------------
 */
 
-if (!isset($_SESSION['user_id'])) {
-
-    header("Location: ../index.php");
-    exit;
-}
-
 if (
-    !isset($_SESSION['role']) ||
-    $_SESSION['role'] !== 'admin'
+    !isset($_SESSION['user_id']) ||
+    ($_SESSION['role'] ?? '') !== 'admin'
 ) {
 
-    header("Location: ../index.php");
+    header('Location: ../index.php');
     exit;
 }
 
 
-$admin_id = (int) $_SESSION['user_id'];
-
-$message = "";
-$error = "";
+$adminId =
+    (int) $_SESSION['user_id'];
 
 
 /*
 |--------------------------------------------------------------------------
-| HELPER FUNCTIONS
+| HELPERS
 |--------------------------------------------------------------------------
 */
 
-if (!function_exists('e')) {
+if (!function_exists('orderEscape')) {
 
-    function e($value)
+    function orderEscape($value): string
     {
         return htmlspecialchars(
             (string) $value,
@@ -72,14 +65,194 @@ if (!function_exists('e')) {
 }
 
 
-if (!function_exists('money')) {
+if (!function_exists('orderMoney')) {
 
-    function money($value)
+    function orderMoney($value): string
     {
-        return "RM " . number_format(
-            (float) $value,
-            2
+        return 'RM ' .
+            number_format(
+                (float) $value,
+                2
+            );
+    }
+}
+
+
+if (!function_exists('orderDate')) {
+
+    function orderDate($date): string
+    {
+        if (!$date) {
+            return '-';
+        }
+
+
+        $timestamp =
+            strtotime($date);
+
+
+        if (!$timestamp) {
+            return '-';
+        }
+
+
+        return date(
+            'd M Y, h:i A',
+            $timestamp
         );
+    }
+}
+
+
+if (!function_exists('orderStatusClass')) {
+
+    function orderStatusClass($status): string
+    {
+        switch ($status) {
+
+            case 'Completed':
+                return 'completed';
+
+            case 'Processing':
+                return 'processing';
+
+            case 'Cancelled':
+                return 'cancelled';
+
+            case 'Pending':
+            default:
+                return 'pending';
+        }
+    }
+}
+
+
+if (!function_exists('paymentStatusClass')) {
+
+    function paymentStatusClass($status): string
+    {
+        $status =
+            strtolower(
+                trim(
+                    (string) $status
+                )
+            );
+
+
+        if (
+            in_array(
+                $status,
+                [
+                    'paid',
+                    'completed',
+                    'success',
+                    'successful'
+                ],
+                true
+            )
+        ) {
+
+            return 'paid';
+        }
+
+
+        if (
+            in_array(
+                $status,
+                [
+                    'failed',
+                    'cancelled',
+                    'refunded'
+                ],
+                true
+            )
+        ) {
+
+            return 'failed';
+        }
+
+
+        return 'pending';
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CSRF TOKEN
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !isset($_SESSION['csrf_token']) ||
+    empty($_SESSION['csrf_token'])
+) {
+
+    $_SESSION['csrf_token'] =
+        bin2hex(
+            random_bytes(32)
+        );
+}
+
+
+$csrfToken =
+    $_SESSION['csrf_token'];
+
+
+/*
+|--------------------------------------------------------------------------
+| MESSAGE
+|--------------------------------------------------------------------------
+*/
+
+$message = '';
+$error = '';
+
+
+if (
+    isset($_GET['success']) &&
+    $_GET['success'] === 'status'
+) {
+
+    $message =
+        'Order status updated successfully.';
+}
+
+
+if (isset($_GET['error'])) {
+
+    switch ($_GET['error']) {
+
+        case 'security':
+
+            $error =
+                'Invalid security token. Please refresh and try again.';
+
+            break;
+
+
+        case 'invalid':
+
+            $error =
+                'Invalid order information.';
+
+            break;
+
+
+        case 'notfound':
+
+            $error =
+                'Order not found.';
+
+            break;
+
+
+        default:
+
+            $error =
+                'Unable to process the order request.';
+
+            break;
     }
 }
 
@@ -95,87 +268,186 @@ if (
     isset($_POST['update_status'])
 ) {
 
-    $order_id = isset($_POST['order_id'])
-        ? (int) $_POST['order_id']
-        : 0;
+    /*
+    |--------------------------------------------------------------------------
+    | CSRF
+    |--------------------------------------------------------------------------
+    */
 
-    $new_status = isset($_POST['order_status'])
-        ? trim($_POST['order_status'])
-        : '';
+    $submittedToken =
+        $_POST['csrf_token']
+        ?? '';
 
 
-    $allowed_status = [
+    if (
+        empty($submittedToken) ||
+        !hash_equals(
+            $csrfToken,
+            $submittedToken
+        )
+    ) {
+
+        header(
+            'Location: orders.php?error=security'
+        );
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | INPUT
+    |--------------------------------------------------------------------------
+    */
+
+    $orderId =
+        isset($_POST['order_id'])
+            ? (int) $_POST['order_id']
+            : 0;
+
+
+    $newStatus =
+        isset($_POST['order_status'])
+            ? trim(
+                $_POST['order_status']
+            )
+            : '';
+
+
+    $allowedStatuses = [
+
         'Pending',
         'Processing',
         'Completed',
         'Cancelled'
+
     ];
 
 
-    if ($order_id <= 0) {
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATION
+    |--------------------------------------------------------------------------
+    */
 
-        $error = "Invalid order ID.";
+    if (
+        $orderId <= 0 ||
+        !in_array(
+            $newStatus,
+            $allowedStatuses,
+            true
+        )
+    ) {
 
-    } elseif (!in_array(
-        $new_status,
-        $allowed_status,
-        true
-    )) {
+        header(
+            'Location: orders.php?error=invalid'
+        );
 
-        $error = "Invalid order status.";
+        exit;
+    }
 
-    } else {
 
-        try {
+    try {
 
-            /*
-            |--------------------------------------------------------------------------
-            | COMPLETED
-            |--------------------------------------------------------------------------
-            */
+        $db->beginTransaction();
 
-            if ($new_status === 'Completed') {
 
-                $stmt = $db->prepare("
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK ORDER
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $db->prepare("
+                SELECT order_id
+                FROM orders
+                WHERE order_id = ?
+                LIMIT 1
+                FOR UPDATE
+            ");
+
+
+        $stmt->execute([
+            $orderId
+        ]);
+
+
+        if (
+            !$stmt->fetch(
+                PDO::FETCH_ASSOC
+            )
+        ) {
+
+            $db->rollBack();
+
+
+            header(
+                'Location: orders.php?error=notfound'
+            );
+
+            exit;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE STATUS
+        |--------------------------------------------------------------------------
+        */
+
+        if ($newStatus === 'Completed') {
+
+            $stmt =
+                $db->prepare("
                     UPDATE orders
+
                     SET
-                        order_status = :status,
+                        order_status = ?,
                         completed_date = NOW()
-                    WHERE order_id = :order_id
+
+                    WHERE order_id = ?
                 ");
 
-            } else {
+        }
 
-                $stmt = $db->prepare("
+        else {
+
+            $stmt =
+                $db->prepare("
                     UPDATE orders
+
                     SET
-                        order_status = :status,
+                        order_status = ?,
                         completed_date = NULL
-                    WHERE order_id = :order_id
+
+                    WHERE order_id = ?
                 ");
-            }
+        }
 
 
-            $stmt->execute([
-                ':status' => $new_status,
-                ':order_id' => $order_id
-            ]);
+        $stmt->execute([
+            $newStatus,
+            $orderId
+        ]);
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | ADMIN LOG
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | ADMIN LOG
+        |--------------------------------------------------------------------------
+        */
 
-            $action =
-                "Updated order #"
-                . $order_id
-                . " status to "
-                . $new_status;
+        $action =
+            'Updated order #' .
+            $orderId .
+            ' status to ' .
+            $newStatus;
 
 
-            $log = $db->prepare("
+        $log =
+            $db->prepare("
                 INSERT INTO admin_logs
                 (
                     admin_id,
@@ -183,73 +455,108 @@ if (
                     target_type,
                     target_id
                 )
+
                 VALUES
                 (
-                    :admin_id,
-                    :action,
-                    :target_type,
-                    :target_id
+                    ?,
+                    ?,
+                    ?,
+                    ?
                 )
             ");
 
 
-            $log->execute([
-                ':admin_id' => $admin_id,
-                ':action' => $action,
-                ':target_type' => 'order',
-                ':target_id' => $order_id
-            ]);
+        $log->execute([
+
+            $adminId,
+            $action,
+            'order',
+            $orderId
+
+        ]);
 
 
-            $message =
-                "Order #"
-                . $order_id
-                . " status updated successfully.";
+        $db->commit();
 
 
-        } catch (PDOException $e) {
+        $redirect =
+            'orders.php?success=status';
 
-            error_log(
-                "HOCHIPOHUB ADMIN ORDERS UPDATE ERROR: "
-                . $e->getMessage()
-            );
 
-            $error =
-                "Failed to update order status.";
+        if (
+            isset($_POST['return_view']) &&
+            (int) $_POST['return_view'] > 0
+        ) {
+
+            $redirect .=
+                '&view=' .
+                (int) $_POST['return_view'];
         }
+
+
+        header(
+            'Location: ' .
+            $redirect
+        );
+
+        exit;
+
+    }
+
+    catch (Throwable $e) {
+
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+
+
+        error_log(
+            'HOCHIPOHUB ADMIN ORDERS UPDATE ERROR: ' .
+            $e->getMessage()
+        );
+
+
+        header(
+            'Location: orders.php?error=update'
+        );
+
+        exit;
     }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| ORDER DETAILS
+| SELECTED ORDER DETAILS
 |--------------------------------------------------------------------------
 */
 
-$selected_order = null;
-$order_items = [];
-$vendor_orders = [];
+$selectedOrder = null;
+$orderItems = [];
+$vendorOrders = [];
 
 
-if (isset($_GET['view'])) {
+if (
+    isset($_GET['view']) &&
+    (int) $_GET['view'] > 0
+) {
 
-    $view_order_id =
+    $viewOrderId =
         (int) $_GET['view'];
 
 
-    if ($view_order_id > 0) {
+    try {
 
-        try {
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN ORDER
+        |--------------------------------------------------------------------------
+        */
 
-            /*
-            |--------------------------------------------------------------------------
-            | MAIN ORDER
-            |--------------------------------------------------------------------------
-            */
-
-            $stmt = $db->prepare("
+        $stmt =
+            $db->prepare("
                 SELECT
+
                     o.order_id,
                     o.customer_id,
                     o.order_date,
@@ -269,31 +576,35 @@ if (isset($_GET['view'])) {
                 INNER JOIN users u
                     ON o.customer_id = u.user_id
 
-                WHERE o.order_id = :order_id
+                WHERE o.order_id = ?
 
                 LIMIT 1
             ");
 
 
-            $stmt->execute([
-                ':order_id' => $view_order_id
-            ]);
+        $stmt->execute([
+            $viewOrderId
+        ]);
 
 
-            $selected_order =
-                $stmt->fetch(PDO::FETCH_ASSOC);
+        $selectedOrder =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | ORDER ITEMS
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | ORDER ITEMS
+        |--------------------------------------------------------------------------
+        */
 
-            if ($selected_order) {
+        if ($selectedOrder) {
 
-                $stmt = $db->prepare("
+            $stmt =
+                $db->prepare("
                     SELECT
+
                         od.order_detail_id,
                         od.product_id,
                         od.quantity,
@@ -314,29 +625,33 @@ if (isset($_GET['view'])) {
                     INNER JOIN vendors v
                         ON p.vendor_id = v.vendor_id
 
-                    WHERE od.order_id = :order_id
+                    WHERE od.order_id = ?
 
                     ORDER BY od.order_detail_id ASC
                 ");
 
 
-                $stmt->execute([
-                    ':order_id' => $view_order_id
-                ]);
+            $stmt->execute([
+                $viewOrderId
+            ]);
 
 
-                $order_items =
-                    $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $orderItems =
+                $stmt->fetchAll(
+                    PDO::FETCH_ASSOC
+                );
 
 
-                /*
-                |--------------------------------------------------------------------------
-                | VENDOR ORDERS
-                |--------------------------------------------------------------------------
-                */
+            /*
+            |--------------------------------------------------------------------------
+            | VENDOR ORDERS
+            |--------------------------------------------------------------------------
+            */
 
-                $stmt = $db->prepare("
+            $stmt =
+                $db->prepare("
                     SELECT
+
                         vo.vendor_order_id,
                         vo.vendor_id,
                         vo.subtotal,
@@ -353,40 +668,65 @@ if (isset($_GET['view'])) {
                     INNER JOIN vendors v
                         ON vo.vendor_id = v.vendor_id
 
-                    WHERE vo.order_id = :order_id
+                    WHERE vo.order_id = ?
 
                     ORDER BY vo.vendor_order_id ASC
                 ");
 
 
-                $stmt->execute([
-                    ':order_id' => $view_order_id
-                ]);
+            $stmt->execute([
+                $viewOrderId
+            ]);
 
 
-                $vendor_orders =
-                    $stmt->fetchAll(PDO::FETCH_ASSOC);
-            }
-
-
-        } catch (PDOException $e) {
-
-            error_log(
-                "HOCHIPOHUB ADMIN ORDER DETAILS ERROR: "
-                . $e->getMessage()
-            );
-
-
-            $error =
-                "Unable to load order details.";
+            $vendorOrders =
+                $stmt->fetchAll(
+                    PDO::FETCH_ASSOC
+                );
         }
+
+    }
+
+    catch (Throwable $e) {
+
+        error_log(
+            'HOCHIPOHUB ADMIN ORDER DETAILS ERROR: ' .
+            $e->getMessage()
+        );
+
+
+        $error =
+            'Unable to load order details.';
     }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| FETCH ALL ORDERS
+| SEARCH & FILTER
+|--------------------------------------------------------------------------
+*/
+
+$search =
+    trim(
+        $_GET['search']
+        ?? ''
+    );
+
+
+$statusFilter =
+    $_GET['status']
+    ?? '';
+
+
+$paymentFilter =
+    $_GET['payment']
+    ?? '';
+
+
+/*
+|--------------------------------------------------------------------------
+| FETCH ORDERS
 |--------------------------------------------------------------------------
 */
 
@@ -396,7 +736,6 @@ $orders = [];
 try {
 
     $sql = "
-
         SELECT
 
             o.order_id,
@@ -413,92 +752,282 @@ try {
             u.email AS customer_email,
 
             COALESCE(
-
                 (
-                    SELECT
-                        p.payment_status
+                    SELECT p.payment_status
 
                     FROM payments p
 
-                    WHERE
-                        p.order_id = o.order_id
+                    WHERE p.order_id = o.order_id
 
-                    ORDER BY
-                        p.payment_id DESC
+                    ORDER BY p.payment_id DESC
 
                     LIMIT 1
                 ),
-
                 'Pending'
-
             ) AS payment_status,
 
-
             COALESCE(
-
                 (
-                    SELECT
-                        COUNT(*)
+                    SELECT COUNT(*)
 
                     FROM order_details od
 
-                    WHERE
-                        od.order_id = o.order_id
+                    WHERE od.order_id = o.order_id
                 ),
-
                 0
-
             ) AS total_items,
 
-
             COALESCE(
-
                 (
-                    SELECT
-                        COUNT(*)
+                    SELECT COUNT(*)
 
                     FROM vendor_orders vo
 
-                    WHERE
-                        vo.order_id = o.order_id
+                    WHERE vo.order_id = o.order_id
                 ),
-
                 0
-
             ) AS vendor_count
-
 
         FROM orders o
 
-
         INNER JOIN users u
-
             ON o.customer_id = u.user_id
 
-
-        ORDER BY
-            o.order_date DESC
-
+        WHERE 1 = 1
     ";
 
 
-    $stmt = $db->query($sql);
+    $params = [];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SEARCH
+    |--------------------------------------------------------------------------
+    */
+
+    if ($search !== '') {
+
+        $sql .= "
+            AND
+            (
+                CAST(
+                    o.order_id AS CHAR
+                ) LIKE ?
+
+                OR u.name LIKE ?
+
+                OR u.email LIKE ?
+
+                OR o.tracking_number LIKE ?
+            )
+        ";
+
+
+        $searchValue =
+            '%' .
+            $search .
+            '%';
+
+
+        $params[] =
+            $searchValue;
+
+        $params[] =
+            $searchValue;
+
+        $params[] =
+            $searchValue;
+
+        $params[] =
+            $searchValue;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORDER STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        in_array(
+            $statusFilter,
+            [
+                'Pending',
+                'Processing',
+                'Completed',
+                'Cancelled'
+            ],
+            true
+        )
+    ) {
+
+        $sql .= "
+            AND o.order_status = ?
+        ";
+
+
+        $params[] =
+            $statusFilter;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAYMENT FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    if ($paymentFilter === 'Paid') {
+
+        $sql .= "
+            AND EXISTS
+            (
+                SELECT 1
+
+                FROM payments px
+
+                WHERE px.payment_id =
+                (
+                    SELECT MAX(py.payment_id)
+
+                    FROM payments py
+
+                    WHERE py.order_id = o.order_id
+                )
+
+                AND LOWER(px.payment_status)
+                    IN
+                    (
+                        'paid',
+                        'completed',
+                        'success',
+                        'successful'
+                    )
+            )
+        ";
+
+    }
+
+    elseif ($paymentFilter === 'Pending') {
+
+        $sql .= "
+            AND
+            (
+                NOT EXISTS
+                (
+                    SELECT 1
+                    FROM payments px
+                    WHERE px.order_id = o.order_id
+                )
+
+                OR EXISTS
+                (
+                    SELECT 1
+
+                    FROM payments px
+
+                    WHERE px.payment_id =
+                    (
+                        SELECT MAX(py.payment_id)
+
+                        FROM payments py
+
+                        WHERE py.order_id = o.order_id
+                    )
+
+                    AND LOWER(px.payment_status)
+                        NOT IN
+                        (
+                            'paid',
+                            'completed',
+                            'success',
+                            'successful',
+                            'failed',
+                            'cancelled',
+                            'refunded'
+                        )
+                )
+            )
+        ";
+
+    }
+
+    elseif ($paymentFilter === 'Failed') {
+
+        $sql .= "
+            AND EXISTS
+            (
+                SELECT 1
+
+                FROM payments px
+
+                WHERE px.payment_id =
+                (
+                    SELECT MAX(py.payment_id)
+
+                    FROM payments py
+
+                    WHERE py.order_id = o.order_id
+                )
+
+                AND LOWER(px.payment_status)
+                    IN
+                    (
+                        'failed',
+                        'cancelled',
+                        'refunded'
+                    )
+            )
+        ";
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORDER
+    |--------------------------------------------------------------------------
+    */
+
+    $sql .= "
+        ORDER BY
+            o.order_date DESC,
+            o.order_id DESC
+    ";
+
+
+    $stmt =
+        $db->prepare(
+            $sql
+        );
+
+
+    $stmt->execute(
+        $params
+    );
 
 
     $orders =
-        $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        );
 
+}
 
-} catch (PDOException $e) {
+catch (Throwable $e) {
+
+    $orders = [];
+
 
     error_log(
-        "HOCHIPOHUB ADMIN FETCH ORDERS ERROR: "
-        . $e->getMessage()
+        'HOCHIPOHUB ADMIN FETCH ORDERS ERROR: ' .
+        $e->getMessage()
     );
 
 
     $error =
-        "Unable to load orders.";
+        'Unable to load orders.';
 }
 
 
@@ -508,99 +1037,78 @@ try {
 |--------------------------------------------------------------------------
 */
 
-$total_orders =
-    count($orders);
-
-$pending_orders = 0;
-$processing_orders = 0;
-$completed_orders = 0;
-$cancelled_orders = 0;
+$totalOrders = 0;
+$pendingOrders = 0;
+$processingOrders = 0;
+$completedOrders = 0;
+$cancelledOrders = 0;
 
 
-foreach ($orders as $order) {
+try {
 
-    switch ($order['order_status']) {
+    $totalOrders =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM orders
+            ")
+            ->fetchColumn();
 
-        case 'Pending':
-            $pending_orders++;
-            break;
 
-        case 'Processing':
-            $processing_orders++;
-            break;
+    $pendingOrders =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM orders
+                WHERE order_status = 'Pending'
+            ")
+            ->fetchColumn();
 
-        case 'Completed':
-            $completed_orders++;
-            break;
 
-        case 'Cancelled':
-            $cancelled_orders++;
-            break;
-    }
+    $processingOrders =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM orders
+                WHERE order_status = 'Processing'
+            ")
+            ->fetchColumn();
+
+
+    $completedOrders =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM orders
+                WHERE order_status = 'Completed'
+            ")
+            ->fetchColumn();
+
+
+    $cancelledOrders =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM orders
+                WHERE order_status = 'Cancelled'
+            ")
+            ->fetchColumn();
+
 }
 
+catch (Throwable $e) {
 
-/*
-|--------------------------------------------------------------------------
-| STATUS CLASS
-|--------------------------------------------------------------------------
-*/
-
-function orderStatusClass($status)
-{
-    switch ($status) {
-
-        case 'Completed':
-            return 'status-completed';
-
-        case 'Processing':
-            return 'status-processing';
-
-        case 'Cancelled':
-            return 'status-cancelled';
-
-        case 'Pending':
-        default:
-            return 'status-pending';
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| PAYMENT CLASS
-|--------------------------------------------------------------------------
-*/
-
-function paymentStatusClass($status)
-{
-    $status = strtolower(trim($status));
-
-    if (
-        in_array(
-            $status,
-            ['paid', 'completed', 'success', 'successful'],
-            true
-        )
-    ) {
-        return 'payment-paid';
-    }
-
-    if (
-        in_array(
-            $status,
-            ['failed', 'cancelled', 'refunded'],
-            true
-        )
-    ) {
-        return 'payment-failed';
-    }
-
-    return 'payment-pending';
+    error_log(
+        $e->getMessage()
+    );
 }
 
 ?>
-
 <!DOCTYPE html>
 
 <html lang="en">
@@ -619,7 +1127,9 @@ function paymentStatusClass($status)
     </title>
 
 
-    <!-- Poppins -->
+    <!-- ============================================================
+         POPPINS
+    ============================================================= -->
 
     <link
         rel="preconnect"
@@ -633,10 +1143,14 @@ function paymentStatusClass($status)
     >
 
     <link
-        href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
         rel="stylesheet"
     >
 
+
+    <!-- ============================================================
+         CSS
+    ============================================================= -->
 
     <link
         rel="stylesheet"
@@ -651,63 +1165,76 @@ function paymentStatusClass($status)
 
     <style>
 
-        /* =====================================================
-           HOCHIPOHUB ORDERS PAGE
-        ===================================================== */
+        /*
+        |--------------------------------------------------------------------------
+        | ROOT
+        |--------------------------------------------------------------------------
+        */
 
         :root {
-            --blue-950: #06142f;
-            --blue-900: #08245c;
-            --blue-800: #0b3b91;
-            --blue-700: #1255c8;
-            --blue-600: #1769e8;
-            --blue-500: #2583ff;
-            --blue-400: #4ca0ff;
-            --blue-100: #e8f2ff;
-            --blue-50: #f5f9ff;
 
-            --text-dark: #10213f;
-            --text-muted: #71809b;
+            --orders-sidebar-width:
+                260px;
 
-            --white: #ffffff;
+            --orders-blue:
+                #2563eb;
 
-            --green: #16a673;
-            --green-bg: #e9faf3;
+            --orders-navy:
+                #08265a;
 
-            --orange: #ef8b24;
-            --orange-bg: #fff5e8;
+            --orders-border:
+                #dce7f3;
 
-            --red: #e5484d;
-            --red-bg: #fff0f1;
+            --orders-text:
+                #0b2d63;
 
-            --shadow:
-                0 18px 50px rgba(8, 36, 92, .10);
+            --orders-muted:
+                #8294b3;
 
-            --radius: 22px;
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | RESET
+        |--------------------------------------------------------------------------
+        */
+
         * {
-            box-sizing: border-box;
+
+            box-sizing:
+                border-box;
+
+        }
+
+
+        html,
+        body {
+
+            margin:
+                0;
+
+            padding:
+                0;
+
+            min-height:
+                100%;
+
+            font-family:
+                'Poppins',
+                sans-serif;
+
+            background:
+                #eef5fd;
+
         }
 
 
         body {
-            font-family: 'Poppins', sans-serif !important;
-            background:
-                radial-gradient(
-                    circle at 10% 0%,
-                    rgba(37, 131, 255, .12),
-                    transparent 28%
-                ),
-                radial-gradient(
-                    circle at 90% 10%,
-                    rgba(23, 105, 232, .08),
-                    transparent 25%
-                ),
-                #f5f8fd !important;
 
-            color: var(--text-dark);
+            overflow-x:
+                hidden;
+
         }
 
 
@@ -715,820 +1242,1983 @@ function paymentStatusClass($status)
         input,
         select,
         textarea {
-            font-family: 'Poppins', sans-serif;
+
+            font-family:
+                inherit;
+
         }
 
 
-        /* =====================================================
-           MAIN
-        ===================================================== */
+        /*
+        |--------------------------------------------------------------------------
+        | SIDEBAR FONT
+        |--------------------------------------------------------------------------
+        */
 
-        .admin-main {
-            padding: 34px !important;
+        .admin-wrapper,
+        .admin-wrapper *,
+        .admin-sidebar,
+        .admin-sidebar *,
+        .sidebar,
+        .sidebar * {
+
+            font-family:
+                'Poppins',
+                sans-serif !important;
+
         }
 
 
-        /* =====================================================
-           TOP HEADER
-        ===================================================== */
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN
+        |--------------------------------------------------------------------------
+        */
 
-        .admin-header,
-        .admin-topbar {
+        .orders-main {
+
+            min-height:
+                100vh;
+
+            margin-left:
+                var(
+                    --orders-sidebar-width
+                );
+
+            width:
+                calc(
+                    100% -
+                    var(
+                        --orders-sidebar-width
+                    )
+                );
+
             background:
+
+                radial-gradient(
+                    circle at 90% 2%,
+                    rgba(
+                        37,
+                        99,
+                        235,
+                        .12
+                    ),
+                    transparent 24%
+                ),
+
                 linear-gradient(
                     135deg,
-                    #071b43,
-                    #0d3e98 58%,
-                    #1769e8
+                    #f4f8fd,
+                    #eaf3ff
                 );
 
-            border-radius: 26px;
-            padding: 30px 34px;
-            margin-bottom: 25px;
-
-            color: white;
-
-            box-shadow:
-                0 18px 45px
-                rgba(9, 54, 135, .20);
-
-            position: relative;
-            overflow: hidden;
         }
 
 
-        .admin-header::after,
-        .admin-topbar::after {
-            content: "";
-            position: absolute;
-
-            width: 230px;
-            height: 230px;
-
-            right: -60px;
-            top: -100px;
-
-            border-radius: 50%;
-
-            background:
-                rgba(255,255,255,.08);
-        }
-
-
-        .admin-header h1,
-        .admin-topbar h1 {
-            margin: 0 0 6px;
-
-            font-size: 34px;
-            font-weight: 800;
-
-            color: white;
-            letter-spacing: -.8px;
-        }
-
-
-        .admin-header p,
-        .admin-topbar p {
-            margin: 0;
-
-            color: rgba(255,255,255,.75);
-
-            font-size: 14px;
-        }
-
-
-        /* =====================================================
-           ALERTS
-        ===================================================== */
-
-        .admin-alert {
-            border-radius: 15px;
-
-            padding: 15px 18px;
-
-            margin-bottom: 22px;
-
-            font-size: 13px;
-            font-weight: 600;
-
-            border: 1px solid transparent;
-        }
-
-
-        .admin-alert.success {
-            background: var(--green-bg);
-            color: #08784f;
-            border-color: #bdeedb;
-        }
-
-
-        .admin-alert.error {
-            background: var(--red-bg);
-            color: #b4232b;
-            border-color: #ffc9cc;
-        }
-
-
-        /* =====================================================
-           STATISTICS
-        ===================================================== */
-
-        .admin-stats {
-            display: grid;
-
-            grid-template-columns:
-                repeat(5, minmax(0, 1fr));
-
-            gap: 17px;
-
-            margin-bottom: 25px;
-        }
-
-
-        .stat-card {
-            background: white;
-
-            border-radius: 20px;
-
-            padding: 22px;
-
-            box-shadow: var(--shadow);
-
-            border: 1px solid #e7eef8;
-
-            position: relative;
-
-            overflow: hidden;
-
-            transition:
-                transform .25s ease,
-                box-shadow .25s ease;
-        }
-
-
-        .stat-card::before {
-            content: "";
-
-            position: absolute;
-
-            left: 0;
-            top: 0;
-
-            width: 5px;
-            height: 100%;
-
-            background:
-                linear-gradient(
-                    180deg,
-                    var(--blue-500),
-                    var(--blue-800)
-                );
-        }
-
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-
-            box-shadow:
-                0 22px 55px
-                rgba(8, 36, 92, .14);
-        }
-
-
-        .stat-card span {
-            display: block;
-
-            font-size: 11px;
-            font-weight: 700;
-
-            text-transform: uppercase;
-
-            letter-spacing: .8px;
-
-            color: var(--text-muted);
-
-            margin-bottom: 8px;
-        }
-
-
-        .stat-card strong {
-            display: block;
-
-            font-size: 30px;
-
-            line-height: 1;
-
-            color: var(--blue-900);
-
-            font-weight: 800;
-        }
-
-
-        .stat-card:nth-child(2)::before {
-            background: #ef8b24;
-        }
-
-
-        .stat-card:nth-child(3)::before {
-            background: #2583ff;
-        }
-
-
-        .stat-card:nth-child(4)::before {
-            background: #16a673;
-        }
-
-
-        .stat-card:nth-child(5)::before {
-            background: #e5484d;
-        }
-
-
-        /* =====================================================
-           CARDS
-        ===================================================== */
-
-        .admin-card {
-            background: rgba(255,255,255,.96);
-
-            border-radius: var(--radius);
-
-            padding: 28px;
-
-            margin-bottom: 25px;
-
-            border:
-                1px solid #e4ebf5;
-
-            box-shadow: var(--shadow);
-        }
-
-
-        .card-header {
-            display: flex;
-
-            justify-content: space-between;
-            align-items: center;
-
-            gap: 20px;
-
-            margin-bottom: 24px;
-        }
-
-
-        .card-header h2 {
-            margin: 0 0 5px;
-
-            font-size: 21px;
-
-            font-weight: 800;
-
-            color: var(--blue-950);
-        }
-
-
-        .card-header p {
-            margin: 0;
-
-            color: var(--text-muted);
-
-            font-size: 13px;
-        }
-
-
-        /* =====================================================
-           ORDER INFO
-        ===================================================== */
-
-        .order-info-grid {
-            display: grid;
-
-            grid-template-columns:
-                repeat(4, minmax(0, 1fr));
-
-            gap: 15px;
-
-            margin-bottom: 30px;
-        }
-
-
-        .order-info-grid > div {
-            background:
-                linear-gradient(
-                    145deg,
-                    #f7faff,
-                    #edf5ff
-                );
-
-            border: 1px solid #dfeafa;
-
-            border-radius: 18px;
-
-            padding: 20px;
-        }
-
-
-        .order-info-grid h3 {
-            margin: 0 0 10px;
-
-            font-size: 11px;
-
-            text-transform: uppercase;
-
-            letter-spacing: 1px;
-
-            color: var(--blue-700);
-
-            font-weight: 800;
-        }
-
-
-        .order-info-grid p {
-            margin: 5px 0;
-
-            color: #51617c;
-
-            font-size: 13px;
-
-            line-height: 1.55;
-        }
-
-
-        .order-info-grid strong {
-            font-size: 20px;
-
-            color: var(--blue-900);
-
-            font-weight: 800;
-        }
-
-
-        /* =====================================================
-           SECTION TITLE
-        ===================================================== */
-
-        .section-title {
-            font-size: 17px;
-
-            font-weight: 800;
-
-            color: var(--blue-950);
+        /*
+        |--------------------------------------------------------------------------
+        | CONTENT
+        |--------------------------------------------------------------------------
+        */
+
+        .orders-content {
+
+            width:
+                100%;
+
+            max-width:
+                1450px;
 
             margin:
-                28px 0 15px;
+                0 auto;
+
+            padding:
+                38px
+                35px
+                70px;
+
         }
 
 
-        /* =====================================================
-           TABLE
-        ===================================================== */
+        /*
+        |--------------------------------------------------------------------------
+        | HERO
+        |--------------------------------------------------------------------------
+        */
 
-        .admin-table-wrapper {
-            width: 100%;
+        .orders-hero {
 
-            overflow-x: auto;
+            position:
+                relative;
 
-            border-radius: 18px;
+            min-height:
+                155px;
 
-            border: 1px solid #e5ecf6;
-        }
+            overflow:
+                hidden;
 
+            display:
+                flex;
 
-        .admin-table {
-            width: 100%;
+            align-items:
+                center;
 
-            border-collapse: separate;
+            justify-content:
+                space-between;
 
-            border-spacing: 0;
+            padding:
+                34px
+                38px;
 
-            min-width: 900px;
+            margin-bottom:
+                26px;
 
-            background: white;
-        }
-
-
-        .admin-table thead th {
-            background:
-                linear-gradient(
-                    180deg,
-                    #f4f8fe,
-                    #edf4fc
-                );
-
-            color: #71809b;
-
-            font-size: 10px;
-
-            text-transform: uppercase;
-
-            letter-spacing: .8px;
-
-            font-weight: 800;
-
-            padding: 16px 14px;
-
-            text-align: left;
-
-            border-bottom:
-                1px solid #dfe8f3;
-
-            white-space: nowrap;
-        }
-
-
-        .admin-table tbody td {
-            padding: 17px 14px;
-
-            font-size: 12px;
-
-            color: #40516f;
-
-            border-bottom:
-                1px solid #edf1f7;
-
-            vertical-align: middle;
-        }
-
-
-        .admin-table tbody tr {
-            transition:
-                background .2s ease;
-        }
-
-
-        .admin-table tbody tr:hover {
-            background: #f7faff;
-        }
-
-
-        .admin-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-
-        .admin-table strong {
-            color: var(--blue-950);
-
-            font-weight: 700;
-        }
-
-
-        .admin-table small {
-            display: block;
-
-            margin-top: 3px;
-
-            color: #8995aa;
-
-            font-size: 10px;
-        }
-
-
-        /* =====================================================
-           ORDER ID
-        ===================================================== */
-
-        .order-id {
-            display: inline-flex;
-
-            align-items: center;
-
-            padding: 7px 11px;
-
-            border-radius: 10px;
-
-            background: var(--blue-50);
-
-            color: var(--blue-700);
-
-            font-size: 11px;
-
-            font-weight: 800;
-        }
-
-
-        /* =====================================================
-           CUSTOMER
-        ===================================================== */
-
-        .customer-cell {
-            display: flex;
-
-            align-items: center;
-
-            gap: 10px;
-
-            min-width: 190px;
-        }
-
-
-        .customer-avatar {
-            width: 38px;
-            height: 38px;
-
-            flex-shrink: 0;
-
-            border-radius: 12px;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
+            color:
+                #ffffff;
 
             background:
+
                 linear-gradient(
-                    135deg,
-                    #1769e8,
-                    #6a5cff
+                    110deg,
+                    #08265a 0%,
+                    #123c8c 47%,
+                    #2480ed 100%
                 );
 
-            color: white;
-
-            font-size: 14px;
-
-            font-weight: 800;
+            border-radius:
+                26px;
 
             box-shadow:
-                0 6px 16px
-                rgba(23,105,232,.22);
+
+                0
+                20px
+                45px
+                rgba(
+                    18,
+                    70,
+                    150,
+                    .15
+                );
+
         }
 
 
-        /* =====================================================
-           STATUS BADGES
-        ===================================================== */
+        .orders-hero::before {
 
-        .status-badge,
-        .payment-badge {
-            display: inline-flex;
+            content:
+                "";
 
-            align-items: center;
+            position:
+                absolute;
 
-            gap: 6px;
+            width:
+                260px;
 
-            padding: 7px 11px;
+            height:
+                260px;
 
-            border-radius: 999px;
+            right:
+                -70px;
 
-            font-size: 10px;
+            top:
+                -140px;
 
-            font-weight: 800;
+            border-radius:
+                50%;
 
-            white-space: nowrap;
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .07
+                );
+
         }
 
 
-        .status-badge::before,
-        .payment-badge::before {
-            content: "";
+        .orders-hero::after {
 
-            width: 6px;
-            height: 6px;
+            content:
+                "";
 
-            border-radius: 50%;
+            position:
+                absolute;
 
-            background: currentColor;
+            width:
+                170px;
+
+            height:
+                170px;
+
+            right:
+                155px;
+
+            bottom:
+                -110px;
+
+            border-radius:
+                50%;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .045
+                );
+
         }
 
 
-        .status-pending {
-            color: #b66a00;
-            background: #fff5df;
+        .orders-hero-text {
+
+            position:
+                relative;
+
+            z-index:
+                2;
+
         }
 
 
-        .status-processing {
-            color: #075dbb;
-            background: #e7f2ff;
+        .orders-hero h1 {
+
+            margin:
+                0
+                0
+                8px;
+
+            color:
+                #ffffff;
+
+            font-size:
+                38px;
+
+            line-height:
+                1.05;
+
+            font-weight:
+                800;
+
+            letter-spacing:
+                -1.5px;
+
         }
 
 
-        .status-completed {
-            color: #08784f;
-            background: #e8faf2;
+        .orders-hero p {
+
+            margin:
+                0;
+
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .82
+                );
+
+            font-size:
+                14px;
+
+            font-weight:
+                500;
+
         }
 
 
-        .status-cancelled {
-            color: #b4232b;
-            background: #fff0f1;
+        /*
+        |--------------------------------------------------------------------------
+        | HERO ICON
+        |--------------------------------------------------------------------------
+        */
+
+        .orders-hero-icon {
+
+            position:
+                relative;
+
+            z-index:
+                2;
+
+            width:
+                82px;
+
+            height:
+                82px;
+
+            flex-shrink:
+                0;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            border:
+                1px solid
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .26
+                );
+
+            border-radius:
+                22px;
+
+            background:
+
+                linear-gradient(
+                    145deg,
+                    rgba(
+                        255,
+                        255,
+                        255,
+                        .20
+                    ),
+                    rgba(
+                        255,
+                        255,
+                        255,
+                        .10
+                    )
+                );
+
+            box-shadow:
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .25
+                ),
+
+                0
+                12px
+                30px
+                rgba(
+                    0,
+                    35,
+                    100,
+                    .18
+                );
+
+            font-size:
+                34px;
+
+            line-height:
+                1;
+
         }
 
 
-        .payment-paid {
-            color: #08784f;
-            background: #e8faf2;
+        /*
+        |--------------------------------------------------------------------------
+        | ALERT
+        |--------------------------------------------------------------------------
+        */
+
+        .orders-alert {
+
+            margin-bottom:
+                22px;
+
+            padding:
+                14px
+                17px;
+
+            border-radius:
+                12px;
+
+            font-size:
+                11px;
+
+            font-weight:
+                600;
+
         }
 
 
-        .payment-pending {
-            color: #a86800;
-            background: #fff5df;
+        .orders-alert.success {
+
+            color:
+                #166534;
+
+            background:
+                #ecfdf5;
+
+            border:
+                1px solid
+                #bbf7d0;
+
         }
 
 
-        .payment-failed {
-            color: #b4232b;
-            background: #fff0f1;
+        .orders-alert.error {
+
+            color:
+                #991b1b;
+
+            background:
+                #fff1f2;
+
+            border:
+                1px solid
+                #fecdd3;
+
         }
 
 
-        /* =====================================================
-           STATUS SELECT
-        ===================================================== */
+        /*
+        |--------------------------------------------------------------------------
+        | STATS
+        |--------------------------------------------------------------------------
+        */
+
+        .orders-stats {
+
+            display:
+                grid;
+
+            grid-template-columns:
+
+                repeat(
+                    5,
+                    minmax(
+                        0,
+                        1fr
+                    )
+                );
+
+            gap:
+                18px;
+
+            margin-bottom:
+                30px;
+
+        }
+
+
+        .order-stat {
+
+            position:
+                relative;
+
+            min-height:
+                145px;
+
+            overflow:
+                hidden;
+
+            padding:
+                25px
+                22px;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid
+                var(
+                    --orders-border
+                );
+
+            border-top:
+                4px solid
+                #2563eb;
+
+            border-radius:
+                20px;
+
+            box-shadow:
+
+                0
+                12px
+                28px
+                rgba(
+                    20,
+                    60,
+                    120,
+                    .055
+                );
+
+        }
+
+
+        .order-stat::after {
+
+            content:
+                "";
+
+            position:
+                absolute;
+
+            right:
+                -29px;
+
+            bottom:
+                -45px;
+
+            width:
+                110px;
+
+            height:
+                110px;
+
+            border-radius:
+                50%;
+
+            background:
+                #edf4ff;
+
+        }
+
+
+        .order-stat.pending {
+
+            border-top-color:
+                #f59e0b;
+
+        }
+
+
+        .order-stat.pending::after {
+
+            background:
+                #fff7df;
+
+        }
+
+
+        .order-stat.processing {
+
+            border-top-color:
+                #3b82f6;
+
+        }
+
+
+        .order-stat.completed {
+
+            border-top-color:
+                #16a34a;
+
+        }
+
+
+        .order-stat.completed::after {
+
+            background:
+                #eaf9ef;
+
+        }
+
+
+        .order-stat.cancelled {
+
+            border-top-color:
+                #ef4444;
+
+        }
+
+
+        .order-stat.cancelled::after {
+
+            background:
+                #fff0f1;
+
+        }
+
+
+        .order-stat-label {
+
+            position:
+                relative;
+
+            z-index:
+                2;
+
+            display:
+                block;
+
+            margin-bottom:
+                15px;
+
+            color:
+                #61728e;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+            letter-spacing:
+                .75px;
+
+            text-transform:
+                uppercase;
+
+        }
+
+
+        .order-stat-value {
+
+            position:
+                relative;
+
+            z-index:
+                2;
+
+            display:
+                block;
+
+            color:
+                #0b326d;
+
+            font-size:
+                32px;
+
+            line-height:
+                1;
+
+            font-weight:
+                800;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PANEL
+        |--------------------------------------------------------------------------
+        */
+
+        .orders-panel {
+
+            overflow:
+                hidden;
+
+            margin-bottom:
+                28px;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid
+                var(
+                    --orders-border
+                );
+
+            border-radius:
+                24px;
+
+            box-shadow:
+
+                0
+                14px
+                35px
+                rgba(
+                    24,
+                    64,
+                    120,
+                    .055
+                );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PANEL HEADER
+        |--------------------------------------------------------------------------
+        */
+
+        .orders-panel-header {
+
+            min-height:
+                110px;
+
+            padding:
+                26px
+                30px;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                space-between;
+
+            gap:
+                20px;
+
+            border-bottom:
+                1px solid
+                #e7edf5;
+
+        }
+
+
+        .orders-panel-title {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            gap:
+                16px;
+
+        }
+
+
+        .orders-panel-icon {
+
+            width:
+                53px;
+
+            height:
+                53px;
+
+            flex-shrink:
+                0;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            border-radius:
+                16px;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #1476e8,
+                    #1d95f3
+                );
+
+            font-size:
+                22px;
+
+            line-height:
+                1;
+
+            box-shadow:
+
+                0
+                9px
+                20px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .22
+                );
+
+        }
+
+
+        .orders-panel-header h2 {
+
+            margin:
+                0
+                0
+                5px;
+
+            color:
+                #092e65;
+
+            font-size:
+                20px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .orders-panel-header p {
+
+            margin:
+                0;
+
+            color:
+                #8999b4;
+
+            font-size:
+                11px;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | COUNT
+        |--------------------------------------------------------------------------
+        */
+
+        .orders-count {
+
+            min-height:
+                36px;
+
+            padding:
+                0
+                16px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            color:
+                #2563eb;
+
+            background:
+                #eff6ff;
+
+            border:
+                1px solid
+                #d6e7ff;
+
+            border-radius:
+                999px;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER
+        |--------------------------------------------------------------------------
+        */
+
+        .orders-filter-wrapper {
+
+            padding:
+                22px
+                28px;
+
+            background:
+                #fbfdff;
+
+            border-bottom:
+                1px solid
+                #edf1f6;
+
+        }
+
+
+        .orders-filter {
+
+            display:
+                grid;
+
+            grid-template-columns:
+
+                minmax(
+                    250px,
+                    1.5fr
+                )
+
+                minmax(
+                    150px,
+                    .5fr
+                )
+
+                minmax(
+                    150px,
+                    .5fr
+                )
+
+                auto
+                auto;
+
+            gap:
+                10px;
+
+        }
+
+
+        .orders-filter input,
+        .orders-filter select {
+
+            width:
+                100%;
+
+            height:
+                43px;
+
+            padding:
+                0
+                13px;
+
+            outline:
+                none;
+
+            color:
+                #26354e;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid
+                #d8e3ef;
+
+            border-radius:
+                10px;
+
+            font-size:
+                10px;
+
+        }
+
+
+        .orders-filter input:focus,
+        .orders-filter select:focus {
+
+            border-color:
+                #3b82f6;
+
+            box-shadow:
+
+                0
+                0
+                0
+                3px
+                rgba(
+                    59,
+                    130,
+                    246,
+                    .08
+                );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | BUTTON
+        |--------------------------------------------------------------------------
+        */
+
+        .order-btn {
+
+            min-height:
+                43px;
+
+            padding:
+                0
+                17px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            border-radius:
+                10px;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+            text-decoration:
+                none;
+
+            cursor:
+                pointer;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        .order-btn-primary {
+
+            color:
+                #ffffff;
+
+            border:
+                0;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #1d65d8
+                );
+
+        }
+
+
+        .order-btn-secondary {
+
+            color:
+                #66758b;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid
+                #d7e2ee;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ORDER DETAIL GRID
+        |--------------------------------------------------------------------------
+        */
+
+        .order-detail-grid {
+
+            display:
+                grid;
+
+            grid-template-columns:
+
+                repeat(
+                    4,
+                    minmax(
+                        0,
+                        1fr
+                    )
+                );
+
+            gap:
+                14px;
+
+            padding:
+                25px
+                28px;
+
+        }
+
+
+        .order-detail-card {
+
+            padding:
+                19px;
+
+            background:
+
+                linear-gradient(
+                    145deg,
+                    #f9fbff,
+                    #f0f6ff
+                );
+
+            border:
+                1px solid
+                #dce8f7;
+
+            border-radius:
+                17px;
+
+        }
+
+
+        .order-detail-title {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            gap:
+                7px;
+
+            margin-bottom:
+                10px;
+
+            color:
+                #2563eb;
+
+            font-size:
+                9px;
+
+            font-weight:
+                800;
+
+            text-transform:
+                uppercase;
+
+            letter-spacing:
+                .6px;
+
+        }
+
+
+        .order-detail-card strong {
+
+            color:
+                #0b326d;
+
+            font-size:
+                14px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .order-detail-card p {
+
+            margin:
+                5px
+                0;
+
+            color:
+                #61728e;
+
+            font-size:
+                9px;
+
+            line-height:
+                1.6;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUB SECTION
+        |--------------------------------------------------------------------------
+        */
+
+        .order-subsection {
+
+            padding:
+                0
+                28px
+                28px;
+
+        }
+
+
+        .order-subsection-title {
+
+            margin:
+                5px
+                0
+                14px;
+
+            color:
+                #092e65;
+
+            font-size:
+                15px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TABLE
+        |--------------------------------------------------------------------------
+        */
+
+        .orders-table-wrapper {
+
+            width:
+                100%;
+
+            overflow-x:
+                auto;
+
+        }
+
+
+        .orders-table {
+
+            width:
+                100%;
+
+            min-width:
+                1100px;
+
+            border-collapse:
+                collapse;
+
+        }
+
+
+        .orders-table thead {
+
+            background:
+                #f6f9fd;
+
+        }
+
+
+        .orders-table th {
+
+            height:
+                44px;
+
+            padding:
+                0
+                16px;
+
+            color:
+                #65758f;
+
+            border-bottom:
+                1px solid
+                #dfe7f0;
+
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+            text-align:
+                left;
+
+            letter-spacing:
+                .55px;
+
+            text-transform:
+                uppercase;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        .orders-table td {
+
+            padding:
+                16px;
+
+            color:
+                #435169;
+
+            border-bottom:
+                1px solid
+                #edf1f6;
+
+            font-size:
+                9px;
+
+            vertical-align:
+                middle;
+
+        }
+
+
+        .orders-table tbody tr:hover {
+
+            background:
+                #f9fbff;
+
+        }
+
+
+        .orders-table tbody tr:last-child td {
+
+            border-bottom:
+                0;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ORDER ID
+        |--------------------------------------------------------------------------
+        */
+
+        .order-id {
+
+            color:
+                #2563eb;
+
+            font-size:
+                9px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CUSTOMER
+        |--------------------------------------------------------------------------
+        */
+
+        .order-customer {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            gap:
+                10px;
+
+            min-width:
+                190px;
+
+        }
+
+
+        .order-avatar {
+
+            width:
+                39px;
+
+            height:
+                39px;
+
+            flex-shrink:
+                0;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            color:
+                #ffffff;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #60a5fa
+                );
+
+            border-radius:
+                10px;
+
+            font-size:
+                12px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .order-customer strong {
+
+            display:
+                block;
+
+            margin-bottom:
+                3px;
+
+            color:
+                #112b55;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .order-customer small {
+
+            display:
+                block;
+
+            max-width:
+                180px;
+
+            overflow:
+                hidden;
+
+            color:
+                #8897ac;
+
+            font-size:
+                8px;
+
+            text-overflow:
+                ellipsis;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATUS BADGES
+        |--------------------------------------------------------------------------
+        */
+
+        .order-status-badge,
+        .payment-status-badge {
+
+            min-height:
+                27px;
+
+            padding:
+                0
+                9px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            gap:
+                5px;
+
+            border-radius:
+                999px;
+
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        .order-status-badge::before,
+        .payment-status-badge::before {
+
+            content:
+                "";
+
+            width:
+                5px;
+
+            height:
+                5px;
+
+            border-radius:
+                50%;
+
+            background:
+                currentColor;
+
+        }
+
+
+        .order-status-badge.pending {
+
+            color:
+                #a16207;
+
+            background:
+                #fffbea;
+
+        }
+
+
+        .order-status-badge.processing {
+
+            color:
+                #1d4ed8;
+
+            background:
+                #eff6ff;
+
+        }
+
+
+        .order-status-badge.completed {
+
+            color:
+                #15803d;
+
+            background:
+                #ecfdf3;
+
+        }
+
+
+        .order-status-badge.cancelled {
+
+            color:
+                #b91c1c;
+
+            background:
+                #fff1f2;
+
+        }
+
+
+        .payment-status-badge.paid {
+
+            color:
+                #15803d;
+
+            background:
+                #ecfdf3;
+
+        }
+
+
+        .payment-status-badge.pending {
+
+            color:
+                #a16207;
+
+            background:
+                #fffbea;
+
+        }
+
+
+        .payment-status-badge.failed {
+
+            color:
+                #b91c1c;
+
+            background:
+                #fff1f2;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATUS SELECT
+        |--------------------------------------------------------------------------
+        */
 
         .order-status-select {
-            min-width: 125px;
 
-            border: 1px solid #d7e3f3;
+            min-width:
+                118px;
 
-            background: white;
+            height:
+                34px;
 
-            border-radius: 10px;
+            padding:
+                0
+                9px;
 
-            padding: 8px 10px;
+            outline:
+                none;
 
-            color: var(--blue-900);
+            color:
+                #334155;
 
-            font-size: 11px;
+            background:
+                #ffffff;
 
-            font-weight: 700;
+            border:
+                1px solid
+                #d7e2ef;
 
-            outline: none;
+            border-radius:
+                9px;
 
-            cursor: pointer;
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+            cursor:
+                pointer;
+
         }
 
 
         .order-status-select:focus {
-            border-color: var(--blue-500);
+
+            border-color:
+                #3b82f6;
 
             box-shadow:
-                0 0 0 3px
-                rgba(37,131,255,.12);
-        }
 
-
-        /* =====================================================
-           BUTTONS
-        ===================================================== */
-
-        .admin-btn {
-            display: inline-flex;
-
-            align-items: center;
-            justify-content: center;
-
-            text-decoration: none;
-
-            border: none;
-
-            border-radius: 11px;
-
-            padding: 10px 15px;
-
-            font-size: 11px;
-
-            font-weight: 700;
-
-            cursor: pointer;
-
-            transition:
-                transform .2s ease,
-                box-shadow .2s ease,
-                background .2s ease;
-        }
-
-
-        .admin-btn:hover {
-            transform: translateY(-2px);
-        }
-
-
-        .admin-btn.primary {
-            background:
-                linear-gradient(
-                    135deg,
-                    #1769e8,
-                    #0b3b91
+                0
+                0
+                0
+                3px
+                rgba(
+                    59,
+                    130,
+                    246,
+                    .08
                 );
 
-            color: white;
-
-            box-shadow:
-                0 8px 18px
-                rgba(23,105,232,.22);
         }
 
 
-        .admin-btn.secondary {
-            background: #edf4ff;
+        /*
+        |--------------------------------------------------------------------------
+        | VIEW BUTTON
+        |--------------------------------------------------------------------------
+        */
 
-            color: var(--blue-700);
-        }
+        .order-view-btn {
 
+            min-height:
+                32px;
 
-        .admin-btn.small {
-            padding: 8px 12px;
+            padding:
+                0
+                11px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            color:
+                #2563eb;
 
             background:
-                linear-gradient(
-                    135deg,
-                    #2583ff,
-                    #1255c8
-                );
+                #eff6ff;
 
-            color: white;
+            border:
+                1px solid
+                #dbeafe;
 
-            box-shadow:
-                0 6px 14px
-                rgba(18,85,200,.18);
+            border-radius:
+                8px;
+
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+            text-decoration:
+                none;
+
         }
 
 
-        /* =====================================================
-           EMPTY STATE
-        ===================================================== */
+        /*
+        |--------------------------------------------------------------------------
+        | EMPTY
+        |--------------------------------------------------------------------------
+        */
 
-        .empty-state {
-            text-align: center;
+        .orders-empty {
 
-            padding: 55px 20px !important;
+            padding:
+                70px
+                20px !important;
 
-            color: #8a97ac !important;
+            color:
+                #94a3b8 !important;
 
-            font-size: 13px !important;
+            text-align:
+                center;
+
         }
 
 
-        /* =====================================================
-           RESPONSIVE
-        ===================================================== */
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSIVE
+        |--------------------------------------------------------------------------
+        */
 
-        @media (max-width: 1200px) {
+        @media (max-width: 1250px) {
 
-            .admin-stats {
+            .orders-stats {
+
                 grid-template-columns:
-                    repeat(3, 1fr);
+
+                    repeat(
+                        3,
+                        1fr
+                    );
+
             }
 
-            .order-info-grid {
+
+            .order-detail-grid {
+
                 grid-template-columns:
-                    repeat(2, 1fr);
+
+                    repeat(
+                        2,
+                        1fr
+                    );
+
             }
+
+
+            .orders-filter {
+
+                grid-template-columns:
+
+                    1fr
+                    1fr;
+
+            }
+
+
+            .orders-filter input {
+
+                grid-column:
+                    1 / -1;
+
+            }
+
         }
 
 
-        @media (max-width: 800px) {
+        @media (max-width: 900px) {
 
-            .admin-main {
-                padding: 18px !important;
+            :root {
+
+                --orders-sidebar-width:
+                    0px;
+
             }
 
 
-            .admin-header,
-            .admin-topbar {
-                padding: 24px;
+            .orders-main {
 
-                border-radius: 20px;
+                margin-left:
+                    0;
+
+                width:
+                    100%;
+
             }
 
 
-            .admin-header h1,
-            .admin-topbar h1 {
-                font-size: 27px;
+            .orders-content {
+
+                padding:
+                    25px
+                    20px
+                    50px;
+
             }
 
 
-            .admin-stats {
-                grid-template-columns:
-                    repeat(2, 1fr);
+            .orders-hero {
+
+                min-height:
+                    140px;
+
+                padding:
+                    28px;
+
             }
 
 
-            .order-info-grid {
-                grid-template-columns: 1fr;
+            .orders-hero h1 {
+
+                font-size:
+                    31px;
+
             }
 
 
-            .admin-card {
-                padding: 18px;
+            .orders-hero-icon {
+
+                width:
+                    67px;
+
+                height:
+                    67px;
+
+                font-size:
+                    28px;
+
             }
+
         }
 
 
-        @media (max-width: 500px) {
+        @media (max-width: 650px) {
 
-            .admin-stats {
-                grid-template-columns: 1fr;
+            .orders-content {
+
+                padding:
+                    18px
+                    13px
+                    40px;
+
             }
 
 
-            .card-header {
-                align-items: flex-start;
+            .orders-hero {
 
-                flex-direction: column;
+                min-height:
+                    auto;
+
+                padding:
+                    25px
+                    21px;
+
+                border-radius:
+                    20px;
+
             }
+
+
+            .orders-hero h1 {
+
+                font-size:
+                    27px;
+
+            }
+
+
+            .orders-hero p {
+
+                max-width:
+                    230px;
+
+                font-size:
+                    11px;
+
+            }
+
+
+            .orders-hero-icon {
+
+                width:
+                    55px;
+
+                height:
+                    55px;
+
+                border-radius:
+                    15px;
+
+                font-size:
+                    24px;
+
+            }
+
+
+            .orders-stats {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
+
+            .order-detail-grid {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
+
+            .orders-panel-header {
+
+                flex-direction:
+                    column;
+
+                align-items:
+                    flex-start;
+
+                padding:
+                    20px
+                    17px;
+
+            }
+
+
+            .orders-filter {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
+
+            .orders-filter input {
+
+                grid-column:
+                    auto;
+
+            }
+
+
+            .order-btn {
+
+                width:
+                    100%;
+
+            }
+
         }
 
     </style>
@@ -1539,621 +3229,46 @@ function paymentStatusClass($status)
 <body>
 
 
-<div class="admin-layout">
+<div class="admin-wrapper">
 
-
-    <!-- =====================================================
-         SIDEBAR
-         ONLY ONE SIDEBAR
-    ====================================================== -->
 
     <?php
-    require_once dirname(__DIR__) . '/includes/admin_sidebar.php';
+
+    require_once __DIR__ .
+        '/../includes/admin_sidebar.php';
+
     ?>
 
 
-    <!-- =====================================================
-         MAIN
-    ====================================================== -->
+    <main class="orders-main">
 
-    <main class="admin-main">
 
+        <div class="orders-content">
 
-        <!-- =================================================
-             HEADER
-        ================================================== -->
 
-        <header class="admin-header">
+            <!-- =====================================================
+                 HERO
+            ====================================================== -->
 
-            <div>
+            <section class="orders-hero">
 
-                <h1>
-                    Orders
-                </h1>
 
-                <p>
-                    Manage, monitor and track every customer order.
-                </p>
+                <div class="orders-hero-text">
 
-            </div>
+                    <h1>
+                        Orders
+                    </h1>
 
-        </header>
-
-
-        <!-- =================================================
-             SUCCESS
-        ================================================== -->
-
-        <?php if ($message): ?>
-
-            <div class="admin-alert success">
-
-                <?= e($message) ?>
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <!-- =================================================
-             ERROR
-        ================================================== -->
-
-        <?php if ($error): ?>
-
-            <div class="admin-alert error">
-
-                <?= e($error) ?>
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <!-- =================================================
-             STATISTICS
-        ================================================== -->
-
-        <section class="admin-stats">
-
-
-            <div class="stat-card">
-
-                <span>
-                    Total Orders
-                </span>
-
-                <strong>
-                    <?= number_format($total_orders) ?>
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span>
-                    Pending
-                </span>
-
-                <strong>
-                    <?= number_format($pending_orders) ?>
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span>
-                    Processing
-                </span>
-
-                <strong>
-                    <?= number_format($processing_orders) ?>
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span>
-                    Completed
-                </span>
-
-                <strong>
-                    <?= number_format($completed_orders) ?>
-                </strong>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <span>
-                    Cancelled
-                </span>
-
-                <strong>
-                    <?= number_format($cancelled_orders) ?>
-                </strong>
-
-            </div>
-
-
-        </section>
-
-
-        <!-- =================================================
-             SELECTED ORDER DETAILS
-        ================================================== -->
-
-        <?php if ($selected_order): ?>
-
-
-            <section class="admin-card">
-
-
-                <div class="card-header">
-
-                    <div>
-
-                        <h2>
-
-                            Order #
-
-                            <?= e(
-                                $selected_order['order_id']
-                            ) ?>
-
-                        </h2>
-
-                        <p>
-
-                            Placed on
-
-                            <?= e(
-                                $selected_order['order_date']
-                            ) ?>
-
-                        </p>
-
-                    </div>
-
-
-                    <a
-                        href="orders.php"
-                        class="admin-btn secondary"
-                    >
-                        ← Back to Orders
-                    </a>
+                    <p>
+                        Manage, monitor and track every HochipoHub customer order.
+                    </p>
 
                 </div>
 
 
-                <!-- ORDER INFO -->
+                <div class="orders-hero-icon">
 
-                <div class="order-info-grid">
-
-
-                    <!-- CUSTOMER -->
-
-                    <div>
-
-                        <h3>
-                            Customer
-                        </h3>
-
-                        <p>
-                            <strong>
-                                <?= e(
-                                    $selected_order['customer_name']
-                                ) ?>
-                            </strong>
-                        </p>
-
-                        <p>
-                            <?= e(
-                                $selected_order['customer_email']
-                            ) ?>
-                        </p>
-
-                        <p>
-                            <?= e(
-                                $selected_order['customer_phone']
-                                ?? '-'
-                            ) ?>
-                        </p>
-
-                    </div>
-
-
-                    <!-- DELIVERY -->
-
-                    <div>
-
-                        <h3>
-                            Delivery
-                        </h3>
-
-                        <p>
-                            <strong>
-                                <?= e(
-                                    $selected_order[
-                                        'delivery_method'
-                                    ] ?? '-'
-                                ) ?>
-                            </strong>
-                        </p>
-
-
-                        <?php if (
-                            !empty(
-                                $selected_order[
-                                    'delivery_address'
-                                ]
-                            )
-                        ): ?>
-
-                            <p>
-
-                                <?= nl2br(
-                                    e(
-                                        $selected_order[
-                                            'delivery_address'
-                                        ]
-                                    )
-                                ) ?>
-
-                            </p>
-
-                        <?php endif; ?>
-
-                    </div>
-
-
-                    <!-- STATUS -->
-
-                    <div>
-
-                        <h3>
-                            Order Status
-                        </h3>
-
-                        <span
-                            class="status-badge <?= e(
-                                orderStatusClass(
-                                    $selected_order[
-                                        'order_status'
-                                    ]
-                                )
-                            ) ?>"
-                        >
-
-                            <?= e(
-                                $selected_order[
-                                    'order_status'
-                                ]
-                            ) ?>
-
-                        </span>
-
-                    </div>
-
-
-                    <!-- TOTAL -->
-
-                    <div>
-
-                        <h3>
-                            Order Total
-                        </h3>
-
-                        <strong>
-
-                            <?= money(
-                                $selected_order[
-                                    'total_amount'
-                                ]
-                            ) ?>
-
-                        </strong>
-
-                    </div>
-
-
-                </div>
-
-
-                <!-- =================================================
-                     ORDER ITEMS
-                ================================================== -->
-
-                <h3 class="section-title">
-                    Order Items
-                </h3>
-
-
-                <div class="admin-table-wrapper">
-
-                    <table class="admin-table">
-
-                        <thead>
-
-                            <tr>
-
-                                <th>
-                                    Product
-                                </th>
-
-                                <th>
-                                    Vendor
-                                </th>
-
-                                <th>
-                                    Quantity
-                                </th>
-
-                                <th>
-                                    Unit Price
-                                </th>
-
-                                <th>
-                                    Subtotal
-                                </th>
-
-                            </tr>
-
-                        </thead>
-
-
-                        <tbody>
-
-
-                        <?php if (
-                            empty($order_items)
-                        ): ?>
-
-                            <tr>
-
-                                <td
-                                    colspan="5"
-                                    class="empty-state"
-                                >
-                                    No order items found.
-                                </td>
-
-                            </tr>
-
-                        <?php else: ?>
-
-
-                            <?php foreach (
-                                $order_items as $item
-                            ): ?>
-
-                                <tr>
-
-                                    <td>
-
-                                        <strong>
-
-                                            <?= e(
-                                                $item[
-                                                    'product_name'
-                                                ]
-                                            ) ?>
-
-                                        </strong>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?= e(
-                                            $item[
-                                                'business_name'
-                                            ]
-                                        ) ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?= e(
-                                            $item[
-                                                'quantity'
-                                            ]
-                                        ) ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?= money(
-                                            $item[
-                                                'unit_price'
-                                            ]
-                                        ) ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <strong>
-
-                                            <?= money(
-                                                $item[
-                                                    'subtotal'
-                                                ]
-                                            ) ?>
-
-                                        </strong>
-
-                                    </td>
-
-                                </tr>
-
-                            <?php endforeach; ?>
-
-
-                        <?php endif; ?>
-
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-
-                <!-- =================================================
-                     VENDOR SUB ORDERS
-                ================================================== -->
-
-                <h3 class="section-title">
-                    Vendor Sub-orders
-                </h3>
-
-
-                <div class="admin-table-wrapper">
-
-                    <table class="admin-table">
-
-                        <thead>
-
-                            <tr>
-
-                                <th>
-                                    Vendor
-                                </th>
-
-                                <th>
-                                    Subtotal
-                                </th>
-
-                                <th>
-                                    Delivery Fee
-                                </th>
-
-                                <th>
-                                    Status
-                                </th>
-
-                                <th>
-                                    Tracking
-                                </th>
-
-                            </tr>
-
-                        </thead>
-
-
-                        <tbody>
-
-
-                        <?php if (
-                            empty($vendor_orders)
-                        ): ?>
-
-                            <tr>
-
-                                <td
-                                    colspan="5"
-                                    class="empty-state"
-                                >
-                                    No vendor orders found.
-                                </td>
-
-                            </tr>
-
-                        <?php else: ?>
-
-
-                            <?php foreach (
-                                $vendor_orders as $vo
-                            ): ?>
-
-                                <tr>
-
-                                    <td>
-
-                                        <strong>
-
-                                            <?= e(
-                                                $vo[
-                                                    'business_name'
-                                                ]
-                                            ) ?>
-
-                                        </strong>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?= money(
-                                            $vo[
-                                                'subtotal'
-                                            ]
-                                        ) ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?= money(
-                                            $vo[
-                                                'delivery_fee'
-                                            ]
-                                        ) ?>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <span class="status-badge status-processing">
-
-                                            <?= e(
-                                                $vo[
-                                                    'vendor_status'
-                                                ]
-                                            ) ?>
-
-                                        </span>
-
-                                    </td>
-
-
-                                    <td>
-
-                                        <?= e(
-                                            $vo[
-                                                'tracking_number'
-                                            ] ?: '-'
-                                        ) ?>
-
-                                    </td>
-
-                                </tr>
-
-                            <?php endforeach; ?>
-
-
-                        <?php endif; ?>
-
-
-                        </tbody>
-
-                    </table>
+                    🧾
 
                 </div>
 
@@ -2161,420 +3276,1637 @@ function paymentStatusClass($status)
             </section>
 
 
-        <?php endif; ?>
+            <!-- =====================================================
+                 MESSAGE
+            ====================================================== -->
+
+            <?php if ($message !== ''): ?>
 
 
-        <!-- =================================================
-             ALL ORDERS
-        ================================================== -->
+                <div
+                    class="
+                        orders-alert
+                        success
+                    "
+                >
 
-        <section class="admin-card">
-
-
-            <div class="card-header">
-
-                <div>
-
-                    <h2>
-                        All Orders
-                    </h2>
-
-                    <p>
-                        Customer orders and payment information.
-                    </p>
+                    <?= orderEscape(
+                        $message
+                    ) ?>
 
                 </div>
 
-            </div>
+
+            <?php endif; ?>
 
 
-            <div class="admin-table-wrapper">
-
-                <table class="admin-table">
+            <?php if ($error !== ''): ?>
 
 
-                    <thead>
+                <div
+                    class="
+                        orders-alert
+                        error
+                    "
+                >
 
-                        <tr>
+                    <?= orderEscape(
+                        $error
+                    ) ?>
 
-                            <th>
-                                Order
-                            </th>
-
-                            <th>
-                                Customer
-                            </th>
-
-                            <th>
-                                Date
-                            </th>
-
-                            <th>
-                                Items
-                            </th>
-
-                            <th>
-                                Vendors
-                            </th>
-
-                            <th>
-                                Total
-                            </th>
-
-                            <th>
-                                Payment
-                            </th>
-
-                            <th>
-                                Status
-                            </th>
-
-                            <th>
-                                Action
-                            </th>
-
-                        </tr>
-
-                    </thead>
+                </div>
 
 
-                    <tbody>
+            <?php endif; ?>
 
 
-                    <?php if (
-                        empty($orders)
-                    ): ?>
+            <!-- =====================================================
+                 STATISTICS
+            ====================================================== -->
 
-                        <tr>
+            <section class="orders-stats">
 
-                            <td
-                                colspan="9"
-                                class="empty-state"
+
+                <div class="order-stat">
+
+                    <span class="order-stat-label">
+
+                        Total Orders
+
+                    </span>
+
+
+                    <strong class="order-stat-value">
+
+                        <?= number_format(
+                            $totalOrders
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="
+                        order-stat
+                        pending
+                    "
+                >
+
+                    <span class="order-stat-label">
+
+                        Pending
+
+                    </span>
+
+
+                    <strong class="order-stat-value">
+
+                        <?= number_format(
+                            $pendingOrders
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="
+                        order-stat
+                        processing
+                    "
+                >
+
+                    <span class="order-stat-label">
+
+                        Processing
+
+                    </span>
+
+
+                    <strong class="order-stat-value">
+
+                        <?= number_format(
+                            $processingOrders
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="
+                        order-stat
+                        completed
+                    "
+                >
+
+                    <span class="order-stat-label">
+
+                        Completed
+
+                    </span>
+
+
+                    <strong class="order-stat-value">
+
+                        <?= number_format(
+                            $completedOrders
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="
+                        order-stat
+                        cancelled
+                    "
+                >
+
+                    <span class="order-stat-label">
+
+                        Cancelled
+
+                    </span>
+
+
+                    <strong class="order-stat-value">
+
+                        <?= number_format(
+                            $cancelledOrders
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+            </section>
+
+
+            <!-- =====================================================
+                 SELECTED ORDER
+            ====================================================== -->
+
+            <?php if ($selectedOrder): ?>
+
+
+                <section class="orders-panel">
+
+
+                    <div class="orders-panel-header">
+
+
+                        <div class="orders-panel-title">
+
+
+                            <div class="orders-panel-icon">
+
+                                🔎
+
+                            </div>
+
+
+                            <div>
+
+                                <h2>
+
+                                    Order
+                                    #<?= (int)
+                                        $selectedOrder[
+                                            'order_id'
+                                        ] ?>
+
+                                </h2>
+
+
+                                <p>
+
+                                    <?= orderEscape(
+                                        orderDate(
+                                            $selectedOrder[
+                                                'order_date'
+                                            ]
+                                            ?? null
+                                        )
+                                    ) ?>
+
+                                </p>
+
+                            </div>
+
+
+                        </div>
+
+
+                        <a
+                            href="orders.php"
+                            class="
+                                order-btn
+                                order-btn-secondary
+                            "
+                        >
+
+                            ← Back to Orders
+
+                        </a>
+
+
+                    </div>
+
+
+                    <!-- =================================================
+                         ORDER INFO
+                    ================================================== -->
+
+                    <div class="order-detail-grid">
+
+
+                        <!-- CUSTOMER -->
+
+                        <div class="order-detail-card">
+
+                            <div class="order-detail-title">
+
+                                👤 Customer
+
+                            </div>
+
+
+                            <strong>
+
+                                <?= orderEscape(
+                                    $selectedOrder[
+                                        'customer_name'
+                                    ]
+                                ) ?>
+
+                            </strong>
+
+
+                            <p>
+
+                                <?= orderEscape(
+                                    $selectedOrder[
+                                        'customer_email'
+                                    ]
+                                ) ?>
+
+                            </p>
+
+
+                            <p>
+
+                                <?= orderEscape(
+                                    $selectedOrder[
+                                        'customer_phone'
+                                    ]
+                                    ?? '-'
+                                ) ?>
+
+                            </p>
+
+                        </div>
+
+
+                        <!-- DELIVERY -->
+
+                        <div class="order-detail-card">
+
+                            <div class="order-detail-title">
+
+                                🚚 Delivery
+
+                            </div>
+
+
+                            <strong>
+
+                                <?= orderEscape(
+                                    $selectedOrder[
+                                        'delivery_method'
+                                    ]
+                                    ?? '-'
+                                ) ?>
+
+                            </strong>
+
+
+                            <?php if (
+                                !empty(
+                                    $selectedOrder[
+                                        'delivery_address'
+                                    ]
+                                )
+                            ): ?>
+
+
+                                <p>
+
+                                    <?= nl2br(
+                                        orderEscape(
+                                            $selectedOrder[
+                                                'delivery_address'
+                                            ]
+                                        )
+                                    ) ?>
+
+                                </p>
+
+
+                            <?php endif; ?>
+
+
+                            <?php if (
+                                !empty(
+                                    $selectedOrder[
+                                        'tracking_number'
+                                    ]
+                                )
+                            ): ?>
+
+
+                                <p>
+
+                                    Tracking:
+                                    <?= orderEscape(
+                                        $selectedOrder[
+                                            'tracking_number'
+                                        ]
+                                    ) ?>
+
+                                </p>
+
+
+                            <?php endif; ?>
+
+                        </div>
+
+
+                        <!-- STATUS -->
+
+                        <div class="order-detail-card">
+
+                            <div class="order-detail-title">
+
+                                📌 Order Status
+
+                            </div>
+
+
+                            <span
+                                class="
+                                    order-status-badge
+                                    <?= orderEscape(
+                                        orderStatusClass(
+                                            $selectedOrder[
+                                                'order_status'
+                                            ]
+                                        )
+                                    ) ?>
+                                "
                             >
 
-                                No orders found.
+                                <?= orderEscape(
+                                    $selectedOrder[
+                                        'order_status'
+                                    ]
+                                ) ?>
 
-                            </td>
+                            </span>
 
-                        </tr>
-
-
-                    <?php else: ?>
+                        </div>
 
 
-                        <?php foreach (
-                            $orders as $order
-                        ): ?>
+                        <!-- TOTAL -->
 
+                        <div class="order-detail-card">
+
+                            <div class="order-detail-title">
+
+                                💰 Order Total
+
+                            </div>
+
+
+                            <strong>
+
+                                <?= orderEscape(
+                                    orderMoney(
+                                        $selectedOrder[
+                                            'total_amount'
+                                        ]
+                                    )
+                                ) ?>
+
+                            </strong>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <!-- =================================================
+                         ORDER ITEMS
+                    ================================================== -->
+
+                    <div class="order-subsection">
+
+
+                        <h3 class="order-subsection-title">
+
+                            📦 Order Items
+
+                        </h3>
+
+
+                        <div class="orders-table-wrapper">
+
+
+                            <table class="orders-table">
+
+
+                                <thead>
+
+                                    <tr>
+
+                                        <th>
+                                            Product
+                                        </th>
+
+                                        <th>
+                                            Vendor
+                                        </th>
+
+                                        <th>
+                                            Quantity
+                                        </th>
+
+                                        <th>
+                                            Unit Price
+                                        </th>
+
+                                        <th>
+                                            Subtotal
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+
+                                <tbody>
+
+
+                                    <?php if (
+                                        empty(
+                                            $orderItems
+                                        )
+                                    ): ?>
+
+
+                                        <tr>
+
+                                            <td
+                                                colspan="5"
+                                                class="orders-empty"
+                                            >
+
+                                                No order items found.
+
+                                            </td>
+
+                                        </tr>
+
+
+                                    <?php else: ?>
+
+
+                                        <?php foreach (
+                                            $orderItems
+                                            as $item
+                                        ): ?>
+
+
+                                            <tr>
+
+                                                <td>
+
+                                                    <strong>
+
+                                                        <?= orderEscape(
+                                                            $item[
+                                                                'product_name'
+                                                            ]
+                                                        ) ?>
+
+                                                    </strong>
+
+                                                </td>
+
+
+                                                <td>
+
+                                                    <?= orderEscape(
+                                                        $item[
+                                                            'business_name'
+                                                        ]
+                                                    ) ?>
+
+                                                </td>
+
+
+                                                <td>
+
+                                                    <?= number_format(
+                                                        (int)
+                                                        $item[
+                                                            'quantity'
+                                                        ]
+                                                    ) ?>
+
+                                                </td>
+
+
+                                                <td>
+
+                                                    <?= orderEscape(
+                                                        orderMoney(
+                                                            $item[
+                                                                'unit_price'
+                                                            ]
+                                                        )
+                                                    ) ?>
+
+                                                </td>
+
+
+                                                <td>
+
+                                                    <strong>
+
+                                                        <?= orderEscape(
+                                                            orderMoney(
+                                                                $item[
+                                                                    'subtotal'
+                                                                ]
+                                                            )
+                                                        ) ?>
+
+                                                    </strong>
+
+                                                </td>
+
+                                            </tr>
+
+
+                                        <?php endforeach; ?>
+
+
+                                    <?php endif; ?>
+
+
+                                </tbody>
+
+
+                            </table>
+
+
+                        </div>
+
+
+                    </div>
+
+
+                    <!-- =================================================
+                         VENDOR SUB ORDERS
+                    ================================================== -->
+
+                    <div class="order-subsection">
+
+
+                        <h3 class="order-subsection-title">
+
+                            🏪 Vendor Sub-orders
+
+                        </h3>
+
+
+                        <div class="orders-table-wrapper">
+
+
+                            <table class="orders-table">
+
+
+                                <thead>
+
+                                    <tr>
+
+                                        <th>
+                                            Vendor
+                                        </th>
+
+                                        <th>
+                                            Subtotal
+                                        </th>
+
+                                        <th>
+                                            Delivery Fee
+                                        </th>
+
+                                        <th>
+                                            Status
+                                        </th>
+
+                                        <th>
+                                            Tracking
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+
+                                <tbody>
+
+
+                                    <?php if (
+                                        empty(
+                                            $vendorOrders
+                                        )
+                                    ): ?>
+
+
+                                        <tr>
+
+                                            <td
+                                                colspan="5"
+                                                class="orders-empty"
+                                            >
+
+                                                No vendor orders found.
+
+                                            </td>
+
+                                        </tr>
+
+
+                                    <?php else: ?>
+
+
+                                        <?php foreach (
+                                            $vendorOrders
+                                            as $vendorOrder
+                                        ): ?>
+
+
+                                            <tr>
+
+                                                <td>
+
+                                                    <strong>
+
+                                                        <?= orderEscape(
+                                                            $vendorOrder[
+                                                                'business_name'
+                                                            ]
+                                                        ) ?>
+
+                                                    </strong>
+
+                                                </td>
+
+
+                                                <td>
+
+                                                    <?= orderEscape(
+                                                        orderMoney(
+                                                            $vendorOrder[
+                                                                'subtotal'
+                                                            ]
+                                                        )
+                                                    ) ?>
+
+                                                </td>
+
+
+                                                <td>
+
+                                                    <?= orderEscape(
+                                                        orderMoney(
+                                                            $vendorOrder[
+                                                                'delivery_fee'
+                                                            ]
+                                                        )
+                                                    ) ?>
+
+                                                </td>
+
+
+                                                <td>
+
+                                                    <span
+                                                        class="
+                                                            order-status-badge
+                                                            processing
+                                                        "
+                                                    >
+
+                                                        <?= orderEscape(
+                                                            $vendorOrder[
+                                                                'vendor_status'
+                                                            ]
+                                                        ) ?>
+
+                                                    </span>
+
+                                                </td>
+
+
+                                                <td>
+
+                                                    <?= orderEscape(
+                                                        $vendorOrder[
+                                                            'tracking_number'
+                                                        ]
+                                                        ?: '-'
+                                                    ) ?>
+
+                                                </td>
+
+                                            </tr>
+
+
+                                        <?php endforeach; ?>
+
+
+                                    <?php endif; ?>
+
+
+                                </tbody>
+
+
+                            </table>
+
+
+                        </div>
+
+
+                    </div>
+
+
+                </section>
+
+
+            <?php endif; ?>
+
+
+            <!-- =====================================================
+                 ORDERS PANEL
+            ====================================================== -->
+
+            <section class="orders-panel">
+
+
+                <div class="orders-panel-header">
+
+
+                    <div class="orders-panel-title">
+
+
+                        <div class="orders-panel-icon">
+
+                            📦
+
+                        </div>
+
+
+                        <div>
+
+                            <h2>
+                                Order Management
+                            </h2>
+
+                            <p>
+                                Search, filter and manage customer orders.
+                            </p>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <span class="orders-count">
+
+                        <?= number_format(
+                            count(
+                                $orders
+                            )
+                        ) ?>
+
+                        orders
+
+                    </span>
+
+
+                </div>
+
+
+                <!-- =================================================
+                     FILTER
+                ================================================== -->
+
+                <div class="orders-filter-wrapper">
+
+
+                    <form
+                        method="GET"
+                        action="orders.php"
+                        class="orders-filter"
+                    >
+
+
+                        <!-- SEARCH -->
+
+                        <input
+                            type="search"
+                            name="search"
+                            value="<?= orderEscape(
+                                $search
+                            ) ?>"
+                            placeholder="Search order, customer, email or tracking..."
+                            autocomplete="off"
+                        >
+
+
+                        <!-- STATUS -->
+
+                        <select
+                            name="status"
+                            aria-label="Filter order status"
+                        >
+
+                            <option value="">
+
+                                All Status
+
+                            </option>
+
+
+                            <?php foreach (
+                                [
+                                    'Pending',
+                                    'Processing',
+                                    'Completed',
+                                    'Cancelled'
+                                ]
+                                as $status
+                            ): ?>
+
+
+                                <option
+                                    value="<?= orderEscape(
+                                        $status
+                                    ) ?>"
+                                    <?= $statusFilter === $status
+                                        ? 'selected'
+                                        : '' ?>
+                                >
+
+                                    <?= orderEscape(
+                                        $status
+                                    ) ?>
+
+                                </option>
+
+
+                            <?php endforeach; ?>
+
+
+                        </select>
+
+
+                        <!-- PAYMENT -->
+
+                        <select
+                            name="payment"
+                            aria-label="Filter payment status"
+                        >
+
+                            <option value="">
+
+                                All Payments
+
+                            </option>
+
+
+                            <option
+                                value="Paid"
+                                <?= $paymentFilter ===
+                                    'Paid'
+                                        ? 'selected'
+                                        : '' ?>
+                            >
+
+                                Paid
+
+                            </option>
+
+
+                            <option
+                                value="Pending"
+                                <?= $paymentFilter ===
+                                    'Pending'
+                                        ? 'selected'
+                                        : '' ?>
+                            >
+
+                                Pending
+
+                            </option>
+
+
+                            <option
+                                value="Failed"
+                                <?= $paymentFilter ===
+                                    'Failed'
+                                        ? 'selected'
+                                        : '' ?>
+                            >
+
+                                Failed
+
+                            </option>
+
+
+                        </select>
+
+
+                        <button
+                            type="submit"
+                            class="
+                                order-btn
+                                order-btn-primary
+                            "
+                        >
+
+                            Search
+
+                        </button>
+
+
+                        <a
+                            href="orders.php"
+                            class="
+                                order-btn
+                                order-btn-secondary
+                            "
+                        >
+
+                            Reset
+
+                        </a>
+
+
+                    </form>
+
+
+                </div>
+
+
+                <!-- =================================================
+                     TABLE
+                ================================================== -->
+
+                <div class="orders-table-wrapper">
+
+
+                    <table class="orders-table">
+
+
+                        <thead>
 
                             <tr>
 
+                                <th>
+                                    Order
+                                </th>
 
-                                <!-- ORDER -->
+                                <th>
+                                    Customer
+                                </th>
 
-                                <td>
+                                <th>
+                                    Date
+                                </th>
 
-                                    <span class="order-id">
+                                <th>
+                                    Items
+                                </th>
 
-                                        #
+                                <th>
+                                    Vendors
+                                </th>
 
-                                        <?= e(
+                                <th>
+                                    Total
+                                </th>
+
+                                <th>
+                                    Payment
+                                </th>
+
+                                <th>
+                                    Status
+                                </th>
+
+                                <th>
+                                    Action
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+
+                            <?php if (
+                                empty(
+                                    $orders
+                                )
+                            ): ?>
+
+
+                                <tr>
+
+                                    <td
+                                        colspan="9"
+                                        class="orders-empty"
+                                    >
+
+                                        No orders found.
+
+                                    </td>
+
+                                </tr>
+
+
+                            <?php else: ?>
+
+
+                                <?php foreach (
+                                    $orders
+                                    as $order
+                                ): ?>
+
+
+                                    <?php
+
+                                    $orderId =
+                                        (int)
+                                        $order[
+                                            'order_id'
+                                        ];
+
+
+                                    $initial =
+                                        strtoupper(
+                                            substr(
+                                                trim(
+                                                    $order[
+                                                        'customer_name'
+                                                    ]
+                                                    ?? 'U'
+                                                ),
+                                                0,
+                                                1
+                                            )
+                                        );
+
+
+                                    $statusClass =
+                                        orderStatusClass(
                                             $order[
-                                                'order_id'
+                                                'order_status'
                                             ]
-                                        ) ?>
-
-                                    </span>
-
-                                </td>
+                                        );
 
 
-                                <!-- CUSTOMER -->
+                                    $paymentClass =
+                                        paymentStatusClass(
+                                            $order[
+                                                'payment_status'
+                                            ]
+                                        );
 
-                                <td>
-
-                                    <div class="customer-cell">
+                                    ?>
 
 
-                                        <div class="customer-avatar">
+                                    <tr>
 
-                                            <?= e(
-                                                strtoupper(
-                                                    substr(
+
+                                        <!-- ORDER -->
+
+                                        <td>
+
+                                            <span class="order-id">
+
+                                                #<?= $orderId ?>
+
+                                            </span>
+
+                                        </td>
+
+
+                                        <!-- CUSTOMER -->
+
+                                        <td>
+
+
+                                            <div class="order-customer">
+
+
+                                                <div class="order-avatar">
+
+                                                    <?= orderEscape(
+                                                        $initial
+                                                    ) ?>
+
+                                                </div>
+
+
+                                                <div>
+
+                                                    <strong>
+
+                                                        <?= orderEscape(
+                                                            $order[
+                                                                'customer_name'
+                                                            ]
+                                                        ) ?>
+
+                                                    </strong>
+
+
+                                                    <small>
+
+                                                        <?= orderEscape(
+                                                            $order[
+                                                                'customer_email'
+                                                            ]
+                                                        ) ?>
+
+                                                    </small>
+
+                                                </div>
+
+
+                                            </div>
+
+
+                                        </td>
+
+
+                                        <!-- DATE -->
+
+                                        <td>
+
+                                            <?= orderEscape(
+                                                date(
+                                                    'd M Y',
+                                                    strtotime(
                                                         $order[
-                                                            'customer_name'
-                                                        ],
-                                                        0,
-                                                        1
+                                                            'order_date'
+                                                        ]
                                                     )
                                                 )
                                             ) ?>
 
-                                        </div>
+
+                                            <small>
+
+                                                <?= orderEscape(
+                                                    date(
+                                                        'h:i A',
+                                                        strtotime(
+                                                            $order[
+                                                                'order_date'
+                                                            ]
+                                                        )
+                                                    )
+                                                ) ?>
+
+                                            </small>
+
+                                        </td>
 
 
-                                        <div>
+                                        <!-- ITEMS -->
+
+                                        <td>
 
                                             <strong>
 
-                                                <?= e(
+                                                <?= number_format(
+                                                    (int)
                                                     $order[
-                                                        'customer_name'
+                                                        'total_items'
                                                     ]
                                                 ) ?>
 
                                             </strong>
 
                                             <small>
+                                                item(s)
+                                            </small>
 
-                                                <?= e(
+                                        </td>
+
+
+                                        <!-- VENDORS -->
+
+                                        <td>
+
+                                            <strong>
+
+                                                <?= number_format(
+                                                    (int)
                                                     $order[
-                                                        'customer_email'
+                                                        'vendor_count'
                                                     ]
                                                 ) ?>
 
+                                            </strong>
+
+                                            <small>
+                                                vendor(s)
                                             </small>
 
-                                        </div>
+                                        </td>
 
 
-                                    </div>
+                                        <!-- TOTAL -->
 
-                                </td>
+                                        <td>
 
+                                            <strong>
 
-                                <!-- DATE -->
-
-                                <td>
-
-                                    <?= e(
-                                        date(
-                                            'd M Y',
-                                            strtotime(
-                                                $order[
-                                                    'order_date'
-                                                ]
-                                            )
-                                        )
-                                    ) ?>
-
-                                    <small>
-
-                                        <?= e(
-                                            date(
-                                                'h:i A',
-                                                strtotime(
-                                                    $order[
-                                                        'order_date'
-                                                    ]
-                                                )
-                                            )
-                                        ) ?>
-
-                                    </small>
-
-                                </td>
-
-
-                                <!-- ITEMS -->
-
-                                <td>
-
-                                    <strong>
-
-                                        <?= e(
-                                            $order[
-                                                'total_items'
-                                            ]
-                                        ) ?>
-
-                                    </strong>
-
-                                    <small>
-                                        item(s)
-                                    </small>
-
-                                </td>
-
-
-                                <!-- VENDORS -->
-
-                                <td>
-
-                                    <strong>
-
-                                        <?= e(
-                                            $order[
-                                                'vendor_count'
-                                            ]
-                                        ) ?>
-
-                                    </strong>
-
-                                    <small>
-                                        vendor(s)
-                                    </small>
-
-                                </td>
-
-
-                                <!-- TOTAL -->
-
-                                <td>
-
-                                    <strong>
-
-                                        <?= money(
-                                            $order[
-                                                'total_amount'
-                                            ]
-                                        ) ?>
-
-                                    </strong>
-
-                                </td>
-
-
-                                <!-- PAYMENT -->
-
-                                <td>
-
-                                    <span
-                                        class="payment-badge <?= e(
-                                            paymentStatusClass(
-                                                $order[
-                                                    'payment_status'
-                                                ]
-                                            )
-                                        ) ?>"
-                                    >
-
-                                        <?= e(
-                                            $order[
-                                                'payment_status'
-                                            ]
-                                        ) ?>
-
-                                    </span>
-
-                                </td>
-
-
-                                <!-- STATUS -->
-
-                                <td>
-
-                                    <form
-                                        method="POST"
-                                        action=""
-                                    >
-
-                                        <input
-                                            type="hidden"
-                                            name="order_id"
-                                            value="<?= e(
-                                                $order[
-                                                    'order_id'
-                                                ]
-                                            ) ?>"
-                                        >
-
-
-                                        <input
-                                            type="hidden"
-                                            name="update_status"
-                                            value="1"
-                                        >
-
-
-                                        <select
-                                            name="order_status"
-                                            class="order-status-select"
-                                            onchange="this.form.submit()"
-                                        >
-
-                                            <?php foreach (
-                                                [
-                                                    'Pending',
-                                                    'Processing',
-                                                    'Completed',
-                                                    'Cancelled'
-                                                ]
-                                                as $status
-                                            ): ?>
-
-                                                <option
-                                                    value="<?= e(
-                                                        $status
-                                                    ) ?>"
-                                                    <?= (
+                                                <?= orderEscape(
+                                                    orderMoney(
                                                         $order[
-                                                            'order_status'
-                                                        ] === $status
+                                                            'total_amount'
+                                                        ]
                                                     )
-                                                        ? 'selected'
-                                                        : ''
-                                                    ?>
+                                                ) ?>
+
+                                            </strong>
+
+                                        </td>
+
+
+                                        <!-- PAYMENT -->
+
+                                        <td>
+
+                                            <span
+                                                class="
+                                                    payment-status-badge
+                                                    <?= orderEscape(
+                                                        $paymentClass
+                                                    ) ?>
+                                                "
+                                            >
+
+                                                <?= orderEscape(
+                                                    $order[
+                                                        'payment_status'
+                                                    ]
+                                                ) ?>
+
+                                            </span>
+
+                                        </td>
+
+
+                                        <!-- STATUS -->
+
+                                        <td>
+
+
+                                            <form
+                                                method="POST"
+                                                action="orders.php"
+                                            >
+
+
+                                                <input
+                                                    type="hidden"
+                                                    name="csrf_token"
+                                                    value="<?= orderEscape(
+                                                        $csrfToken
+                                                    ) ?>"
                                                 >
 
-                                                    <?= e(
-                                                        $status
+
+                                                <input
+                                                    type="hidden"
+                                                    name="order_id"
+                                                    value="<?= $orderId ?>"
+                                                >
+
+
+                                                <input
+                                                    type="hidden"
+                                                    name="update_status"
+                                                    value="1"
+                                                >
+
+
+                                                <?php if (
+                                                    $selectedOrder &&
+                                                    (int)
+                                                    $selectedOrder[
+                                                        'order_id'
+                                                    ] === $orderId
+                                                ): ?>
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="return_view"
+                                                        value="<?= $orderId ?>"
+                                                    >
+
+
+                                                <?php endif; ?>
+
+
+                                                <select
+                                                    name="order_status"
+                                                    class="order-status-select"
+                                                    onchange="
+                                                        if (
+                                                            confirm(
+                                                                'Change order status to ' +
+                                                                this.value +
+                                                                '?'
+                                                            )
+                                                        ) {
+                                                            this.form.submit();
+                                                        } else {
+                                                            window.location.reload();
+                                                        }
+                                                    "
+                                                >
+
+
+                                                    <?php foreach (
+                                                        [
+                                                            'Pending',
+                                                            'Processing',
+                                                            'Completed',
+                                                            'Cancelled'
+                                                        ]
+                                                        as $status
+                                                    ): ?>
+
+
+                                                        <option
+                                                            value="<?= orderEscape(
+                                                                $status
+                                                            ) ?>"
+                                                            <?= $order[
+                                                                'order_status'
+                                                            ] === $status
+                                                                ? 'selected'
+                                                                : '' ?>
+                                                        >
+
+                                                            <?= orderEscape(
+                                                                $status
+                                                            ) ?>
+
+                                                        </option>
+
+
+                                                    <?php endforeach; ?>
+
+
+                                                </select>
+
+
+                                            </form>
+
+
+                                            <div
+                                                style="
+                                                    margin-top:
+                                                        7px;
+                                                "
+                                            >
+
+                                                <span
+                                                    class="
+                                                        order-status-badge
+                                                        <?= orderEscape(
+                                                            $statusClass
+                                                        ) ?>
+                                                    "
+                                                >
+
+                                                    <?= orderEscape(
+                                                        $order[
+                                                            'order_status'
+                                                        ]
                                                     ) ?>
 
-                                                </option>
+                                                </span>
 
-                                            <?php endforeach; ?>
-
-                                        </select>
-
-                                    </form>
-
-                                </td>
+                                            </div>
 
 
-                                <!-- ACTION -->
-
-                                <td>
-
-                                    <a
-                                        href="orders.php?view=<?= e(
-                                            $order[
-                                                'order_id'
-                                            ]
-                                        ) ?>"
-                                        class="admin-btn small"
-                                    >
-
-                                        View
-
-                                    </a>
-
-                                </td>
+                                        </td>
 
 
-                            </tr>
+                                        <!-- ACTION -->
+
+                                        <td>
+
+                                            <a
+                                                href="orders.php?view=<?= $orderId ?>"
+                                                class="order-view-btn"
+                                            >
+
+                                                View
+
+                                            </a>
+
+                                        </td>
 
 
-                        <?php endforeach; ?>
+                                    </tr>
 
 
-                    <?php endif; ?>
+                                <?php endforeach; ?>
 
 
-                    </tbody>
-
-                </table>
-
-            </div>
+                            <?php endif; ?>
 
 
-        </section>
+                        </tbody>
+
+
+                    </table>
+
+
+                </div>
+
+
+            </section>
+
+
+        </div>
 
 
     </main>
 
 
 </div>
+
+
+<script>
+
+    /*
+    |--------------------------------------------------------------------------
+    | SIDEBAR WIDTH
+    |--------------------------------------------------------------------------
+    */
+
+    function syncOrdersSidebar() {
+
+        const main =
+            document.querySelector(
+                '.orders-main'
+            );
+
+
+        if (!main) {
+            return;
+        }
+
+
+        if (
+            window.innerWidth <= 900
+        ) {
+
+            document.documentElement
+                .style
+                .setProperty(
+                    '--orders-sidebar-width',
+                    '0px'
+                );
+
+
+            return;
+        }
+
+
+        const sidebar =
+            document.querySelector(
+                '.admin-sidebar'
+            ) ||
+            document.querySelector(
+                '.dashboard-sidebar'
+            ) ||
+            document.querySelector(
+                '.sidebar'
+            ) ||
+            document.querySelector(
+                'aside'
+            );
+
+
+        if (!sidebar) {
+
+            document.documentElement
+                .style
+                .setProperty(
+                    '--orders-sidebar-width',
+                    '260px'
+                );
+
+
+            return;
+        }
+
+
+        const rect =
+            sidebar
+                .getBoundingClientRect();
+
+
+        if (rect.right > 0) {
+
+            document.documentElement
+                .style
+                .setProperty(
+                    '--orders-sidebar-width',
+                    rect.right + 'px'
+                );
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD
+    |--------------------------------------------------------------------------
+    */
+
+    document.addEventListener(
+        'DOMContentLoaded',
+        function () {
+
+            syncOrdersSidebar();
+
+
+            setTimeout(
+                syncOrdersSidebar,
+                100
+            );
+
+
+            setTimeout(
+                syncOrdersSidebar,
+                400
+            );
+
+        }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESIZE
+    |--------------------------------------------------------------------------
+    */
+
+    window.addEventListener(
+        'resize',
+        syncOrdersSidebar
+    );
+
+</script>
 
 
 </body>
