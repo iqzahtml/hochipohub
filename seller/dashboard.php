@@ -1,12 +1,13 @@
 <?php
 
-/**
- * =========================================================
- * HOCHIPOHUB
- * SELLER - DASHBOARD
- * File: seller/dashboard.php
- * =========================================================
- */
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - SELLER DASHBOARD
+|--------------------------------------------------------------------------
+| File:
+| seller/dashboard.php
+|--------------------------------------------------------------------------
+*/
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../database/db.php';
@@ -16,7 +17,7 @@ require_once __DIR__ . '/../includes/functions.php';
 
 /*
 |--------------------------------------------------------------------------
-| SECURITY - VENDOR ONLY
+| SESSION
 |--------------------------------------------------------------------------
 */
 
@@ -27,13 +28,16 @@ if (session_status() === PHP_SESSION_NONE) {
 
 /*
 |--------------------------------------------------------------------------
-| CHECK LOGIN
+| LOGIN CHECK
 |--------------------------------------------------------------------------
 */
 
 if (!isset($_SESSION['user_id'])) {
 
-    header('Location: ../index.php');
+    header(
+        'Location: ../index.php'
+    );
+
     exit;
 
 }
@@ -41,22 +45,28 @@ if (!isset($_SESSION['user_id'])) {
 
 /*
 |--------------------------------------------------------------------------
-| CHECK VENDOR ROLE
+| VENDOR ROLE CHECK
 |--------------------------------------------------------------------------
 */
 
 if (
     !isset($_SESSION['role']) ||
-    $_SESSION['role'] !== 'vendor'
+    strtolower(
+        $_SESSION['role']
+    ) !== 'vendor'
 ) {
 
-    header('Location: ../dashboard.php');
+    header(
+        'Location: ../dashboard.php'
+    );
+
     exit;
 
 }
 
 
-$userId = (int) $_SESSION['user_id'];
+$userId =
+    (int) $_SESSION['user_id'];
 
 
 /*
@@ -76,12 +86,13 @@ if (!isset($db) || !($db instanceof PDO)) {
 
 /*
 |--------------------------------------------------------------------------
-| GET VENDOR
+| VENDOR INFORMATION
 |--------------------------------------------------------------------------
 */
 
-$vendorStmt = $db->prepare("
+$stmt = $db->prepare("
     SELECT
+
         v.vendor_id,
         v.business_name,
         v.business_logo,
@@ -91,6 +102,7 @@ $vendorStmt = $db->prepare("
         v.delivery_method,
         v.approval_status,
         v.created_at,
+
         u.name,
         u.email,
         u.phone
@@ -105,26 +117,44 @@ $vendorStmt = $db->prepare("
     LIMIT 1
 ");
 
-$vendorStmt->execute([
+
+$stmt->execute([
     $userId
 ]);
 
-$vendor = $vendorStmt->fetch(
-    PDO::FETCH_ASSOC
-);
+
+$vendor =
+    $stmt->fetch(
+        PDO::FETCH_ASSOC
+    );
 
 
 if (!$vendor) {
 
-    die(
-        'Vendor profile not found. ' .
-        'Please make sure this user has a record in the vendors table.'
+    header(
+        'Location: setup_profile.php'
     );
+
+    exit;
 
 }
 
 
-$vendorId = (int) $vendor['vendor_id'];
+$vendorId =
+    (int) $vendor['vendor_id'];
+
+
+/*
+|--------------------------------------------------------------------------
+| SESSION BUSINESS NAME
+|--------------------------------------------------------------------------
+*/
+
+$_SESSION['business_name'] =
+    $vendor['business_name'];
+
+$_SESSION['vendor_approval_status'] =
+    $vendor['approval_status'];
 
 
 /*
@@ -141,7 +171,7 @@ $productStats = [
 ];
 
 
-$productStatsStmt = $db->prepare("
+$stmt = $db->prepare("
     SELECT
 
         COUNT(*) AS total,
@@ -176,40 +206,40 @@ $productStatsStmt = $db->prepare("
 ");
 
 
-$productStatsStmt->execute([
+$stmt->execute([
     $vendorId
 ]);
 
 
-$productStatsData =
-    $productStatsStmt->fetch(
+$data =
+    $stmt->fetch(
         PDO::FETCH_ASSOC
     );
 
 
-if ($productStatsData) {
+if ($data) {
 
     $productStats['total'] =
         (int) (
-            $productStatsData['total']
+            $data['total']
             ?? 0
         );
 
     $productStats['available'] =
         (int) (
-            $productStatsData['available']
+            $data['available']
             ?? 0
         );
 
     $productStats['out_of_stock'] =
         (int) (
-            $productStatsData['out_of_stock']
+            $data['out_of_stock']
             ?? 0
         );
 
     $productStats['hidden'] =
         (int) (
-            $productStatsData['hidden']
+            $data['hidden']
             ?? 0
         );
 
@@ -218,12 +248,11 @@ if ($productStatsData) {
 
 /*
 |--------------------------------------------------------------------------
-| VENDOR ORDER STATISTICS
+| ORDER STATISTICS
 |--------------------------------------------------------------------------
 */
 
 $orderStats = [
-
     'total'      => 0,
     'pending'    => 0,
     'processing' => 0,
@@ -231,11 +260,10 @@ $orderStats = [
     'shipped'    => 0,
     'completed'  => 0,
     'cancelled'  => 0
-
 ];
 
 
-$orderStatsStmt = $db->prepare("
+$stmt = $db->prepare("
     SELECT
 
         COUNT(*) AS total,
@@ -294,84 +322,59 @@ $orderStatsStmt = $db->prepare("
 ");
 
 
-$orderStatsStmt->execute([
+$stmt->execute([
     $vendorId
 ]);
 
 
-$orderStatsData =
-    $orderStatsStmt->fetch(
+$data =
+    $stmt->fetch(
         PDO::FETCH_ASSOC
     );
 
 
-if ($orderStatsData) {
+if ($data) {
 
-    $orderStats['total'] =
-        (int) (
-            $orderStatsData['total']
-            ?? 0
-        );
+    foreach (
+        $orderStats
+        as $key => $value
+    ) {
 
-    $orderStats['pending'] =
-        (int) (
-            $orderStatsData['pending']
-            ?? 0
-        );
+        $orderStats[$key] =
+            (int) (
+                $data[$key]
+                ?? 0
+            );
 
-    $orderStats['processing'] =
-        (int) (
-            $orderStatsData['processing']
-            ?? 0
-        );
-
-    $orderStats['ready'] =
-        (int) (
-            $orderStatsData['ready']
-            ?? 0
-        );
-
-    $orderStats['shipped'] =
-        (int) (
-            $orderStatsData['shipped']
-            ?? 0
-        );
-
-    $orderStats['completed'] =
-        (int) (
-            $orderStatsData['completed']
-            ?? 0
-        );
-
-    $orderStats['cancelled'] =
-        (int) (
-            $orderStatsData['cancelled']
-            ?? 0
-        );
+    }
 
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| SALES STATISTICS
+| SALES
 |--------------------------------------------------------------------------
 */
 
 $salesStats = [
-
     'total_sales'     => 0,
     'completed_sales' => 0,
     'pending_sales'   => 0
-
 ];
 
 
-$salesStmt = $db->prepare("
+$stmt = $db->prepare("
     SELECT
 
         COALESCE(
-            SUM(subtotal),
+            SUM(
+                CASE
+                    WHEN vendor_status != 'Cancelled'
+                    THEN subtotal
+                    ELSE 0
+                END
+            ),
             0
         ) AS total_sales,
 
@@ -408,34 +411,34 @@ $salesStmt = $db->prepare("
 ");
 
 
-$salesStmt->execute([
+$stmt->execute([
     $vendorId
 ]);
 
 
-$salesData =
-    $salesStmt->fetch(
+$data =
+    $stmt->fetch(
         PDO::FETCH_ASSOC
     );
 
 
-if ($salesData) {
+if ($data) {
 
     $salesStats['total_sales'] =
         (float) (
-            $salesData['total_sales']
+            $data['total_sales']
             ?? 0
         );
 
     $salesStats['completed_sales'] =
         (float) (
-            $salesData['completed_sales']
+            $data['completed_sales']
             ?? 0
         );
 
     $salesStats['pending_sales'] =
         (float) (
-            $salesData['pending_sales']
+            $data['pending_sales']
             ?? 0
         );
 
@@ -444,20 +447,18 @@ if ($salesData) {
 
 /*
 |--------------------------------------------------------------------------
-| INVENTORY STATISTICS
+| INVENTORY
 |--------------------------------------------------------------------------
 */
 
 $inventoryStats = [
-
     'total_stock'  => 0,
     'low_stock'    => 0,
     'out_of_stock' => 0
-
 ];
 
 
-$inventoryStmt = $db->prepare("
+$stmt = $db->prepare("
     SELECT
 
         COALESCE(
@@ -496,34 +497,34 @@ $inventoryStmt = $db->prepare("
 ");
 
 
-$inventoryStmt->execute([
+$stmt->execute([
     $vendorId
 ]);
 
 
-$inventoryData =
-    $inventoryStmt->fetch(
+$data =
+    $stmt->fetch(
         PDO::FETCH_ASSOC
     );
 
 
-if ($inventoryData) {
+if ($data) {
 
     $inventoryStats['total_stock'] =
         (int) (
-            $inventoryData['total_stock']
+            $data['total_stock']
             ?? 0
         );
 
     $inventoryStats['low_stock'] =
         (int) (
-            $inventoryData['low_stock']
+            $data['low_stock']
             ?? 0
         );
 
     $inventoryStats['out_of_stock'] =
         (int) (
-            $inventoryData['out_of_stock']
+            $data['out_of_stock']
             ?? 0
         );
 
@@ -532,25 +533,18 @@ if ($inventoryData) {
 
 /*
 |--------------------------------------------------------------------------
-| RECENT VENDOR ORDERS
+| RECENT ORDERS
 |--------------------------------------------------------------------------
 */
 
-$recentOrders = [];
-
-
-$recentOrdersStmt = $db->prepare("
+$stmt = $db->prepare("
     SELECT
 
         vo.vendor_order_id,
         vo.order_id,
         vo.subtotal,
-        vo.delivery_fee,
         vo.vendor_status,
-        vo.tracking_number,
         vo.created_at,
-
-        o.order_date,
 
         u.name AS customer_name
 
@@ -564,100 +558,85 @@ $recentOrdersStmt = $db->prepare("
 
     WHERE vo.vendor_id = ?
 
-    ORDER BY vo.created_at DESC
+    ORDER BY
+        vo.created_at DESC
 
-    LIMIT 8
+    LIMIT 5
 ");
 
 
-$recentOrdersStmt->execute([
+$stmt->execute([
     $vendorId
 ]);
 
 
 $recentOrders =
-    $recentOrdersStmt->fetchAll(
+    $stmt->fetchAll(
         PDO::FETCH_ASSOC
     );
 
 
 /*
 |--------------------------------------------------------------------------
-| RECENT PRODUCTS
-|--------------------------------------------------------------------------
-*/
-
-$recentProducts = [];
-
-
-$recentProductsStmt = $db->prepare("
-    SELECT
-
-        p.product_id,
-        p.product_name,
-        p.price,
-        p.stock_quantity,
-        p.image,
-        p.status,
-
-        c.category_name
-
-    FROM products p
-
-    LEFT JOIN categories c
-        ON p.category_id = c.category_id
-
-    WHERE p.vendor_id = ?
-
-    ORDER BY p.created_at DESC
-
-    LIMIT 6
-");
-
-
-$recentProductsStmt->execute([
-    $vendorId
-]);
-
-
-$recentProducts =
-    $recentProductsStmt->fetchAll(
-        PDO::FETCH_ASSOC
-    );
-
-
-/*
-|--------------------------------------------------------------------------
-| PAGE TITLE
+| PAGE
 |--------------------------------------------------------------------------
 */
 
 $pageTitle =
-    'Seller Dashboard - HochipoHub';
+    'Seller Dashboard';
 
 ?>
+
 
 <!DOCTYPE html>
 
 <html lang="en">
 
+
 <head>
 
     <meta charset="UTF-8">
+
 
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
 
+
     <title>
-        <?= htmlspecialchars(
-            $pageTitle,
-            ENT_QUOTES,
-            'UTF-8'
-        ) ?>
+        Seller Dashboard - HochipoHub
     </title>
 
+
+    <!-- GOOGLE FONT -->
+
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
+
+    <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossorigin
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@600;700;800&display=swap"
+        rel="stylesheet"
+    >
+
+
+    <!-- FONT AWESOME -->
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+
+
+    <!-- CSS -->
 
     <link
         rel="stylesheet"
@@ -666,816 +645,771 @@ $pageTitle =
 
     <link
         rel="stylesheet"
-        href="../css/dashboard.css"
-    >
-
-    <link
-        rel="stylesheet"
         href="../css/vendor.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="../css/responsive.css"
     >
 
 </head>
 
 
-<body class="vendor-dashboard-page">
+<body class="seller-dashboard-page">
 
 
 <?php
 
-$sidebarFile =
-    dirname(__DIR__) .
-    '/includes/vendor_sidebar.php';
-
-if (file_exists($sidebarFile)) {
-
-    include $sidebarFile;
-
-}
+require_once __DIR__ .
+    '/../includes/vendor_sidebar.php';
 
 ?>
 
 
-<main class="vendor-dashboard-main">
+<!-- =========================================================
+     MAIN
+========================================================== -->
+
+<main class="seller-dashboard-main">
 
 
     <!-- =====================================================
-         TOP HEADER
+         TOP BAR
     ====================================================== -->
 
-    <section class="seller-welcome">
+    <header class="seller-topbar">
 
-        <div class="seller-welcome-content">
 
-            <span class="seller-eyebrow">
-                SELLER CENTER
+        <div>
+
+            <span class="seller-topbar-label">
+                Seller Center
             </span>
 
-            <h1>
+        </div>
 
-                Welcome back,
 
-                <span>
+        <div class="seller-topbar-actions">
+
+
+            <button
+                type="button"
+                class="seller-topbar-icon"
+            >
+
+                <i class="fa-regular fa-bell"></i>
+
+                <?php if (
+                    $orderStats['pending'] > 0
+                ): ?>
+
+                    <span>
+
+                        <?= min(
+                            9,
+                            $orderStats['pending']
+                        ) ?>
+
+                    </span>
+
+                <?php endif; ?>
+
+            </button>
+
+
+            <div class="seller-topbar-user">
+
+                <div class="seller-topbar-avatar">
+
                     <?= htmlspecialchars(
-                        $vendor['business_name'],
+                        strtoupper(
+                            substr(
+                                $vendor['name'],
+                                0,
+                                1
+                            )
+                        ),
                         ENT_QUOTES,
                         'UTF-8'
                     ) ?>
-                </span>
 
-                👋
+                </div>
 
-            </h1>
 
-            <p>
-                Manage your products, orders and sales
-                from one powerful dashboard.
-            </p>
+                <div>
+
+                    <strong>
+
+                        <?= htmlspecialchars(
+                            $vendor['name'],
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>
+
+                    </strong>
+
+                    <small>
+                        Vendor
+                    </small>
+
+                </div>
+
+            </div>
+
 
         </div>
 
 
-        <div class="seller-welcome-actions">
+    </header>
+
+
+    <div class="seller-dashboard-content">
+
+
+        <!-- =================================================
+             WELCOME
+        ================================================== -->
+
+        <section class="seller-welcome">
+
+
+            <div>
+
+                <span class="seller-eyebrow">
+                    SELLER DASHBOARD
+                </span>
+
+
+                <h1>
+
+                    Welcome back,
+
+                    <?= htmlspecialchars(
+                        $vendor['name'],
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>!
+
+                    👋
+
+                </h1>
+
+
+                <p>
+                    Here's what's happening with your store today.
+                </p>
+
+            </div>
+
 
             <a
                 href="add_product.php"
-                class="seller-primary-btn"
+                class="seller-add-product-btn"
             >
-                <i class="fas fa-plus"></i>
+
+                <i class="fa-solid fa-plus"></i>
+
                 Add Product
+
             </a>
 
-            <a
-                href="products.php"
-                class="seller-secondary-btn"
-            >
-                <i class="fas fa-box"></i>
-                Manage Products
-            </a>
 
-        </div>
-
-    </section>
+        </section>
 
 
-    <!-- =====================================================
-         APPROVAL STATUS
-    ====================================================== -->
+        <!-- =================================================
+             MAIN STATS
+        ================================================== -->
 
-    <section
-        class="vendor-status-card
-        <?= strtolower(
-            $vendor['approval_status']
-        ) ?>"
-    >
-
-        <div class="vendor-status-icon">
-
-            <?php if (
-                $vendor['approval_status']
-                === 'Approved'
-            ): ?>
-
-                <i class="fas fa-check"></i>
-
-            <?php elseif (
-                $vendor['approval_status']
-                === 'Pending'
-            ): ?>
-
-                <i class="fas fa-clock"></i>
-
-            <?php else: ?>
-
-                <i class="fas fa-exclamation"></i>
-
-            <?php endif; ?>
-
-        </div>
+        <section class="seller-main-stats">
 
 
-        <div class="vendor-status-content">
+            <!-- PRODUCTS -->
 
-            <span>
-                VENDOR ACCOUNT STATUS
-            </span>
-
-            <strong>
-                <?= htmlspecialchars(
-                    $vendor['approval_status'],
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>
-            </strong>
-
-        </div>
+            <article class="seller-summary-card blue">
 
 
-        <div class="vendor-status-right">
+                <div class="seller-summary-icon">
 
-            <?php if (
-                $vendor['approval_status']
-                === 'Approved'
-            ): ?>
-
-                <span class="status-pill approved">
-                    Active
-                </span>
-
-            <?php elseif (
-                $vendor['approval_status']
-                === 'Pending'
-            ): ?>
-
-                <span class="status-pill pending">
-                    Under Review
-                </span>
-
-            <?php else: ?>
-
-                <span class="status-pill rejected">
-                    Attention Required
-                </span>
-
-            <?php endif; ?>
-
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         PRODUCT OVERVIEW
-    ====================================================== -->
-
-    <section class="dashboard-section">
-
-        <div class="section-heading">
-
-            <div>
-
-                <span class="section-eyebrow">
-                    PRODUCT OVERVIEW
-                </span>
-
-                <h2>
-                    Your Products
-                </h2>
-
-                <p>
-                    Keep track of your product inventory.
-                </p>
-
-            </div>
-
-
-            <a
-                href="products.php"
-                class="section-link"
-            >
-                View Products
-                <i class="fas fa-arrow-right"></i>
-            </a>
-
-        </div>
-
-
-        <div class="stats-grid product-stats">
-
-
-            <!-- TOTAL -->
-
-            <article class="stat-card blue">
-
-                <div class="stat-card-top">
-
-                    <div class="stat-icon">
-                        <i class="fas fa-box"></i>
-                    </div>
-
-                    <span>
-                        ALL PRODUCTS
-                    </span>
+                    <i class="fa-solid fa-bag-shopping"></i>
 
                 </div>
 
-                <strong>
-                    <?= $productStats['total'] ?>
-                </strong>
 
-                <p>
-                    Total products
-                </p>
+                <div class="seller-summary-copy">
+
+                    <span>
+                        TOTAL PRODUCTS
+                    </span>
+
+                    <strong>
+
+                        <?= $productStats['total'] ?>
+
+                    </strong>
+
+                    <p>
+                        All your products
+                    </p>
+
+
+                    <a href="products.php">
+
+                        Manage
+
+                        <i class="fa-solid fa-arrow-right"></i>
+
+                    </a>
+
+                </div>
+
 
             </article>
 
 
-            <!-- AVAILABLE -->
+            <!-- ORDERS -->
 
-            <article class="stat-card green">
+            <article class="seller-summary-card green">
 
-                <div class="stat-card-top">
 
-                    <div class="stat-icon">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
+                <div class="seller-summary-icon">
 
-                    <span>
-                        AVAILABLE
-                    </span>
+                    <i class="fa-solid fa-clipboard-check"></i>
 
                 </div>
 
-                <strong>
-                    <?= $productStats['available'] ?>
-                </strong>
 
-                <p>
-                    Currently available
-                </p>
+                <div class="seller-summary-copy">
+
+                    <span>
+                        TOTAL ORDERS
+                    </span>
+
+                    <strong>
+
+                        <?= $orderStats['total'] ?>
+
+                    </strong>
+
+                    <p>
+                        All customer orders
+                    </p>
+
+
+                    <a href="orders.php">
+
+                        View orders
+
+                        <i class="fa-solid fa-arrow-right"></i>
+
+                    </a>
+
+                </div>
+
 
             </article>
 
 
-            <!-- OUT OF STOCK -->
+            <!-- SALES -->
 
-            <article class="stat-card red">
+            <article class="seller-summary-card orange">
 
-                <div class="stat-card-top">
 
-                    <div class="stat-icon">
-                        <i class="fas fa-triangle-exclamation"></i>
-                    </div>
+                <div class="seller-summary-icon">
 
-                    <span>
-                        OUT OF STOCK
-                    </span>
+                    <i class="fa-solid fa-dollar-sign"></i>
 
                 </div>
 
-                <strong>
-                    <?= $productStats['out_of_stock'] ?>
-                </strong>
 
-                <p>
-                    Need restocking
-                </p>
-
-            </article>
-
-
-            <!-- HIDDEN -->
-
-            <article class="stat-card purple">
-
-                <div class="stat-card-top">
-
-                    <div class="stat-icon">
-                        <i class="fas fa-eye-slash"></i>
-                    </div>
-
-                    <span>
-                        HIDDEN
-                    </span>
-
-                </div>
-
-                <strong>
-                    <?= $productStats['hidden'] ?>
-                </strong>
-
-                <p>
-                    Not visible to customers
-                </p>
-
-            </article>
-
-
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         SALES PERFORMANCE
-    ====================================================== -->
-
-    <section class="dashboard-section">
-
-        <div class="section-heading">
-
-            <div>
-
-                <span class="section-eyebrow">
-                    BUSINESS PERFORMANCE
-                </span>
-
-                <h2>
-                    Sales Performance
-                </h2>
-
-                <p>
-                    Monitor your marketplace sales.
-                </p>
-
-            </div>
-
-        </div>
-
-
-        <div class="sales-grid">
-
-
-            <!-- TOTAL SALES -->
-
-            <article class="sales-card featured">
-
-                <div class="sales-card-icon">
-                    <i class="fas fa-wallet"></i>
-                </div>
-
-                <div>
+                <div class="seller-summary-copy">
 
                     <span>
                         TOTAL SALES
                     </span>
 
                     <strong>
+
                         RM
                         <?= number_format(
                             $salesStats['total_sales'],
                             2
                         ) ?>
+
                     </strong>
 
-                    <small>
-                        Overall vendor sales
-                    </small>
+                    <p>
+                        Overall sales
+                    </p>
+
+
+                    <a href="sales.php">
+
+                        View sales
+
+                        <i class="fa-solid fa-arrow-right"></i>
+
+                    </a>
 
                 </div>
 
-            </article>
-
-
-            <!-- COMPLETED -->
-
-            <article class="sales-card">
-
-                <div class="sales-card-icon">
-                    <i class="fas fa-chart-line"></i>
-                </div>
-
-                <div>
-
-                    <span>
-                        COMPLETED SALES
-                    </span>
-
-                    <strong>
-                        RM
-                        <?= number_format(
-                            $salesStats['completed_sales'],
-                            2
-                        ) ?>
-                    </strong>
-
-                    <small>
-                        Successfully completed
-                    </small>
-
-                </div>
 
             </article>
 
 
             <!-- PENDING -->
 
-            <article class="sales-card">
+            <article class="seller-summary-card purple">
 
-                <div class="sales-card-icon">
-                    <i class="fas fa-hourglass-half"></i>
+
+                <div class="seller-summary-icon">
+
+                    <i class="fa-solid fa-arrow-trend-up"></i>
+
                 </div>
 
-                <div>
+
+                <div class="seller-summary-copy">
 
                     <span>
-                        PENDING SALES
+                        PENDING ORDERS
                     </span>
 
                     <strong>
-                        RM
-                        <?= number_format(
-                            $salesStats['pending_sales'],
-                            2
-                        ) ?>
+
+                        <?= $orderStats['pending'] ?>
+
                     </strong>
 
-                    <small>
+                    <p>
                         Orders in progress
-                    </small>
+                    </p>
+
+
+                    <a href="orders.php">
+
+                        View pending
+
+                        <i class="fa-solid fa-arrow-right"></i>
+
+                    </a>
 
                 </div>
+
 
             </article>
 
 
-        </div>
-
-    </section>
+        </section>
 
 
-    <!-- =====================================================
-         ORDER OVERVIEW
-    ====================================================== -->
+        <!-- =================================================
+             DASHBOARD GRID
+        ================================================== -->
 
-    <section class="dashboard-panel">
+        <section class="seller-dashboard-grid">
 
-        <div class="panel-heading">
 
-            <div>
+            <!-- =================================================
+                 SALES OVERVIEW
+            ================================================== -->
 
-                <span class="section-eyebrow">
-                    ORDER MANAGEMENT
-                </span>
+            <div class="seller-dashboard-card seller-sales-overview">
 
-                <h2>
-                    Order Overview
-                </h2>
 
-                <p>
-                    Track the status of your vendor orders.
-                </p>
+                <div class="seller-card-heading">
+
+
+                    <div class="seller-heading-icon blue">
+
+                        <i class="fa-solid fa-chart-line"></i>
+
+                    </div>
+
+
+                    <div>
+
+                        <h2>
+                            Sales Overview
+                        </h2>
+
+                        <p>
+                            Monitor your store sales performance
+                        </p>
+
+                    </div>
+
+
+                </div>
+
+
+                <div class="seller-sales-mini-grid">
+
+
+                    <div class="seller-sales-mini">
+
+
+                        <div class="seller-mini-icon blue">
+
+                            <i class="fa-solid fa-coins"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                TOTAL SALES
+                            </span>
+
+                            <strong>
+
+                                RM
+                                <?= number_format(
+                                    $salesStats['total_sales'],
+                                    2
+                                ) ?>
+
+                            </strong>
+
+                            <small>
+                                From all orders
+                            </small>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <div class="seller-sales-mini">
+
+
+                        <div class="seller-mini-icon green">
+
+                            <i class="fa-solid fa-circle-check"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                COMPLETED SALES
+                            </span>
+
+                            <strong>
+
+                                RM
+                                <?= number_format(
+                                    $salesStats['completed_sales'],
+                                    2
+                                ) ?>
+
+                            </strong>
+
+                            <small>
+                                Successfully completed
+                            </small>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <div class="seller-sales-mini">
+
+
+                        <div class="seller-mini-icon orange">
+
+                            <i class="fa-regular fa-clock"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                PENDING SALES
+                            </span>
+
+                            <strong>
+
+                                RM
+                                <?= number_format(
+                                    $salesStats['pending_sales'],
+                                    2
+                                ) ?>
+
+                            </strong>
+
+                            <small>
+                                Orders in progress
+                            </small>
+
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+                <!-- VISUAL CHART -->
+
+                <div class="seller-chart">
+
+
+                    <div class="seller-chart-title">
+                        Sales Performance
+                    </div>
+
+
+                    <div class="seller-chart-area">
+
+
+                        <div class="seller-chart-line line-one"></div>
+
+                        <div class="seller-chart-line line-two"></div>
+
+                        <div class="seller-chart-line line-three"></div>
+
+                        <div class="seller-chart-line line-four"></div>
+
+
+                        <div class="seller-chart-placeholder">
+
+                            <i class="fa-solid fa-chart-area"></i>
+
+                            <span>
+                                Sales data will appear here
+                            </span>
+
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
 
             </div>
 
 
-            <a
-                href="orders.php"
-                class="section-link"
-            >
-                View All
-                <i class="fas fa-arrow-right"></i>
-            </a>
+            <!-- =================================================
+                 QUICK ACTIONS
+            ================================================== -->
 
-        </div>
+            <div class="seller-dashboard-card">
 
 
-        <div class="order-status-grid">
+                <div class="seller-card-heading">
 
 
-            <div class="order-status-item pending">
+                    <div class="seller-heading-icon purple">
 
-                <div class="order-status-icon">
-                    <i class="fas fa-clock"></i>
+                        <i class="fa-solid fa-bolt"></i>
+
+                    </div>
+
+
+                    <div>
+
+                        <h2>
+                            Quick Actions
+                        </h2>
+
+                        <p>
+                            Manage your store efficiently
+                        </p>
+
+                    </div>
+
+
                 </div>
 
-                <strong>
-                    <?= $orderStats['pending'] ?>
-                </strong>
 
-                <span>
-                    Pending
-                </span>
+                <div class="seller-quick-grid">
+
+
+                    <a
+                        href="add_product.php"
+                        class="seller-quick-card blue"
+                    >
+
+                        <div>
+
+                            <i class="fa-solid fa-circle-plus"></i>
+
+                        </div>
+
+                        <strong>
+                            Add New Product
+                        </strong>
+
+                        <span>
+                            Create new product
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="products.php"
+                        class="seller-quick-card green"
+                    >
+
+                        <div>
+
+                            <i class="fa-solid fa-cube"></i>
+
+                        </div>
+
+                        <strong>
+                            Manage Products
+                        </strong>
+
+                        <span>
+                            View all products
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="orders.php"
+                        class="seller-quick-card orange"
+                    >
+
+                        <div>
+
+                            <i class="fa-solid fa-bag-shopping"></i>
+
+                        </div>
+
+                        <strong>
+                            View Orders
+                        </strong>
+
+                        <span>
+                            Check customer orders
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="sales.php"
+                        class="seller-quick-card purple"
+                    >
+
+                        <div>
+
+                            <i class="fa-solid fa-chart-column"></i>
+
+                        </div>
+
+                        <strong>
+                            View Sales
+                        </strong>
+
+                        <span>
+                            Sales performance
+                        </span>
+
+                    </a>
+
+
+                </div>
+
 
             </div>
 
 
-            <div class="order-status-item processing">
+            <!-- =================================================
+                 RECENT ORDERS
+            ================================================== -->
 
-                <div class="order-status-icon">
-                    <i class="fas fa-gear"></i>
-                </div>
-
-                <strong>
-                    <?= $orderStats['processing'] ?>
-                </strong>
-
-                <span>
-                    Processing
-                </span>
-
-            </div>
+            <div class="seller-dashboard-card">
 
 
-            <div class="order-status-item ready">
-
-                <div class="order-status-icon">
-                    <i class="fas fa-box-open"></i>
-                </div>
-
-                <strong>
-                    <?= $orderStats['ready'] ?>
-                </strong>
-
-                <span>
-                    Ready
-                </span>
-
-            </div>
+                <div class="seller-card-heading seller-heading-between">
 
 
-            <div class="order-status-item shipped">
-
-                <div class="order-status-icon">
-                    <i class="fas fa-truck"></i>
-                </div>
-
-                <strong>
-                    <?= $orderStats['shipped'] ?>
-                </strong>
-
-                <span>
-                    Shipped
-                </span>
-
-            </div>
+                    <div class="seller-heading-left">
 
 
-            <div class="order-status-item completed">
+                        <div class="seller-heading-icon blue">
 
-                <div class="order-status-icon">
-                    <i class="fas fa-circle-check"></i>
-                </div>
+                            <i class="fa-solid fa-bag-shopping"></i>
 
-                <strong>
-                    <?= $orderStats['completed'] ?>
-                </strong>
-
-                <span>
-                    Completed
-                </span>
-
-            </div>
+                        </div>
 
 
-            <div class="order-status-item cancelled">
+                        <div>
 
-                <div class="order-status-icon">
-                    <i class="fas fa-xmark"></i>
-                </div>
+                            <h2>
+                                Recent Orders
+                            </h2>
 
-                <strong>
-                    <?= $orderStats['cancelled'] ?>
-                </strong>
+                            <p>
+                                Latest orders from your customers
+                            </p>
 
-                <span>
-                    Cancelled
-                </span>
-
-            </div>
+                        </div>
 
 
-        </div>
-
-    </section>
+                    </div>
 
 
-    <!-- =====================================================
-         INVENTORY
-    ====================================================== -->
+                    <a
+                        href="orders.php"
+                        class="seller-view-all"
+                    >
 
-    <section class="dashboard-panel">
+                        View all orders
 
-        <div class="panel-heading">
+                        <i class="fa-solid fa-arrow-right"></i>
 
-            <div>
+                    </a>
 
-                <span class="section-eyebrow">
-                    STOCK CONTROL
-                </span>
-
-                <h2>
-                    Inventory Overview
-                </h2>
-
-                <p>
-                    Monitor your current stock levels.
-                </p>
-
-            </div>
-
-
-            <a
-                href="../inventory.php"
-                class="section-link"
-            >
-                Manage Inventory
-                <i class="fas fa-arrow-right"></i>
-            </a>
-
-        </div>
-
-
-        <div class="inventory-grid">
-
-
-            <div class="inventory-item">
-
-                <div class="inventory-icon blue">
-                    <i class="fas fa-cubes"></i>
-                </div>
-
-                <div>
-
-                    <strong>
-                        <?= $inventoryStats['total_stock'] ?>
-                    </strong>
-
-                    <span>
-                        Total Stock
-                    </span>
 
                 </div>
 
-            </div>
+
+                <?php if (
+                    empty(
+                        $recentOrders
+                    )
+                ): ?>
 
 
-            <div class="inventory-item">
-
-                <div class="inventory-icon yellow">
-                    <i class="fas fa-battery-quarter"></i>
-                </div>
-
-                <div>
-
-                    <strong>
-                        <?= $inventoryStats['low_stock'] ?>
-                    </strong>
-
-                    <span>
-                        Low Stock
-                    </span>
-
-                </div>
-
-            </div>
+                    <div class="seller-empty-orders">
 
 
-            <div class="inventory-item">
+                        <div>
 
-                <div class="inventory-icon red">
-                    <i class="fas fa-box-open"></i>
-                </div>
+                            <i class="fa-solid fa-box-open"></i>
 
-                <div>
-
-                    <strong>
-                        <?= $inventoryStats['out_of_stock'] ?>
-                    </strong>
-
-                    <span>
-                        Out of Stock
-                    </span>
-
-                </div>
-
-            </div>
+                        </div>
 
 
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         RECENT ORDERS
-    ====================================================== -->
-
-    <section class="dashboard-panel">
-
-        <div class="panel-heading">
-
-            <div>
-
-                <span class="section-eyebrow">
-                    LATEST ACTIVITY
-                </span>
-
-                <h2>
-                    Recent Orders
-                </h2>
-
-                <p>
-                    Your latest customer orders.
-                </p>
-
-            </div>
+                        <strong>
+                            No orders yet
+                        </strong>
 
 
-            <a
-                href="orders.php"
-                class="section-link"
-            >
-                View All
-                <i class="fas fa-arrow-right"></i>
-            </a>
-
-        </div>
+                        <p>
+                            Orders will appear here when customers purchase your products.
+                        </p>
 
 
-        <div class="table-wrapper">
-
-            <table class="seller-table">
-
-                <thead>
-
-                    <tr>
-
-                        <th>
-                            Order
-                        </th>
-
-                        <th>
-                            Customer
-                        </th>
-
-                        <th>
-                            Amount
-                        </th>
-
-                        <th>
-                            Status
-                        </th>
-
-                    </tr>
-
-                </thead>
+                    </div>
 
 
-                <tbody>
+                <?php else: ?>
 
-                    <?php if (
-                        empty($recentOrders)
-                    ): ?>
 
-                        <tr>
-
-                            <td
-                                colspan="4"
-                                class="empty-table"
-                            >
-
-                                <div class="empty-icon">
-                                    <i class="fas fa-inbox"></i>
-                                </div>
-
-                                <strong>
-                                    No orders yet
-                                </strong>
-
-                                <span>
-                                    Your recent orders will appear here.
-                                </span>
-
-                            </td>
-
-                        </tr>
-
-                    <?php else: ?>
+                    <div class="seller-order-list">
 
 
                         <?php foreach (
@@ -1483,91 +1417,33 @@ if (file_exists($sidebarFile)) {
                             as $order
                         ): ?>
 
-                            <tr>
 
-                                <td>
+                            <div class="seller-order-row">
 
-                                    <strong class="order-number">
 
-                                        #
-                                        <?= (int)
+                                <div class="seller-order-icon">
+
+                                    <i class="fa-solid fa-box"></i>
+
+                                </div>
+
+
+                                <div class="seller-order-info">
+
+                                    <strong>
+
+                                        Order
+                                        #<?= (int)
                                             $order['order_id']
                                         ?>
 
                                     </strong>
 
-                                </td>
-
-
-                                <td>
-
-                                    <div class="customer-cell">
-
-                                        <div class="customer-avatar">
-
-                                            <?= strtoupper(
-                                                substr(
-                                                    $order[
-                                                        'customer_name'
-                                                    ],
-                                                    0,
-                                                    1
-                                                )
-                                            ) ?>
-
-                                        </div>
-
-                                        <span>
-
-                                            <?= htmlspecialchars(
-                                                $order[
-                                                    'customer_name'
-                                                ],
-                                                ENT_QUOTES,
-                                                'UTF-8'
-                                            ) ?>
-
-                                        </span>
-
-                                    </div>
-
-                                </td>
-
-
-                                <td>
-
-                                    <strong>
-
-                                        RM
-                                        <?= number_format(
-                                            (float)
-                                            $order['subtotal'],
-                                            2
-                                        ) ?>
-
-                                    </strong>
-
-                                </td>
-
-
-                                <td>
-
-                                    <span
-                                        class="table-status
-                                        <?= strtolower(
-                                            str_replace(
-                                                ' ',
-                                                '-',
-                                                $order[
-                                                    'vendor_status'
-                                                ]
-                                            )
-                                        ) ?>"
-                                    >
+                                    <span>
 
                                         <?= htmlspecialchars(
                                             $order[
-                                                'vendor_status'
+                                                'customer_name'
                                             ],
                                             ENT_QUOTES,
                                             'UTF-8'
@@ -1575,235 +1451,216 @@ if (file_exists($sidebarFile)) {
 
                                     </span>
 
-                                </td>
-
-                            </tr>
-
-                        <?php endforeach; ?>
+                                </div>
 
 
-                    <?php endif; ?>
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         RECENT PRODUCTS
-    ====================================================== -->
-
-    <section class="dashboard-panel">
-
-        <div class="panel-heading">
-
-            <div>
-
-                <span class="section-eyebrow">
-                    YOUR CATALOG
-                </span>
-
-                <h2>
-                    Recent Products
-                </h2>
-
-                <p>
-                    Your latest products added to the marketplace.
-                </p>
-
-            </div>
-
-
-            <a
-                href="products.php"
-                class="section-link"
-            >
-                Manage Products
-                <i class="fas fa-arrow-right"></i>
-            </a>
-
-        </div>
-
-
-        <?php if (
-            empty($recentProducts)
-        ): ?>
-
-            <div class="empty-products">
-
-                <div class="empty-icon">
-                    <i class="fas fa-box-open"></i>
-                </div>
-
-                <h3>
-                    No products yet
-                </h3>
-
-                <p>
-                    Start adding products to your store.
-                </p>
-
-                <a
-                    href="add_product.php"
-                    class="seller-primary-btn"
-                >
-                    <i class="fas fa-plus"></i>
-                    Add Your First Product
-                </a>
-
-            </div>
-
-        <?php else: ?>
-
-
-            <div class="product-grid">
-
-
-                <?php foreach (
-                    $recentProducts
-                    as $product
-                ): ?>
-
-
-                    <?php
-
-                    $productImage =
-                        !empty(
-                            $product['image']
-                        )
-
-                        ? '../uploads/products/' .
-                          $product['image']
-
-                        : '../image/logo.jpg';
-
-                    ?>
-
-
-                    <article class="dashboard-product-card">
-
-
-                        <div class="product-image-wrapper">
-
-                            <img
-                                src="<?= htmlspecialchars(
-                                    $productImage,
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                alt="<?= htmlspecialchars(
-                                    $product[
-                                        'product_name'
-                                    ],
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                onerror="
-                                    this.src='../image/logo.jpg';
-                                "
-                            >
-
-                            <span
-                                class="product-status
-                                <?= strtolower(
-                                    str_replace(
-                                        ' ',
-                                        '-',
-                                        $product[
-                                            'status'
-                                        ]
-                                    )
-                                ) ?>"
-                            >
-
-                                <?= htmlspecialchars(
-                                    $product[
-                                        'status'
-                                    ],
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>
-
-                            </span>
-
-                        </div>
-
-
-                        <div class="product-card-content">
-
-                            <span class="product-category">
-
-                                <?= htmlspecialchars(
-                                    $product[
-                                        'category_name'
-                                    ]
-                                    ?? 'Uncategorized',
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>
-
-                            </span>
-
-
-                            <h3>
-
-                                <?= htmlspecialchars(
-                                    $product[
-                                        'product_name'
-                                    ],
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>
-
-                            </h3>
-
-
-                            <div class="product-card-bottom">
-
-                                <strong>
+                                <strong class="seller-order-price">
 
                                     RM
                                     <?= number_format(
                                         (float)
-                                        $product['price'],
+                                        $order['subtotal'],
                                         2
                                     ) ?>
 
                                 </strong>
 
 
-                                <span>
+                                <span
+                                    class="seller-order-status
+                                    <?= strtolower(
+                                        $order[
+                                            'vendor_status'
+                                        ]
+                                    ) ?>"
+                                >
 
-                                    <i class="fas fa-cubes"></i>
-
-                                    <?= (int)
-                                        $product[
-                                            'stock_quantity'
-                                        ] ?>
+                                    <?= htmlspecialchars(
+                                        $order[
+                                            'vendor_status'
+                                        ],
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?>
 
                                 </span>
 
+
                             </div>
 
-                        </div>
 
-                    </article>
+                        <?php endforeach; ?>
 
 
-                <?php endforeach; ?>
+                    </div>
+
+
+                <?php endif; ?>
 
 
             </div>
 
 
-        <?php endif; ?>
+            <!-- =================================================
+                 STORE STATUS
+            ================================================== -->
+
+            <div class="seller-dashboard-card">
 
 
-    </section>
+                <div class="seller-card-heading seller-heading-between">
+
+
+                    <div class="seller-heading-left">
+
+
+                        <div class="seller-heading-icon cyan">
+
+                            <i class="fa-solid fa-store"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <h2>
+                                Store Status
+                            </h2>
+
+                            <p>
+                                Store information
+                            </p>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <span
+                        class="seller-store-status
+                        <?= strtolower(
+                            $vendor[
+                                'approval_status'
+                            ]
+                        ) ?>"
+                    >
+
+                        <?= htmlspecialchars(
+                            $vendor[
+                                'approval_status'
+                            ],
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>
+
+                    </span>
+
+
+                </div>
+
+
+                <div class="seller-store-info">
+
+
+                    <div>
+
+                        <span>
+                            Store Name
+                        </span>
+
+                        <strong>
+
+                            <?= htmlspecialchars(
+                                $vendor[
+                                    'business_name'
+                                ],
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
+
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Vendor Status
+                        </span>
+
+                        <strong>
+
+                            <?= htmlspecialchars(
+                                $vendor[
+                                    'approval_status'
+                                ],
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
+
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Total Stock
+                        </span>
+
+                        <strong>
+
+                            <?= $inventoryStats[
+                                'total_stock'
+                            ] ?>
+
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Member Since
+                        </span>
+
+                        <strong>
+
+                            <?= !empty(
+                                $vendor[
+                                    'created_at'
+                                ]
+                            )
+                                ? date(
+                                    'd M Y',
+                                    strtotime(
+                                        $vendor[
+                                            'created_at'
+                                        ]
+                                    )
+                                )
+                                : '—'
+                            ?>
+
+                        </strong>
+
+                    </div>
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+    </div>
 
 
 </main>
