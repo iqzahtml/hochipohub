@@ -1,39 +1,68 @@
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB
+| HOCHIPO HUB
 | Responsive CSS
 |--------------------------------------------------------------------------
-| Admin-specific responsive behaviour is primarily handled by admin.css.
-| This file provides safe global responsive rules without destroying
-| the admin design system.
+| Global responsive safety rules.
+| Admin-specific responsive behaviour remains in admin.css.
 |--------------------------------------------------------------------------
 */
 
-img {
-    max-width: 100%;
-}
-
-
 * {
+    box-sizing: border-box;
+}
+
+html {
     max-width: 100%;
 }
 
+body {
+    max-width: 100%;
+}
+
+img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+video,
+iframe,
+svg {
+    max-width: 100%;
+}
+
+table {
+    max-width: 100%;
+}
+
+input,
+select,
+textarea,
+button {
+    max-width: 100%;
+}
 
 @media (max-width: 1100px) {
 
     .admin-wrapper {
         width: 100%;
+        max-width: 100%;
     }
 
+    .admin-main {
+        width: 100%;
+        max-width: 100%;
+    }
 }
 
 
 @media (max-width: 760px) {
 
     table {
+        width: 100%;
         max-width: 100%;
     }
-
 
     input,
     select,
@@ -42,13 +71,27 @@ img {
         max-width: 100%;
     }
 
+    .admin-wrapper {
+        overflow-x: hidden;
+    }
 }
 
 
 @media (max-width: 480px) {
 
+    html,
     body {
+        width: 100%;
+        max-width: 100%;
         overflow-x: hidden;
     }
 
+    .admin-wrapper {
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    img {
+        max-width: 100%;
+    }
 }
