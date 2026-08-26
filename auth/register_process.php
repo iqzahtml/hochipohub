@@ -18,6 +18,13 @@
 |--------------------------------------------------------------------------
 */
 
+
+/*
+|--------------------------------------------------------------------------
+| LOAD CONFIG
+|--------------------------------------------------------------------------
+*/
+
 require_once dirname(__DIR__) . '/config.php';
 
 
@@ -28,7 +35,9 @@ require_once dirname(__DIR__) . '/config.php';
 */
 
 if (session_status() === PHP_SESSION_NONE) {
+
     session_start();
+
 }
 
 
@@ -45,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     );
 
     exit;
+
 }
 
 
@@ -54,11 +64,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 |--------------------------------------------------------------------------
 */
 
-$name = trim($_POST['name'] ?? '');
+$name = trim(
+    $_POST['name'] ?? ''
+);
 
-$email = trim($_POST['email'] ?? '');
+$email = trim(
+    $_POST['email'] ?? ''
+);
 
-$phone = trim($_POST['phone'] ?? '');
+$phone = trim(
+    $_POST['phone'] ?? ''
+);
 
 $role = strtolower(
     trim(
@@ -70,7 +86,22 @@ $password = $_POST['password'] ?? '';
 
 $confirmPassword = $_POST['confirm_password'] ?? '';
 
-$terms = isset($_POST['terms']);
+$terms = isset(
+    $_POST['terms']
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| CLEAN PHONE
+|--------------------------------------------------------------------------
+*/
+
+$cleanPhone = preg_replace(
+    '/[\s\-\(\)]/',
+    '',
+    $phone
+);
 
 
 /*
@@ -78,18 +109,20 @@ $terms = isset($_POST['terms']);
 | SAVE OLD FORM DATA
 |--------------------------------------------------------------------------
 |
-| We save the information so it can be displayed again
-| when the registration form is reopened after an error.
+| Password is intentionally NOT saved.
 |
-| Password is NOT saved.
-|--------------------------------------------------------------------------
 */
 
 $_SESSION['register_old'] = [
-    'name'  => $name,
+
+    'name' => $name,
+
     'email' => $email,
+
     'phone' => $phone,
-    'role'  => $role
+
+    'role' => $role
+
 ];
 
 
@@ -98,21 +131,18 @@ $_SESSION['register_old'] = [
 | REGISTER ERROR FUNCTION
 |--------------------------------------------------------------------------
 |
-| IMPORTANT:
+| This function:
+| 1. Saves error message
+| 2. Saves old form information
+| 3. Tells homepage to open register modal
+| 4. Redirects back to register modal
 |
-| When an error happens:
-|
-| 1. Save the error
-| 2. Save the entered data
-| 3. Tell the homepage to open register modal
-| 4. Redirect to index.php
-|
-| The JavaScript will automatically open the modal.
 |--------------------------------------------------------------------------
 */
 
 function registerError($message)
 {
+
     $_SESSION['register_error'] = $message;
 
     $_SESSION['open_register_modal'] = true;
@@ -124,6 +154,7 @@ function registerError($message)
     );
 
     exit;
+
 }
 
 
@@ -138,6 +169,7 @@ if ($name === '') {
     registerError(
         'Name is required.'
     );
+
 }
 
 
@@ -158,6 +190,7 @@ if (
     registerError(
         'Please enter a valid email address.'
     );
+
 }
 
 
@@ -167,17 +200,12 @@ if (
 |--------------------------------------------------------------------------
 */
 
-$cleanPhone = preg_replace(
-    '/[\s\-\(\)]/',
-    '',
-    $phone
-);
-
 if ($cleanPhone === '') {
 
     registerError(
         'Phone number is required.'
     );
+
 }
 
 
@@ -186,7 +214,9 @@ if ($cleanPhone === '') {
 | VALIDATE PHONE FORMAT
 |--------------------------------------------------------------------------
 |
-| Optional basic validation.
+| Malaysian mobile number:
+| 01XXXXXXXX
+|
 |--------------------------------------------------------------------------
 */
 
@@ -200,6 +230,7 @@ if (
     registerError(
         'Please enter a valid Malaysian phone number.'
     );
+
 }
 
 
@@ -210,9 +241,13 @@ if (
 */
 
 $allowedRoles = [
+
     'customer',
+
     'vendor'
+
 ];
+
 
 if (
     !in_array(
@@ -225,6 +260,7 @@ if (
     registerError(
         'Invalid account type.'
     );
+
 }
 
 
@@ -234,11 +270,14 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if (strlen($password) < 6) {
+if (
+    strlen($password) < 6
+) {
 
     registerError(
         'Password must contain at least 6 characters.'
     );
+
 }
 
 
@@ -248,11 +287,14 @@ if (strlen($password) < 6) {
 |--------------------------------------------------------------------------
 */
 
-if ($password !== $confirmPassword) {
+if (
+    $password !== $confirmPassword
+) {
 
     registerError(
         'Passwords do not match.'
     );
+
 }
 
 
@@ -267,6 +309,7 @@ if (!$terms) {
     registerError(
         'You must agree to the Terms & Conditions.'
     );
+
 }
 
 
@@ -276,7 +319,17 @@ if (!$terms) {
 |--------------------------------------------------------------------------
 */
 
+$db = null;
+
+
 try {
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | GET DATABASE CONNECTION
+    |--------------------------------------------------------------------------
+    */
 
     $db = getDB();
 
@@ -294,15 +347,20 @@ try {
         LIMIT 1
     ");
 
+
     $stmt->execute([
+
         $email
+
     ]);
+
 
     if ($stmt->fetch()) {
 
         registerError(
             'This email is already registered. Please use another email.'
         );
+
     }
 
 
@@ -319,15 +377,20 @@ try {
         LIMIT 1
     ");
 
+
     $stmt->execute([
+
         $cleanPhone
+
     ]);
+
 
     if ($stmt->fetch()) {
 
         registerError(
             'This phone number is already registered. Please use another phone number.'
         );
+
     }
 
 
@@ -359,6 +422,7 @@ try {
     */
 
     $stmt = $db->prepare("
+
         INSERT INTO users
         (
             name,
@@ -368,6 +432,7 @@ try {
             role,
             status
         )
+
         VALUES
         (
             :name,
@@ -377,24 +442,22 @@ try {
             :role,
             'active'
         )
+
     ");
+
 
     $stmt->execute([
 
-        ':name' =>
-            $name,
+        ':name' => $name,
 
-        ':email' =>
-            $email,
+        ':email' => $email,
 
-        ':phone' =>
-            $cleanPhone,
+        ':phone' => $cleanPhone,
 
-        ':password' =>
-            $passwordHash,
+        ':password' => $passwordHash,
 
-        ':role' =>
-            $role
+        ':role' => $role
+
     ]);
 
 
@@ -412,6 +475,7 @@ try {
         throw new Exception(
             'Failed to create user.'
         );
+
     }
 
 
@@ -423,20 +487,25 @@ try {
 
     if ($role === 'vendor') {
 
+
         $vendorStmt = $db->prepare("
+
             INSERT INTO vendors
             (
                 user_id,
                 business_name,
                 approval_status
             )
+
             VALUES
             (
                 ?,
                 ?,
                 ?
             )
+
         ");
+
 
         $vendorStmt->execute([
 
@@ -445,7 +514,9 @@ try {
             $name,
 
             'Pending'
+
         ]);
+
     }
 
 
@@ -460,7 +531,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CLEAR REGISTER DATA
+    | CLEAR OLD REGISTER DATA
     |--------------------------------------------------------------------------
     */
 
@@ -481,6 +552,12 @@ try {
         'Account created successfully. Please login.';
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | REMEMBER LOGIN EMAIL
+    |--------------------------------------------------------------------------
+    */
+
     $_SESSION['login_email'] =
         $email;
 
@@ -500,7 +577,16 @@ try {
     exit;
 
 
-} catch (Throwable $e) {
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE / SYSTEM ERROR
+|--------------------------------------------------------------------------
+*/
+
+catch (Throwable $e) {
 
 
     /*
@@ -516,12 +602,37 @@ try {
     ) {
 
         $db->rollBack();
+
     }
 
 
     /*
     |--------------------------------------------------------------------------
+    | SAVE USER DATA AGAIN
+    |--------------------------------------------------------------------------
+    */
+
+    $_SESSION['register_old'] = [
+
+        'name' => $name,
+
+        'email' => $email,
+
+        'phone' => $phone,
+
+        'role' => $role
+
+    ];
+
+
+    /*
+    |--------------------------------------------------------------------------
     | SAVE ERROR
+    |--------------------------------------------------------------------------
+    |
+    | Development error is shown here so you can identify
+    | database problems.
+    |
     |--------------------------------------------------------------------------
     */
 
@@ -552,4 +663,7 @@ try {
     );
 
     exit;
+
 }
+
+?>
