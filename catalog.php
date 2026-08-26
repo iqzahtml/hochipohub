@@ -2,20 +2,21 @@
 
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB - CATALOG PAGE
+| HOCHIPOHUB - PREMIUM CATALOG
 |--------------------------------------------------------------------------
-| File: catalog.php
+| File:
+| catalog.php
 |--------------------------------------------------------------------------
 |
-| Purpose:
-| - Product catalog
+| Features:
 | - Search products
-| - Filter by category
-| - Filter by vendor
-| - Sort products
+| - Category filter
+| - Vendor filter
+| - Product sorting
 | - Wishlist
 | - Add to cart
-| - UI matched with category.php / vendor.php
+| - Customer navigation
+| - Responsive product grid
 |
 |--------------------------------------------------------------------------
 */
@@ -34,7 +35,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 /*
 |--------------------------------------------------------------------------
-| CONFIGURATION
+| CONFIG
 |--------------------------------------------------------------------------
 */
 
@@ -61,7 +62,21 @@ require_once __DIR__ . '/includes/functions.php';
 
 /*
 |--------------------------------------------------------------------------
-| PAGE SETTINGS
+| DATABASE
+|--------------------------------------------------------------------------
+*/
+
+$db = getDB();
+
+
+if (!($db instanceof PDO)) {
+    die('Database connection is not available.');
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PAGE
 |--------------------------------------------------------------------------
 */
 
@@ -83,15 +98,6 @@ $allJS = [
 
 /*
 |--------------------------------------------------------------------------
-| DATABASE
-|--------------------------------------------------------------------------
-*/
-
-$db = getDB();
-
-
-/*
-|--------------------------------------------------------------------------
 | HELPERS
 |--------------------------------------------------------------------------
 */
@@ -106,7 +112,6 @@ if (!function_exists('catalogEscape')) {
             'UTF-8'
         );
     }
-
 }
 
 
@@ -124,19 +129,60 @@ if (!function_exists('catalogProductImage')) {
             return getProductImage(
                 $image
             );
-
         }
 
 
-        return BASE_URL .
+        return
+            BASE_URL .
             'uploads/products/' .
             rawurlencode(
-                basename(
-                    $image
-                )
+                basename($image)
             );
     }
+}
 
+
+if (!function_exists('catalogBuildUrl')) {
+
+    function catalogBuildUrl(
+        array $changes = []
+    ): string {
+
+        $params = $_GET;
+
+
+        foreach ($changes as $key => $value) {
+
+            if (
+                $value === null ||
+                $value === '' ||
+                $value === 0
+            ) {
+
+                unset($params[$key]);
+
+            } else {
+
+                $params[$key] = $value;
+            }
+        }
+
+
+        $query =
+            http_build_query(
+                $params
+            );
+
+
+        return
+            BASE_URL .
+            'catalog.php' .
+            (
+                $query !== ''
+                    ? '?' . $query
+                    : ''
+            );
+    }
 }
 
 
@@ -148,7 +194,9 @@ if (!function_exists('catalogProductImage')) {
 
 $search =
     isset($_GET['search'])
-        ? trim($_GET['search'])
+        ? trim(
+            (string) $_GET['search']
+        )
         : '';
 
 
@@ -166,24 +214,24 @@ $vendorId =
 
 $sort =
     isset($_GET['sort'])
-        ? trim($_GET['sort'])
+        ? trim(
+            (string) $_GET['sort']
+        )
         : 'latest';
 
 
 /*
 |--------------------------------------------------------------------------
-| VALID SORT OPTIONS
+| VALID SORT
 |--------------------------------------------------------------------------
 */
 
 $allowedSorts = [
-
     'latest',
     'price_low',
     'price_high',
     'name',
     'oldest'
-
 ];
 
 
@@ -196,13 +244,12 @@ if (
 ) {
 
     $sort = 'latest';
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| INITIAL VARIABLES
+| DATA ARRAYS
 |--------------------------------------------------------------------------
 */
 
@@ -227,75 +274,80 @@ $activeVendorName = '';
 
 try {
 
-    $categoryStmt =
+    $stmt =
         $db->prepare("
             SELECT
+
                 category_id,
                 category_name
+
             FROM categories
-            ORDER BY category_name ASC
+
+            ORDER BY
+                category_name ASC
         ");
 
 
-    $categoryStmt->execute();
+    $stmt->execute();
 
 
     $categories =
-        $categoryStmt->fetchAll(
+        $stmt->fetchAll(
             PDO::FETCH_ASSOC
         );
 
-}
-
-catch (Throwable $e) {
+} catch (Throwable $e) {
 
     $categories = [];
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| LOAD VENDORS
+| LOAD APPROVED VENDORS
 |--------------------------------------------------------------------------
 */
 
 try {
 
-    $vendorStmt =
+    $stmt =
         $db->prepare("
             SELECT
+
                 v.vendor_id,
                 v.business_name
+
             FROM vendors v
+
             INNER JOIN users u
                 ON v.user_id = u.user_id
+
             WHERE LOWER(v.approval_status) = 'approved'
+
             AND LOWER(u.status) = 'active'
-            ORDER BY v.business_name ASC
+
+            ORDER BY
+                v.business_name ASC
         ");
 
 
-    $vendorStmt->execute();
+    $stmt->execute();
 
 
     $vendors =
-        $vendorStmt->fetchAll(
+        $stmt->fetchAll(
             PDO::FETCH_ASSOC
         );
 
-}
-
-catch (Throwable $e) {
+} catch (Throwable $e) {
 
     $vendors = [];
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| ACTIVE CATEGORY NAME
+| ACTIVE CATEGORY
 |--------------------------------------------------------------------------
 */
 
@@ -303,45 +355,45 @@ if ($categoryId > 0) {
 
     try {
 
-        $categoryNameStmt =
+        $stmt =
             $db->prepare("
                 SELECT
                     category_name
+
                 FROM categories
+
                 WHERE category_id = ?
+
                 LIMIT 1
             ");
 
 
-        $categoryNameStmt->execute([
+        $stmt->execute([
             $categoryId
         ]);
 
 
         $activeCategoryName =
-            $categoryNameStmt->fetchColumn();
+            $stmt->fetchColumn();
 
 
-        if ($activeCategoryName === false) {
+        if (
+            $activeCategoryName === false
+        ) {
 
             $activeCategoryName = '';
-
         }
 
-    }
-
-    catch (Throwable $e) {
+    } catch (Throwable $e) {
 
         $activeCategoryName = '';
-
     }
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| ACTIVE VENDOR NAME
+| ACTIVE VENDOR
 |--------------------------------------------------------------------------
 */
 
@@ -349,45 +401,45 @@ if ($vendorId > 0) {
 
     try {
 
-        $vendorNameStmt =
+        $stmt =
             $db->prepare("
                 SELECT
                     business_name
+
                 FROM vendors
+
                 WHERE vendor_id = ?
+
                 LIMIT 1
             ");
 
 
-        $vendorNameStmt->execute([
+        $stmt->execute([
             $vendorId
         ]);
 
 
         $activeVendorName =
-            $vendorNameStmt->fetchColumn();
+            $stmt->fetchColumn();
 
 
-        if ($activeVendorName === false) {
+        if (
+            $activeVendorName === false
+        ) {
 
             $activeVendorName = '';
-
         }
 
-    }
-
-    catch (Throwable $e) {
+    } catch (Throwable $e) {
 
         $activeVendorName = '';
-
     }
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| PRODUCT SORTING
+| SORT
 |--------------------------------------------------------------------------
 */
 
@@ -437,7 +489,6 @@ switch ($sort) {
             'p.created_at DESC';
 
         break;
-
 }
 
 
@@ -454,7 +505,6 @@ $sql = "
         p.*,
 
         v.business_name,
-
         v.business_logo,
 
         c.category_name
@@ -472,7 +522,8 @@ $sql = "
 
     WHERE p.stock_quantity > 0
 
-    AND LOWER(p.status) IN (
+    AND LOWER(p.status) IN
+    (
         'available',
         'active'
     )
@@ -500,8 +551,11 @@ if ($search !== '') {
         AND
         (
             p.product_name LIKE ?
+
             OR v.business_name LIKE ?
+
             OR c.category_name LIKE ?
+
             OR p.description LIKE ?
         )
 
@@ -518,7 +572,6 @@ if ($search !== '') {
     $params[] = $searchValue;
     $params[] = $searchValue;
     $params[] = $searchValue;
-
 }
 
 
@@ -539,7 +592,6 @@ if ($categoryId > 0) {
 
     $params[] =
         $categoryId;
-
 }
 
 
@@ -560,13 +612,12 @@ if ($vendorId > 0) {
 
     $params[] =
         $vendorId;
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| ORDER
+| ORDER BY
 |--------------------------------------------------------------------------
 */
 
@@ -585,19 +636,19 @@ $sql .= "
 
 try {
 
-    $productStmt =
+    $stmt =
         $db->prepare(
             $sql
         );
 
 
-    $productStmt->execute(
+    $stmt->execute(
         $params
     );
 
 
     $products =
-        $productStmt->fetchAll(
+        $stmt->fetchAll(
             PDO::FETCH_ASSOC
         );
 
@@ -607,20 +658,157 @@ try {
             $products
         );
 
-}
-
-catch (Throwable $e) {
+} catch (Throwable $e) {
 
     $products = [];
 
     $productCount = 0;
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| HEADER
+| CATEGORY COUNT
+|--------------------------------------------------------------------------
+*/
+
+$categoryCount =
+    count(
+        $categories
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| VENDOR COUNT
+|--------------------------------------------------------------------------
+*/
+
+$vendorCount =
+    count(
+        $vendors
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| CUSTOMER NAV COUNTS
+|--------------------------------------------------------------------------
+*/
+
+$cartCount = 0;
+
+$wishlistCount = 0;
+
+
+if (
+    isset(
+        $_SESSION['user_id']
+    ) &&
+    strtolower(
+        (string) (
+            $_SESSION['role']
+            ?? ''
+        )
+    ) === 'customer'
+) {
+
+    $customerId =
+        (int) $_SESSION['user_id'];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CART
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $db->prepare("
+                SELECT
+
+                    COALESCE(
+                        SUM(quantity),
+                        0
+                    ) AS total
+
+                FROM cart
+
+                WHERE customer_id = ?
+            ");
+
+
+        $stmt->execute([
+            $customerId
+        ]);
+
+
+        $row =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        $cartCount =
+            (int) (
+                $row['total']
+                ?? 0
+            );
+
+    } catch (Throwable $e) {
+
+        $cartCount = 0;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | WISHLIST
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $db->prepare("
+                SELECT
+                    COUNT(*) AS total
+
+                FROM wishlist
+
+                WHERE user_id = ?
+            ");
+
+
+        $stmt->execute([
+            $customerId
+        ]);
+
+
+        $row =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        $wishlistCount =
+            (int) (
+                $row['total']
+                ?? 0
+            );
+
+    } catch (Throwable $e) {
+
+        $wishlistCount = 0;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PAGE CSS
 |--------------------------------------------------------------------------
 */
 
@@ -629,26 +817,35 @@ $extraCSS = [
 ];
 
 
+$hideSiteMainWrapper =
+    true;
+
+
+/*
+|--------------------------------------------------------------------------
+| HEADER
+|--------------------------------------------------------------------------
+*/
+
 require_once __DIR__ .
     '/includes/header.php';
 
 
 /*
 |--------------------------------------------------------------------------
-| CUSTOMER SIDEBAR
+| CUSTOMER NAV
 |--------------------------------------------------------------------------
 */
 
 if (
     isset($_SESSION['role']) &&
     strtolower(
-        $_SESSION['role']
+        (string) $_SESSION['role']
     ) === 'customer'
 ) {
 
     require_once __DIR__ .
         '/includes/customer_sidebar.php';
-
 }
 
 ?>
@@ -657,73 +854,65 @@ if (
 <style>
 
 /* ==========================================================================
-   HOCHIPOHUB CATALOG
-   MATCH CATEGORY + VENDOR UI
+   HOCHIPOHUB PREMIUM CATALOG
    ========================================================================== */
 
-.catalog-page {
+.hh-catalog-page {
 
     --catalog-blue:
         #2563eb;
 
     --catalog-navy:
-        #08265a;
+        #0b2d69;
 
     --catalog-text:
-        #0b2d63;
+        #14213d;
 
     --catalog-muted:
-        #7e91ae;
+        #8291a7;
 
     --catalog-border:
-        #dce7f3;
+        #e1e9f4;
 
-    --catalog-soft:
-        #edf5ff;
+    width: 100%;
 
-    width:
-        100%;
+    min-height: 100vh;
 
-    min-height:
-        100vh;
+    padding:
+        42px
+        24px
+        75px;
+
+    overflow-x: hidden;
+
+    color:
+        var(--catalog-text);
 
     background:
 
+        radial-gradient(
+            circle at 92% 4%,
+            rgba(59,130,246,.08),
+            transparent 24%
+        ),
+
         linear-gradient(
             180deg,
-            #f4f8fd 0%,
-            #ffffff 33%,
+            #f5f8ff 0%,
+            #f8faff 55%,
             #ffffff 100%
         );
 
-    color:
-        var(
-            --catalog-text
-        );
-
 }
 
 
-.catalog-container {
+.hh-catalog-container {
 
-    width:
-        min(
-            1315px,
-            calc(
-                100% - 52px
-            )
-        );
+    width: 100%;
 
-    margin:
-        0 auto;
+    max-width: 1340px;
 
-}
-
-
-.catalog-page-inner {
-
-    padding:
-        58px 0 80px;
+    margin: 0 auto;
 
 }
 
@@ -732,80 +921,81 @@ if (
    HERO
    ========================================================================== */
 
-.catalog-hero-modern {
+.hh-catalog-hero {
 
-    position:
-        relative;
+    position: relative;
 
-    overflow:
-        hidden;
+    min-height: 350px;
 
-    min-height:
-        320px;
+    margin-bottom: 23px;
 
     padding:
-        52px 58px;
+        48px
+        52px;
 
-    margin-bottom:
-        48px;
+    overflow: hidden;
 
-    display:
-        flex;
+    display: grid;
 
-    align-items:
-        center;
+    grid-template-columns:
+
+        minmax(
+            0,
+            1fr
+        )
+
+        390px;
+
+    align-items: center;
+
+    gap: 35px;
+
+    color: #ffffff;
 
     background:
 
         linear-gradient(
-            110deg,
+            115deg,
             #0b2b69 0%,
-            #1948a0 48%,
+            #174998 48%,
             #2683ef 100%
         );
 
-    border-radius:
-        31px;
+    border-radius: 28px;
 
     box-shadow:
 
         0
         20px
-        48px
+        50px
         rgba(
-            31,
-            80,
-            160,
-            .13
+            23,
+            79,
+            165,
+            .16
         );
 
 }
 
 
-.catalog-hero-modern::before {
+.hh-catalog-hero::before {
 
-    content:
-        "";
+    content: "";
 
-    position:
-        absolute;
+    position: absolute;
 
-    width:
-        280px;
+    width: 310px;
 
-    height:
-        280px;
+    height: 310px;
 
-    top:
-        -140px;
+    top: -165px;
 
-    right:
-        -25px;
+    right: -65px;
 
-    border-radius:
-        50%;
+    border-radius: 50%;
 
     background:
+
         rgba(
             255,
             255,
@@ -816,174 +1006,150 @@ if (
 }
 
 
-.catalog-hero-modern::after {
+.hh-catalog-hero::after {
 
-    content:
-        "";
+    content: "";
 
-    position:
-        absolute;
+    position: absolute;
 
-    width:
-        190px;
+    width: 190px;
 
-    height:
-        190px;
+    height: 190px;
 
-    right:
-        185px;
+    right: 190px;
 
-    bottom:
-        -120px;
+    bottom: -130px;
 
-    border-radius:
-        50%;
+    border-radius: 50%;
 
     background:
+
         rgba(
-            74,
-            194,
-            255,
-            .18
+            95,
+            229,
+            244,
+            .14
         );
 
 }
 
 
-.catalog-hero-content-modern {
+.hh-catalog-hero-copy {
 
-    position:
-        relative;
+    position: relative;
 
-    z-index:
-        2;
-
-    width:
-        100%;
-
-    max-width:
-        850px;
+    z-index: 3;
 
 }
 
 
-.catalog-hero-label {
+.hh-catalog-pill {
 
-    width:
-        fit-content;
-
-    min-height:
-        37px;
+    min-height: 34px;
 
     padding:
-        0 14px;
+        0
+        13px;
 
-    margin-bottom:
-        18px;
+    margin-bottom: 19px;
 
-    display:
-        inline-flex;
+    display: inline-flex;
 
-    align-items:
-        center;
+    align-items: center;
 
-    gap:
-        7px;
+    gap: 7px;
 
-    color:
-        #ffffff;
+    color: #ffffff;
 
     background:
+
         rgba(
             255,
             255,
             255,
-            .12
+            .11
         );
 
     border:
+
         1px solid
         rgba(
             255,
             255,
             255,
-            .24
+            .23
         );
 
-    border-radius:
-        999px;
+    border-radius: 999px;
 
-    font-size:
-        11px;
+    font-size: 10px;
 
-    font-weight:
-        800;
+    font-weight: 850;
 
-    letter-spacing:
-        .8px;
-
-    text-transform:
-        uppercase;
+    letter-spacing: .5px;
 
 }
 
 
-.catalog-hero-modern h1 {
+.hh-catalog-hero h1 {
 
-    margin:
-        0 0 16px;
+    max-width: 720px;
 
-    color:
-        #ffffff;
+    margin: 0;
+
+    color: #ffffff;
+
+    font-family:
+        "Poppins",
+        "Inter",
+        Arial,
+        sans-serif;
 
     font-size:
+
         clamp(
-            42px,
-            5vw,
-            61px
+            36px,
+            4.7vw,
+            58px
         );
 
-    line-height:
-        1.05;
+    line-height: 1.07;
 
-    font-weight:
-        800;
+    font-weight: 800;
 
-    letter-spacing:
-        -2.4px;
+    letter-spacing: -2px;
 
 }
 
 
-.catalog-hero-modern h1 span {
+.hh-catalog-hero h1 span {
 
-    color:
-        #5fe5f4;
+    color: #6fe7f3;
 
 }
 
 
-.catalog-hero-modern p {
+.hh-catalog-hero p {
 
-    max-width:
-        680px;
+    max-width: 625px;
 
     margin:
-        0 0 27px;
+        17px
+        0
+        0;
 
     color:
+
         rgba(
             255,
             255,
             255,
-            .84
+            .78
         );
 
-    font-size:
-        15px;
+    font-size: 13px;
 
-    line-height:
-        1.75;
+    line-height: 1.75;
 
 }
 
@@ -992,41 +1158,245 @@ if (
    SEARCH
    ========================================================================== */
 
-.catalog-search-modern {
+.hh-catalog-search {
 
-    max-width:
-        720px;
+    max-width: 700px;
 
-    display:
-        grid;
+    margin-top: 25px;
+
+    display: grid;
 
     grid-template-columns:
-        1fr auto;
 
-    gap:
-        10px;
+        minmax(
+            0,
+            1fr
+        )
+
+        auto;
+
+    gap: 9px;
 
 }
 
 
-.catalog-search-field {
+.hh-catalog-search-field {
 
-    height:
-        50px;
+    height: 49px;
 
     padding:
-        0 16px;
+        0
+        15px;
 
-    display:
-        flex;
+    display: flex;
 
-    align-items:
-        center;
+    align-items: center;
 
-    gap:
-        10px;
+    gap: 9px;
 
     background:
+
+        rgba(
+            255,
+            255,
+            255,
+            .96
+        );
+
+    border:
+
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            .8
+        );
+
+    border-radius: 12px;
+
+    box-shadow:
+
+        0
+        8px
+        20px
+        rgba(
+            5,
+            35,
+            85,
+            .13
+        );
+
+}
+
+
+.hh-catalog-search-field i {
+
+    color: #2563eb;
+
+    font-size: 14px;
+
+}
+
+
+.hh-catalog-search-field input {
+
+    width: 100%;
+
+    height: 100%;
+
+    padding: 0;
+
+    outline: none;
+
+    color: #30445f;
+
+    background: transparent;
+
+    border: 0;
+
+    font-family: inherit;
+
+    font-size: 10px;
+
+}
+
+
+.hh-catalog-search-button {
+
+    min-width: 108px;
+
+    height: 49px;
+
+    padding:
+        0
+        16px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 7px;
+
+    color: #1955ad;
+
+    background: #ffffff;
+
+    border: 0;
+
+    border-radius: 12px;
+
+    box-shadow:
+
+        0
+        8px
+        20px
+        rgba(
+            5,
+            35,
+            85,
+            .13
+        );
+
+    font-family: inherit;
+
+    font-size: 9px;
+
+    font-weight: 850;
+
+    cursor: pointer;
+
+}
+
+
+/* ==========================================================================
+   HERO VISUAL
+   ========================================================================== */
+
+.hh-catalog-hero-visual {
+
+    position: relative;
+
+    z-index: 3;
+
+    height: 240px;
+
+}
+
+
+.hh-catalog-hero-bag {
+
+    position: absolute;
+
+    width: 165px;
+
+    height: 165px;
+
+    top: 35px;
+
+    right: 75px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    color: #ffffff;
+
+    background:
+
+        rgba(
+            255,
+            255,
+            255,
+            .11
+        );
+
+    border:
+
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            .18
+        );
+
+    border-radius: 41px;
+
+    font-size: 68px;
+
+    backdrop-filter: blur(12px);
+
+    transform:
+        rotate(-4deg);
+
+}
+
+
+.hh-catalog-float {
+
+    position: absolute;
+
+    min-width: 145px;
+
+    padding:
+        12px
+        14px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 9px;
+
+    color: #26405f;
+
+    background:
+
         rgba(
             255,
             255,
@@ -1034,828 +1404,81 @@ if (
             .95
         );
 
-    border:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            .7
-        );
-
-    border-radius:
-        13px;
+    border-radius: 13px;
 
     box-shadow:
 
         0
-        8px
-        22px
+        14px
+        32px
         rgba(
-            0,
-            30,
-            90,
-            .13
-        );
-
-}
-
-
-.catalog-search-field span {
-
-    font-size:
-        16px;
-
-}
-
-
-.catalog-search-field input {
-
-    flex:
-        1;
-
-    width:
-        100%;
-
-    height:
-        100%;
-
-    padding:
-        0;
-
-    color:
-        #19365f;
-
-    background:
-        transparent;
-
-    border:
-        0;
-
-    outline:
-        none;
-
-    font-family:
-        inherit;
-
-    font-size:
-        11px;
-
-}
-
-
-.catalog-search-button {
-
-    min-width:
-        105px;
-
-    height:
-        50px;
-
-    padding:
-        0 18px;
-
-    color:
-        #1e5cb8;
-
-    background:
-        #ffffff;
-
-    border:
-        0;
-
-    border-radius:
-        13px;
-
-    box-shadow:
-
-        0
-        8px
-        22px
-        rgba(
-            0,
-            30,
-            90,
-            .13
-        );
-
-    font-family:
-        inherit;
-
-    font-size:
-        10px;
-
-    font-weight:
-        800;
-
-    cursor:
-        pointer;
-
-}
-
-
-/* ==========================================================================
-   LAYOUT
-   ========================================================================== */
-
-.catalog-layout-modern {
-
-    display:
-        grid;
-
-    grid-template-columns:
-        245px minmax(0, 1fr);
-
-    align-items:
-        start;
-
-    gap:
-        28px;
-
-}
-
-
-/* ==========================================================================
-   SIDEBAR
-   ========================================================================== */
-
-.catalog-sidebar-modern {
-
-    display:
-        flex;
-
-    flex-direction:
-        column;
-
-    gap:
-        17px;
-
-    position:
-        sticky;
-
-    top:
-        24px;
-
-}
-
-
-.catalog-filter-card-modern {
-
-    padding:
-        20px;
-
-    background:
-        #ffffff;
-
-    border:
-        1px solid
-        var(
-            --catalog-border
-        );
-
-    border-radius:
-        21px;
-
-    box-shadow:
-
-        0
-        10px
-        28px
-        rgba(
-            31,
-            69,
-            125,
-            .045
-        );
-
-}
-
-
-.catalog-filter-heading-modern {
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    gap:
-        12px;
-
-    margin-bottom:
-        16px;
-
-}
-
-
-.catalog-filter-icon {
-
-    width:
-        42px;
-
-    height:
-        42px;
-
-    flex-shrink:
-        0;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    background:
-
-        linear-gradient(
-            135deg,
-            #1476e8,
-            #1d95f3
-        );
-
-    border-radius:
-        13px;
-
-    box-shadow:
-
-        0
-        8px
-        18px
-        rgba(
-            37,
-            99,
-            235,
-            .20
-        );
-
-    font-size:
-        17px;
-
-}
-
-
-.catalog-small-label {
-
-    display:
-        block;
-
-    margin-bottom:
-        3px;
-
-    color:
-        #2563eb;
-
-    font-size:
-        7px;
-
-    font-weight:
-        800;
-
-    letter-spacing:
-        .9px;
-
-    text-transform:
-        uppercase;
-
-}
-
-
-.catalog-filter-heading-modern h3 {
-
-    margin:
-        0;
-
-    color:
-        #0b2d63;
-
-    font-size:
-        15px;
-
-    font-weight:
-        800;
-
-}
-
-
-.catalog-filter-list-modern {
-
-    display:
-        flex;
-
-    flex-direction:
-        column;
-
-    gap:
-        5px;
-
-}
-
-
-.catalog-filter-list-modern a {
-
-    min-height:
-        38px;
-
-    padding:
-        0 11px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        space-between;
-
-    gap:
-        10px;
-
-    color:
-        #657995;
-
-    background:
-        transparent;
-
-    border-radius:
-        10px;
-
-    font-size:
-        9px;
-
-    font-weight:
-        600;
-
-    text-decoration:
-        none;
-
-    transition:
-        .18s ease;
-
-}
-
-
-.catalog-filter-list-modern a:hover {
-
-    color:
-        #2563eb;
-
-    background:
-        #f2f7ff;
-
-}
-
-
-.catalog-filter-list-modern a.active {
-
-    color:
-        #1f5fcf;
-
-    background:
-        #eaf2ff;
-
-    font-weight:
-        800;
-
-}
-
-
-/* ==========================================================================
-   SIDEBAR CTA
-   ========================================================================== */
-
-.catalog-side-cta {
-
-    padding:
-        21px;
-
-    color:
-        #ffffff;
-
-    background:
-
-        linear-gradient(
-            135deg,
-            #0b2e6e,
-            #277bea
-        );
-
-    border-radius:
-        21px;
-
-    box-shadow:
-
-        0
-        12px
-        28px
-        rgba(
-            25,
-            75,
-            155,
-            .15
-        );
-
-}
-
-
-.catalog-side-cta-icon {
-
-    width:
-        39px;
-
-    height:
-        39px;
-
-    margin-bottom:
-        13px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            .13
-        );
-
-    border:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
+            5,
+            35,
+            80,
             .17
         );
 
-    border-radius:
-        12px;
+    font-size: 9px;
 
-    font-size:
-        16px;
+    font-weight: 850;
 
 }
 
 
-.catalog-side-cta h3 {
+.hh-catalog-float i {
 
-    margin:
-        0 0 7px;
+    width: 34px;
 
-    color:
-        #ffffff;
+    height: 34px;
 
-    font-size:
-        14px;
+    display: flex;
 
-    font-weight:
-        800;
+    align-items: center;
 
-}
+    justify-content: center;
 
+    color: #2563eb;
 
-.catalog-side-cta p {
+    background: #eff6ff;
 
-    margin:
-        0 0 13px;
-
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            .72
-        );
-
-    font-size:
-        9px;
-
-    line-height:
-        1.65;
+    border-radius: 9px;
 
 }
 
 
-.catalog-side-cta a {
+.hh-catalog-float.one {
 
-    color:
-        #ffffff;
+    top: 5px;
 
-    font-size:
-        9px;
+    left: 0;
 
-    font-weight:
-        800;
+    transform:
+        rotate(-3deg);
 
-    text-decoration:
-        none;
+}
+
+
+.hh-catalog-float.two {
+
+    right: 0;
+
+    bottom: 5px;
+
+    transform:
+        rotate(3deg);
 
 }
 
 
 /* ==========================================================================
-   MAIN AREA
+   STATS
    ========================================================================== */
 
-.catalog-main-modern {
+.hh-catalog-stats {
 
-    min-width:
-        0;
+    margin-bottom: 23px;
 
-}
-
-
-/* ==========================================================================
-   TOOLBAR
-   ========================================================================== */
-
-.catalog-toolbar-modern {
-
-    min-height:
-        105px;
-
-    padding:
-        22px 25px;
-
-    margin-bottom:
-        18px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        space-between;
-
-    gap:
-        20px;
-
-    background:
-        #ffffff;
-
-    border:
-        1px solid
-        var(
-            --catalog-border
-        );
-
-    border-radius:
-        22px;
-
-    box-shadow:
-
-        0
-        10px
-        28px
-        rgba(
-            31,
-            69,
-            125,
-            .045
-        );
-
-}
-
-
-.catalog-toolbar-modern h2 {
-
-    margin:
-        2px 0 4px;
-
-    color:
-        #092b60;
-
-    font-size:
-        23px;
-
-    line-height:
-        1.2;
-
-    font-weight:
-        800;
-
-}
-
-
-.catalog-toolbar-modern p {
-
-    margin:
-        0;
-
-    color:
-        #8193b1;
-
-    font-size:
-        9px;
-
-}
-
-
-.catalog-toolbar-modern p strong {
-
-    color:
-        #2563eb;
-
-}
-
-
-.catalog-sort-modern {
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    gap:
-        9px;
-
-}
-
-
-.catalog-sort-modern label {
-
-    color:
-        #7385a1;
-
-    font-size:
-        9px;
-
-    font-weight:
-        700;
-
-    white-space:
-        nowrap;
-
-}
-
-
-.catalog-sort-modern select {
-
-    min-width:
-        150px;
-
-    height:
-        39px;
-
-    padding:
-        0 10px;
-
-    color:
-        #30435f;
-
-    background:
-        #f8fbff;
-
-    border:
-        1px solid
-        #d9e5f3;
-
-    border-radius:
-        10px;
-
-    outline:
-        none;
-
-    font-family:
-        inherit;
-
-    font-size:
-        9px;
-
-}
-
-
-/* ==========================================================================
-   ACTIVE FILTERS
-   ========================================================================== */
-
-.catalog-active-filters {
-
-    margin-bottom:
-        18px;
-
-    padding:
-        12px 15px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    flex-wrap:
-        wrap;
-
-    gap:
-        8px;
-
-    background:
-        #f7faff;
-
-    border:
-        1px solid
-        #dce8f5;
-
-    border-radius:
-        14px;
-
-}
-
-
-.catalog-active-label {
-
-    color:
-        #7486a2;
-
-    font-size:
-        8px;
-
-    font-weight:
-        800;
-
-    text-transform:
-        uppercase;
-
-}
-
-
-.catalog-filter-tag {
-
-    min-height:
-        29px;
-
-    padding:
-        0 10px;
-
-    display:
-        inline-flex;
-
-    align-items:
-        center;
-
-    color:
-        #1d5dcc;
-
-    background:
-        #eaf2ff;
-
-    border:
-        1px solid
-        #d5e6ff;
-
-    border-radius:
-        999px;
-
-    font-size:
-        8px;
-
-    font-weight:
-        800;
-
-}
-
-
-.catalog-clear {
-
-    margin-left:
-        auto;
-
-    color:
-        #e04c4c;
-
-    font-size:
-        8px;
-
-    font-weight:
-        800;
-
-    text-decoration:
-        none;
-
-}
-
-
-/* ==========================================================================
-   PRODUCT GRID
-   ========================================================================== */
-
-.catalog-product-grid-modern {
-
-    display:
-        grid;
+    display: grid;
 
     grid-template-columns:
 
@@ -1867,8 +1490,760 @@ if (
             )
         );
 
-    gap:
-        20px;
+    gap: 15px;
+
+}
+
+
+.hh-catalog-stat {
+
+    min-height: 90px;
+
+    padding:
+        17px
+        19px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 13px;
+
+    background:
+
+        rgba(
+            255,
+            255,
+            255,
+            .95
+        );
+
+    border:
+        1px solid
+        var(--catalog-border);
+
+    border-radius: 17px;
+
+    box-shadow:
+
+        0
+        8px
+        24px
+        rgba(
+            40,
+            65,
+            120,
+            .045
+        );
+
+}
+
+
+.hh-catalog-stat-icon {
+
+    width: 43px;
+
+    height: 43px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border-radius: 12px;
+
+    font-size: 15px;
+
+}
+
+
+.hh-catalog-stat-icon.blue {
+
+    color: #2563eb;
+
+    background: #eff6ff;
+
+}
+
+
+.hh-catalog-stat-icon.purple {
+
+    color: #7c3aed;
+
+    background: #f5f3ff;
+
+}
+
+
+.hh-catalog-stat-icon.green {
+
+    color: #15803d;
+
+    background: #ecfdf3;
+
+}
+
+
+.hh-catalog-stat span {
+
+    display: block;
+
+    margin-bottom: 4px;
+
+    color: #8996a9;
+
+    font-size: 7px;
+
+    font-weight: 850;
+
+    letter-spacing: .7px;
+
+}
+
+
+.hh-catalog-stat strong {
+
+    display: block;
+
+    color: #17233c;
+
+    font-size: 18px;
+
+    font-weight: 900;
+
+}
+
+
+/* ==========================================================================
+   LAYOUT
+   ========================================================================== */
+
+.hh-catalog-layout {
+
+    display: grid;
+
+    grid-template-columns:
+
+        245px
+
+        minmax(
+            0,
+            1fr
+        );
+
+    align-items: start;
+
+    gap: 22px;
+
+}
+
+
+/* ==========================================================================
+   FILTER COLUMN
+   ========================================================================== */
+
+.hh-catalog-sidebar {
+
+    position: sticky;
+
+    top: 22px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 16px;
+
+}
+
+
+.hh-catalog-filter-card {
+
+    padding: 19px;
+
+    background: #ffffff;
+
+    border:
+        1px solid
+        var(--catalog-border);
+
+    border-radius: 18px;
+
+    box-shadow:
+
+        0
+        8px
+        24px
+        rgba(
+            40,
+            65,
+            120,
+            .045
+        );
+
+}
+
+
+.hh-catalog-filter-header {
+
+    margin-bottom: 15px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+}
+
+
+.hh-catalog-filter-icon {
+
+    width: 40px;
+
+    height: 40px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    color: #2563eb;
+
+    background: #eff6ff;
+
+    border-radius: 11px;
+
+    font-size: 14px;
+
+}
+
+
+.hh-catalog-filter-header small {
+
+    display: block;
+
+    margin-bottom: 2px;
+
+    color: #2563eb;
+
+    font-size: 6px;
+
+    font-weight: 900;
+
+    letter-spacing: .8px;
+
+}
+
+
+.hh-catalog-filter-header h3 {
+
+    margin: 0;
+
+    color: #17233c;
+
+    font-size: 13px;
+
+    font-weight: 900;
+
+}
+
+
+.hh-catalog-filter-list {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 4px;
+
+}
+
+
+.hh-catalog-filter-list a {
+
+    min-height: 37px;
+
+    padding:
+        0
+        10px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 8px;
+
+    color: #687b95;
+
+    border-radius: 9px;
+
+    font-size: 8px;
+
+    font-weight: 700;
+
+    text-decoration: none;
+
+    transition: .18s ease;
+
+}
+
+
+.hh-catalog-filter-list a:hover {
+
+    color: #2563eb;
+
+    background: #f3f7ff;
+
+}
+
+
+.hh-catalog-filter-list a.active {
+
+    color: #1d5dcc;
+
+    background: #eaf2ff;
+
+    font-weight: 850;
+
+}
+
+
+.hh-catalog-filter-list i {
+
+    font-size: 9px;
+
+}
+
+
+/* ==========================================================================
+   FILTER CTA
+   ========================================================================== */
+
+.hh-catalog-side-cta {
+
+    position: relative;
+
+    overflow: hidden;
+
+    padding: 21px;
+
+    color: #ffffff;
+
+    background:
+
+        linear-gradient(
+            135deg,
+            #0b2e6e,
+            #277bea
+        );
+
+    border-radius: 18px;
+
+    box-shadow:
+
+        0
+        11px
+        27px
+        rgba(
+            24,
+            70,
+            145,
+            .14
+        );
+
+}
+
+
+.hh-catalog-side-cta::after {
+
+    content: "";
+
+    position: absolute;
+
+    width: 95px;
+
+    height: 95px;
+
+    right: -35px;
+
+    bottom: -40px;
+
+    border-radius: 50%;
+
+    background:
+
+        rgba(
+            255,
+            255,
+            255,
+            .07
+        );
+
+}
+
+
+.hh-catalog-side-cta > * {
+
+    position: relative;
+
+    z-index: 2;
+
+}
+
+
+.hh-catalog-side-cta-icon {
+
+    width: 40px;
+
+    height: 40px;
+
+    margin-bottom: 13px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    background:
+
+        rgba(
+            255,
+            255,
+            255,
+            .13
+        );
+
+    border-radius: 11px;
+
+    font-size: 14px;
+
+}
+
+
+.hh-catalog-side-cta h3 {
+
+    margin:
+        0
+        0
+        6px;
+
+    color: #ffffff;
+
+    font-size: 12px;
+
+    font-weight: 900;
+
+}
+
+
+.hh-catalog-side-cta p {
+
+    margin:
+        0
+        0
+        12px;
+
+    color:
+
+        rgba(
+            255,
+            255,
+            255,
+            .72
+        );
+
+    font-size: 8px;
+
+    line-height: 1.65;
+
+}
+
+
+.hh-catalog-side-cta a {
+
+    color: #ffffff;
+
+    font-size: 8px;
+
+    font-weight: 850;
+
+    text-decoration: none;
+
+}
+
+
+/* ==========================================================================
+   MAIN
+   ========================================================================== */
+
+.hh-catalog-main {
+
+    min-width: 0;
+
+}
+
+
+/* ==========================================================================
+   TOOLBAR
+   ========================================================================== */
+
+.hh-catalog-toolbar {
+
+    min-height: 95px;
+
+    margin-bottom: 17px;
+
+    padding:
+        19px
+        22px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 18px;
+
+    background: #ffffff;
+
+    border:
+        1px solid
+        var(--catalog-border);
+
+    border-radius: 18px;
+
+    box-shadow:
+
+        0
+        8px
+        24px
+        rgba(
+            40,
+            65,
+            120,
+            .045
+        );
+
+}
+
+
+.hh-catalog-toolbar small {
+
+    display: block;
+
+    margin-bottom: 3px;
+
+    color: #2563eb;
+
+    font-size: 7px;
+
+    font-weight: 900;
+
+    letter-spacing: .8px;
+
+}
+
+
+.hh-catalog-toolbar h2 {
+
+    margin:
+        0
+        0
+        4px;
+
+    color: #17233c;
+
+    font-size: 18px;
+
+    font-weight: 900;
+
+}
+
+
+.hh-catalog-toolbar p {
+
+    margin: 0;
+
+    color: #8997aa;
+
+    font-size: 8px;
+
+}
+
+
+.hh-catalog-toolbar p strong {
+
+    color: #2563eb;
+
+}
+
+
+.hh-catalog-sort {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+}
+
+
+.hh-catalog-sort label {
+
+    color: #76879e;
+
+    font-size: 8px;
+
+    font-weight: 750;
+
+}
+
+
+.hh-catalog-sort select {
+
+    min-width: 155px;
+
+    height: 39px;
+
+    padding:
+        0
+        10px;
+
+    outline: none;
+
+    color: #35465f;
+
+    background: #f8fbff;
+
+    border:
+        1px solid #dbe5ef;
+
+    border-radius: 9px;
+
+    font-family: inherit;
+
+    font-size: 8px;
+
+}
+
+
+/* ==========================================================================
+   ACTIVE FILTERS
+   ========================================================================== */
+
+.hh-catalog-active {
+
+    margin-bottom: 17px;
+
+    padding:
+        11px
+        13px;
+
+    display: flex;
+
+    align-items: center;
+
+    flex-wrap: wrap;
+
+    gap: 7px;
+
+    background: #f8fbff;
+
+    border:
+        1px solid #dfeaf7;
+
+    border-radius: 12px;
+
+}
+
+
+.hh-catalog-active-label {
+
+    color: #8090a7;
+
+    font-size: 7px;
+
+    font-weight: 900;
+
+}
+
+
+.hh-catalog-filter-tag {
+
+    min-height: 27px;
+
+    padding:
+        0
+        9px;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 5px;
+
+    color: #1d5dcc;
+
+    background: #eaf2ff;
+
+    border:
+        1px solid #d6e5fb;
+
+    border-radius: 999px;
+
+    font-size: 7px;
+
+    font-weight: 800;
+
+}
+
+
+.hh-catalog-clear {
+
+    margin-left: auto;
+
+    color: #dc2626;
+
+    font-size: 7px;
+
+    font-weight: 850;
+
+    text-decoration: none;
+
+}
+
+
+/* ==========================================================================
+   PRODUCT GRID
+   ========================================================================== */
+
+.hh-catalog-grid {
+
+    display: grid;
+
+    grid-template-columns:
+
+        repeat(
+            3,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap: 17px;
 
 }
 
@@ -1877,71 +2252,62 @@ if (
    PRODUCT CARD
    ========================================================================== */
 
-.catalog-product-card-modern {
+.hh-catalog-card {
 
-    position:
-        relative;
+    min-width: 0;
 
-    overflow:
-        hidden;
+    overflow: hidden;
 
-    min-height:
-        390px;
+    display: flex;
 
-    display:
-        flex;
+    flex-direction: column;
 
-    flex-direction:
-        column;
-
-    background:
-        #ffffff;
+    background: #ffffff;
 
     border:
         1px solid
-        #dce7f3;
+        var(--catalog-border);
 
-    border-radius:
-        22px;
+    border-radius: 18px;
 
     box-shadow:
 
         0
-        10px
-        28px
+        7px
+        22px
         rgba(
-            31,
-            69,
-            125,
+            40,
+            65,
+            120,
             .045
         );
 
     transition:
-        transform .22s ease,
-        box-shadow .22s ease,
-        border-color .22s ease;
+
+        transform .20s ease,
+        box-shadow .20s ease,
+        border-color .20s ease;
 
 }
 
 
-.catalog-product-card-modern:hover {
+.hh-catalog-card:hover {
 
     transform:
-        translateY(-5px);
+        translateY(-4px);
 
-    border-color:
-        #bfd8f8;
+    border-color: #c6dcf8;
 
     box-shadow:
 
         0
-        18px
-        42px
+        15px
+        33px
         rgba(
-            31,
-            69,
-            125,
-            .11
+            40,
+            65,
+            120,
+            .10
         );
 
 }
@@ -1951,102 +2317,203 @@ if (
    PRODUCT IMAGE
    ========================================================================== */
 
-.catalog-product-image-modern {
+.hh-catalog-image {
 
-    position:
-        relative;
+    position: relative;
 
-    height:
-        210px;
+    width: 100%;
 
-    overflow:
-        hidden;
+    height: 220px;
 
-    display:
-        flex;
+    overflow: hidden;
 
-    align-items:
-        center;
+    display: flex;
 
-    justify-content:
-        center;
+    align-items: center;
+
+    justify-content: center;
 
     background:
 
         linear-gradient(
             135deg,
-            #edf5ff,
-            #f7fbff
+            #f1f6ff,
+            #eaf2ff
         );
 
 }
 
 
-.catalog-product-image-modern > a {
+.hh-catalog-image > a {
 
-    width:
-        100%;
+    width: 100%;
 
-    height:
-        100%;
+    height: 100%;
 
-    display:
-        flex;
+    display: flex;
 
-    align-items:
-        center;
+    align-items: center;
 
-    justify-content:
-        center;
+    justify-content: center;
+
+    text-decoration: none;
 
 }
 
 
-.catalog-product-image-modern img {
+/*
+|--------------------------------------------------------------------------
+| IMPORTANT
+|--------------------------------------------------------------------------
+| CONTAIN prevents seller images from being cropped.
+|--------------------------------------------------------------------------
+*/
 
-    width:
-        100%;
+.hh-catalog-image img {
 
-    height:
-        100%;
+    width: 100%;
 
-    object-fit:
-        cover;
+    height: 100%;
+
+    padding: 10px;
+
+    display: block;
+
+    object-fit: contain;
+
+    object-position: center;
 
     transition:
-        transform .3s ease;
+        transform .25s ease;
 
 }
 
 
-.catalog-product-card-modern:hover
-.catalog-product-image-modern img {
+.hh-catalog-card:hover
+.hh-catalog-image img {
 
     transform:
-        scale(1.04);
+        scale(1.03);
 
 }
 
 
-.catalog-product-placeholder-modern {
+.hh-catalog-placeholder {
 
-    width:
-        100%;
+    width: 100%;
 
-    height:
-        100%;
+    height: 100%;
 
-    display:
-        flex;
+    display: flex;
 
-    align-items:
-        center;
+    align-items: center;
 
-    justify-content:
-        center;
+    justify-content: center;
 
-    font-size:
-        42px;
+    color: #2563eb;
+
+    font-size: 35px;
+
+}
+
+
+/* ==========================================================================
+   IMAGE BADGES
+   ========================================================================== */
+
+.hh-catalog-category-badge {
+
+    position: absolute;
+
+    left: 11px;
+
+    top: 11px;
+
+    z-index: 3;
+
+    min-height: 24px;
+
+    padding:
+        0
+        8px;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    color: #2563eb;
+
+    background:
+
+        rgba(
+            255,
+            255,
+            255,
+            .94
+        );
+
+    border:
+        1px solid #dbeafe;
+
+    border-radius: 8px;
+
+    font-size: 6px;
+
+    font-weight: 850;
+
+    backdrop-filter: blur(8px);
+
+}
+
+
+.hh-catalog-stock {
+
+    position: absolute;
+
+    left: 11px;
+
+    bottom: 11px;
+
+    z-index: 3;
+
+    min-height: 26px;
+
+    padding:
+        0
+        8px;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 5px;
+
+    color: #15803d;
+
+    background:
+
+        rgba(
+            240,
+            253,
+            244,
+            .94
+        );
+
+    border:
+        1px solid #bbf7d0;
+
+    border-radius: 999px;
+
+    font-size: 6px;
+
+    font-weight: 850;
+
+}
+
+
+.hh-catalog-stock i {
+
+    font-size: 5px;
 
 }
 
@@ -2055,52 +2522,41 @@ if (
    WISHLIST
    ========================================================================== */
 
-.catalog-wishlist {
+.hh-catalog-wishlist {
 
-    position:
-        absolute;
+    position: absolute;
 
-    top:
-        13px;
+    top: 10px;
 
-    right:
-        13px;
+    right: 10px;
 
-    z-index:
-        4;
+    z-index: 5;
 
-    width:
-        35px;
+    width: 36px;
 
-    height:
-        35px;
+    height: 36px;
 
-    display:
-        flex;
+    display: flex;
 
-    align-items:
-        center;
+    align-items: center;
 
-    justify-content:
-        center;
+    justify-content: center;
 
-    color:
-        #2563eb;
+    color: #e11d48;
 
     background:
+
         rgba(
             255,
             255,
             255,
-            .93
+            .94
         );
 
     border:
-        1px solid
-        #dbe8f8;
+        1px solid #ffe1e7;
 
-    border-radius:
-        10px;
+    border-radius: 10px;
 
     box-shadow:
 
@@ -2108,297 +2564,223 @@ if (
         6px
         16px
         rgba(
-            23,
-            70,
-            130,
+            33,
+            50,
+            90,
             .10
         );
 
-    font-size:
-        17px;
+    font-size: 14px;
 
-    cursor:
-        pointer;
+    cursor: pointer;
+
+    transition:
+        transform .18s ease;
 
 }
 
 
-.catalog-stock-badge {
+.hh-catalog-wishlist:hover {
 
-    position:
-        absolute;
-
-    left:
-        13px;
-
-    bottom:
-        13px;
-
-    z-index:
-        3;
-
-    min-height:
-        28px;
-
-    padding:
-        0 9px;
-
-    display:
-        inline-flex;
-
-    align-items:
-        center;
-
-    color:
-        #166534;
-
-    background:
-        rgba(
-            240,
-            253,
-            244,
-            .95
-        );
-
-    border:
-        1px solid
-        #bbf7d0;
-
-    border-radius:
-        999px;
-
-    font-size:
-        8px;
-
-    font-weight:
-        800;
+    transform:
+        scale(1.07);
 
 }
 
 
 /* ==========================================================================
-   PRODUCT BODY
+   CARD BODY
    ========================================================================== */
 
-.catalog-product-body-modern {
+.hh-catalog-card-body {
 
-    flex:
-        1;
+    flex: 1;
 
-    padding:
-        19px;
+    padding: 16px;
 
-    display:
-        flex;
+    display: flex;
 
-    flex-direction:
-        column;
+    flex-direction: column;
 
 }
 
 
-.catalog-product-category-modern {
+.hh-catalog-vendor {
 
-    width:
-        fit-content;
+    margin-bottom: 7px;
 
-    margin-bottom:
-        9px;
+    display: flex;
 
-    padding:
-        5px 9px;
+    align-items: center;
 
-    color:
-        #2563eb;
+    gap: 5px;
 
-    background:
-        #edf5ff;
+    color: #8795aa;
 
-    border:
-        1px solid
-        #dceaff;
+    font-size: 7px;
 
-    border-radius:
-        999px;
-
-    font-size:
-        8px;
-
-    font-weight:
-        800;
+    font-weight: 750;
 
 }
 
 
-.catalog-product-body-modern h3 {
+.hh-catalog-vendor i {
+
+    color: #2563eb;
+
+}
+
+
+.hh-catalog-card h3 {
+
+    min-height: 39px;
+
+    margin: 0;
+
+    display: -webkit-box;
+
+    overflow: hidden;
+
+    font-size: 13px;
+
+    line-height: 1.45;
+
+    -webkit-line-clamp: 2;
+
+    -webkit-box-orient: vertical;
+
+}
+
+
+.hh-catalog-card h3 a {
+
+    color: #17233c;
+
+    font-weight: 900;
+
+    text-decoration: none;
+
+}
+
+
+.hh-catalog-card h3 a:hover {
+
+    color: #2563eb;
+
+}
+
+
+.hh-catalog-description {
+
+    min-height: 34px;
 
     margin:
-        0 0 7px;
+        8px
+        0
+        0;
 
-    color:
-        #092b5f;
+    display: -webkit-box;
 
-    font-size:
-        16px;
+    overflow: hidden;
 
-    line-height:
-        1.35;
+    color: #8a98ac;
 
-    font-weight:
-        800;
+    font-size: 7px;
 
-}
+    line-height: 1.6;
 
+    -webkit-line-clamp: 2;
 
-.catalog-product-body-modern h3 a {
-
-    color:
-        inherit;
-
-    text-decoration:
-        none;
-
-}
-
-
-.catalog-product-body-modern h3 a:hover {
-
-    color:
-        #2563eb;
-
-}
-
-
-.catalog-product-vendor-modern {
-
-    margin:
-        0 0 16px;
-
-    color:
-        #8192aa;
-
-    font-size:
-        9px;
-
-}
-
-
-.catalog-product-vendor-modern strong {
-
-    color:
-        #49617f;
+    -webkit-box-orient: vertical;
 
 }
 
 
 /* ==========================================================================
-   PRODUCT FOOTER
+   CARD FOOTER
    ========================================================================== */
 
-.catalog-product-footer-modern {
+.hh-catalog-card-footer {
 
-    margin-top:
-        auto;
+    margin-top: auto;
 
-    padding-top:
-        15px;
+    padding-top: 14px;
 
-    display:
-        flex;
+    display: flex;
 
-    align-items:
-        flex-end;
+    align-items: flex-end;
 
-    justify-content:
-        space-between;
+    justify-content: space-between;
 
-    gap:
-        10px;
+    gap: 10px;
 
     border-top:
-        1px solid
-        #edf1f6;
+        1px solid #edf1f5;
 
 }
 
 
-.catalog-price-label {
+.hh-catalog-price-label {
 
-    display:
-        block;
+    display: block;
 
-    margin-bottom:
-        3px;
+    margin-bottom: 2px;
 
-    color:
-        #97a5b8;
+    color: #97a4b5;
 
-    font-size:
-        7px;
+    font-size: 6px;
 
-    font-weight:
-        700;
-
-    text-transform:
-        uppercase;
+    font-weight: 800;
 
 }
 
 
-.catalog-price {
+.hh-catalog-price {
 
-    color:
-        #0b326d;
+    display: block;
 
-    font-size:
-        16px;
+    color: #1b4a87;
 
-    font-weight:
-        800;
+    font-size: 16px;
+
+    font-weight: 900;
 
 }
 
 
 /* ==========================================================================
-   CART BUTTON
+   ADD CART
    ========================================================================== */
 
-.catalog-add-cart {
+.hh-catalog-add {
 
-    min-height:
-        35px;
+    min-height: 38px;
 
     padding:
-        0 12px;
+        0
+        12px;
 
-    display:
-        inline-flex;
+    display: inline-flex;
 
-    align-items:
-        center;
+    align-items: center;
 
-    justify-content:
-        center;
+    justify-content: center;
 
-    gap:
-        5px;
+    gap: 6px;
 
-    color:
-        #ffffff;
+    color: #ffffff;
 
     background:
 
         linear-gradient(
             135deg,
             #2563eb,
-            #1676df
+            #377fef
         );
 
-    border:
-        0;
+    border: 0;
 
-    border-radius:
-        9px;
+    border-radius: 9px;
 
     box-shadow:
 
@@ -2409,23 +2791,25 @@ if (
             37,
             99,
             235,
-            .20
+            .18
         );
 
-    font-family:
-        inherit;
+    font-family: inherit;
 
-    font-size:
-        8px;
+    font-size: 8px;
 
-    font-weight:
-        800;
+    font-weight: 850;
 
-    text-decoration:
-        none;
+    text-decoration: none;
 
-    cursor:
-        pointer;
+    cursor: pointer;
+
+}
+
+
+.hh-catalog-add:hover {
+
+    color: #ffffff;
 
 }
 
@@ -2434,130 +2818,140 @@ if (
    EMPTY
    ========================================================================== */
 
-.catalog-empty-modern {
+.hh-catalog-empty {
+
+    min-height: 390px;
 
     padding:
-        75px 25px;
+        55px
+        25px;
 
-    text-align:
-        center;
+    display: flex;
 
-    background:
-        #f5f9ff;
+    align-items: center;
+
+    justify-content: center;
+
+    text-align: center;
+
+    background: #ffffff;
 
     border:
-        1px dashed
-        #bdd8f7;
+        1px dashed #bdd8f7;
 
-    border-radius:
-        24px;
+    border-radius: 20px;
 
 }
 
 
-.catalog-empty-icon-modern {
+.hh-catalog-empty-inner {
 
-    width:
-        64px;
+    max-width: 470px;
 
-    height:
-        64px;
+}
+
+
+.hh-catalog-empty-icon {
+
+    width: 65px;
+
+    height: 65px;
 
     margin:
-        0 auto 14px;
+        0
+        auto
+        15px;
 
-    display:
-        flex;
+    display: flex;
 
-    align-items:
-        center;
+    align-items: center;
 
-    justify-content:
-        center;
+    justify-content: center;
 
-    background:
-        #e9f2ff;
+    color: #2563eb;
 
-    border-radius:
+    background: #eff6ff;
+
+    border-radius: 18px;
+
+    font-size: 25px;
+
+}
+
+
+.hh-catalog-empty small {
+
+    display: block;
+
+    margin-bottom: 5px;
+
+    color: #2563eb;
+
+    font-size: 7px;
+
+    font-weight: 900;
+
+    letter-spacing: .9px;
+
+}
+
+
+.hh-catalog-empty h2 {
+
+    margin: 0;
+
+    color: #17233c;
+
+    font-size: 19px;
+
+    font-weight: 900;
+
+}
+
+
+.hh-catalog-empty p {
+
+    margin:
+        9px
+        auto
         18px;
 
-    font-size:
-        28px;
+    color: #8492a6;
+
+    font-size: 9px;
+
+    line-height: 1.7;
 
 }
 
 
-.catalog-empty-modern h2 {
+.hh-catalog-empty a {
 
-    margin:
-        7px 0;
-
-    color:
-        #143564;
-
-    font-size:
-        21px;
-
-    font-weight:
-        800;
-
-}
-
-
-.catalog-empty-modern p {
-
-    max-width:
-        450px;
-
-    margin:
-        0 auto 18px;
-
-    color:
-        #8596ad;
-
-    font-size:
-        10px;
-
-    line-height:
-        1.7;
-
-}
-
-
-.catalog-empty-button {
-
-    min-height:
-        40px;
+    min-height: 40px;
 
     padding:
-        0 15px;
+        0
+        14px;
 
-    display:
-        inline-flex;
+    display: inline-flex;
 
-    align-items:
-        center;
+    align-items: center;
 
-    justify-content:
-        center;
+    justify-content: center;
 
-    color:
-        #ffffff;
+    gap: 6px;
 
-    background:
-        #2563eb;
+    color: #ffffff;
 
-    border-radius:
-        9px;
+    background: #2563eb;
 
-    font-size:
-        9px;
+    border-radius: 9px;
 
-    font-weight:
-        800;
+    font-size: 8px;
 
-    text-decoration:
-        none;
+    font-weight: 850;
+
+    text-decoration: none;
 
 }
 
@@ -2568,7 +2962,21 @@ if (
 
 @media (max-width: 1150px) {
 
-    .catalog-product-grid-modern {
+    .hh-catalog-hero {
+
+        grid-template-columns:
+
+            minmax(
+                0,
+                1fr
+            )
+
+            310px;
+
+    }
+
+
+    .hh-catalog-grid {
 
         grid-template-columns:
 
@@ -2587,7 +2995,7 @@ if (
 
 @media (max-width: 950px) {
 
-    .catalog-layout-modern {
+    .hh-catalog-layout {
 
         grid-template-columns:
             1fr;
@@ -2595,13 +3003,11 @@ if (
     }
 
 
-    .catalog-sidebar-modern {
+    .hh-catalog-sidebar {
 
-        position:
-            static;
+        position: static;
 
-        display:
-            grid;
+        display: grid;
 
         grid-template-columns:
 
@@ -2616,7 +3022,7 @@ if (
     }
 
 
-    .catalog-side-cta {
+    .hh-catalog-side-cta {
 
         grid-column:
             1 / -1;
@@ -2626,60 +3032,60 @@ if (
 }
 
 
-@media (max-width: 720px) {
+@media (max-width: 850px) {
 
-    .catalog-container {
-
-        width:
-            calc(
-                100% - 26px
-            );
-
-    }
-
-
-    .catalog-page-inner {
+    .hh-catalog-page {
 
         padding:
-            30px 0 55px;
+            30px
+            18px
+            60px;
 
     }
 
 
-    .catalog-hero-modern {
+    .hh-catalog-hero {
 
-        min-height:
-            auto;
+        grid-template-columns:
+            1fr;
 
-        padding:
-            35px 25px;
+        min-height: auto;
 
-        margin-bottom:
-            35px;
-
-        border-radius:
-            23px;
+        padding: 38px;
 
     }
 
 
-    .catalog-hero-modern h1 {
+    .hh-catalog-hero-visual {
 
-        font-size:
-            36px;
-
-    }
-
-
-    .catalog-hero-modern p {
-
-        font-size:
-            12px;
+        display: none;
 
     }
 
 
-    .catalog-search-modern {
+    .hh-catalog-stats {
+
+        grid-template-columns:
+
+            1fr
+            1fr;
+
+    }
+
+
+    .hh-catalog-stat:last-child {
+
+        grid-column:
+            1 / -1;
+
+    }
+
+}
+
+
+@media (max-width: 700px) {
+
+    .hh-catalog-sidebar {
 
         grid-template-columns:
             1fr;
@@ -2687,23 +3093,7 @@ if (
     }
 
 
-    .catalog-search-button {
-
-        width:
-            100%;
-
-    }
-
-
-    .catalog-sidebar-modern {
-
-        grid-template-columns:
-            1fr;
-
-    }
-
-
-    .catalog-side-cta {
+    .hh-catalog-side-cta {
 
         grid-column:
             auto;
@@ -2711,7 +3101,7 @@ if (
     }
 
 
-    .catalog-toolbar-modern {
+    .hh-catalog-toolbar {
 
         align-items:
             flex-start;
@@ -2722,26 +3112,21 @@ if (
     }
 
 
-    .catalog-sort-modern {
+    .hh-catalog-sort {
 
-        width:
-            100%;
-
-        justify-content:
-            space-between;
+        width: 100%;
 
     }
 
 
-    .catalog-sort-modern select {
+    .hh-catalog-sort select {
 
-        flex:
-            1;
+        flex: 1;
 
     }
 
 
-    .catalog-product-grid-modern {
+    .hh-catalog-grid {
 
         grid-template-columns:
             1fr;
@@ -2750,65 +3135,769 @@ if (
 
 }
 
+
+@media (max-width: 520px) {
+
+    .hh-catalog-page {
+
+        padding:
+            21px
+            13px
+            48px;
+
+    }
+
+
+    .hh-catalog-hero {
+
+        padding:
+            28px
+            23px;
+
+        border-radius: 21px;
+
+    }
+
+
+    .hh-catalog-hero h1 {
+
+        font-size: 31px;
+
+        letter-spacing: -1.1px;
+
+    }
+
+
+    .hh-catalog-hero p {
+
+        font-size: 10px;
+
+    }
+
+
+    .hh-catalog-search {
+
+        grid-template-columns:
+            1fr;
+
+    }
+
+
+    .hh-catalog-search-button {
+
+        width: 100%;
+
+    }
+
+
+    .hh-catalog-stats {
+
+        grid-template-columns:
+            1fr;
+
+    }
+
+
+    .hh-catalog-stat:last-child {
+
+        grid-column:
+            auto;
+
+    }
+
+
+    .hh-catalog-active {
+
+        align-items:
+            flex-start;
+
+    }
+
+
+    .hh-catalog-clear {
+
+        width: 100%;
+
+        margin-left: 0;
+
+        margin-top: 3px;
+
+    }
+
+
+    .hh-catalog-image {
+
+        height: 240px;
+
+    }
+
+}
+
 </style>
 
 
+<!-- ===============================================================
+     CATALOG
+================================================================ -->
 
-<main class="catalog-page">
-
-
-    <div class="catalog-page-inner">
-
-
-        <div class="catalog-container">
+<main class="hh-catalog-page">
 
 
-            <!-- =====================================================
-                 HERO
-            ====================================================== -->
-
-            <section class="catalog-hero-modern">
+    <div class="hh-catalog-container">
 
 
-                <div class="catalog-hero-content-modern">
+        <!-- =======================================================
+             HERO
+        ======================================================== -->
+
+        <section class="hh-catalog-hero">
 
 
-                    <div class="catalog-hero-label">
+            <div class="hh-catalog-hero-copy">
 
-                        ✦ Discover • Shop • Support Local
+
+                <span class="hh-catalog-pill">
+
+                    <i class="bi bi-stars"></i>
+
+                    DISCOVER • SHOP • SUPPORT LOCAL
+
+                </span>
+
+
+                <h1>
+
+                    Find Something
+                    <span>Worth Bringing Home.</span>
+
+                </h1>
+
+
+                <p>
+
+                    Explore unique products from approved
+                    HochipoHub sellers, discover local businesses
+                    and shop everything from one marketplace.
+
+                </p>
+
+
+
+                <!-- =================================================
+                     SEARCH
+                ================================================== -->
+
+                <form
+                    method="GET"
+                    action="<?= catalogEscape(
+                        BASE_URL
+                    ) ?>catalog.php"
+                    class="hh-catalog-search"
+                >
+
+
+                    <?php if ($categoryId > 0): ?>
+
+                        <input
+                            type="hidden"
+                            name="category"
+                            value="<?= $categoryId ?>"
+                        >
+
+                    <?php endif; ?>
+
+
+                    <?php if ($vendorId > 0): ?>
+
+                        <input
+                            type="hidden"
+                            name="vendor"
+                            value="<?= $vendorId ?>"
+                        >
+
+                    <?php endif; ?>
+
+
+                    <?php if ($sort !== 'latest'): ?>
+
+                        <input
+                            type="hidden"
+                            name="sort"
+                            value="<?= catalogEscape(
+                                $sort
+                            ) ?>"
+                        >
+
+                    <?php endif; ?>
+
+
+                    <div class="hh-catalog-search-field">
+
+
+                        <i class="bi bi-search"></i>
+
+
+                        <input
+                            type="search"
+                            name="search"
+                            value="<?= catalogEscape(
+                                $search
+                            ) ?>"
+                            placeholder="Search products, sellers or categories..."
+                            autocomplete="off"
+                        >
+
 
                     </div>
 
 
-                    <h1>
+                    <button
+                        type="submit"
+                        class="hh-catalog-search-button"
+                    >
 
-                        Explore
+                        Search
 
-                        <span>
-                            HochipoHub.
-                        </span>
+                        <i class="bi bi-arrow-right"></i>
 
-                    </h1>
+                    </button>
+
+
+                </form>
+
+
+            </div>
+
+
+
+            <!-- ===================================================
+                 VISUAL
+            ==================================================== -->
+
+            <div class="hh-catalog-hero-visual">
+
+
+                <div class="hh-catalog-hero-bag">
+
+                    <i class="bi bi-bag-heart"></i>
+
+                </div>
+
+
+                <div class="hh-catalog-float one">
+
+                    <i class="bi bi-box-seam"></i>
+
+                    <span>
+
+                        <?= number_format(
+                            $productCount
+                        ) ?>
+
+                        products
+
+                    </span>
+
+                </div>
+
+
+                <div class="hh-catalog-float two">
+
+                    <i class="bi bi-shop"></i>
+
+                    <span>
+
+                        <?= number_format(
+                            $vendorCount
+                        ) ?>
+
+                        sellers
+
+                    </span>
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =======================================================
+             STATS
+        ======================================================== -->
+
+        <section class="hh-catalog-stats">
+
+
+            <article class="hh-catalog-stat">
+
+
+                <div class="hh-catalog-stat-icon blue">
+
+                    <i class="bi bi-box-seam"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        PRODUCTS FOUND
+                    </span>
+
+                    <strong>
+                        <?= number_format(
+                            $productCount
+                        ) ?>
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+
+            <article class="hh-catalog-stat">
+
+
+                <div class="hh-catalog-stat-icon purple">
+
+                    <i class="bi bi-grid"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        CATEGORIES
+                    </span>
+
+                    <strong>
+                        <?= number_format(
+                            $categoryCount
+                        ) ?>
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+
+            <article class="hh-catalog-stat">
+
+
+                <div class="hh-catalog-stat-icon green">
+
+                    <i class="bi bi-shop"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        APPROVED SELLERS
+                    </span>
+
+                    <strong>
+                        <?= number_format(
+                            $vendorCount
+                        ) ?>
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+        </section>
+
+
+
+        <!-- =======================================================
+             CATALOG LAYOUT
+        ======================================================== -->
+
+        <section class="hh-catalog-layout">
+
+
+            <!-- ===================================================
+                 SIDEBAR
+            ==================================================== -->
+
+            <aside class="hh-catalog-sidebar">
+
+
+                <!-- ===============================================
+                     CATEGORY FILTER
+                ================================================ -->
+
+                <section class="hh-catalog-filter-card">
+
+
+                    <div class="hh-catalog-filter-header">
+
+
+                        <div class="hh-catalog-filter-icon">
+
+                            <i class="bi bi-grid"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <small>
+                                BROWSE
+                            </small>
+
+                            <h3>
+                                Categories
+                            </h3>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <div class="hh-catalog-filter-list">
+
+
+                        <a
+                            href="<?= catalogEscape(
+                                catalogBuildUrl([
+                                    'category' => null
+                                ])
+                            ) ?>"
+                            class="<?= $categoryId === 0
+                                ? 'active'
+                                : '' ?>"
+                        >
+
+                            <span>
+                                All Products
+                            </span>
+
+                            <i class="bi bi-arrow-right"></i>
+
+                        </a>
+
+
+                        <?php foreach (
+                            $categories
+                            as $category
+                        ): ?>
+
+
+                            <a
+                                href="<?= catalogEscape(
+                                    catalogBuildUrl([
+                                        'category' =>
+                                            (int) $category['category_id']
+                                    ])
+                                ) ?>"
+                                class="<?= $categoryId ===
+                                    (int) $category['category_id']
+                                        ? 'active'
+                                        : '' ?>"
+                            >
+
+                                <span>
+
+                                    <?= catalogEscape(
+                                        $category[
+                                            'category_name'
+                                        ]
+                                    ) ?>
+
+                                </span>
+
+
+                                <i class="bi bi-chevron-right"></i>
+
+                            </a>
+
+
+                        <?php endforeach; ?>
+
+
+                    </div>
+
+
+                </section>
+
+
+
+                <!-- ===============================================
+                     SELLER FILTER
+                ================================================ -->
+
+                <section class="hh-catalog-filter-card">
+
+
+                    <div class="hh-catalog-filter-header">
+
+
+                        <div class="hh-catalog-filter-icon">
+
+                            <i class="bi bi-shop"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <small>
+                                MARKETPLACE
+                            </small>
+
+                            <h3>
+                                Sellers
+                            </h3>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <div class="hh-catalog-filter-list">
+
+
+                        <a
+                            href="<?= catalogEscape(
+                                catalogBuildUrl([
+                                    'vendor' => null
+                                ])
+                            ) ?>"
+                            class="<?= $vendorId === 0
+                                ? 'active'
+                                : '' ?>"
+                        >
+
+                            <span>
+                                All Sellers
+                            </span>
+
+                            <i class="bi bi-arrow-right"></i>
+
+                        </a>
+
+
+                        <?php foreach (
+                            $vendors
+                            as $vendorItem
+                        ): ?>
+
+
+                            <a
+                                href="<?= catalogEscape(
+                                    catalogBuildUrl([
+                                        'vendor' =>
+                                            (int) $vendorItem['vendor_id']
+                                    ])
+                                ) ?>"
+                                class="<?= $vendorId ===
+                                    (int) $vendorItem['vendor_id']
+                                        ? 'active'
+                                        : '' ?>"
+                            >
+
+                                <span>
+
+                                    <?= catalogEscape(
+                                        $vendorItem[
+                                            'business_name'
+                                        ]
+                                    ) ?>
+
+                                </span>
+
+
+                                <i class="bi bi-chevron-right"></i>
+
+                            </a>
+
+
+                        <?php endforeach; ?>
+
+
+                    </div>
+
+
+                </section>
+
+
+
+                <!-- ===============================================
+                     CTA
+                ================================================ -->
+
+                <section class="hh-catalog-side-cta">
+
+
+                    <div class="hh-catalog-side-cta-icon">
+
+                        <i class="bi bi-stars"></i>
+
+                    </div>
+
+
+                    <h3>
+
+                        Discover something new.
+
+                    </h3>
 
 
                     <p>
 
-                        Discover unique products from local
-                        vendors and find something worth
-                        bringing home.
+                        Browse every category and discover
+                        more products from local HochipoHub
+                        sellers.
 
                     </p>
 
 
-                    <!-- =============================================
-                         SEARCH
-                    ============================================== -->
+                    <a href="<?= catalogEscape(
+                        BASE_URL
+                    ) ?>category.php">
+
+                        Explore Categories
+
+                        <i class="bi bi-arrow-right"></i>
+
+                    </a>
+
+
+                </section>
+
+
+            </aside>
+
+
+
+            <!-- ===================================================
+                 PRODUCTS
+            ==================================================== -->
+
+            <div class="hh-catalog-main">
+
+
+                <!-- ===============================================
+                     TOOLBAR
+                ================================================ -->
+
+                <section class="hh-catalog-toolbar">
+
+
+                    <div>
+
+
+                        <small>
+                            PRODUCTS
+                        </small>
+
+
+                        <h2>
+
+
+                            <?php if (
+                                $activeCategoryName !== ''
+                            ): ?>
+
+
+                                <?= catalogEscape(
+                                    $activeCategoryName
+                                ) ?>
+
+
+                            <?php elseif (
+                                $activeVendorName !== ''
+                            ): ?>
+
+
+                                <?= catalogEscape(
+                                    $activeVendorName
+                                ) ?>
+
+
+                            <?php elseif (
+                                $search !== ''
+                            ): ?>
+
+
+                                Search Results
+
+
+                            <?php else: ?>
+
+
+                                All Products
+
+
+                            <?php endif; ?>
+
+
+                        </h2>
+
+
+                        <p>
+
+                            <strong>
+
+                                <?= number_format(
+                                    $productCount
+                                ) ?>
+
+                            </strong>
+
+                            product<?= $productCount !== 1
+                                ? 's'
+                                : '' ?>
+
+                            found
+
+                        </p>
+
+
+                    </div>
+
+
+
+                    <!-- ===========================================
+                         SORT
+                    ============================================ -->
 
                     <form
-                        action="<?= e(BASE_URL) ?>catalog.php"
                         method="GET"
-                        class="catalog-search-modern"
+                        action="<?= catalogEscape(
+                            BASE_URL
+                        ) ?>catalog.php"
+                        class="hh-catalog-sort"
                     >
+
+
+                        <?php if ($search !== ''): ?>
+
+                            <input
+                                type="hidden"
+                                name="search"
+                                value="<?= catalogEscape(
+                                    $search
+                                ) ?>"
+                            >
+
+                        <?php endif; ?>
 
 
                         <?php if ($categoryId > 0): ?>
@@ -2833,286 +3922,164 @@ if (
                         <?php endif; ?>
 
 
-                        <div class="catalog-search-field">
+                        <label for="sort">
 
-                            <span>
-                                🔎
-                            </span>
+                            Sort by
 
-
-                            <input
-                                type="search"
-                                name="search"
-                                value="<?= e($search) ?>"
-                                placeholder="Search products, vendors or categories..."
-                                autocomplete="off"
-                            >
-
-                        </div>
+                        </label>
 
 
-                        <button
-                            type="submit"
-                            class="catalog-search-button"
+                        <select
+                            name="sort"
+                            id="sort"
+                            onchange="this.form.submit()"
                         >
 
-                            Search
 
-                        </button>
+                            <option
+                                value="latest"
+                                <?= $sort === 'latest'
+                                    ? 'selected'
+                                    : '' ?>
+                            >
+                                Latest
+                            </option>
+
+
+                            <option
+                                value="price_low"
+                                <?= $sort === 'price_low'
+                                    ? 'selected'
+                                    : '' ?>
+                            >
+                                Price: Low to High
+                            </option>
+
+
+                            <option
+                                value="price_high"
+                                <?= $sort === 'price_high'
+                                    ? 'selected'
+                                    : '' ?>
+                            >
+                                Price: High to Low
+                            </option>
+
+
+                            <option
+                                value="name"
+                                <?= $sort === 'name'
+                                    ? 'selected'
+                                    : '' ?>
+                            >
+                                Name
+                            </option>
+
+
+                            <option
+                                value="oldest"
+                                <?= $sort === 'oldest'
+                                    ? 'selected'
+                                    : '' ?>
+                            >
+                                Oldest
+                            </option>
+
+
+                        </select>
 
 
                     </form>
 
 
-                </div>
+                </section>
 
 
-            </section>
 
+                <!-- ===============================================
+                     ACTIVE FILTERS
+                ================================================ -->
 
+                <?php if (
+                    $search !== '' ||
+                    $categoryId > 0 ||
+                    $vendorId > 0
+                ): ?>
 
-            <!-- =====================================================
-                 CATALOG LAYOUT
-            ====================================================== -->
 
-            <section class="catalog-layout-modern">
+                    <div class="hh-catalog-active">
 
 
-                <!-- =================================================
-                     SIDEBAR
-                ================================================== -->
+                        <span class="hh-catalog-active-label">
 
-                <aside class="catalog-sidebar-modern">
+                            ACTIVE FILTERS
 
+                        </span>
 
-                    <!-- =============================================
-                         CATEGORY FILTER
-                    ============================================== -->
 
-                    <div class="catalog-filter-card-modern">
+                        <?php if ($search !== ''): ?>
 
 
-                        <div class="catalog-filter-heading-modern">
+                            <span class="hh-catalog-filter-tag">
 
+                                <i class="bi bi-search"></i>
 
-                            <div class="catalog-filter-icon">
+                                <?= catalogEscape(
+                                    $search
+                                ) ?>
 
-                                🗂️
+                            </span>
 
-                            </div>
 
+                        <?php endif; ?>
 
-                            <div>
 
-                                <span class="catalog-small-label">
+                        <?php if (
+                            $activeCategoryName !== ''
+                        ): ?>
 
-                                    Browse
 
-                                </span>
+                            <span class="hh-catalog-filter-tag">
 
+                                <i class="bi bi-grid"></i>
 
-                                <h3>
+                                <?= catalogEscape(
+                                    $activeCategoryName
+                                ) ?>
 
-                                    Categories
+                            </span>
 
-                                </h3>
 
-                            </div>
+                        <?php endif; ?>
 
 
-                        </div>
+                        <?php if (
+                            $activeVendorName !== ''
+                        ): ?>
 
 
-                        <div class="catalog-filter-list-modern">
+                            <span class="hh-catalog-filter-tag">
 
+                                <i class="bi bi-shop"></i>
 
-                            <a
-                                href="<?= e(BASE_URL) ?>catalog.php"
-                                class="<?= $categoryId === 0
-                                    ? 'active'
-                                    : '' ?>"
-                            >
+                                <?= catalogEscape(
+                                    $activeVendorName
+                                ) ?>
 
-                                <span>
-                                    All Products
-                                </span>
+                            </span>
 
-                                <span>
-                                    →
-                                </span>
 
-                            </a>
-
-
-                            <?php foreach ($categories as $category): ?>
-
-
-                                <a
-                                    href="<?= e(BASE_URL) ?>catalog.php?category=<?= (int) $category['category_id'] ?>"
-                                    class="<?= $categoryId ===
-                                        (int) $category['category_id']
-                                            ? 'active'
-                                            : '' ?>"
-                                >
-
-                                    <span>
-
-                                        <?= e(
-                                            $category[
-                                                'category_name'
-                                            ]
-                                        ) ?>
-
-                                    </span>
-
-                                    <span>
-                                        →
-                                    </span>
-
-                                </a>
-
-
-                            <?php endforeach; ?>
-
-
-                        </div>
-
-
-                    </div>
-
-
-
-                    <!-- =============================================
-                         VENDOR FILTER
-                    ============================================== -->
-
-                    <div class="catalog-filter-card-modern">
-
-
-                        <div class="catalog-filter-heading-modern">
-
-
-                            <div class="catalog-filter-icon">
-
-                                🏪
-
-                            </div>
-
-
-                            <div>
-
-                                <span class="catalog-small-label">
-
-                                    Marketplace
-
-                                </span>
-
-
-                                <h3>
-
-                                    Sellers
-
-                                </h3>
-
-                            </div>
-
-
-                        </div>
-
-
-                        <div class="catalog-filter-list-modern">
-
-
-                            <a
-                                href="<?= e(BASE_URL) ?>catalog.php"
-                                class="<?= $vendorId === 0
-                                    ? 'active'
-                                    : '' ?>"
-                            >
-
-                                <span>
-                                    All Sellers
-                                </span>
-
-                                <span>
-                                    →
-                                </span>
-
-                            </a>
-
-
-                            <?php foreach ($vendors as $vendorItem): ?>
-
-
-                                <a
-                                    href="<?= e(BASE_URL) ?>catalog.php?vendor=<?= (int) $vendorItem['vendor_id'] ?>"
-                                    class="<?= $vendorId ===
-                                        (int) $vendorItem['vendor_id']
-                                            ? 'active'
-                                            : '' ?>"
-                                >
-
-                                    <span>
-
-                                        <?= e(
-                                            $vendorItem[
-                                                'business_name'
-                                            ]
-                                        ) ?>
-
-                                    </span>
-
-                                    <span>
-                                        →
-                                    </span>
-
-                                </a>
-
-
-                            <?php endforeach; ?>
-
-
-                        </div>
-
-
-                    </div>
-
-
-
-                    <!-- =============================================
-                         CTA
-                    ============================================== -->
-
-                    <div class="catalog-side-cta">
-
-
-                        <div class="catalog-side-cta-icon">
-
-                            ✨
-
-                        </div>
-
-
-                        <h3>
-
-                            Looking for something else?
-
-                        </h3>
-
-
-                        <p>
-
-                            Browse all categories and discover
-                            more products across HochipoHub.
-
-                        </p>
+                        <?php endif; ?>
 
 
                         <a
-                            href="<?= e(BASE_URL) ?>category.php"
+                            href="<?= catalogEscape(
+                                BASE_URL
+                            ) ?>catalog.php"
+                            class="hh-catalog-clear"
                         >
 
-                            Browse Categories →
+                            Clear All
 
                         </a>
 
@@ -3120,405 +4087,290 @@ if (
                     </div>
 
 
-                </aside>
+                <?php endif; ?>
 
 
 
-                <!-- =================================================
-                     MAIN PRODUCT AREA
-                ================================================== -->
+                <!-- ===============================================
+                     PRODUCT GRID
+                ================================================ -->
 
-                <div class="catalog-main-modern">
+                <?php if (!empty($products)): ?>
 
 
-                    <!-- =============================================
-                         TOOLBAR
-                    ============================================== -->
+                    <div class="hh-catalog-grid">
 
-                    <div class="catalog-toolbar-modern">
 
+                        <?php foreach (
+                            $products
+                            as $product
+                        ): ?>
 
-                        <div>
 
+                            <?php
 
-                            <span class="catalog-small-label">
+                            $currentProductId =
+                                (int) $product[
+                                    'product_id'
+                                ];
 
-                                Products
 
-                            </span>
+                            $price =
+                                (float) $product[
+                                    'price'
+                                ];
 
 
-                            <h2>
-
-
-                                <?php if ($activeCategoryName !== ''): ?>
-
-
-                                    <?= e(
-                                        $activeCategoryName
-                                    ) ?>
-
-
-                                <?php elseif ($activeVendorName !== ''): ?>
-
-
-                                    <?= e(
-                                        $activeVendorName
-                                    ) ?>
-
-
-                                <?php elseif ($search !== ''): ?>
-
-
-                                    Search Results
-
-
-                                <?php else: ?>
-
-
-                                    All Products
-
-
-                                <?php endif; ?>
-
-
-                            </h2>
-
-
-                            <p>
-
-                                <strong>
-
-                                    <?= number_format(
-                                        $productCount
-                                    ) ?>
-
-                                </strong>
-
-                                product<?= $productCount !== 1
-                                    ? 's'
-                                    : '' ?>
-
-                                found
-
-                            </p>
-
-
-                        </div>
-
-
-
-                        <!-- =========================================
-                             SORT
-                        ========================================== -->
-
-                        <form
-                            action="<?= e(BASE_URL) ?>catalog.php"
-                            method="GET"
-                            class="catalog-sort-modern"
-                        >
-
-
-                            <?php if ($search !== ''): ?>
-
-                                <input
-                                    type="hidden"
-                                    name="search"
-                                    value="<?= e($search) ?>"
-                                >
-
-                            <?php endif; ?>
-
-
-                            <?php if ($categoryId > 0): ?>
-
-                                <input
-                                    type="hidden"
-                                    name="category"
-                                    value="<?= $categoryId ?>"
-                                >
-
-                            <?php endif; ?>
-
-
-                            <?php if ($vendorId > 0): ?>
-
-                                <input
-                                    type="hidden"
-                                    name="vendor"
-                                    value="<?= $vendorId ?>"
-                                >
-
-                            <?php endif; ?>
-
-
-                            <label for="sort">
-
-                                Sort by
-
-                            </label>
-
-
-                            <select
-                                name="sort"
-                                id="sort"
-                                onchange="this.form.submit()"
-                            >
-
-
-                                <option
-                                    value="latest"
-                                    <?= $sort === 'latest'
-                                        ? 'selected'
-                                        : '' ?>
-                                >
-
-                                    Latest
-
-                                </option>
-
-
-                                <option
-                                    value="price_low"
-                                    <?= $sort === 'price_low'
-                                        ? 'selected'
-                                        : '' ?>
-                                >
-
-                                    Price: Low to High
-
-                                </option>
-
-
-                                <option
-                                    value="price_high"
-                                    <?= $sort === 'price_high'
-                                        ? 'selected'
-                                        : '' ?>
-                                >
-
-                                    Price: High to Low
-
-                                </option>
-
-
-                                <option
-                                    value="name"
-                                    <?= $sort === 'name'
-                                        ? 'selected'
-                                        : '' ?>
-                                >
-
-                                    Name
-
-                                </option>
-
-
-                                <option
-                                    value="oldest"
-                                    <?= $sort === 'oldest'
-                                        ? 'selected'
-                                        : '' ?>
-                                >
-
-                                    Oldest
-
-                                </option>
-
-
-                            </select>
-
-
-                        </form>
-
-
-                    </div>
-
-
-
-                    <!-- =============================================
-                         ACTIVE FILTERS
-                    ============================================== -->
-
-                    <?php if (
-                        $search !== '' ||
-                        $categoryId > 0 ||
-                        $vendorId > 0
-                    ): ?>
-
-
-                        <div class="catalog-active-filters">
-
-
-                            <span class="catalog-active-label">
-
-                                Active:
-
-                            </span>
-
-
-                            <?php if ($search !== ''): ?>
-
-
-                                <span class="catalog-filter-tag">
-
-                                    🔎
-                                    <?= e($search) ?>
-
-                                </span>
-
-
-                            <?php endif; ?>
-
-
-                            <?php if ($activeCategoryName !== ''): ?>
-
-
-                                <span class="catalog-filter-tag">
-
-                                    🗂️
-                                    <?= e(
-                                        $activeCategoryName
-                                    ) ?>
-
-                                </span>
-
-
-                            <?php endif; ?>
-
-
-                            <?php if ($activeVendorName !== ''): ?>
-
-
-                                <span class="catalog-filter-tag">
-
-                                    🏪
-                                    <?= e(
-                                        $activeVendorName
-                                    ) ?>
-
-                                </span>
-
-
-                            <?php endif; ?>
-
-
-                            <a
-                                href="<?= e(BASE_URL) ?>catalog.php"
-                                class="catalog-clear"
-                            >
-
-                                Clear all
-
-                            </a>
-
-
-                        </div>
-
-
-                    <?php endif; ?>
-
-
-
-                    <!-- =============================================
-                         PRODUCTS
-                    ============================================== -->
-
-                    <?php if (!empty($products)): ?>
-
-
-                        <div class="catalog-product-grid-modern">
-
-
-                            <?php foreach ($products as $product): ?>
-
-
-                                <?php
-
-                                $productId =
-                                    (int)
+                            $productImage =
+                                catalogProductImage(
                                     $product[
-                                        'product_id'
-                                    ];
+                                        'image'
+                                    ]
+                                    ?? ''
+                                );
 
 
-                                $price =
-                                    (float)
-                                    $product[
-                                        'price'
-                                    ];
-
-
-                                $productImage =
-                                    catalogProductImage(
+                            $description =
+                                trim(
+                                    (string) (
                                         $product[
-                                            'image'
+                                            'description'
                                         ]
                                         ?? ''
-                                    );
+                                    )
+                                );
 
-                                ?>
-
-
-                                <article class="catalog-product-card-modern">
+                            ?>
 
 
-                                    <!-- =============================
-                                         IMAGE
-                                    ============================== -->
+                            <article class="hh-catalog-card">
 
-                                    <div class="catalog-product-image-modern">
+
+                                <!-- ===================================
+                                     IMAGE
+                                ==================================== -->
+
+                                <div class="hh-catalog-image">
+
+
+                                    <a
+                                        href="<?= catalogEscape(
+                                            BASE_URL
+                                        ) ?>product_details.php?id=<?= $currentProductId ?>"
+                                    >
+
+
+                                        <?php if (
+                                            $productImage !== ''
+                                        ): ?>
+
+
+                                            <img
+                                                src="<?= catalogEscape(
+                                                    $productImage
+                                                ) ?>"
+                                                alt="<?= catalogEscape(
+                                                    $product[
+                                                        'product_name'
+                                                    ]
+                                                ) ?>"
+                                                loading="lazy"
+                                                onerror="
+                                                    this.style.display='none';
+                                                    this.parentElement.innerHTML='<div class=&quot;hh-catalog-placeholder&quot;><i class=&quot;bi bi-bag&quot;></i></div>';
+                                                "
+                                            >
+
+
+                                        <?php else: ?>
+
+
+                                            <div class="hh-catalog-placeholder">
+
+                                                <i class="bi bi-bag"></i>
+
+                                            </div>
+
+
+                                        <?php endif; ?>
+
+
+                                    </a>
+
+
+
+                                    <!-- CATEGORY -->
+
+                                    <span class="hh-catalog-category-badge">
+
+                                        <?= catalogEscape(
+                                            $product[
+                                                'category_name'
+                                            ]
+                                        ) ?>
+
+                                    </span>
+
+
+
+                                    <!-- WISHLIST -->
+
+                                    <?php if (
+                                        isset(
+                                            $_SESSION[
+                                                'user_id'
+                                            ]
+                                        )
+                                    ): ?>
+
+
+                                        <button
+                                            type="button"
+                                            class="
+                                                wishlist-btn
+                                                hh-catalog-wishlist
+                                            "
+                                            data-product-id="<?= $currentProductId ?>"
+                                            title="Add to wishlist"
+                                            aria-label="Add to wishlist"
+                                        >
+
+                                            <i class="bi bi-heart-fill"></i>
+
+                                        </button>
+
+
+                                    <?php endif; ?>
+
+
+
+                                    <!-- STOCK -->
+
+                                    <span class="hh-catalog-stock">
+
+                                        <i class="bi bi-circle-fill"></i>
+
+                                        <?= (int)
+                                            $product[
+                                                'stock_quantity'
+                                            ] ?>
+
+                                        left
+
+                                    </span>
+
+
+                                </div>
+
+
+
+                                <!-- ===================================
+                                     BODY
+                                ==================================== -->
+
+                                <div class="hh-catalog-card-body">
+
+
+                                    <div class="hh-catalog-vendor">
+
+                                        <i class="bi bi-shop"></i>
+
+                                        <?= catalogEscape(
+                                            $product[
+                                                'business_name'
+                                            ]
+                                        ) ?>
+
+                                    </div>
+
+
+                                    <h3>
 
 
                                         <a
-                                            href="<?= e(BASE_URL) ?>product_details.php?id=<?= $productId ?>"
+                                            href="<?= catalogEscape(
+                                                BASE_URL
+                                            ) ?>product_details.php?id=<?= $currentProductId ?>"
                                         >
 
-
-                                            <?php if (
-                                                !empty(
-                                                    $product[
-                                                        'image'
-                                                    ]
-                                                )
-                                            ): ?>
-
-
-                                                <img
-                                                    src="<?= e(
-                                                        $productImage
-                                                    ) ?>"
-                                                    alt="<?= e(
-                                                        $product[
-                                                            'product_name'
-                                                        ]
-                                                    ) ?>"
-                                                    loading="lazy"
-                                                    onerror="
-                                                        this.style.display='none';
-                                                        this.parentElement.innerHTML='<div class=&quot;catalog-product-placeholder-modern&quot;>🛍️</div>';
-                                                    "
-                                                >
-
-
-                                            <?php else: ?>
-
-
-                                                <div class="catalog-product-placeholder-modern">
-
-                                                    🛍️
-
-                                                </div>
-
-
-                                            <?php endif; ?>
-
+                                            <?= catalogEscape(
+                                                $product[
+                                                    'product_name'
+                                                ]
+                                            ) ?>
 
                                         </a>
 
 
+                                    </h3>
 
-                                        <!-- WISHLIST -->
+
+                                    <?php if (
+                                        $description !== ''
+                                    ): ?>
+
+
+                                        <p class="hh-catalog-description">
+
+                                            <?= catalogEscape(
+                                                $description
+                                            ) ?>
+
+                                        </p>
+
+
+                                    <?php else: ?>
+
+
+                                        <p class="hh-catalog-description">
+
+                                            Discover this product
+                                            from
+
+                                            <?= catalogEscape(
+                                                $product[
+                                                    'business_name'
+                                                ]
+                                            ) ?>.
+
+                                        </p>
+
+
+                                    <?php endif; ?>
+
+
+
+                                    <!-- =================================
+                                         FOOTER
+                                    ================================== -->
+
+                                    <div class="hh-catalog-card-footer">
+
+
+                                        <div>
+
+
+                                            <span class="hh-catalog-price-label">
+
+                                                PRICE
+
+                                            </span>
+
+
+                                            <strong class="hh-catalog-price">
+
+                                                RM
+                                                <?= number_format(
+                                                    $price,
+                                                    2
+                                                ) ?>
+
+                                            </strong>
+
+
+                                        </div>
+
+
 
                                         <?php if (
                                             isset(
@@ -3532,204 +4384,75 @@ if (
                                             <button
                                                 type="button"
                                                 class="
-                                                    wishlist-btn
-                                                    catalog-wishlist
+                                                    add-cart-btn
+                                                    hh-catalog-add
                                                 "
-                                                data-product-id="<?= $productId ?>"
-                                                title="Add to wishlist"
+                                                data-product-id="<?= $currentProductId ?>"
                                             >
 
-                                                ♡
+                                                <i class="bi bi-cart-plus"></i>
+
+                                                Add
 
                                             </button>
+
+
+                                        <?php else: ?>
+
+
+                                            <a
+                                                href="<?= catalogEscape(
+                                                    BASE_URL
+                                                ) ?>index.php?login=1"
+                                                class="hh-catalog-add"
+                                            >
+
+                                                Login
+
+                                            </a>
 
 
                                         <?php endif; ?>
 
 
-
-                                        <!-- STOCK -->
-
-                                        <span class="catalog-stock-badge">
-
-                                            <?= (int)
-                                                $product[
-                                                    'stock_quantity'
-                                                ] ?>
-
-                                            left
-
-                                        </span>
-
-
                                     </div>
 
 
+                                </div>
 
-                                    <!-- =============================
-                                         BODY
-                                    ============================== -->
 
-                                    <div class="catalog-product-body-modern">
+                            </article>
 
 
-                                        <span class="catalog-product-category-modern">
+                        <?php endforeach; ?>
 
-                                            <?= e(
-                                                $product[
-                                                    'category_name'
-                                                ]
-                                            ) ?>
 
-                                        </span>
+                    </div>
 
 
-                                        <h3>
+                <?php else: ?>
 
 
-                                            <a
-                                                href="<?= e(BASE_URL) ?>product_details.php?id=<?= $productId ?>"
-                                            >
+                    <!-- ===============================================
+                         EMPTY
+                    ================================================ -->
 
-                                                <?= e(
-                                                    $product[
-                                                        'product_name'
-                                                    ]
-                                                ) ?>
+                    <section class="hh-catalog-empty">
 
-                                            </a>
 
+                        <div class="hh-catalog-empty-inner">
 
-                                        </h3>
 
+                            <div class="hh-catalog-empty-icon">
 
-                                        <p class="catalog-product-vendor-modern">
-
-                                            by
-
-                                            <strong>
-
-                                                <?= e(
-                                                    $product[
-                                                        'business_name'
-                                                    ]
-                                                ) ?>
-
-                                            </strong>
-
-                                        </p>
-
-
-
-                                        <!-- =========================
-                                             FOOTER
-                                        ========================== -->
-
-                                        <div class="catalog-product-footer-modern">
-
-
-                                            <div>
-
-
-                                                <span class="catalog-price-label">
-
-                                                    Price
-
-                                                </span>
-
-
-                                                <strong class="catalog-price">
-
-                                                    RM
-                                                    <?= number_format(
-                                                        $price,
-                                                        2
-                                                    ) ?>
-
-                                                </strong>
-
-
-                                            </div>
-
-
-
-                                            <?php if (
-                                                isset(
-                                                    $_SESSION[
-                                                        'user_id'
-                                                    ]
-                                                )
-                                            ): ?>
-
-
-                                                <button
-                                                    type="button"
-                                                    class="
-                                                        add-cart-btn
-                                                        catalog-add-cart
-                                                    "
-                                                    data-product-id="<?= $productId ?>"
-                                                >
-
-                                                    🛒
-                                                    Add
-
-                                                </button>
-
-
-                                            <?php else: ?>
-
-
-                                                <a
-                                                    href="<?= e(BASE_URL) ?>index.php?login=1"
-                                                    class="catalog-add-cart"
-                                                >
-
-                                                    Login
-
-                                                </a>
-
-
-                                            <?php endif; ?>
-
-
-                                        </div>
-
-
-                                    </div>
-
-
-                                </article>
-
-
-                            <?php endforeach; ?>
-
-
-                        </div>
-
-
-                    <?php else: ?>
-
-
-                        <!-- =========================================
-                             EMPTY
-                        ========================================== -->
-
-                        <div class="catalog-empty-modern">
-
-
-                            <div class="catalog-empty-icon-modern">
-
-                                🔎
+                                <i class="bi bi-search"></i>
 
                             </div>
 
 
-                            <span class="catalog-small-label">
-
-                                Nothing Here Yet
-
-                            </span>
+                            <small>
+                                NOTHING HERE YET
+                            </small>
 
 
                             <h2>
@@ -3741,16 +4464,21 @@ if (
 
                             <p>
 
-                                Try another keyword, category or seller.
-                                There might be something else waiting for you.
+                                Try another search keyword,
+                                category or seller. Your next
+                                favourite product might be under
+                                a different filter.
 
                             </p>
 
 
                             <a
-                                href="<?= e(BASE_URL) ?>catalog.php"
-                                class="catalog-empty-button"
+                                href="<?= catalogEscape(
+                                    BASE_URL
+                                ) ?>catalog.php"
                             >
+
+                                <i class="bi bi-grid"></i>
 
                                 View All Products
 
@@ -3760,23 +4488,22 @@ if (
                         </div>
 
 
-                    <?php endif; ?>
+                    </section>
 
 
-                </div>
+                <?php endif; ?>
 
 
-            </section>
+            </div>
 
 
-        </div>
+        </section>
 
 
     </div>
 
 
 </main>
-
 
 
 <?php
@@ -3792,10 +4519,13 @@ $footerPath =
     '/includes/footer.php';
 
 
-if (file_exists($footerPath)) {
+if (
+    file_exists(
+        $footerPath
+    )
+) {
 
     require_once $footerPath;
-
 }
 
 ?>
