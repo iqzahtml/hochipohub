@@ -1246,8 +1246,21 @@ $vendorCount =
                 </p>
 
 
+                <!--
+                ============================================================
+                GET STARTED
+                ============================================================
+
+                When the user clicks Get Started:
+                index.php?register=1 will reload this page and
+                automatically open the register modal using the
+                JavaScript below.
+
+                ============================================================
+                -->
+
                 <a
-                    href="<?= e(BASE_URL) ?>dashboard.php"
+                    href="<?= e(BASE_URL) ?>index.php?register=1"
                     class="home-cta-button"
                 >
 
@@ -1279,7 +1292,6 @@ $vendorCount =
 | AUTH MODAL AUTO OPEN
 |--------------------------------------------------------------------------
 |
-| IMPORTANT:
 | register_process.php redirects to:
 |
 | index.php?register=1
@@ -1317,7 +1329,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | OPEN REGISTER MODAL AFTER ERROR
+        | OPEN REGISTER MODAL
         |--------------------------------------------------------------------------
         */
 
@@ -1330,7 +1342,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | OPEN LOGIN MODAL AFTER SUCCESS
+        | OPEN LOGIN MODAL
         |--------------------------------------------------------------------------
         */
 
@@ -1694,11 +1706,11 @@ function openLoginModal()
 
 /*
 |--------------------------------------------------------------------------
-| CLEAR REGISTER URL
+| CLEAR REGISTER / LOGIN URL
 |--------------------------------------------------------------------------
 |
-| After the modal has been opened, remove ?register=1 from
-| browser history without reloading the page.
+| After modal opens, remove ?register=1 / ?login=1
+| without reloading the page.
 |
 |--------------------------------------------------------------------------
 */
