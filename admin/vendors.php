@@ -1,384 +1,1060 @@
 <?php
 
-require_once dirname(__DIR__) . '/database/db.php';
-require_once dirname(__DIR__) . '/includes/session.php';
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - ADMIN VENDORS
+|--------------------------------------------------------------------------
+| File: admin/vendors.php
+|--------------------------------------------------------------------------
+*/
 
-$db = getDB();
+require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
 
-if (!function_exists('e')) {
-    function e($value)
-    {
-        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-    }
-}
+
+/*
+|--------------------------------------------------------------------------
+| SESSION
+|--------------------------------------------------------------------------
+*/
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE
+|--------------------------------------------------------------------------
+*/
+
+$db = getDB();
+
+
+/*
+|--------------------------------------------------------------------------
+| ESCAPE FUNCTION
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('e')) {
+
+    function e($value): string
+    {
+        return htmlspecialchars(
+            (string) $value,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ADMIN ACCESS
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !isset($_SESSION['user_id']) ||
+    ($_SESSION['role'] ?? '') !== 'admin'
+) {
+
     header('Location: ../index.php');
     exit;
 }
 
-$admin_id = (int) $_SESSION['user_id'];
+
+$adminId =
+    (int) $_SESSION['user_id'];
+
 
 /*
 |--------------------------------------------------------------------------
-| APPROVE / REJECT VENDOR APPLICATION
+| CSRF TOKEN
 |--------------------------------------------------------------------------
 */
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_action'])) {
+if (
+    !isset($_SESSION['csrf_token']) ||
+    empty($_SESSION['csrf_token'])
+) {
 
-    $application_id = (int) ($_POST['application_id'] ?? 0);
-    $action = $_POST['application_action'] ?? '';
+    $_SESSION['csrf_token'] =
+        bin2hex(
+            random_bytes(32)
+        );
+}
+
+
+$csrfToken =
+    $_SESSION['csrf_token'];
+
+
+/*
+|--------------------------------------------------------------------------
+| FLASH MESSAGE
+|--------------------------------------------------------------------------
+*/
+
+$message = '';
+$messageType = '';
+
+
+if (isset($_GET['success'])) {
+
+    switch ($_GET['success']) {
+
+        case 'approved':
+
+            $message =
+                'Vendor application approved successfully.';
+
+            $messageType =
+                'success';
+
+            break;
+
+
+        case 'rejected':
+
+            $message =
+                'Vendor application rejected successfully.';
+
+            $messageType =
+                'success';
+
+            break;
+
+
+        case 'status':
+
+            $message =
+                'Vendor status updated successfully.';
+
+            $messageType =
+                'success';
+
+            break;
+    }
+}
+
+
+if (isset($_GET['error'])) {
+
+    $messageType =
+        'error';
+
+
+    switch ($_GET['error']) {
+
+        case 'security':
+
+            $message =
+                'Invalid security token. Please refresh the page and try again.';
+
+            break;
+
+
+        case 'invalid':
+
+            $message =
+                'Invalid vendor information.';
+
+            break;
+
+
+        case 'notfound':
+
+            $message =
+                'Vendor or application was not found.';
+
+            break;
+
+
+        default:
+
+            $message =
+                'Unable to process vendor request. Please try again.';
+
+            break;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| HANDLE POST REQUEST
+|--------------------------------------------------------------------------
+*/
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CSRF CHECK
+    |--------------------------------------------------------------------------
+    */
+
+    $submittedToken =
+        $_POST['csrf_token']
+        ?? '';
+
 
     if (
-        $application_id <= 0 ||
-        !in_array($action, ['approve', 'reject'], true)
+        empty($submittedToken) ||
+        !hash_equals(
+            $csrfToken,
+            $submittedToken
+        )
     ) {
-        header('Location: vendors.php?error=invalid');
+
+        header(
+            'Location: vendors.php?error=security'
+        );
+
         exit;
     }
 
-    try {
-        $db->beginTransaction();
 
-        $stmt = $db->prepare(
-            "SELECT application_id, user_id, business_name, reason, status
-             FROM vendor_applications
-             WHERE application_id = ?
-             LIMIT 1
-             FOR UPDATE"
-        );
+    /*
+    |--------------------------------------------------------------------------
+    | APPROVE / REJECT APPLICATION
+    |--------------------------------------------------------------------------
+    */
 
-        $stmt->execute([$application_id]);
-        $a = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (
+        isset(
+            $_POST['application_action']
+        )
+    ) {
 
-        if (!$a) {
-            $db->rollBack();
-            header('Location: vendors.php?error=notfound');
+        $applicationId =
+            (int) (
+                $_POST['application_id']
+                ?? 0
+            );
+
+
+        $action =
+            $_POST['application_action']
+            ?? '';
+
+
+        if (
+            $applicationId <= 0 ||
+            !in_array(
+                $action,
+                [
+                    'approve',
+                    'reject'
+                ],
+                true
+            )
+        ) {
+
+            header(
+                'Location: vendors.php?error=invalid'
+            );
+
             exit;
         }
 
-        if ($action === 'approve') {
 
-            $stmt = $db->prepare(
-                "UPDATE vendor_applications
-                 SET status = 'Approved',
-                     reviewed_at = NOW(),
-                     reviewed_by = ?
-                 WHERE application_id = ?"
-            );
+        try {
+
+            $db->beginTransaction();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | LOAD APPLICATION
+            |--------------------------------------------------------------------------
+            */
+
+            $stmt =
+                $db->prepare("
+                    SELECT
+
+                        application_id,
+                        user_id,
+                        business_name,
+                        reason,
+                        status
+
+                    FROM vendor_applications
+
+                    WHERE application_id = ?
+
+                    LIMIT 1
+
+                    FOR UPDATE
+                ");
+
 
             $stmt->execute([
-                $admin_id,
-                $application_id
+                $applicationId
             ]);
 
-            $stmt = $db->prepare(
-                "UPDATE users
-                 SET role = 'vendor',
-                     status = 'active'
-                 WHERE user_id = ?"
-            );
 
-            $stmt->execute([$a['user_id']]);
-
-            $stmt = $db->prepare(
-                "SELECT vendor_id
-                 FROM vendors
-                 WHERE user_id = ?
-                 LIMIT 1"
-            );
-
-            $stmt->execute([$a['user_id']]);
-            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($existing) {
-
-                $stmt = $db->prepare(
-                    "UPDATE vendors
-                     SET business_name = ?,
-                         approval_status = 'Approved'
-                     WHERE user_id = ?"
+            $application =
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
                 );
 
+
+            if (!$application) {
+
+                $db->rollBack();
+
+
+                header(
+                    'Location: vendors.php?error=notfound'
+                );
+
+                exit;
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | APPROVE APPLICATION
+            |--------------------------------------------------------------------------
+            */
+
+            if ($action === 'approve') {
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | APPLICATION STATUS
+                |--------------------------------------------------------------------------
+                */
+
+                $stmt =
+                    $db->prepare("
+                        UPDATE vendor_applications
+
+                        SET
+                            status = 'Approved',
+                            reviewed_at = NOW(),
+                            reviewed_by = ?
+
+                        WHERE application_id = ?
+                    ");
+
+
                 $stmt->execute([
-                    $a['business_name'],
-                    $a['user_id']
+
+                    $adminId,
+                    $applicationId
+
                 ]);
 
-            } else {
 
-                $stmt = $db->prepare(
-                    "INSERT INTO vendors
-                        (user_id, business_name, approval_status)
-                     VALUES
-                        (?, ?, 'Approved')"
-                );
+                /*
+                |--------------------------------------------------------------------------
+                | USER ROLE
+                |--------------------------------------------------------------------------
+                */
+
+                $stmt =
+                    $db->prepare("
+                        UPDATE users
+
+                        SET
+                            role = 'vendor',
+                            status = 'active'
+
+                        WHERE user_id = ?
+                    ");
+
 
                 $stmt->execute([
-                    $a['user_id'],
-                    $a['business_name']
+                    $application['user_id']
+                ]);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CHECK EXISTING VENDOR
+                |--------------------------------------------------------------------------
+                */
+
+                $stmt =
+                    $db->prepare("
+                        SELECT vendor_id
+
+                        FROM vendors
+
+                        WHERE user_id = ?
+
+                        LIMIT 1
+                    ");
+
+
+                $stmt->execute([
+                    $application['user_id']
+                ]);
+
+
+                $existingVendor =
+                    $stmt->fetch(
+                        PDO::FETCH_ASSOC
+                    );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | UPDATE EXISTING VENDOR
+                |--------------------------------------------------------------------------
+                */
+
+                if ($existingVendor) {
+
+                    $stmt =
+                        $db->prepare("
+                            UPDATE vendors
+
+                            SET
+                                business_name = ?,
+                                approval_status = 'Approved'
+
+                            WHERE user_id = ?
+                        ");
+
+
+                    $stmt->execute([
+
+                        $application['business_name'],
+                        $application['user_id']
+
+                    ]);
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CREATE VENDOR
+                |--------------------------------------------------------------------------
+                */
+
+                else {
+
+                    $stmt =
+                        $db->prepare("
+                            INSERT INTO vendors
+                            (
+                                user_id,
+                                business_name,
+                                approval_status
+                            )
+
+                            VALUES
+                            (
+                                ?,
+                                ?,
+                                'Approved'
+                            )
+                        ");
+
+
+                    $stmt->execute([
+
+                        $application['user_id'],
+                        $application['business_name']
+
+                    ]);
+                }
+
+
+                $logAction =
+                    'Approved vendor application';
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | REJECT APPLICATION
+            |--------------------------------------------------------------------------
+            */
+
+            else {
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | APPLICATION STATUS
+                |--------------------------------------------------------------------------
+                */
+
+                $stmt =
+                    $db->prepare("
+                        UPDATE vendor_applications
+
+                        SET
+                            status = 'Rejected',
+                            reviewed_at = NOW(),
+                            reviewed_by = ?
+
+                        WHERE application_id = ?
+                    ");
+
+
+                $stmt->execute([
+
+                    $adminId,
+                    $applicationId
+
+                ]);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | VENDOR STATUS
+                |--------------------------------------------------------------------------
+                */
+
+                $stmt =
+                    $db->prepare("
+                        UPDATE vendors
+
+                        SET
+                            approval_status = 'Rejected'
+
+                        WHERE user_id = ?
+                    ");
+
+
+                $stmt->execute([
+                    $application['user_id']
+                ]);
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | USER ROLE
+                |--------------------------------------------------------------------------
+                */
+
+                $stmt =
+                    $db->prepare("
+                        UPDATE users
+
+                        SET
+                            role = 'customer'
+
+                        WHERE user_id = ?
+
+                        AND role != 'admin'
+                    ");
+
+
+                $stmt->execute([
+                    $application['user_id']
+                ]);
+
+
+                $logAction =
+                    'Rejected vendor application';
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ADMIN LOG
+            |--------------------------------------------------------------------------
+            */
+
+            $stmt =
+                $db->prepare("
+                    INSERT INTO admin_logs
+                    (
+                        admin_id,
+                        action,
+                        target_type,
+                        target_id
+                    )
+
+                    VALUES
+                    (
+                        ?,
+                        ?,
+                        ?,
+                        ?
+                    )
+                ");
+
+
+            $stmt->execute([
+
+                $adminId,
+                $logAction,
+                'vendor_application',
+                $applicationId
+
+            ]);
+
+
+            $db->commit();
+
+
+            header(
+                'Location: vendors.php?success=' .
+                (
+                    $action === 'approve'
+                        ? 'approved'
+                        : 'rejected'
+                )
+            );
+
+            exit;
+
+        }
+
+        catch (Throwable $e) {
+
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+
+            error_log(
+                $e->getMessage()
+            );
+
+
+            header(
+                'Location: vendors.php?error=process'
+            );
+
+            exit;
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE VENDOR STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        isset(
+            $_POST['update_vendor_status']
+        )
+    ) {
+
+        $vendorId =
+            (int) (
+                $_POST['vendor_id']
+                ?? 0
+            );
+
+
+        $approvalStatus =
+            $_POST['approval_status']
+            ?? '';
+
+
+        $allowedStatuses = [
+
+            'Pending',
+            'Approved',
+            'Rejected',
+            'Suspended'
+
+        ];
+
+
+        if (
+            $vendorId <= 0 ||
+            !in_array(
+                $approvalStatus,
+                $allowedStatuses,
+                true
+            )
+        ) {
+
+            header(
+                'Location: vendors.php?error=invalid'
+            );
+
+            exit;
+        }
+
+
+        try {
+
+            $db->beginTransaction();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | GET VENDOR
+            |--------------------------------------------------------------------------
+            */
+
+            $stmt =
+                $db->prepare("
+                    SELECT
+                        vendor_id,
+                        user_id
+
+                    FROM vendors
+
+                    WHERE vendor_id = ?
+
+                    LIMIT 1
+                ");
+
+
+            $stmt->execute([
+                $vendorId
+            ]);
+
+
+            $vendor =
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
+
+
+            if (!$vendor) {
+
+                $db->rollBack();
+
+
+                header(
+                    'Location: vendors.php?error=notfound'
+                );
+
+                exit;
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE VENDOR
+            |--------------------------------------------------------------------------
+            */
+
+            $stmt =
+                $db->prepare("
+                    UPDATE vendors
+
+                    SET
+                        approval_status = ?
+
+                    WHERE vendor_id = ?
+                ");
+
+
+            $stmt->execute([
+
+                $approvalStatus,
+                $vendorId
+
+            ]);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE USER WHEN SUSPENDED
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $approvalStatus ===
+                'Suspended'
+            ) {
+
+                $stmt =
+                    $db->prepare("
+                        UPDATE users
+
+                        SET
+                            status = 'suspended'
+
+                        WHERE user_id = ?
+                    ");
+
+
+                $stmt->execute([
+                    $vendor['user_id']
                 ]);
             }
 
-            $log = 'Approved vendor application';
 
-        } else {
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE USER WHEN APPROVED
+            |--------------------------------------------------------------------------
+            */
 
-            $stmt = $db->prepare(
-                "UPDATE vendor_applications
-                 SET status = 'Rejected',
-                     reviewed_at = NOW(),
-                     reviewed_by = ?
-                 WHERE application_id = ?"
-            );
+            elseif (
+                $approvalStatus ===
+                'Approved'
+            ) {
+
+                $stmt =
+                    $db->prepare("
+                        UPDATE users
+
+                        SET
+                            role = 'vendor',
+                            status = 'active'
+
+                        WHERE user_id = ?
+                    ");
+
+
+                $stmt->execute([
+                    $vendor['user_id']
+                ]);
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ADMIN LOG
+            |--------------------------------------------------------------------------
+            */
+
+            $stmt =
+                $db->prepare("
+                    INSERT INTO admin_logs
+                    (
+                        admin_id,
+                        action,
+                        target_type,
+                        target_id
+                    )
+
+                    VALUES
+                    (
+                        ?,
+                        ?,
+                        ?,
+                        ?
+                    )
+                ");
+
 
             $stmt->execute([
-                $admin_id,
-                $application_id
+
+                $adminId,
+
+                'Updated vendor approval status to ' .
+                $approvalStatus,
+
+                'vendor',
+
+                $vendorId
+
             ]);
 
-            $stmt = $db->prepare(
-                "UPDATE vendors
-                 SET approval_status = 'Rejected'
-                 WHERE user_id = ?"
+
+            $db->commit();
+
+
+            header(
+                'Location: vendors.php?success=status'
             );
 
-            $stmt->execute([$a['user_id']]);
+            exit;
 
-            $stmt = $db->prepare(
-                "UPDATE users
-                 SET role = 'customer'
-                 WHERE user_id = ?
-                 AND role != 'admin'"
+        }
+
+        catch (Throwable $e) {
+
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+
+            error_log(
+                $e->getMessage()
             );
 
-            $stmt->execute([$a['user_id']]);
 
-            $log = 'Rejected vendor application';
-        }
+            header(
+                'Location: vendors.php?error=update'
+            );
 
-        $stmt = $db->prepare(
-            "INSERT INTO admin_logs
-                (admin_id, action, target_type, target_id)
-             VALUES
-                (?, ?, ?, ?)"
-        );
-
-        $stmt->execute([
-            $admin_id,
-            $log,
-            'vendor_application',
-            $application_id
-        ]);
-
-        $db->commit();
-
-        header(
-            'Location: vendors.php?success=' .
-            ($action === 'approve' ? 'approved' : 'rejected')
-        );
-        exit;
-
-    } catch (PDOException $e) {
-
-        if ($db->inTransaction()) {
-            $db->rollBack();
-        }
-
-        error_log($e->getMessage());
-
-        header('Location: vendors.php?error=process');
-        exit;
-    }
-}
-
-/*
-|--------------------------------------------------------------------------
-| UPDATE VENDOR STATUS
-|--------------------------------------------------------------------------
-*/
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_vendor_status'])) {
-
-    $vendor_id = (int) ($_POST['vendor_id'] ?? 0);
-    $approval = $_POST['approval_status'] ?? '';
-
-    $allowed = [
-        'Pending',
-        'Approved',
-        'Rejected',
-        'Suspended'
-    ];
-
-    if (
-        $vendor_id <= 0 ||
-        !in_array($approval, $allowed, true)
-    ) {
-        header('Location: vendors.php?error=invalid');
-        exit;
-    }
-
-    try {
-        $db->beginTransaction();
-
-        $stmt = $db->prepare(
-            "SELECT user_id
-             FROM vendors
-             WHERE vendor_id = ?
-             LIMIT 1"
-        );
-
-        $stmt->execute([$vendor_id]);
-        $v = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$v) {
-            $db->rollBack();
-            header('Location: vendors.php?error=notfound');
             exit;
         }
-
-        $stmt = $db->prepare(
-            "UPDATE vendors
-             SET approval_status = ?
-             WHERE vendor_id = ?"
-        );
-
-        $stmt->execute([
-            $approval,
-            $vendor_id
-        ]);
-
-        if ($approval === 'Suspended') {
-
-            $stmt = $db->prepare(
-                "UPDATE users
-                 SET status = 'suspended'
-                 WHERE user_id = ?
-                 AND role = 'vendor'"
-            );
-
-            $stmt->execute([$v['user_id']]);
-
-        } elseif ($approval === 'Approved') {
-
-            $stmt = $db->prepare(
-                "UPDATE users
-                 SET role = 'vendor',
-                     status = 'active'
-                 WHERE user_id = ?"
-            );
-
-            $stmt->execute([$v['user_id']]);
-        }
-
-        $stmt = $db->prepare(
-            "INSERT INTO admin_logs
-                (admin_id, action, target_type, target_id)
-             VALUES
-                (?, ?, ?, ?)"
-        );
-
-        $stmt->execute([
-            $admin_id,
-            'Updated vendor approval status to ' . $approval,
-            'vendor',
-            $vendor_id
-        ]);
-
-        $db->commit();
-
-        header('Location: vendors.php?success=status');
-        exit;
-
-    } catch (PDOException $e) {
-
-        if ($db->inTransaction()) {
-            $db->rollBack();
-        }
-
-        error_log($e->getMessage());
-
-        header('Location: vendors.php?error=update');
-        exit;
     }
 }
 
+
 /*
 |--------------------------------------------------------------------------
-| GET VENDOR DATA
+| SEARCH & FILTER
 |--------------------------------------------------------------------------
 */
 
-$search = trim($_GET['search'] ?? '');
-$status_filter = $_GET['status'] ?? '';
+$search =
+    trim(
+        $_GET['search']
+        ?? ''
+    );
 
-$sql = "
-    SELECT
-        v.vendor_id,
-        v.user_id,
-        v.business_name,
-        v.business_logo,
-        v.business_description,
-        v.business_address,
-        v.category,
-        v.delivery_method,
-        v.approval_status,
-        v.created_at,
-        u.name AS owner_name,
-        u.email AS owner_email,
-        u.phone AS owner_phone,
-        u.status AS user_status
-    FROM vendors v
-    INNER JOIN users u
-        ON v.user_id = u.user_id
-    WHERE 1 = 1
-";
 
-$params = [];
+$statusFilter =
+    $_GET['status']
+    ?? '';
 
-if ($search !== '') {
 
-    $sql .= "
-        AND (
-            v.business_name LIKE ?
-            OR u.name LIKE ?
-            OR u.email LIKE ?
-        )
+/*
+|--------------------------------------------------------------------------
+| LOAD VENDORS
+|--------------------------------------------------------------------------
+*/
+
+$vendors = [];
+
+
+try {
+
+    $sql = "
+        SELECT
+
+            v.vendor_id,
+            v.user_id,
+            v.business_name,
+            v.business_logo,
+            v.business_description,
+            v.business_address,
+            v.category,
+            v.delivery_method,
+            v.approval_status,
+            v.created_at,
+
+            u.name AS owner_name,
+            u.email AS owner_email,
+            u.phone AS owner_phone,
+            u.status AS user_status
+
+        FROM vendors v
+
+        INNER JOIN users u
+            ON v.user_id = u.user_id
+
+        WHERE 1 = 1
     ";
 
-    $x = "%$search%";
 
-    array_push(
-        $params,
-        $x,
-        $x,
-        $x
+    $params = [];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SEARCH
+    |--------------------------------------------------------------------------
+    */
+
+    if ($search !== '') {
+
+        $sql .= "
+            AND
+            (
+                v.business_name LIKE ?
+                OR u.name LIKE ?
+                OR u.email LIKE ?
+            )
+        ";
+
+
+        $searchValue =
+            '%' .
+            $search .
+            '%';
+
+
+        $params[] =
+            $searchValue;
+
+        $params[] =
+            $searchValue;
+
+        $params[] =
+            $searchValue;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATUS FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        in_array(
+            $statusFilter,
+            [
+                'Pending',
+                'Approved',
+                'Rejected',
+                'Suspended'
+            ],
+            true
+        )
+    ) {
+
+        $sql .= "
+            AND v.approval_status = ?
+        ";
+
+
+        $params[] =
+            $statusFilter;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORDER
+    |--------------------------------------------------------------------------
+    */
+
+    $sql .= "
+        ORDER BY
+            v.created_at DESC,
+            v.vendor_id DESC
+    ";
+
+
+    $stmt =
+        $db->prepare(
+            $sql
+        );
+
+
+    $stmt->execute(
+        $params
+    );
+
+
+    $vendors =
+        $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        );
+
+}
+
+catch (Throwable $e) {
+
+    $vendors = [];
+
+    error_log(
+        $e->getMessage()
     );
 }
 
-if (
-    in_array(
-        $status_filter,
-        ['Pending', 'Approved', 'Rejected', 'Suspended'],
-        true
-    )
-) {
-
-    $sql .= " AND v.approval_status = ?";
-    $params[] = $status_filter;
-}
-
-$sql .= " ORDER BY v.created_at DESC";
-
-$stmt = $db->prepare($sql);
-$stmt->execute($params);
-
-$vendors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 /*
 |--------------------------------------------------------------------------
@@ -386,63 +1062,123 @@ $vendors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 |--------------------------------------------------------------------------
 */
 
-$stmt = $db->query(
-    "SELECT
-        va.application_id,
-        va.user_id,
-        va.business_name,
-        va.reason,
-        va.status,
-        va.created_at,
-        u.name AS applicant_name,
-        u.email AS applicant_email,
-        u.phone AS applicant_phone
-     FROM vendor_applications va
-     INNER JOIN users u
-        ON va.user_id = u.user_id
-     WHERE va.status = 'Pending'
-     ORDER BY va.created_at DESC"
-);
+$applications = [];
 
-$applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+try {
+
+    $stmt =
+        $db->query("
+            SELECT
+
+                va.application_id,
+                va.user_id,
+                va.business_name,
+                va.reason,
+                va.status,
+                va.created_at,
+
+                u.name AS applicant_name,
+                u.email AS applicant_email,
+                u.phone AS applicant_phone
+
+            FROM vendor_applications va
+
+            INNER JOIN users u
+                ON va.user_id = u.user_id
+
+            WHERE va.status = 'Pending'
+
+            ORDER BY
+                va.created_at DESC
+        ");
+
+
+    $applications =
+        $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        );
+
+}
+
+catch (Throwable $e) {
+
+    $applications = [];
+
+    error_log(
+        $e->getMessage()
+    );
+}
+
 
 /*
 |--------------------------------------------------------------------------
-| VENDOR STATISTICS
+| STATISTICS
 |--------------------------------------------------------------------------
 */
 
-$total_vendors = (int) $db
-    ->query("SELECT COUNT(*) FROM vendors")
-    ->fetchColumn();
+$totalVendors = 0;
+$approvedVendors = 0;
+$pendingVendors = 0;
+$suspendedVendors = 0;
 
-$approved_vendors = (int) $db
-    ->query(
-        "SELECT COUNT(*)
-         FROM vendors
-         WHERE approval_status = 'Approved'"
-    )
-    ->fetchColumn();
 
-$pending_vendors = (int) $db
-    ->query(
-        "SELECT COUNT(*)
-         FROM vendors
-         WHERE approval_status = 'Pending'"
-    )
-    ->fetchColumn();
+try {
 
-$suspended_vendors = (int) $db
-    ->query(
-        "SELECT COUNT(*)
-         FROM vendors
-         WHERE approval_status = 'Suspended'"
-    )
-    ->fetchColumn();
+    $totalVendors =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM vendors
+            ")
+            ->fetchColumn();
+
+
+    $approvedVendors =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM vendors
+                WHERE approval_status = 'Approved'
+            ")
+            ->fetchColumn();
+
+
+    $pendingVendors =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM vendors
+                WHERE approval_status = 'Pending'
+            ")
+            ->fetchColumn();
+
+
+    $suspendedVendors =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM vendors
+                WHERE approval_status = 'Suspended'
+            ")
+            ->fetchColumn();
+
+}
+
+catch (Throwable $e) {
+
+    error_log(
+        $e->getMessage()
+    );
+}
 
 ?>
+<!DOCTYPE html>
 
-<!doctype html>
 <html lang="en">
 
 <head>
@@ -454,9 +1190,19 @@ $suspended_vendors = (int) $db
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Vendors | HochipoHub Admin</title>
+    <title>
+        Vendors | HochipoHub Admin
+    </title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    <!-- ============================================================
+         FONT
+    ============================================================= -->
+
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
 
     <link
         rel="preconnect"
@@ -469,6 +1215,11 @@ $suspended_vendors = (int) $db
         rel="stylesheet"
     >
 
+
+    <!-- ============================================================
+         ADMIN CSS
+    ============================================================= -->
+
     <link
         rel="stylesheet"
         href="../css/admin.css"
@@ -479,133 +1230,214 @@ $suspended_vendors = (int) $db
         href="../css/responsive.css"
     >
 
+
     <style>
 
+        /*
+        |--------------------------------------------------------------------------
+        | ROOT
+        |--------------------------------------------------------------------------
+        */
+
+        :root {
+
+            --vendor-blue:
+                #2563eb;
+
+            --vendor-blue-dark:
+                #174ca8;
+
+            --vendor-navy:
+                #08265a;
+
+            --vendor-bg:
+                #eef5fd;
+
+            --vendor-white:
+                #ffffff;
+
+            --vendor-text:
+                #0b2d63;
+
+            --vendor-muted:
+                #8294b3;
+
+            --vendor-border:
+                #dbe5f1;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | GLOBAL
+        |--------------------------------------------------------------------------
+        */
+
+        * {
+
+            box-sizing: border-box;
+
+        }
+
+
         html,
-        body,
-        button,
-        input,
-        select,
-        textarea {
-
-            font-family:
-                'Poppins',
-                sans-serif;
-        }
-
-        .vendors-page,
-        .vendors-page * {
-
-            font-family:
-                'Poppins',
-                sans-serif;
-        }
-
-        .vendors-page {
-
-            --blue: #2563eb;
-            --blue-dark: #1d4ed8;
-            --blue-deep: #172554;
-            --blue-light: #eff6ff;
-            --blue-soft: #dbeafe;
-            --cyan: #38bdf8;
-
-            --text: #172033;
-            --muted: #71809a;
-            --border: #e6ebf2;
-            --background: #f6f8fc;
-            --white: #ffffff;
-
-            padding: 0 34px 55px;
-        }
-
-        .vendors-topbar {
-
-            min-height: 92px;
-
-            display: flex;
-            align-items: center;
-            justify-content: flex-start;
-
-            margin: 0 -34px 28px;
-            padding: 0 34px;
-
-            background: rgba(255,255,255,.96);
-
-            border-bottom: 1px solid #edf0f5;
-        }
-
-        .vendors-header-left {
-
-            display: flex;
-            align-items: center;
-
-            gap: 18px;
-        }
-
-        .vendors-header-text h1 {
+        body {
 
             margin: 0;
 
-            font-size: 31px;
-            line-height: 1.1;
+            padding: 0;
 
-            font-weight: 800;
+            min-height: 100%;
 
-            color: #111827;
+            font-family:
+                'Poppins',
+                sans-serif;
 
-            letter-spacing: -.8px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #f4f8fd,
+                    #eaf3ff
+                );
+
         }
 
-        .vendors-header-text p {
 
-            margin: 7px 0 0;
+        body {
 
-            color: var(--muted);
+            overflow-x: hidden;
 
-            font-size: 14px;
-
-            font-weight: 500;
         }
+
+
+        button,
+        input,
+        select {
+
+            font-family: inherit;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN
+        |--------------------------------------------------------------------------
+        */
+
+        .vendors-main {
+
+            min-height: 100vh;
+
+            margin-left: 260px;
+
+            width:
+                calc(
+                    100% - 260px
+                );
+
+            background:
+
+                radial-gradient(
+                    circle at 90% 2%,
+                    rgba(
+                        37,
+                        99,
+                        235,
+                        .12
+                    ),
+                    transparent 24%
+                ),
+
+                linear-gradient(
+                    135deg,
+                    #f4f8fd,
+                    #eaf3ff
+                );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CONTENT
+        |--------------------------------------------------------------------------
+        */
+
+        .vendors-content {
+
+            width: 100%;
+
+            max-width: 1450px;
+
+            margin:
+                0
+                auto;
+
+            padding:
+
+                38px
+                35px
+                70px;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | HERO
+        |--------------------------------------------------------------------------
+        */
 
         .vendors-hero {
 
             position: relative;
 
+            min-height: 155px;
+
             overflow: hidden;
 
-            min-height: 225px;
-
             display: flex;
+
             align-items: center;
 
-            padding: 38px 42px;
+            justify-content: space-between;
 
-            border-radius: 28px;
+            padding:
+
+                34px
+                38px;
+
+            margin-bottom: 26px;
+
+            color: #ffffff;
 
             background:
-                radial-gradient(
-                    circle at 88% 15%,
-                    rgba(96,165,250,.42),
-                    transparent 28%
-                ),
-                radial-gradient(
-                    circle at 74% 100%,
-                    rgba(56,189,248,.25),
-                    transparent 34%
-                ),
+
                 linear-gradient(
-                    135deg,
-                    #172554 0%,
-                    #1d4ed8 48%,
-                    #2563eb 100%
+                    110deg,
+                    #08265a 0%,
+                    #123c8c 47%,
+                    #2480ed 100%
                 );
 
-            box-shadow:
-                0 20px 50px rgba(37,99,235,.22);
+            border-radius: 26px;
 
-            margin-bottom: 32px;
+            box-shadow:
+
+                0
+                20px
+                45px
+                rgba(
+                    18,
+                    70,
+                    150,
+                    .15
+                );
+
         }
+
 
         .vendors-hero::before {
 
@@ -613,16 +1445,24 @@ $suspended_vendors = (int) $db
 
             position: absolute;
 
-            width: 330px;
-            height: 330px;
+            width: 260px;
+            height: 260px;
 
-            right: -100px;
-            top: -130px;
-
-            border: 1px solid rgba(255,255,255,.14);
+            right: -70px;
+            top: -140px;
 
             border-radius: 50%;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .07
+                );
+
         }
+
 
         .vendors-hero::after {
 
@@ -630,189 +1470,245 @@ $suspended_vendors = (int) $db
 
             position: absolute;
 
-            width: 240px;
-            height: 240px;
+            width: 170px;
+            height: 170px;
 
-            right: 40px;
-            bottom: -145px;
-
-            border: 1px solid rgba(255,255,255,.10);
+            right: 155px;
+            bottom: -110px;
 
             border-radius: 50%;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .045
+                );
+
         }
 
-        .vendors-hero-content {
+
+        .vendors-hero-text {
 
             position: relative;
 
             z-index: 2;
 
-            max-width: 760px;
         }
 
-        .vendors-hero-label {
 
-            display: inline-flex;
+        .vendors-hero h1 {
 
-            align-items: center;
+            margin:
 
-            gap: 9px;
-
-            padding: 8px 14px;
-
-            margin-bottom: 17px;
-
-            border-radius: 999px;
-
-            border: 1px solid rgba(255,255,255,.20);
-
-            background: rgba(255,255,255,.10);
-
-            color: white;
-
-            font-size: 10px;
-
-            font-weight: 800;
-
-            letter-spacing: 1px;
-
-            text-transform: uppercase;
-
-            backdrop-filter: blur(10px);
-        }
-
-        .vendors-hero-label i {
-
-            width: 8px;
-            height: 8px;
-
-            display: inline-block;
-
-            border-radius: 50%;
-
-            background: #bfdbfe;
-
-            box-shadow:
-                0 0 0 5px rgba(191,219,254,.13);
-        }
-
-        .vendors-hero h2 {
-
-            margin: 0;
+                0
+                0
+                8px;
 
             color: #ffffff;
 
-            font-size: clamp(30px, 3vw, 44px);
+            font-size: 38px;
 
             line-height: 1.05;
 
             font-weight: 800;
 
             letter-spacing: -1.5px;
+
         }
+
 
         .vendors-hero p {
 
-            max-width: 700px;
+            margin: 0;
 
-            margin: 15px 0 0;
-
-            color: rgba(255,255,255,.82);
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .82
+                );
 
             font-size: 14px;
 
-            line-height: 1.7;
-
             font-weight: 500;
+
         }
 
-        .vendors-hero-number {
 
-            position: absolute;
+        /*
+        |--------------------------------------------------------------------------
+        | HERO ICON
+        |--------------------------------------------------------------------------
+        */
 
-            z-index: 3;
+        .vendors-hero-icon {
 
-            right: 65px;
-            top: 50%;
+            position: relative;
 
-            transform: translateY(-50%);
+            z-index: 2;
 
-            text-align: center;
-        }
+            width: 82px;
+            height: 82px;
 
-        .vendors-hero-number strong {
+            flex-shrink: 0;
 
-            display: block;
+            display: flex;
 
-            color: white;
+            align-items: center;
+            justify-content: center;
 
-            font-size: 68px;
+            border:
 
-            line-height: 1;
+                1px solid
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .25
+                );
+
+            border-radius: 22px;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .14
+                );
+
+            color: #ffffff;
+
+            font-size: 34px;
 
             font-weight: 800;
 
-            letter-spacing: -4px;
         }
 
-        .vendors-hero-number span {
 
-            display: block;
+        /*
+        |--------------------------------------------------------------------------
+        | MESSAGE
+        |--------------------------------------------------------------------------
+        */
 
-            margin-top: 8px;
+        .vendors-message {
 
-            color: rgba(255,255,255,.70);
+            margin-bottom: 22px;
 
-            font-size: 10px;
+            padding:
 
-            font-weight: 800;
+                14px
+                17px;
 
-            letter-spacing: 1.2px;
+            border-radius: 12px;
 
-            text-transform: uppercase;
+            font-size: 11px;
+
+            font-weight: 600;
+
         }
+
+
+        .vendors-message.success {
+
+            color: #166534;
+
+            background: #ecfdf5;
+
+            border:
+
+                1px solid
+                #bbf7d0;
+
+        }
+
+
+        .vendors-message.error {
+
+            color: #991b1b;
+
+            background: #fff1f2;
+
+            border:
+
+                1px solid
+                #fecdd3;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATISTICS
+        |--------------------------------------------------------------------------
+        */
 
         .vendors-stats {
 
             display: grid;
 
             grid-template-columns:
-                repeat(4, minmax(0,1fr));
 
-            gap: 17px;
+                repeat(
+                    4,
+                    minmax(
+                        0,
+                        1fr
+                    )
+                );
 
-            margin-bottom: 35px;
+            gap: 18px;
+
+            margin-bottom: 30px;
+
         }
+
 
         .vendor-stat-card {
 
             position: relative;
 
+            min-height: 150px;
+
             overflow: hidden;
 
-            min-height: 145px;
+            padding:
 
-            padding: 23px;
+                26px
+                24px;
 
-            background: white;
+            background: #ffffff;
 
-            border: 1px solid var(--border);
+            border:
+
+                1px solid
+                #dce7f3;
+
+            border-top:
+
+                4px solid
+                #2563eb;
 
             border-radius: 20px;
 
             box-shadow:
-                0 7px 22px rgba(30,50,90,.055);
 
-            transition: .25s ease;
+                0
+                12px
+                28px
+                rgba(
+                    20,
+                    60,
+                    120,
+                    .055
+                );
+
         }
 
-        .vendor-stat-card:hover {
-
-            transform: translateY(-4px);
-
-            box-shadow:
-                0 15px 32px rgba(30,50,90,.10);
-        }
 
         .vendor-stat-card::after {
 
@@ -820,52 +1716,62 @@ $suspended_vendors = (int) $db
 
             position: absolute;
 
+            right: -29px;
+            bottom: -45px;
+
             width: 110px;
             height: 110px;
 
-            right: -45px;
-            bottom: -50px;
-
             border-radius: 50%;
 
-            background: var(--blue-light);
+            background: #edf4ff;
+
         }
 
-        .vendor-stat-top {
 
-            position: relative;
+        .vendor-stat-card.approved {
 
-            z-index: 2;
+            border-top-color: #16a34a;
 
-            display: flex;
-
-            justify-content: space-between;
         }
 
-        .vendor-stat-icon {
 
-            width: 45px;
-            height: 45px;
+        .vendor-stat-card.approved::after {
 
-            display: flex;
+            background: #eaf9ef;
 
-            align-items: center;
-            justify-content: center;
-
-            border-radius: 13px;
-
-            background: var(--blue-light);
-
-            color: var(--blue);
         }
 
-        .vendor-stat-icon svg {
 
-            width: 22px;
-            height: 22px;
+        .vendor-stat-card.pending {
+
+            border-top-color: #f59e0b;
+
         }
 
-        .vendor-stat-card strong {
+
+        .vendor-stat-card.pending::after {
+
+            background: #fff7df;
+
+        }
+
+
+        .vendor-stat-card.suspended {
+
+            border-top-color: #ef4444;
+
+        }
+
+
+        .vendor-stat-card.suspended::after {
+
+            background: #fff0f1;
+
+        }
+
+
+        .vendor-stat-label {
 
             position: relative;
 
@@ -873,65 +1779,90 @@ $suspended_vendors = (int) $db
 
             display: block;
 
-            margin-top: 17px;
+            margin-bottom: 15px;
 
-            color: #111827;
+            color: #61728e;
 
-            font-size: 31px;
+            font-size: 10px;
+
+            font-weight: 800;
+
+            letter-spacing: .75px;
+
+            text-transform: uppercase;
+
+        }
+
+
+        .vendor-stat-value {
+
+            position: relative;
+
+            z-index: 2;
+
+            display: block;
+
+            color: #0b326d;
+
+            font-size: 32px;
 
             line-height: 1;
 
             font-weight: 800;
+
         }
 
-        .vendor-stat-card span {
 
-            position: relative;
-
-            z-index: 2;
-
-            display: block;
-
-            margin-top: 7px;
-
-            color: var(--muted);
-
-            font-size: 12px;
-
-            font-weight: 600;
-        }
-
-        .vendor-stat-card.pending .vendor-stat-icon {
-
-            color: #d97706;
-
-            background: #fff7ed;
-        }
-
-        .vendor-stat-card.suspended .vendor-stat-icon {
-
-            color: #dc2626;
-
-            background: #fef2f2;
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | PANEL
+        |--------------------------------------------------------------------------
+        */
 
         .vendors-panel {
 
             overflow: hidden;
 
-            margin-bottom: 25px;
+            margin-bottom: 28px;
 
-            background: white;
+            background: #ffffff;
 
-            border: 1px solid var(--border);
+            border:
 
-            border-radius: 22px;
+                1px solid
+                #dce7f3;
+
+            border-radius: 24px;
 
             box-shadow:
-                0 8px 28px rgba(30,50,90,.055);
+
+                0
+                14px
+                35px
+                rgba(
+                    24,
+                    64,
+                    120,
+                    .055
+                );
+
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | PANEL HEADER
+        |--------------------------------------------------------------------------
+        */
+
         .vendors-panel-header {
+
+            min-height: 110px;
+
+            padding:
+
+                26px
+                30px;
 
             display: flex;
 
@@ -941,10 +1872,13 @@ $suspended_vendors = (int) $db
 
             gap: 20px;
 
-            padding: 23px 25px;
+            border-bottom:
 
-            border-bottom: 1px solid #edf0f5;
+                1px solid
+                #e7edf5;
+
         }
+
 
         .vendors-panel-title {
 
@@ -952,188 +1886,15 @@ $suspended_vendors = (int) $db
 
             align-items: center;
 
-            gap: 13px;
+            gap: 16px;
+
         }
+
 
         .vendors-panel-icon {
 
-            width: 42px;
-            height: 42px;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            color: var(--blue);
-
-            background: var(--blue-light);
-
-            border-radius: 12px;
-        }
-
-        .vendors-panel-icon svg {
-
-            width: 21px;
-            height: 21px;
-        }
-
-        .vendors-panel-header h2 {
-
-            margin: 0;
-
-            color: #172033;
-
-            font-size: 17px;
-
-            font-weight: 800;
-        }
-
-        .vendors-panel-header p {
-
-            margin: 4px 0 0;
-
-            color: var(--muted);
-
-            font-size: 12px;
-
-            font-weight: 500;
-        }
-
-        .vendor-count-badge {
-
-            padding: 7px 11px;
-
-            color: var(--blue);
-
-            background: var(--blue-light);
-
-            border-radius: 999px;
-
-            font-size: 10px;
-
-            font-weight: 800;
-        }
-
-        .vendors-alert {
-
-            display: flex;
-
-            align-items: center;
-
-            gap: 11px;
-
-            padding: 14px 17px;
-
-            margin-bottom: 22px;
-
-            border-radius: 14px;
-
-            font-size: 13px;
-
-            font-weight: 600;
-        }
-
-        .vendors-alert.success {
-
-            color: #166534;
-
-            background: #f0fdf4;
-
-            border: 1px solid #bbf7d0;
-        }
-
-        .vendors-alert.error {
-
-            color: #991b1b;
-
-            background: #fef2f2;
-
-            border: 1px solid #fecaca;
-        }
-
-        .vendors-table-wrapper {
-
-            width: 100%;
-
-            overflow-x: auto;
-        }
-
-        .vendors-table {
-
-            width: 100%;
-
-            min-width: 850px;
-
-            border-collapse: collapse;
-        }
-
-        .vendors-table th {
-
-            padding: 14px 20px;
-
-            text-align: left;
-
-            background: #f8fafc;
-
-            border-bottom: 1px solid #e8edf4;
-
-            color: #7b89a2;
-
-            font-size: 10px;
-
-            font-weight: 800;
-
-            letter-spacing: .9px;
-
-            text-transform: uppercase;
-
-            white-space: nowrap;
-        }
-
-        .vendors-table td {
-
-            padding: 18px 20px;
-
-            border-bottom: 1px solid #eef1f5;
-
-            color: #27344a;
-
-            font-size: 12px;
-
-            font-weight: 500;
-
-            vertical-align: middle;
-        }
-
-        .vendors-table tbody tr {
-
-            transition: .2s ease;
-        }
-
-        .vendors-table tbody tr:hover {
-
-            background: #f8fbff;
-        }
-
-        .vendors-table tbody tr:last-child td {
-
-            border-bottom: none;
-        }
-
-        .vendor-person {
-
-            display: flex;
-
-            align-items: center;
-
-            gap: 11px;
-        }
-
-        .vendor-avatar {
-
-            width: 38px;
-            height: 38px;
+            width: 53px;
+            height: 53px;
 
             flex-shrink: 0;
 
@@ -1142,185 +1903,410 @@ $suspended_vendors = (int) $db
             align-items: center;
             justify-content: center;
 
-            border-radius: 11px;
+            border-radius: 16px;
 
-            color: white;
+            color: #ffffff;
 
             background:
+
                 linear-gradient(
                     135deg,
-                    #2563eb,
-                    #60a5fa
+                    #1476e8,
+                    #1d95f3
                 );
 
-            font-size: 13px;
+            font-size: 22px;
 
             font-weight: 800;
+
+            box-shadow:
+
+                0
+                9px
+                20px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .22
+                );
+
         }
 
-        .vendor-person-info strong {
 
-            display: block;
+        .vendors-panel-header h2 {
 
-            color: #172033;
+            margin:
 
-            font-size: 12px;
+                0
+                0
+                5px;
+
+            color: #092e65;
+
+            font-size: 20px;
 
             font-weight: 800;
+
         }
 
-        .vendor-person-info small {
 
-            display: block;
+        .vendors-panel-header p {
 
-            margin-top: 3px;
+            margin: 0;
 
-            color: #8a96a9;
-
-            font-size: 10px;
-        }
-
-        .vendor-business strong {
-
-            display: block;
-
-            color: #172033;
-
-            font-weight: 800;
-        }
-
-        .vendor-business small {
-
-            display: block;
-
-            max-width: 210px;
-
-            margin-top: 4px;
-
-            color: #8a96a9;
-
-            font-size: 10px;
-
-            white-space: nowrap;
-
-            overflow: hidden;
-
-            text-overflow: ellipsis;
-        }
-
-        .vendor-id {
-
-            color: var(--blue);
-
-            font-weight: 800;
-        }
-
-        .vendor-category {
-
-            display: inline-flex;
-
-            padding: 6px 9px;
-
-            border-radius: 8px;
-
-            background: #f1f5f9;
-
-            color: #526176;
-
-            font-size: 10px;
-
-            font-weight: 700;
-        }
-
-        .vendor-delivery {
-
-            color: #5c6b82;
+            color: #8999b4;
 
             font-size: 11px;
 
-            font-weight: 600;
         }
 
-        .vendor-status-form {
 
-            display: inline-block;
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | COUNT BADGE
+        |--------------------------------------------------------------------------
+        */
 
-        .vendor-status-select {
+        .vendors-count-badge {
 
-            min-width: 116px;
+            min-height: 36px;
 
-            padding: 8px 28px 8px 11px;
+            padding:
 
-            border-radius: 9px;
+                0
+                16px;
 
-            border: 1px solid #dce3ed;
+            display: inline-flex;
 
-            background: #f8fafc;
+            align-items: center;
+            justify-content: center;
 
-            color: #334155;
+            color: #2563eb;
 
-            font-family: 'Poppins', sans-serif;
+            background: #eff6ff;
+
+            border:
+
+                1px solid
+                #d6e7ff;
+
+            border-radius: 999px;
 
             font-size: 10px;
 
             font-weight: 800;
 
-            cursor: pointer;
+            white-space: nowrap;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER
+        |--------------------------------------------------------------------------
+        */
+
+        .vendors-filter-wrapper {
+
+            padding:
+
+                22px
+                28px;
+
+            border-bottom:
+
+                1px solid
+                #edf1f6;
+
+            background: #fbfdff;
+
+        }
+
+
+        .vendors-filter {
+
+            display: grid;
+
+            grid-template-columns:
+
+                minmax(
+                    260px,
+                    1.7fr
+                )
+
+                minmax(
+                    160px,
+                    .55fr
+                )
+
+                auto
+
+                auto;
+
+            gap: 10px;
+
+        }
+
+
+        .vendors-filter input,
+        .vendors-filter select {
+
+            width: 100%;
+
+            height: 43px;
+
+            padding:
+
+                0
+                13px;
 
             outline: none;
 
-            transition: .2s ease;
+            color: #26354e;
+
+            background: #ffffff;
+
+            border:
+
+                1px solid
+                #d8e3ef;
+
+            border-radius: 10px;
+
+            font-size: 10px;
+
         }
 
-        .vendor-status-select:hover,
-        .vendor-status-select:focus {
 
-            border-color: var(--blue);
+        .vendors-filter input::placeholder {
 
-            background: white;
+            color: #96a5b9;
+
+        }
+
+
+        .vendors-filter input:focus,
+        .vendors-filter select:focus {
+
+            border-color: #3b82f6;
 
             box-shadow:
-                0 0 0 3px rgba(37,99,235,.10);
+
+                0
+                0
+                0
+                3px
+                rgba(
+                    59,
+                    130,
+                    246,
+                    .08
+                );
+
         }
 
-        .vendor-status-select.approved {
 
-            color: #166534;
+        /*
+        |--------------------------------------------------------------------------
+        | BUTTON
+        |--------------------------------------------------------------------------
+        */
 
-            background: #f0fdf4;
+        .vendor-btn {
 
-            border-color: #bbf7d0;
+            min-height: 43px;
+
+            padding:
+
+                0
+                17px;
+
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 10px;
+
+            font-size: 10px;
+
+            font-weight: 800;
+
+            text-decoration: none;
+
+            cursor: pointer;
+
+            white-space: nowrap;
+
         }
 
-        .vendor-status-select.pending {
 
-            color: #92400e;
+        .vendor-btn.primary {
 
-            background: #fffbeb;
+            color: #ffffff;
 
-            border-color: #fde68a;
+            border: 0;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #1d65d8
+                );
+
+            box-shadow:
+
+                0
+                7px
+                15px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .20
+                );
+
         }
 
-        .vendor-status-select.rejected {
 
-            color: #991b1b;
+        .vendor-btn.secondary {
 
-            background: #fef2f2;
+            color: #66758b;
 
-            border-color: #fecaca;
+            border:
+
+                1px solid
+                #d7e2ee;
+
+            background: #ffffff;
+
         }
 
-        .vendor-status-select.suspended {
 
-            color: #7f1d1d;
+        /*
+        |--------------------------------------------------------------------------
+        | TABLE
+        |--------------------------------------------------------------------------
+        */
 
-            background: #fef2f2;
+        .vendors-table-wrapper {
 
-            border-color: #fecaca;
+            width: 100%;
+
+            overflow-x: auto;
+
         }
 
-        .vendors-filter {
+
+        .vendors-table {
+
+            width: 100%;
+
+            min-width: 1000px;
+
+            border-collapse: collapse;
+
+        }
+
+
+        .vendors-table thead {
+
+            background: #f6f9fd;
+
+        }
+
+
+        .vendors-table th {
+
+            height: 44px;
+
+            padding:
+
+                0
+                18px;
+
+            color: #65758f;
+
+            border-bottom:
+
+                1px solid
+                #dfe7f0;
+
+            font-size: 8px;
+
+            font-weight: 800;
+
+            text-align: left;
+
+            letter-spacing: .55px;
+
+            text-transform: uppercase;
+
+            white-space: nowrap;
+
+        }
+
+
+        .vendors-table td {
+
+            padding:
+
+                16px
+                18px;
+
+            color: #435169;
+
+            border-bottom:
+
+                1px solid
+                #edf1f6;
+
+            font-size: 9px;
+
+            vertical-align: middle;
+
+        }
+
+
+        .vendors-table tbody tr:hover {
+
+            background: #f9fbff;
+
+        }
+
+
+        .vendors-table tbody tr:last-child td {
+
+            border-bottom: 0;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ID
+        |--------------------------------------------------------------------------
+        */
+
+        .vendor-id {
+
+            color: #8796ac;
+
+            font-weight: 700;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PERSON
+        |--------------------------------------------------------------------------
+        */
+
+        .vendor-person {
 
             display: flex;
 
@@ -1328,197 +2314,206 @@ $suspended_vendors = (int) $db
 
             gap: 11px;
 
-            padding: 21px 25px;
+            min-width: 200px;
 
-            background: #ffffff;
         }
 
-        .vendors-search {
 
-            position: relative;
+        .vendor-avatar {
 
-            flex: 1;
-        }
+            width: 39px;
+            height: 39px;
 
-        .vendors-search svg {
+            flex-shrink: 0;
 
-            position: absolute;
-
-            left: 14px;
-            top: 50%;
-
-            width: 17px;
-            height: 17px;
-
-            transform: translateY(-50%);
-
-            color: #8b98aa;
-
-            pointer-events: none;
-        }
-
-        .vendors-search input {
-
-            width: 100%;
-
-            height: 44px;
-
-            box-sizing: border-box;
-
-            padding: 0 15px 0 42px;
-
-            border: 1px solid #dfe5ed;
-
-            border-radius: 11px;
-
-            outline: none;
-
-            color: #172033;
-
-            background: #f8fafc;
-
-            font-family: 'Poppins', sans-serif;
-
-            font-size: 12px;
-
-            font-weight: 500;
-
-            transition: .2s ease;
-        }
-
-        .vendors-search input:focus {
-
-            border-color: var(--blue);
-
-            background: white;
-
-            box-shadow:
-                0 0 0 3px rgba(37,99,235,.09);
-        }
-
-        .vendors-filter select {
-
-            width: 155px;
-
-            height: 44px;
-
-            padding: 0 12px;
-
-            border: 1px solid #dfe5ed;
-
-            border-radius: 11px;
-
-            outline: none;
-
-            background: #f8fafc;
-
-            color: #526176;
-
-            font-family: 'Poppins', sans-serif;
-
-            font-size: 12px;
-
-            font-weight: 600;
-
-            cursor: pointer;
-        }
-
-        .vendors-filter select:focus {
-
-            border-color: var(--blue);
-
-            box-shadow:
-                0 0 0 3px rgba(37,99,235,.09);
-        }
-
-        .vendors-filter-btn {
-
-            height: 44px;
-
-            display: inline-flex;
+            display: flex;
 
             align-items: center;
-
             justify-content: center;
 
-            gap: 8px;
+            border-radius: 10px;
 
-            padding: 0 19px;
-
-            border: none;
-
-            border-radius: 11px;
+            color: #ffffff;
 
             background:
+
                 linear-gradient(
                     135deg,
                     #2563eb,
-                    #1d4ed8
+                    #60a5fa
                 );
-
-            color: white;
-
-            font-family: 'Poppins', sans-serif;
 
             font-size: 12px;
 
             font-weight: 800;
 
-            cursor: pointer;
-
-            box-shadow:
-                0 7px 16px rgba(37,99,235,.20);
-
-            transition: .2s ease;
         }
 
-        .vendors-filter-btn:hover {
 
-            transform: translateY(-1px);
+        .vendor-person strong,
+        .vendor-business strong {
 
-            box-shadow:
-                0 10px 20px rgba(37,99,235,.27);
+            display: block;
+
+            margin-bottom: 3px;
+
+            color: #112b55;
+
+            font-size: 10px;
+
+            font-weight: 800;
+
         }
 
-        .vendors-reset {
 
-            height: 44px;
+        .vendor-person small,
+        .vendor-business small {
+
+            display: block;
+
+            max-width: 210px;
+
+            overflow: hidden;
+
+            color: #8897ac;
+
+            font-size: 8px;
+
+            text-overflow: ellipsis;
+
+            white-space: nowrap;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TAG
+        |--------------------------------------------------------------------------
+        */
+
+        .vendor-tag {
+
+            min-height: 27px;
+
+            padding:
+
+                0
+                9px;
 
             display: inline-flex;
 
             align-items: center;
 
-            justify-content: center;
+            color: #52647f;
 
-            padding: 0 16px;
+            background: #f1f5f9;
 
-            border: 1px solid #dfe5ed;
+            border:
 
-            border-radius: 11px;
+                1px solid
+                #e2e8f0;
 
-            color: #526176;
+            border-radius: 999px;
 
-            background: white;
-
-            font-family: 'Poppins', sans-serif;
-
-            font-size: 12px;
+            font-size: 8px;
 
             font-weight: 700;
 
-            text-decoration: none;
-
-            transition: .2s ease;
         }
 
-        .vendors-reset:hover {
 
-            color: var(--blue);
+        /*
+        |--------------------------------------------------------------------------
+        | STATUS SELECT
+        |--------------------------------------------------------------------------
+        */
 
-            border-color: #bfdbfe;
+        .vendor-status-select {
 
-            background: var(--blue-light);
+            min-width: 115px;
+
+            height: 34px;
+
+            padding:
+
+                0
+                10px;
+
+            outline: none;
+
+            border-radius: 9px;
+
+            font-size: 8px;
+
+            font-weight: 800;
+
+            cursor: pointer;
+
         }
+
+
+        .vendor-status-select.approved {
+
+            color: #15803d;
+
+            background: #ecfdf3;
+
+            border:
+
+                1px solid
+                #bbf7d0;
+
+        }
+
+
+        .vendor-status-select.pending {
+
+            color: #a16207;
+
+            background: #fffbea;
+
+            border:
+
+                1px solid
+                #fde68a;
+
+        }
+
+
+        .vendor-status-select.rejected {
+
+            color: #b91c1c;
+
+            background: #fff1f2;
+
+            border:
+
+                1px solid
+                #fecdd3;
+
+        }
+
+
+        .vendor-status-select.suspended {
+
+            color: #b91c1c;
+
+            background: #fff1f2;
+
+            border:
+
+                1px solid
+                #fecdd3;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | APPLICATION ACTIONS
+        |--------------------------------------------------------------------------
+        */
 
         .application-actions {
 
@@ -1527,1431 +2522,1660 @@ $suspended_vendors = (int) $db
             align-items: center;
 
             gap: 7px;
+
         }
+
+
+        .application-actions form {
+
+            margin: 0;
+
+        }
+
 
         .application-btn {
 
-            height: 34px;
+            min-height: 32px;
 
-            display: inline-flex;
+            padding:
 
-            align-items: center;
+                0
+                11px;
 
-            justify-content: center;
+            border-radius: 8px;
 
-            gap: 6px;
-
-            padding: 0 12px;
-
-            border-radius: 9px;
-
-            font-family: 'Poppins', sans-serif;
-
-            font-size: 10px;
+            font-size: 8px;
 
             font-weight: 800;
 
             cursor: pointer;
 
-            transition: .2s ease;
         }
+
 
         .application-btn.approve {
 
-            border: 1px solid #bbf7d0;
-
-            background: #f0fdf4;
-
             color: #15803d;
+
+            background: #ecfdf3;
+
+            border:
+
+                1px solid
+                #bbf7d0;
+
         }
 
-        .application-btn.approve:hover {
-
-            color: white;
-
-            background: #16a34a;
-
-            border-color: #16a34a;
-        }
 
         .application-btn.reject {
 
-            border: 1px solid #fecaca;
+            color: #b91c1c;
 
-            background: #fef2f2;
+            background: #fff1f2;
 
-            color: #dc2626;
+            border:
+
+                1px solid
+                #fecdd3;
+
         }
 
-        .application-btn.reject:hover {
 
-            color: white;
-
-            background: #dc2626;
-
-            border-color: #dc2626;
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | EMPTY STATE
+        |--------------------------------------------------------------------------
+        */
 
         .vendor-empty {
 
-            padding: 55px 20px !important;
+            padding:
 
-            text-align: center !important;
+                65px
+                20px !important;
 
             color: #94a3b8 !important;
+
+            text-align: center;
+
         }
 
-        .vendor-empty-icon {
-
-            width: 54px;
-            height: 54px;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            margin: 0 auto 13px;
-
-            border-radius: 16px;
-
-            background: #f1f5f9;
-
-            color: #94a3b8;
-        }
-
-        .vendor-empty-icon svg {
-
-            width: 25px;
-            height: 25px;
-        }
 
         .vendor-empty strong {
 
             display: block;
 
-            color: #526176;
+            margin-bottom: 6px;
 
-            font-size: 13px;
-
-            font-weight: 800;
-        }
-
-        .vendor-empty span {
-
-            display: block;
-
-            margin-top: 5px;
+            color: #49617f;
 
             font-size: 11px;
 
-            color: #9aa6b7;
         }
 
-        .vendor-date {
 
-            color: #64748b;
-
-            font-size: 11px;
-
-            font-weight: 600;
-
-            white-space: nowrap;
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSIVE
+        |--------------------------------------------------------------------------
+        */
 
         @media (max-width: 1200px) {
-
-            .vendors-page {
-
-                padding-left: 25px;
-                padding-right: 25px;
-            }
-
-            .vendors-topbar {
-
-                margin-left: -25px;
-                margin-right: -25px;
-
-                padding-left: 25px;
-                padding-right: 25px;
-            }
-
-            .vendors-hero-number {
-
-                right: 40px;
-            }
 
             .vendors-stats {
 
                 grid-template-columns:
-                    repeat(2, minmax(0,1fr));
-            }
-        }
 
-        @media (max-width: 900px) {
+                    repeat(
+                        2,
+                        1fr
+                    );
 
-            .vendors-hero {
-
-                padding: 30px;
             }
 
-            .vendors-hero-number {
-
-                display: none;
-            }
 
             .vendors-filter {
 
-                flex-wrap: wrap;
+                grid-template-columns:
+
+                    1fr
+                    1fr;
+
             }
 
-            .vendors-search {
 
-                flex: 1 1 100%;
+            .vendors-filter input {
+
+                grid-column:
+
+                    1 /
+                    -1;
+
             }
 
-            .vendors-filter select {
-
-                flex: 1;
-            }
         }
+
+
+        @media (max-width: 900px) {
+
+            .vendors-main {
+
+                margin-left: 0;
+
+                width: 100%;
+
+            }
+
+
+            .vendors-content {
+
+                padding:
+
+                    25px
+                    20px
+                    50px;
+
+            }
+
+
+            .vendors-hero {
+
+                min-height: 140px;
+
+                padding:
+
+                    28px;
+
+            }
+
+
+            .vendors-hero h1 {
+
+                font-size: 31px;
+
+            }
+
+
+            .vendors-hero-icon {
+
+                width: 67px;
+                height: 67px;
+
+            }
+
+        }
+
 
         @media (max-width: 650px) {
 
-            .vendors-page {
+            .vendors-content {
 
-                padding: 0 15px 40px;
+                padding:
+
+                    18px
+                    13px
+                    40px;
+
             }
 
-            .vendors-topbar {
-
-                margin-left: -15px;
-                margin-right: -15px;
-
-                padding-left: 15px;
-                padding-right: 15px;
-
-                min-height: 78px;
-            }
-
-            .vendors-header-text h1 {
-
-                font-size: 25px;
-            }
-
-            .vendors-header-text p {
-
-                font-size: 12px;
-            }
 
             .vendors-hero {
 
                 min-height: auto;
 
-                padding: 27px 23px;
+                padding:
 
-                border-radius: 21px;
+                    25px
+                    21px;
+
+                border-radius: 20px;
+
             }
 
-            .vendors-hero h2 {
 
-                font-size: 29px;
+            .vendors-hero h1 {
+
+                font-size: 27px;
+
             }
+
 
             .vendors-hero p {
 
-                font-size: 12px;
+                max-width: 230px;
+
+                font-size: 11px;
+
             }
+
+
+            .vendors-hero-icon {
+
+                width: 55px;
+                height: 55px;
+
+                border-radius: 15px;
+
+                font-size: 24px;
+
+            }
+
 
             .vendors-stats {
 
                 grid-template-columns: 1fr;
 
                 gap: 12px;
+
             }
+
+
+            .vendor-stat-card {
+
+                min-height: 120px;
+
+            }
+
 
             .vendors-panel-header {
 
-                align-items: flex-start;
+                padding:
+
+                    20px
+                    17px;
 
                 flex-direction: column;
 
-                padding: 19px;
+                align-items: flex-start;
+
             }
+
 
             .vendors-filter {
 
-                padding: 17px;
+                grid-template-columns: 1fr;
 
-                flex-direction: column;
-
-                align-items: stretch;
             }
 
-            .vendors-filter select {
+
+            .vendors-filter input {
+
+                grid-column: auto;
+
+            }
+
+
+            .vendor-btn {
 
                 width: 100%;
+
             }
 
-            .vendors-filter-btn,
-            .vendors-reset {
-
-                width: 100%;
-            }
-
-            .vendors-table th,
-            .vendors-table td {
-
-                padding-left: 14px;
-                padding-right: 14px;
-            }
         }
 
     </style>
 
 </head>
 
+
 <body>
+
 
 <div class="admin-wrapper">
 
-    <?php require_once dirname(__DIR__) . '/includes/admin_sidebar.php'; ?>
 
-    <main class="admin-main">
+    <?php
 
-        <!-- PAGE HEADER -->
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN SIDEBAR
+    |--------------------------------------------------------------------------
+    */
 
-        <header class="vendors-topbar">
+    require_once __DIR__ .
+        '/../includes/admin_sidebar.php';
 
-            <div class="vendors-header-left">
+    ?>
 
-                <div class="vendors-header-text">
 
-                    <h1>Vendors</h1>
+    <main class="vendors-main">
 
-                    <p>
-                        Manage marketplace sellers and vendor applications.
-                    </p>
 
-                </div>
+        <div class="vendors-content">
 
-            </div>
 
-        </header>
-
-        <div class="vendors-page">
-
-            <!-- ALERT -->
-
-            <?php if (isset($_GET['success'])): ?>
-
-                <div class="vendors-alert success">
-
-                    <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                    >
-                        <path d="M20 6 9 17l-5-5"/>
-                    </svg>
-
-                    <span>
-
-                        <?php
-
-                        $s = $_GET['success'];
-
-                        echo $s === 'approved'
-                            ? 'Vendor application approved successfully.'
-                            : (
-                                $s === 'rejected'
-                                    ? 'Vendor application rejected.'
-                                    : (
-                                        $s === 'status'
-                                            ? 'Vendor status updated successfully.'
-                                            : 'Action completed successfully.'
-                                    )
-                            );
-
-                        ?>
-
-                    </span>
-
-                </div>
-
-            <?php endif; ?>
-
-            <?php if (isset($_GET['error'])): ?>
-
-                <div class="vendors-alert error">
-
-                    <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                    >
-                        <circle
-                            cx="12"
-                            cy="12"
-                            r="9"
-                        />
-
-                        <path d="M12 8v4"/>
-
-                        <path d="M12 16h.01"/>
-                    </svg>
-
-                    <span>
-                        Unable to process the vendor request.
-                    </span>
-
-                </div>
-
-            <?php endif; ?>
-
-            <!-- HERO -->
+            <!-- =====================================================
+                 HERO
+            ====================================================== -->
 
             <section class="vendors-hero">
 
-                <div class="vendors-hero-content">
 
-                    <div class="vendors-hero-label">
+                <div class="vendors-hero-text">
 
-                        <i></i>
-
-                        Vendor Management Center
-
-                    </div>
-
-                    <h2>
-                        Grow your marketplace<br>
-                        with trusted vendors.
-                    </h2>
+                    <h1>
+                        Vendors
+                    </h1>
 
                     <p>
-                        Review applications, monitor vendor activity,
-                        manage approval status and keep your HochipoHub
-                        marketplace running smoothly.
+                        Monitor and manage marketplace vendors and applications.
                     </p>
 
                 </div>
 
-                <div class="vendors-hero-number">
 
-                    <strong>
-                        <?= number_format($total_vendors) ?>
-                    </strong>
+                <div class="vendors-hero-icon">
 
-                    <span>
-                        Total Vendors
-                    </span>
+                    🏪
 
                 </div>
 
+
             </section>
 
-            <!-- STATISTICS -->
 
-            <div class="vendors-stats">
+            <!-- =====================================================
+                 MESSAGE
+            ====================================================== -->
+
+            <?php if ($message !== ''): ?>
+
+
+                <div
+                    class="
+                        vendors-message
+                        <?= e($messageType) ?>
+                    "
+                >
+
+                    <?= e($message) ?>
+
+                </div>
+
+
+            <?php endif; ?>
+
+
+            <!-- =====================================================
+                 STATISTICS
+            ====================================================== -->
+
+            <section class="vendors-stats">
+
 
                 <!-- TOTAL -->
 
                 <div class="vendor-stat-card">
 
-                    <div class="vendor-stat-top">
+                    <span class="vendor-stat-label">
 
-                        <div class="vendor-stat-icon">
-
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                            >
-                                <path
-                                    d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
-                                />
-
-                                <circle
-                                    cx="9"
-                                    cy="7"
-                                    r="4"
-                                />
-
-                                <path
-                                    d="M22 21v-2a4 4 0 0 0-3-3.87"
-                                />
-
-                                <path
-                                    d="M16 3.13a4 4 0 0 1 0 7.75"
-                                />
-                            </svg>
-
-                        </div>
-
-                    </div>
-
-                    <strong>
-                        <?= number_format($total_vendors) ?>
-                    </strong>
-
-                    <span>
                         Total Vendors
+
                     </span>
 
+
+                    <strong class="vendor-stat-value">
+
+                        <?= number_format(
+                            $totalVendors
+                        ) ?>
+
+                    </strong>
+
                 </div>
+
 
                 <!-- APPROVED -->
 
-                <div class="vendor-stat-card">
+                <div
+                    class="
+                        vendor-stat-card
+                        approved
+                    "
+                >
 
-                    <div class="vendor-stat-top">
+                    <span class="vendor-stat-label">
 
-                        <div class="vendor-stat-icon">
+                        Approved
 
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                            >
-                                <path
-                                    d="M20 7h-3V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"
-                                />
-
-                                <path d="M8 7h8"/>
-
-                                <path d="m9 14 2 2 4-4"/>
-                            </svg>
-
-                        </div>
-
-                    </div>
-
-                    <strong>
-                        <?= number_format($approved_vendors) ?>
-                    </strong>
-
-                    <span>
-                        Approved Vendors
                     </span>
 
+
+                    <strong class="vendor-stat-value">
+
+                        <?= number_format(
+                            $approvedVendors
+                        ) ?>
+
+                    </strong>
+
                 </div>
+
 
                 <!-- PENDING -->
 
-                <div class="vendor-stat-card pending">
+                <div
+                    class="
+                        vendor-stat-card
+                        pending
+                    "
+                >
 
-                    <div class="vendor-stat-top">
-
-                        <div class="vendor-stat-icon">
-
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                            >
-                                <circle
-                                    cx="12"
-                                    cy="12"
-                                    r="9"
-                                />
-
-                                <path d="M12 7v5l3 2"/>
-                            </svg>
-
-                        </div>
-
-                    </div>
-
-                    <strong>
-                        <?= number_format($pending_vendors) ?>
-                    </strong>
-
-                    <span>
-                        Pending Vendors
-                    </span>
-
-                </div>
-
-                <!-- SUSPENDED -->
-
-                <div class="vendor-stat-card suspended">
-
-                    <div class="vendor-stat-top">
-
-                        <div class="vendor-stat-icon">
-
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                            >
-                                <circle
-                                    cx="12"
-                                    cy="12"
-                                    r="9"
-                                />
-
-                                <path d="M8 8l8 8"/>
-
-                                <path d="M16 8l-8 8"/>
-                            </svg>
-
-                        </div>
-
-                    </div>
-
-                    <strong>
-                        <?= number_format($suspended_vendors) ?>
-                    </strong>
-
-                    <span>
-                        Suspended Vendors
-                    </span>
-
-                </div>
-
-            </div>
-
-            <!-- PENDING APPLICATIONS -->
-
-            <section class="vendors-panel">
-
-                <div class="vendors-panel-header">
-
-                    <div class="vendors-panel-title">
-
-                        <div class="vendors-panel-icon">
-
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                            >
-                                <path
-                                    d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
-                                />
-
-                                <circle
-                                    cx="9"
-                                    cy="7"
-                                    r="4"
-                                />
-
-                                <path d="M19 8v6"/>
-
-                                <path d="M22 11h-6"/>
-                            </svg>
-
-                        </div>
-
-                        <div>
-
-                            <h2>
-                                Pending Vendor Applications
-                            </h2>
-
-                            <p>
-                                Review applications before approving vendors.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-                    <div class="vendor-count-badge">
-
-                        <?= count($applications) ?>
+                    <span class="vendor-stat-label">
 
                         Pending
 
-                    </div>
+                    </span>
+
+
+                    <strong class="vendor-stat-value">
+
+                        <?= number_format(
+                            $pendingVendors
+                        ) ?>
+
+                    </strong>
 
                 </div>
 
-                <div class="vendors-table-wrapper">
 
-                    <table class="vendors-table">
+                <!-- SUSPENDED -->
 
-                        <thead>
-
-                            <tr>
-
-                                <th>ID</th>
-
-                                <th>Applicant</th>
-
-                                <th>Business</th>
-
-                                <th>Reason</th>
-
-                                <th>Date</th>
-
-                                <th>Action</th>
-
-                            </tr>
-
-                        </thead>
-
-                        <tbody>
-
-                        <?php if (!$applications): ?>
-
-                            <tr>
-
-                                <td
-                                    colspan="6"
-                                    class="vendor-empty"
-                                >
-
-                                    <div class="vendor-empty-icon">
-
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="1.7"
-                                        >
-                                            <path
-                                                d="M20 7h-3V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"
-                                            />
-
-                                            <path d="M8 12h8"/>
-
-                                            <path d="M8 16h5"/>
-                                        </svg>
-
-                                    </div>
-
-                                    <strong>
-                                        No pending applications
-                                    </strong>
-
-                                    <span>
-                                        New vendor applications will appear here.
-                                    </span>
-
-                                </td>
-
-                            </tr>
-
-                        <?php else: ?>
-
-                            <?php foreach ($applications as $a): ?>
-
-                                <?php
-
-                                $applicantInitial =
-                                    strtoupper(
-                                        substr(
-                                            trim($a['applicant_name'] ?? 'A'),
-                                            0,
-                                            1
-                                        )
-                                    );
-
-                                ?>
-
-                                <tr>
-
-                                    <td>
-
-                                        <span class="vendor-id">
-                                            #<?= (int) $a['application_id'] ?>
-                                        </span>
-
-                                    </td>
-
-                                    <td>
-
-                                        <div class="vendor-person">
-
-                                            <div class="vendor-avatar">
-                                                <?= e($applicantInitial) ?>
-                                            </div>
-
-                                            <div class="vendor-person-info">
-
-                                                <strong>
-                                                    <?= e($a['applicant_name']) ?>
-                                                </strong>
-
-                                                <small>
-                                                    <?= e($a['applicant_email']) ?>
-                                                </small>
-
-                                                <small>
-                                                    <?= e($a['applicant_phone'] ?? '-') ?>
-                                                </small>
-
-                                            </div>
-
-                                        </div>
-
-                                    </td>
-
-                                    <td>
-
-                                        <div class="vendor-business">
-
-                                            <strong>
-                                                <?= e($a['business_name']) ?>
-                                            </strong>
-
-                                            <small>
-                                                Vendor Application
-                                            </small>
-
-                                        </div>
-
-                                    </td>
-
-                                    <td>
-
-                                        <div
-                                            style="
-                                                max-width:230px;
-                                                line-height:1.55;
-                                                color:#64748b;
-                                                font-size:11px;
-                                                font-family:'Poppins',sans-serif;
-                                            "
-                                        >
-                                            <?= nl2br(e($a['reason'] ?? '-')) ?>
-                                        </div>
-
-                                    </td>
-
-                                    <td>
-
-                                        <span class="vendor-date">
-
-                                            <?= e(
-                                                date(
-                                                    'd M Y',
-                                                    strtotime($a['created_at'])
-                                                )
-                                            ) ?>
-
-                                        </span>
-
-                                    </td>
-
-                                    <td>
-
-                                        <div class="application-actions">
-
-                                            <form method="POST">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="application_id"
-                                                    value="<?= (int) $a['application_id'] ?>"
-                                                >
-
-                                                <input
-                                                    type="hidden"
-                                                    name="application_action"
-                                                    value="approve"
-                                                >
-
-                                                <button
-                                                    type="submit"
-                                                    class="application-btn approve"
-                                                    onclick="return confirm('Approve this vendor application?');"
-                                                >
-
-                                                    <svg
-                                                        width="13"
-                                                        height="13"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        stroke-width="2.5"
-                                                    >
-                                                        <path d="M20 6 9 17l-5-5"/>
-                                                    </svg>
-
-                                                    Approve
-
-                                                </button>
-
-                                            </form>
-
-                                            <form method="POST">
-
-                                                <input
-                                                    type="hidden"
-                                                    name="application_id"
-                                                    value="<?= (int) $a['application_id'] ?>"
-                                                >
-
-                                                <input
-                                                    type="hidden"
-                                                    name="application_action"
-                                                    value="reject"
-                                                >
-
-                                                <button
-                                                    type="submit"
-                                                    class="application-btn reject"
-                                                    onclick="return confirm('Reject this vendor application?');"
-                                                >
-
-                                                    <svg
-                                                        width="13"
-                                                        height="13"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        stroke-width="2.5"
-                                                    >
-                                                        <path d="M18 6 6 18"/>
-
-                                                        <path d="m6 6 12 12"/>
-                                                    </svg>
-
-                                                    Reject
-
-                                                </button>
-
-                                            </form>
-
-                                        </div>
-
-                                    </td>
-
-                                </tr>
-
-                            <?php endforeach; ?>
-
-                        <?php endif; ?>
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            </section>
-
-            <!-- SEARCH / FILTER -->
-
-            <section class="vendors-panel">
-
-                <div class="vendors-panel-header">
-
-                    <div class="vendors-panel-title">
-
-                        <div class="vendors-panel-icon">
-
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                            >
-                                <circle
-                                    cx="11"
-                                    cy="11"
-                                    r="7"
-                                />
-
-                                <path d="m20 20-4-4"/>
-                            </svg>
-
-                        </div>
-
-                        <div>
-
-                            <h2>
-                                Find Vendors
-                            </h2>
-
-                            <p>
-                                Search and filter your marketplace vendors.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-                <form
-                    method="GET"
-                    class="vendors-filter"
+                <div
+                    class="
+                        vendor-stat-card
+                        suspended
+                    "
                 >
 
-                    <div class="vendors-search">
+                    <span class="vendor-stat-label">
 
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.8"
-                        >
-                            <circle
-                                cx="11"
-                                cy="11"
-                                r="7"
-                            />
+                        Suspended
 
-                            <path d="m20 20-4-4"/>
-                        </svg>
+                    </span>
 
-                        <input
-                            type="text"
-                            name="search"
-                            placeholder="Search vendor, owner or email..."
-                            value="<?= e($search) ?>"
-                        >
 
-                    </div>
+                    <strong class="vendor-stat-value">
 
-                    <select name="status">
+                        <?= number_format(
+                            $suspendedVendors
+                        ) ?>
 
-                        <option value="">
-                            All Status
-                        </option>
+                    </strong>
 
-                        <?php foreach (
-                            ['Pending', 'Approved', 'Rejected', 'Suspended']
-                            as $s
-                        ): ?>
+                </div>
 
-                            <option
-                                value="<?= e($s) ?>"
-                                <?= $status_filter === $s ? 'selected' : '' ?>
-                            >
-                                <?= e($s) ?>
-                            </option>
-
-                        <?php endforeach; ?>
-
-                    </select>
-
-                    <button
-                        type="submit"
-                        class="vendors-filter-btn"
-                    >
-
-                        <svg
-                            width="15"
-                            height="15"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        >
-                            <circle
-                                cx="11"
-                                cy="11"
-                                r="7"
-                            />
-
-                            <path d="m20 20-4-4"/>
-                        </svg>
-
-                        Search
-
-                    </button>
-
-                    <a
-                        href="vendors.php"
-                        class="vendors-reset"
-                    >
-                        Reset
-                    </a>
-
-                </form>
 
             </section>
 
-            <!-- VENDOR LIST -->
+
+            <!-- =====================================================
+                 PENDING APPLICATIONS PANEL
+            ====================================================== -->
 
             <section class="vendors-panel">
 
+
+                <!-- =================================================
+                     HEADER
+                ================================================== -->
+
                 <div class="vendors-panel-header">
+
 
                     <div class="vendors-panel-title">
 
+
                         <div class="vendors-panel-icon">
 
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                            >
-                                <path d="M3 21h18"/>
-
-                                <path d="M5 21V8l7-4 7 4v13"/>
-
-                                <path d="M9 21v-5h6v5"/>
-
-                                <path d="M8 10h1"/>
-
-                                <path d="M15 10h1"/>
-
-                                <path d="M8 13h1"/>
-
-                                <path d="M15 13h1"/>
-                            </svg>
+                            ✓
 
                         </div>
+
 
                         <div>
 
                             <h2>
-                                Vendor List
+                                Vendor Applications
                             </h2>
 
                             <p>
-                                <?= count($vendors) ?>
-                                vendor(s) found in marketplace.
+                                Review pending applications before approving vendors.
                             </p>
 
                         </div>
 
-                    </div>
-
-                    <div class="vendor-count-badge">
-
-                        <?= number_format(count($vendors)) ?>
-
-                        Vendors
 
                     </div>
+
+
+                    <span class="vendors-count-badge">
+
+                        <?= number_format(
+                            count(
+                                $applications
+                            )
+                        ) ?>
+
+                        pending
+
+                    </span>
+
 
                 </div>
 
+
+                <!-- =================================================
+                     APPLICATION TABLE
+                ================================================== -->
+
                 <div class="vendors-table-wrapper">
 
+
                     <table class="vendors-table">
+
 
                         <thead>
 
                             <tr>
 
-                                <th>ID</th>
+                                <th>
+                                    ID
+                                </th>
 
-                                <th>Business</th>
+                                <th>
+                                    Applicant
+                                </th>
 
-                                <th>Owner</th>
+                                <th>
+                                    Business
+                                </th>
 
-                                <th>Category</th>
+                                <th>
+                                    Reason
+                                </th>
 
-                                <th>Delivery</th>
+                                <th>
+                                    Applied
+                                </th>
 
-                                <th>Status</th>
-
-                                <th>Joined</th>
+                                <th>
+                                    Action
+                                </th>
 
                             </tr>
 
                         </thead>
 
+
                         <tbody>
 
-                        <?php if (!$vendors): ?>
 
-                            <tr>
+                            <?php if (empty($applications)): ?>
 
-                                <td
-                                    colspan="7"
-                                    class="vendor-empty"
-                                >
-
-                                    <div class="vendor-empty-icon">
-
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="1.7"
-                                        >
-
-                                            <path
-                                                d="M20 7h-3V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"
-                                            />
-
-                                            <path d="M8 12h8"/>
-
-                                            <path d="M8 16h5"/>
-
-                                        </svg>
-
-                                    </div>
-
-                                    <strong>
-                                        No vendors found
-                                    </strong>
-
-                                    <span>
-                                        Try changing your search or status filter.
-                                    </span>
-
-                                </td>
-
-                            </tr>
-
-                        <?php else: ?>
-
-                            <?php foreach ($vendors as $v): ?>
-
-                                <?php
-
-                                $ownerInitial =
-                                    strtoupper(
-                                        substr(
-                                            trim($v['owner_name'] ?? 'V'),
-                                            0,
-                                            1
-                                        )
-                                    );
-
-                                $statusClass =
-                                    strtolower(
-                                        $v['approval_status'] ?? 'pending'
-                                    );
-
-                                ?>
 
                                 <tr>
 
-                                    <!-- ID -->
+                                    <td
+                                        colspan="6"
+                                        class="vendor-empty"
+                                    >
 
-                                    <td>
+                                        <strong>
+                                            No pending applications
+                                        </strong>
 
-                                        <span class="vendor-id">
-                                            #<?= (int) $v['vendor_id'] ?>
-                                        </span>
-
-                                    </td>
-
-                                    <!-- BUSINESS -->
-
-                                    <td>
-
-                                        <div class="vendor-business">
-
-                                            <strong>
-                                                <?= e($v['business_name']) ?>
-                                            </strong>
-
-                                            <small>
-                                                <?= e(
-                                                    $v['business_address'] ?? '-'
-                                                ) ?>
-                                            </small>
-
-                                        </div>
-
-                                    </td>
-
-                                    <!-- OWNER -->
-
-                                    <td>
-
-                                        <div class="vendor-person">
-
-                                            <div class="vendor-avatar">
-                                                <?= e($ownerInitial) ?>
-                                            </div>
-
-                                            <div class="vendor-person-info">
-
-                                                <strong>
-                                                    <?= e($v['owner_name']) ?>
-                                                </strong>
-
-                                                <small>
-                                                    <?= e($v['owner_email']) ?>
-                                                </small>
-
-                                            </div>
-
-                                        </div>
-
-                                    </td>
-
-                                    <!-- CATEGORY -->
-
-                                    <td>
-
-                                        <span class="vendor-category">
-
-                                            <?= e(
-                                                $v['category'] ?? 'General'
-                                            ) ?>
-
-                                        </span>
-
-                                    </td>
-
-                                    <!-- DELIVERY -->
-
-                                    <td>
-
-                                        <span class="vendor-delivery">
-
-                                            <?= e(
-                                                $v['delivery_method'] ?? '-'
-                                            ) ?>
-
-                                        </span>
-
-                                    </td>
-
-                                    <!-- STATUS -->
-
-                                    <td>
-
-                                        <form
-                                            method="POST"
-                                            class="vendor-status-form"
-                                        >
-
-                                            <input
-                                                type="hidden"
-                                                name="update_vendor_status"
-                                                value="1"
-                                            >
-
-                                            <input
-                                                type="hidden"
-                                                name="vendor_id"
-                                                value="<?= (int) $v['vendor_id'] ?>"
-                                            >
-
-                                            <select
-                                                name="approval_status"
-                                                class="vendor-status-select <?= e($statusClass) ?>"
-                                                onchange="this.form.submit()"
-                                            >
-
-                                                <?php foreach (
-                                                    [
-                                                        'Pending',
-                                                        'Approved',
-                                                        'Rejected',
-                                                        'Suspended'
-                                                    ] as $s
-                                                ): ?>
-
-                                                    <option
-                                                        value="<?= e($s) ?>"
-                                                        <?= $v['approval_status'] === $s
-                                                            ? 'selected'
-                                                            : '' ?>
-                                                    >
-
-                                                        <?= e($s) ?>
-
-                                                    </option>
-
-                                                <?php endforeach; ?>
-
-                                            </select>
-
-                                        </form>
-
-                                    </td>
-
-                                    <!-- JOINED -->
-
-                                    <td>
-
-                                        <span class="vendor-date">
-
-                                            <?= e(
-                                                date(
-                                                    'd M Y',
-                                                    strtotime(
-                                                        $v['created_at']
-                                                    )
-                                                )
-                                            ) ?>
-
-                                        </span>
+                                        New vendor applications will appear here.
 
                                     </td>
 
                                 </tr>
 
-                            <?php endforeach; ?>
 
-                        <?php endif; ?>
+                            <?php else: ?>
+
+
+                                <?php foreach ($applications as $application): ?>
+
+
+                                    <?php
+
+                                    $applicantInitial =
+                                        strtoupper(
+                                            substr(
+                                                trim(
+                                                    $application[
+                                                        'applicant_name'
+                                                    ]
+                                                    ?? 'A'
+                                                ),
+                                                0,
+                                                1
+                                            )
+                                        );
+
+                                    ?>
+
+
+                                    <tr>
+
+
+                                        <!-- ID -->
+
+                                        <td>
+
+                                            <span class="vendor-id">
+
+                                                #<?= (int)
+                                                    $application[
+                                                        'application_id'
+                                                    ] ?>
+
+                                            </span>
+
+                                        </td>
+
+
+                                        <!-- APPLICANT -->
+
+                                        <td>
+
+
+                                            <div class="vendor-person">
+
+
+                                                <div class="vendor-avatar">
+
+                                                    <?= e(
+                                                        $applicantInitial
+                                                    ) ?>
+
+                                                </div>
+
+
+                                                <div>
+
+                                                    <strong>
+
+                                                        <?= e(
+                                                            $application[
+                                                                'applicant_name'
+                                                            ]
+                                                        ) ?>
+
+                                                    </strong>
+
+
+                                                    <small>
+
+                                                        <?= e(
+                                                            $application[
+                                                                'applicant_email'
+                                                            ]
+                                                        ) ?>
+
+                                                    </small>
+
+
+                                                    <?php if (
+                                                        !empty(
+                                                            $application[
+                                                                'applicant_phone'
+                                                            ]
+                                                        )
+                                                    ): ?>
+
+
+                                                        <small>
+
+                                                            <?= e(
+                                                                $application[
+                                                                    'applicant_phone'
+                                                                ]
+                                                            ) ?>
+
+                                                        </small>
+
+
+                                                    <?php endif; ?>
+
+
+                                                </div>
+
+
+                                            </div>
+
+
+                                        </td>
+
+
+                                        <!-- BUSINESS -->
+
+                                        <td>
+
+
+                                            <div class="vendor-business">
+
+                                                <strong>
+
+                                                    <?= e(
+                                                        $application[
+                                                            'business_name'
+                                                        ]
+                                                    ) ?>
+
+                                                </strong>
+
+
+                                                <small>
+                                                    Vendor application
+                                                </small>
+
+                                            </div>
+
+
+                                        </td>
+
+
+                                        <!-- REASON -->
+
+                                        <td>
+
+                                            <?= e(
+                                                $application[
+                                                    'reason'
+                                                ]
+                                                ?? '-'
+                                            ) ?>
+
+                                        </td>
+
+
+                                        <!-- APPLIED -->
+
+                                        <td>
+
+                                            <?= !empty(
+                                                $application[
+                                                    'created_at'
+                                                ]
+                                            )
+                                                ? e(
+                                                    date(
+                                                        'd M Y',
+                                                        strtotime(
+                                                            $application[
+                                                                'created_at'
+                                                            ]
+                                                        )
+                                                    )
+                                                )
+                                                : '-' ?>
+
+                                        </td>
+
+
+                                        <!-- ACTION -->
+
+                                        <td>
+
+
+                                            <div class="application-actions">
+
+
+                                                <!-- APPROVE -->
+
+                                                <form
+                                                    method="POST"
+                                                    action="vendors.php"
+                                                >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="csrf_token"
+                                                        value="<?= e(
+                                                            $csrfToken
+                                                        ) ?>"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="application_id"
+                                                        value="<?= (int)
+                                                            $application[
+                                                                'application_id'
+                                                            ] ?>"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="application_action"
+                                                        value="approve"
+                                                    >
+
+
+                                                    <button
+                                                        type="submit"
+                                                        class="
+                                                            application-btn
+                                                            approve
+                                                        "
+                                                        onclick="
+                                                            return confirm(
+                                                                'Approve this vendor application?'
+                                                            );
+                                                        "
+                                                    >
+
+                                                        Approve
+
+                                                    </button>
+
+
+                                                </form>
+
+
+                                                <!-- REJECT -->
+
+                                                <form
+                                                    method="POST"
+                                                    action="vendors.php"
+                                                >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="csrf_token"
+                                                        value="<?= e(
+                                                            $csrfToken
+                                                        ) ?>"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="application_id"
+                                                        value="<?= (int)
+                                                            $application[
+                                                                'application_id'
+                                                            ] ?>"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="application_action"
+                                                        value="reject"
+                                                    >
+
+
+                                                    <button
+                                                        type="submit"
+                                                        class="
+                                                            application-btn
+                                                            reject
+                                                        "
+                                                        onclick="
+                                                            return confirm(
+                                                                'Reject this vendor application?'
+                                                            );
+                                                        "
+                                                    >
+
+                                                        Reject
+
+                                                    </button>
+
+
+                                                </form>
+
+
+                                            </div>
+
+
+                                        </td>
+
+
+                                    </tr>
+
+
+                                <?php endforeach; ?>
+
+
+                            <?php endif; ?>
+
 
                         </tbody>
 
+
                     </table>
+
 
                 </div>
 
+
             </section>
+
+
+            <!-- =====================================================
+                 VENDOR MANAGEMENT PANEL
+            ====================================================== -->
+
+            <section class="vendors-panel">
+
+
+                <!-- =================================================
+                     HEADER
+                ================================================== -->
+
+                <div class="vendors-panel-header">
+
+
+                    <div class="vendors-panel-title">
+
+
+                        <div class="vendors-panel-icon">
+
+                            🏪
+
+                        </div>
+
+
+                        <div>
+
+                            <h2>
+                                Vendor Management
+                            </h2>
+
+                            <p>
+                                Search vendors and manage marketplace approval status.
+                            </p>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <span class="vendors-count-badge">
+
+                        <?= number_format(
+                            count(
+                                $vendors
+                            )
+                        ) ?>
+
+                        vendors
+
+                    </span>
+
+
+                </div>
+
+
+                <!-- =================================================
+                     FILTER
+                ================================================== -->
+
+                <div class="vendors-filter-wrapper">
+
+
+                    <form
+                        method="GET"
+                        action="vendors.php"
+                        class="vendors-filter"
+                    >
+
+
+                        <!-- SEARCH -->
+
+                        <input
+                            type="search"
+                            name="search"
+                            value="<?= e($search) ?>"
+                            placeholder="Search business, owner or email..."
+                            autocomplete="off"
+                        >
+
+
+                        <!-- STATUS -->
+
+                        <select
+                            name="status"
+                            aria-label="Filter vendor status"
+                        >
+
+                            <option value="">
+                                All Status
+                            </option>
+
+
+                            <?php foreach (
+                                [
+                                    'Pending',
+                                    'Approved',
+                                    'Rejected',
+                                    'Suspended'
+                                ]
+                                as $status
+                            ): ?>
+
+
+                                <option
+                                    value="<?= e(
+                                        $status
+                                    ) ?>"
+                                    <?= $statusFilter === $status
+                                        ? 'selected'
+                                        : '' ?>
+                                >
+
+                                    <?= e($status) ?>
+
+                                </option>
+
+
+                            <?php endforeach; ?>
+
+
+                        </select>
+
+
+                        <!-- SEARCH -->
+
+                        <button
+                            type="submit"
+                            class="
+                                vendor-btn
+                                primary
+                            "
+                        >
+
+                            Search
+
+                        </button>
+
+
+                        <!-- RESET -->
+
+                        <a
+                            href="vendors.php"
+                            class="
+                                vendor-btn
+                                secondary
+                            "
+                        >
+
+                            Reset
+
+                        </a>
+
+
+                    </form>
+
+
+                </div>
+
+
+                <!-- =================================================
+                     VENDOR TABLE
+                ================================================== -->
+
+                <div class="vendors-table-wrapper">
+
+
+                    <table class="vendors-table">
+
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    ID
+                                </th>
+
+                                <th>
+                                    Business
+                                </th>
+
+                                <th>
+                                    Owner
+                                </th>
+
+                                <th>
+                                    Category
+                                </th>
+
+                                <th>
+                                    Delivery
+                                </th>
+
+                                <th>
+                                    Status
+                                </th>
+
+                                <th>
+                                    Joined
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+
+                            <?php if (empty($vendors)): ?>
+
+
+                                <tr>
+
+                                    <td
+                                        colspan="7"
+                                        class="vendor-empty"
+                                    >
+
+                                        <strong>
+                                            No vendors found
+                                        </strong>
+
+                                        Try another search keyword or status.
+
+                                    </td>
+
+                                </tr>
+
+
+                            <?php else: ?>
+
+
+                                <?php foreach ($vendors as $vendor): ?>
+
+
+                                    <?php
+
+                                    $ownerInitial =
+                                        strtoupper(
+                                            substr(
+                                                trim(
+                                                    $vendor[
+                                                        'owner_name'
+                                                    ]
+                                                    ?? 'V'
+                                                ),
+                                                0,
+                                                1
+                                            )
+                                        );
+
+
+                                    $statusClass =
+                                        strtolower(
+                                            $vendor[
+                                                'approval_status'
+                                            ]
+                                            ?? 'pending'
+                                        );
+
+                                    ?>
+
+
+                                    <tr>
+
+
+                                        <!-- ID -->
+
+                                        <td>
+
+                                            <span class="vendor-id">
+
+                                                #<?= (int)
+                                                    $vendor[
+                                                        'vendor_id'
+                                                    ] ?>
+
+                                            </span>
+
+                                        </td>
+
+
+                                        <!-- BUSINESS -->
+
+                                        <td>
+
+
+                                            <div class="vendor-business">
+
+                                                <strong>
+
+                                                    <?= e(
+                                                        $vendor[
+                                                            'business_name'
+                                                        ]
+                                                    ) ?>
+
+                                                </strong>
+
+
+                                                <small>
+
+                                                    <?= e(
+                                                        $vendor[
+                                                            'business_address'
+                                                        ]
+                                                        ?? '-'
+                                                    ) ?>
+
+                                                </small>
+
+                                            </div>
+
+
+                                        </td>
+
+
+                                        <!-- OWNER -->
+
+                                        <td>
+
+
+                                            <div class="vendor-person">
+
+
+                                                <div class="vendor-avatar">
+
+                                                    <?= e(
+                                                        $ownerInitial
+                                                    ) ?>
+
+                                                </div>
+
+
+                                                <div>
+
+                                                    <strong>
+
+                                                        <?= e(
+                                                            $vendor[
+                                                                'owner_name'
+                                                            ]
+                                                        ) ?>
+
+                                                    </strong>
+
+
+                                                    <small>
+
+                                                        <?= e(
+                                                            $vendor[
+                                                                'owner_email'
+                                                            ]
+                                                        ) ?>
+
+                                                    </small>
+
+                                                </div>
+
+
+                                            </div>
+
+
+                                        </td>
+
+
+                                        <!-- CATEGORY -->
+
+                                        <td>
+
+                                            <span class="vendor-tag">
+
+                                                <?= e(
+                                                    $vendor[
+                                                        'category'
+                                                    ]
+                                                    ?? 'General'
+                                                ) ?>
+
+                                            </span>
+
+                                        </td>
+
+
+                                        <!-- DELIVERY -->
+
+                                        <td>
+
+                                            <?= e(
+                                                $vendor[
+                                                    'delivery_method'
+                                                ]
+                                                ?? '-'
+                                            ) ?>
+
+                                        </td>
+
+
+                                        <!-- STATUS -->
+
+                                        <td>
+
+
+                                            <form
+                                                method="POST"
+                                                action="vendors.php"
+                                            >
+
+
+                                                <input
+                                                    type="hidden"
+                                                    name="csrf_token"
+                                                    value="<?= e(
+                                                        $csrfToken
+                                                    ) ?>"
+                                                >
+
+
+                                                <input
+                                                    type="hidden"
+                                                    name="update_vendor_status"
+                                                    value="1"
+                                                >
+
+
+                                                <input
+                                                    type="hidden"
+                                                    name="vendor_id"
+                                                    value="<?= (int)
+                                                        $vendor[
+                                                            'vendor_id'
+                                                        ] ?>"
+                                                >
+
+
+                                                <select
+                                                    name="approval_status"
+                                                    class="
+                                                        vendor-status-select
+                                                        <?= e(
+                                                            $statusClass
+                                                        ) ?>
+                                                    "
+                                                    onchange="
+                                                        if (
+                                                            confirm(
+                                                                'Update vendor status to ' +
+                                                                this.value +
+                                                                '?'
+                                                            )
+                                                        ) {
+                                                            this.form.submit();
+                                                        } else {
+                                                            window.location.reload();
+                                                        }
+                                                    "
+                                                >
+
+
+                                                    <?php foreach (
+                                                        [
+                                                            'Pending',
+                                                            'Approved',
+                                                            'Rejected',
+                                                            'Suspended'
+                                                        ]
+                                                        as $status
+                                                    ): ?>
+
+
+                                                        <option
+                                                            value="<?= e(
+                                                                $status
+                                                            ) ?>"
+                                                            <?= (
+                                                                $vendor[
+                                                                    'approval_status'
+                                                                ]
+                                                                ===
+                                                                $status
+                                                            )
+                                                                ? 'selected'
+                                                                : '' ?>
+                                                        >
+
+                                                            <?= e(
+                                                                $status
+                                                            ) ?>
+
+                                                        </option>
+
+
+                                                    <?php endforeach; ?>
+
+
+                                                </select>
+
+
+                                            </form>
+
+
+                                        </td>
+
+
+                                        <!-- JOINED -->
+
+                                        <td>
+
+                                            <?= !empty(
+                                                $vendor[
+                                                    'created_at'
+                                                ]
+                                            )
+                                                ? e(
+                                                    date(
+                                                        'd M Y',
+                                                        strtotime(
+                                                            $vendor[
+                                                                'created_at'
+                                                            ]
+                                                        )
+                                                    )
+                                                )
+                                                : '-' ?>
+
+                                        </td>
+
+
+                                    </tr>
+
+
+                                <?php endforeach; ?>
+
+
+                            <?php endif; ?>
+
+
+                        </tbody>
+
+
+                    </table>
+
+
+                </div>
+
+
+            </section>
+
 
         </div>
 
+
     </main>
+
 
 </div>
 
+
+<!-- ===============================================================
+     JAVASCRIPT
+================================================================ -->
+
 <script>
 
-/*
-|--------------------------------------------------------------------------
-| UPDATE STATUS SELECT COLOR
-|--------------------------------------------------------------------------
-*/
+    /*
+    |--------------------------------------------------------------------------
+    | SIDEBAR WIDTH SYNC
+    |--------------------------------------------------------------------------
+    */
 
-document.addEventListener('DOMContentLoaded', function () {
+    function syncVendorSidebarWidth() {
 
-    const selects =
-        document.querySelectorAll(
-            '.vendor-status-select'
-        );
-
-    selects.forEach(function (select) {
-
-        function updateStatusColor() {
-
-            select.classList.remove(
-                'pending',
-                'approved',
-                'rejected',
-                'suspended'
+        const main =
+            document.querySelector(
+                '.vendors-main'
             );
 
-            const value =
-                select.value.toLowerCase();
 
-            select.classList.add(value);
+        if (!main) {
+
+            return;
+
         }
 
-        updateStatusColor();
 
-        select.addEventListener(
-            'change',
-            updateStatusColor
-        );
+        /*
+        |--------------------------------------------------------------------------
+        | MOBILE
+        |--------------------------------------------------------------------------
+        */
 
-    });
+        if (
+            window.innerWidth <= 900
+        ) {
 
-});
+            main.style.marginLeft =
+                '0px';
+
+            main.style.width =
+                '100%';
+
+            return;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FIND SIDEBAR
+        |--------------------------------------------------------------------------
+        */
+
+        const sidebar =
+            document.querySelector(
+                '.admin-sidebar'
+            ) ||
+            document.querySelector(
+                '.dashboard-sidebar'
+            ) ||
+            document.querySelector(
+                '.sidebar'
+            ) ||
+            document.querySelector(
+                'aside'
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | DEFAULT
+        |--------------------------------------------------------------------------
+        */
+
+        if (!sidebar) {
+
+            main.style.marginLeft =
+                '260px';
+
+            main.style.width =
+                'calc(100% - 260px)';
+
+            return;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | REAL WIDTH
+        |--------------------------------------------------------------------------
+        */
+
+        const sidebarRect =
+            sidebar.getBoundingClientRect();
+
+
+        if (sidebarRect.right > 0) {
+
+            main.style.marginLeft =
+                sidebarRect.right +
+                'px';
+
+
+            main.style.width =
+                'calc(100% - ' +
+                sidebarRect.right +
+                'px)';
+
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD
+    |--------------------------------------------------------------------------
+    */
+
+    document.addEventListener(
+        'DOMContentLoaded',
+        function () {
+
+            syncVendorSidebarWidth();
+
+
+            setTimeout(
+                syncVendorSidebarWidth,
+                100
+            );
+
+
+            setTimeout(
+                syncVendorSidebarWidth,
+                400
+            );
+
+        }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESIZE
+    |--------------------------------------------------------------------------
+    */
+
+    window.addEventListener(
+        'resize',
+        syncVendorSidebarWidth
+    );
 
 </script>
+
 
 </body>
 
