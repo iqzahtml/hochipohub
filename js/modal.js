@@ -10,6 +10,8 @@
 | - Open register modal
 | - Switch modal
 | - Close modal
+| - Click outside to close
+| - Escape to close
 | - Auto open register after registration error
 | - Auto open login after successful registration
 |--------------------------------------------------------------------------
@@ -22,7 +24,7 @@
 
     /*
     |--------------------------------------------------------------------------
-    | INITIALIZE MODAL SYSTEM
+    | START MODAL SYSTEM
     |--------------------------------------------------------------------------
     */
 
@@ -33,6 +35,23 @@
 
         const registerModal =
             document.getElementById('registerModal');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK MODAL
+        |--------------------------------------------------------------------------
+        */
+
+        if (!loginModal && !registerModal) {
+
+            console.warn(
+                'HOCHIPOHUB: Login/Register modal tidak dijumpai.'
+            );
+
+            return;
+
+        }
 
 
         /*
@@ -48,10 +67,53 @@
             }
 
 
+            /*
+            |--------------------------------------------------------------
+            | Tutup modal lain dahulu
+            |--------------------------------------------------------------
+            */
+
+            if (
+                loginModal &&
+                loginModal !== modal
+            ) {
+
+                loginModal.classList.remove('active');
+                loginModal.classList.remove('show');
+
+                loginModal.setAttribute(
+                    'aria-hidden',
+                    'true'
+                );
+
+            }
+
+
+            if (
+                registerModal &&
+                registerModal !== modal
+            ) {
+
+                registerModal.classList.remove('active');
+                registerModal.classList.remove('show');
+
+                registerModal.setAttribute(
+                    'aria-hidden',
+                    'true'
+                );
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------
+            | BUKA MODAL
+            |--------------------------------------------------------------
+            */
+
             modal.classList.add('active');
 
             modal.classList.add('show');
-
 
             modal.setAttribute(
                 'aria-hidden',
@@ -65,26 +127,29 @@
 
 
             /*
-            |--------------------------------------------------------------------------
-            | FOCUS FIRST INPUT
-            |--------------------------------------------------------------------------
+            |--------------------------------------------------------------
+            | FOCUS INPUT
+            |--------------------------------------------------------------
             */
 
-            setTimeout(function () {
+            setTimeout(
+                function () {
 
-                const firstInput =
-                    modal.querySelector(
-                        'input:not([type="hidden"])'
-                    );
+                    const firstInput =
+                        modal.querySelector(
+                            'input:not([type="hidden"]):not([type="checkbox"])'
+                        );
 
 
-                if (firstInput) {
+                    if (firstInput) {
 
-                    firstInput.focus();
+                        firstInput.focus();
 
-                }
+                    }
 
-            }, 200);
+                },
+                150
+            );
 
         }
 
@@ -113,13 +178,7 @@
             );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | ONLY REMOVE BODY LOCK IF BOTH MODALS CLOSED
-            |--------------------------------------------------------------------------
-            */
-
-            const loginIsOpen =
+            const loginOpen =
                 loginModal &&
                 (
                     loginModal.classList.contains('active') ||
@@ -127,7 +186,7 @@
                 );
 
 
-            const registerIsOpen =
+            const registerOpen =
                 registerModal &&
                 (
                     registerModal.classList.contains('active') ||
@@ -135,7 +194,10 @@
                 );
 
 
-            if (!loginIsOpen && !registerIsOpen) {
+            if (
+                !loginOpen &&
+                !registerOpen
+            ) {
 
                 document.body.classList.remove(
                     'modal-open'
@@ -159,40 +221,38 @@
 
             if (currentModal) {
 
-                closeModal(
-                    currentModal
+                currentModal.classList.remove(
+                    'active'
+                );
+
+                currentModal.classList.remove(
+                    'show'
+                );
+
+                currentModal.setAttribute(
+                    'aria-hidden',
+                    'true'
                 );
 
             }
 
 
-            setTimeout(function () {
-
-                if (targetModal) {
-
-                    openModal(
-                        targetModal
-                    );
-
-                }
-
-            }, 150);
+            openModal(
+                targetModal
+            );
 
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | OPEN / SWITCH MODAL BUTTON
+        | OPEN LOGIN / REGISTER
         |--------------------------------------------------------------------------
         |
-        | SUPPORT:
+        | Guna event delegation.
         |
         | data-modal-open="loginModal"
         | data-modal-open="registerModal"
-        |
-        | data-modal-target="loginModal"
-        | data-modal-target="registerModal"
         |--------------------------------------------------------------------------
         */
 
@@ -200,31 +260,9 @@
             'click',
             function (event) {
 
-                /*
-                |--------------------------------------------------------------------------
-                | SAFETY CHECK
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    !event.target ||
-                    typeof event.target.closest !== 'function'
-                ) {
-
-                    return;
-
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | FIND BUTTON
-                |--------------------------------------------------------------------------
-                */
-
                 const button =
                     event.target.closest(
-                        '[data-modal-open], [data-modal-target]'
+                        '[data-modal-open]'
                     );
 
 
@@ -235,32 +273,10 @@
                 }
 
 
-                /*
-                |--------------------------------------------------------------------------
-                | GET TARGET
-                |--------------------------------------------------------------------------
-                */
-
-                let targetId =
+                const targetId =
                     button.getAttribute(
                         'data-modal-open'
                     );
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | FALLBACK
-                |--------------------------------------------------------------------------
-                */
-
-                if (!targetId) {
-
-                    targetId =
-                        button.getAttribute(
-                            'data-modal-target'
-                        );
-
-                }
 
 
                 if (!targetId) {
@@ -269,12 +285,6 @@
 
                 }
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | GET MODAL
-                |--------------------------------------------------------------------------
-                */
 
                 const targetModal =
                     document.getElementById(
@@ -284,8 +294,8 @@
 
                 if (!targetModal) {
 
-                    console.warn(
-                        'HOCHIPOHUB Modal not found:',
+                    console.error(
+                        'HOCHIPOHUB: Modal tidak dijumpai:',
                         targetId
                     );
 
@@ -295,57 +305,35 @@
 
 
                 /*
-                |--------------------------------------------------------------------------
-                | STOP NORMAL BUTTON ACTION
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
+                | PENTING:
+                | Jangan bagi button ikut default action.
+                |----------------------------------------------------------
                 */
 
                 event.preventDefault();
 
-                event.stopPropagation();
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | CURRENT MODAL
-                |--------------------------------------------------------------------------
-                */
-
-                const currentId =
+                const currentModal =
                     button.getAttribute(
                         'data-modal-switch'
                     );
 
 
-                /*
-                |--------------------------------------------------------------------------
-                | SWITCH
-                |--------------------------------------------------------------------------
-                */
+                if (currentModal) {
 
-                if (currentId) {
-
-                    const currentModal =
+                    const current =
                         document.getElementById(
-                            currentId
+                            currentModal
                         );
 
 
                     switchModal(
-                        currentModal,
+                        current,
                         targetModal
                     );
 
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | NORMAL OPEN
-                |--------------------------------------------------------------------------
-                */
-
-                else {
+                } else {
 
                     openModal(
                         targetModal
@@ -353,8 +341,116 @@
 
                 }
 
-            },
-            true
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SWITCH BUTTON
+        |--------------------------------------------------------------------------
+        |
+        | Contoh:
+        |
+        | data-modal-switch="registerModal"
+        | data-modal-target="loginModal"
+        |--------------------------------------------------------------------------
+        */
+
+        document.addEventListener(
+            'click',
+            function (event) {
+
+                const button =
+                    event.target.closest(
+                        '[data-modal-target]'
+                    );
+
+
+                if (!button) {
+
+                    return;
+
+                }
+
+
+                const targetId =
+                    button.getAttribute(
+                        'data-modal-target'
+                    );
+
+
+                if (!targetId) {
+
+                    return;
+
+                }
+
+
+                const targetModal =
+                    document.getElementById(
+                        targetId
+                    );
+
+
+                if (!targetModal) {
+
+                    console.error(
+                        'HOCHIPOHUB: Target modal tidak dijumpai:',
+                        targetId
+                    );
+
+                    return;
+
+                }
+
+
+                event.preventDefault();
+
+
+                let currentModal = null;
+
+
+                if (
+                    loginModal &&
+                    (
+                        loginModal.classList.contains(
+                            'active'
+                        ) ||
+                        loginModal.classList.contains(
+                            'show'
+                        )
+                    )
+                ) {
+
+                    currentModal = loginModal;
+
+                }
+
+
+                if (
+                    registerModal &&
+                    (
+                        registerModal.classList.contains(
+                            'active'
+                        ) ||
+                        registerModal.classList.contains(
+                            'show'
+                        )
+                    )
+                ) {
+
+                    currentModal = registerModal;
+
+                }
+
+
+                switchModal(
+                    currentModal,
+                    targetModal
+                );
+
+            }
         );
 
 
@@ -367,16 +463,6 @@
         document.addEventListener(
             'click',
             function (event) {
-
-                if (
-                    !event.target ||
-                    typeof event.target.closest !== 'function'
-                ) {
-
-                    return;
-
-                }
-
 
                 const closeButton =
                     event.target.closest(
@@ -392,8 +478,6 @@
 
 
                 event.preventDefault();
-
-                event.stopPropagation();
 
 
                 const modalId =
@@ -412,14 +496,13 @@
                     modal
                 );
 
-            },
-            true
+            }
         );
 
 
         /*
         |--------------------------------------------------------------------------
-        | CLICK OUTSIDE MODAL
+        | CLICK OUTSIDE
         |--------------------------------------------------------------------------
         */
 
@@ -429,9 +512,9 @@
 
 
                 /*
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 | LOGIN
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 */
 
                 if (
@@ -449,9 +532,9 @@
 
 
                 /*
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 | REGISTER
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 */
 
                 if (
@@ -469,9 +552,9 @@
 
 
                 /*
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 | TERMS
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 */
 
                 const termsModal =
@@ -493,12 +576,10 @@
                         'active'
                     );
 
-
                     termsModal.setAttribute(
                         'aria-hidden',
                         'true'
                     );
-
 
                     document.body.classList.remove(
                         'terms-open'
@@ -530,9 +611,9 @@
 
 
                 /*
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 | TERMS
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 */
 
                 const termsModal =
@@ -561,17 +642,14 @@
                         'active'
                     );
 
-
                     termsModal.setAttribute(
                         'aria-hidden',
                         'true'
                     );
 
-
                     document.body.classList.remove(
                         'terms-open'
                     );
-
 
                     return;
 
@@ -579,9 +657,9 @@
 
 
                 /*
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 | LOGIN
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 */
 
                 if (
@@ -600,16 +678,15 @@
                         loginModal
                     );
 
-
                     return;
 
                 }
 
 
                 /*
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 | REGISTER
-                |--------------------------------------------------------------------------
+                |----------------------------------------------------------
                 */
 
                 if (
@@ -665,41 +742,24 @@
             );
 
 
-            setTimeout(function () {
+            setTimeout(
+                function () {
 
-                const loginEmail =
-                    document.getElementById(
-                        'loginEmail'
-                    );
-
-
-                if (loginEmail) {
-
-                    loginEmail.focus();
-
-                }
-
-            }, 300);
+                    const loginEmail =
+                        document.getElementById(
+                            'loginEmail'
+                        );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | CLEAN URL
-            |--------------------------------------------------------------------------
-            */
+                    if (loginEmail) {
 
-            if (
-                window.history &&
-                window.history.replaceState
-            ) {
+                        loginEmail.focus();
 
-                window.history.replaceState(
-                    {},
-                    document.title,
-                    window.location.pathname
-                );
+                    }
 
-            }
+                },
+                250
+            );
 
         }
 
@@ -723,48 +783,58 @@
             );
 
 
-            setTimeout(function () {
+            setTimeout(
+                function () {
 
-                const registerEmail =
-                    document.getElementById(
-                        'registerEmail'
-                    );
-
-
-                if (registerEmail) {
-
-                    registerEmail.focus();
-
-                }
-
-            }, 300);
+                    const registerEmail =
+                        document.getElementById(
+                            'registerEmail'
+                        );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | CLEAN URL
-            |--------------------------------------------------------------------------
-            */
+                    if (registerEmail) {
 
-            if (
-                window.history &&
-                window.history.replaceState
-            ) {
+                        registerEmail.focus();
 
-                window.history.replaceState(
-                    {},
-                    document.title,
-                    window.location.pathname
-                );
+                    }
 
-            }
+                },
+                250
+            );
 
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | PHP ALREADY OPENED REGISTER MODAL
+        | CLEAN URL
+        |--------------------------------------------------------------------------
+        |
+        | Buat selepas check parameter.
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            (
+                urlParams.get('login') === '1' ||
+                urlParams.get('register') === '1'
+            ) &&
+            window.history &&
+            window.history.replaceState
+        ) {
+
+            window.history.replaceState(
+                {},
+                document.title,
+                window.location.pathname
+            );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PHP ALREADY OPENED MODAL
         |--------------------------------------------------------------------------
         */
 
@@ -780,33 +850,12 @@
             )
         ) {
 
-            registerModal.classList.add(
-                'active'
-            );
-
-            registerModal.classList.add(
-                'show'
-            );
-
-
-            registerModal.setAttribute(
-                'aria-hidden',
-                'false'
-            );
-
-
             document.body.classList.add(
                 'modal-open'
             );
 
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | PHP ALREADY OPENED LOGIN MODAL
-        |--------------------------------------------------------------------------
-        */
 
         if (
             loginModal &&
@@ -820,21 +869,6 @@
             )
         ) {
 
-            loginModal.classList.add(
-                'active'
-            );
-
-            loginModal.classList.add(
-                'show'
-            );
-
-
-            loginModal.setAttribute(
-                'aria-hidden',
-                'false'
-            );
-
-
             document.body.classList.add(
                 'modal-open'
             );
@@ -846,7 +880,7 @@
 
     /*
     |--------------------------------------------------------------------------
-    | START
+    | INITIALIZE
     |--------------------------------------------------------------------------
     */
 
@@ -864,6 +898,5 @@
         initModalSystem();
 
     }
-
 
 })();
