@@ -6,16 +6,13 @@
 |--------------------------------------------------------------------------
 | File:
 | ajax/add_cart.php
-|
-| Purpose:
-| Add a product to customer's shopping cart.
 |--------------------------------------------------------------------------
 */
 
 
 /*
 |--------------------------------------------------------------------------
-| LOAD REQUIRED FILES
+| REQUIRED FILES
 |--------------------------------------------------------------------------
 */
 
@@ -27,7 +24,18 @@ require_once dirname(__DIR__) . '/database/db.php';
 
 /*
 |--------------------------------------------------------------------------
-| AJAX RESPONSE
+| SESSION
+|--------------------------------------------------------------------------
+*/
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| JSON ONLY
 |--------------------------------------------------------------------------
 */
 
@@ -38,7 +46,258 @@ header(
 
 /*
 |--------------------------------------------------------------------------
-| ONLY POST REQUEST
+| PREVENT PHP HTML ERRORS FROM BREAKING JSON
+|--------------------------------------------------------------------------
+*/
+
+ini_set(
+    'display_errors',
+    '0'
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| JSON RESPONSE HELPER
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('cartJsonResponse')) {
+
+    function cartJsonResponse(
+        bool $success,
+        string $message,
+        array $extra = [],
+        int $statusCode = 200
+    ): void {
+
+        http_response_code(
+            $statusCode
+        );
+
+
+        echo json_encode(
+            array_merge(
+                [
+                    'success' => $success,
+                    'message' => $message
+                ],
+                $extra
+            ),
+            JSON_UNESCAPED_UNICODE
+        );
+
+
+        exit;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CSRF COMPATIBILITY
+|--------------------------------------------------------------------------
+|
+| Your project has used different CSRF function names:
+|
+| validateCsrfToken()
+| verifyCsrfToken()
+|
+| This supports both.
+|
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('cartValidateCsrf')) {
+
+    function cartValidateCsrf(
+        string $token
+    ): bool {
+
+        if ($token === '') {
+            return false;
+        }
+
+
+        if (
+            function_exists(
+                'validateCsrfToken'
+            )
+        ) {
+
+            return (bool)
+                validateCsrfToken(
+                    $token
+                );
+        }
+
+
+        if (
+            function_exists(
+                'verifyCsrfToken'
+            )
+        ) {
+
+            return (bool)
+                verifyCsrfToken(
+                    $token
+                );
+        }
+
+
+        return false;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CURRENT USER COMPATIBILITY
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('cartCurrentUserId')) {
+
+    function cartCurrentUserId(): int
+    {
+        if (
+            function_exists(
+                'currentUserId'
+            )
+        ) {
+
+            return (int)
+                currentUserId();
+        }
+
+
+        if (
+            function_exists(
+                'getUserId'
+            )
+        ) {
+
+            return (int)
+                getUserId();
+        }
+
+
+        return (int) (
+            $_SESSION['user_id']
+            ?? 0
+        );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| LOGIN COMPATIBILITY
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('cartIsLoggedIn')) {
+
+    function cartIsLoggedIn(): bool
+    {
+        if (
+            function_exists(
+                'isLoggedIn'
+            )
+        ) {
+
+            return (bool)
+                isLoggedIn();
+        }
+
+
+        return !empty(
+            $_SESSION['user_id']
+        );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CUSTOMER ROLE COMPATIBILITY
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('cartIsCustomer')) {
+
+    function cartIsCustomer(): bool
+    {
+        if (
+            function_exists(
+                'isCustomer'
+            )
+        ) {
+
+            return (bool)
+                isCustomer();
+        }
+
+
+        $role =
+            strtolower(
+                trim(
+                    (string) (
+                        $_SESSION['role']
+                        ?? $_SESSION['user_role']
+                        ?? ''
+                    )
+                )
+            );
+
+
+        return $role === 'customer';
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    if (
+        !isset($db) ||
+        !($db instanceof PDO)
+    ) {
+
+        $db = getDB();
+    }
+
+
+    if (!($db instanceof PDO)) {
+
+        cartJsonResponse(
+            false,
+            'Database connection is not available.',
+            [],
+            500
+        );
+    }
+
+
+} catch (Throwable $e) {
+
+    cartJsonResponse(
+        false,
+        'Unable to connect to database.',
+        [],
+        500
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| POST ONLY
 |--------------------------------------------------------------------------
 */
 
@@ -47,104 +306,82 @@ if (
     !== 'POST'
 ) {
 
-    http_response_code(405);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Invalid request method.'
-    ]);
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Invalid request method.',
+        [],
+        405
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| REQUIRE LOGIN
+| LOGIN
 |--------------------------------------------------------------------------
 */
 
-if (!isLoggedIn()) {
+if (!cartIsLoggedIn()) {
 
-    http_response_code(401);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Please login to add products to your cart.'
-    ]);
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Please login to add products to your cart.',
+        [],
+        401
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| REQUIRE CUSTOMER
+| CUSTOMER ONLY
 |--------------------------------------------------------------------------
 */
 
-if (!isCustomer()) {
+if (!cartIsCustomer()) {
 
-    http_response_code(403);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Only customers can add products to the cart.'
-    ]);
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Only customer accounts can add products to cart.',
+        [],
+        403
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| ACCOUNT STATUS
-|--------------------------------------------------------------------------
-*/
-
-if (!isAccountActive()) {
-
-    http_response_code(403);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Your account is not active.'
-    ]);
-
-    exit;
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CSRF VALIDATION
+| CSRF
 |--------------------------------------------------------------------------
 */
 
 $csrfToken =
-    $_POST['csrf_token']
-    ?? '';
+    trim(
+        (string) (
+            $_POST['csrf_token']
+            ?? ''
+        )
+    );
+
 
 if (
-    !verifyCsrfToken(
+    !cartValidateCsrf(
         $csrfToken
     )
 ) {
 
-    http_response_code(403);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Invalid security token. Please refresh the page and try again.'
-    ]);
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Invalid security token. Please refresh the page and try again.',
+        [],
+        403
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| GET PRODUCT ID
+| PRODUCT ID
 |--------------------------------------------------------------------------
 */
 
@@ -157,25 +394,22 @@ $productId =
 
 
 if (
-    !$productId
-    ||
+    !$productId ||
     $productId <= 0
 ) {
 
-    http_response_code(400);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Invalid product.'
-    ]);
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Invalid product.',
+        [],
+        400
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| GET QUANTITY
+| QUANTITY
 |--------------------------------------------------------------------------
 */
 
@@ -187,15 +421,8 @@ $quantity =
     );
 
 
-/*
-|--------------------------------------------------------------------------
-| DEFAULT QUANTITY
-|--------------------------------------------------------------------------
-*/
-
 if (
-    $quantity === false
-    ||
+    $quantity === false ||
     $quantity === null
 ) {
 
@@ -203,74 +430,50 @@ if (
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| VALIDATE QUANTITY
-|--------------------------------------------------------------------------
-*/
+$quantity =
+    (int) $quantity;
 
-if (
-    $quantity <= 0
-) {
 
-    http_response_code(400);
+if ($quantity <= 0) {
 
-    echo json_encode([
-        'success' => false,
-        'message' => 'Quantity must be at least 1.'
-    ]);
+    cartJsonResponse(
+        false,
+        'Quantity must be at least 1.',
+        [],
+        400
+    );
+}
 
-    exit;
+
+if ($quantity > 999) {
+
+    cartJsonResponse(
+        false,
+        'Quantity is too large.',
+        [],
+        400
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| LIMIT REQUESTED QUANTITY
-|--------------------------------------------------------------------------
-|
-| Prevent unreasonable quantities from
-| being submitted through the browser.
-|
-*/
-
-if (
-    $quantity > 999
-) {
-
-    http_response_code(400);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Quantity is too large.'
-    ]);
-
-    exit;
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CURRENT CUSTOMER
+| CUSTOMER ID
 |--------------------------------------------------------------------------
 */
 
 $customerId =
-    currentUserId();
+    cartCurrentUserId();
 
 
-if (
-    !$customerId
-) {
+if ($customerId <= 0) {
 
-    http_response_code(401);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Customer session not found.'
-    ]);
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Customer session not found.',
+        [],
+        401
+    );
 }
 
 
@@ -285,16 +488,27 @@ try {
     $stmt =
         $db->prepare("
             SELECT
-                product_id,
-                product_name,
-                price,
-                stock_quantity,
-                status,
-                vendor_id
 
-            FROM products
+                p.product_id,
+                p.product_name,
+                p.price,
+                p.stock_quantity,
+                p.status,
+                p.vendor_id,
 
-            WHERE product_id = ?
+                v.approval_status,
+
+                u.status AS vendor_user_status
+
+            FROM products p
+
+            INNER JOIN vendors v
+                ON p.vendor_id = v.vendor_id
+
+            INNER JOIN users u
+                ON v.user_id = u.user_id
+
+            WHERE p.product_id = ?
 
             LIMIT 1
         ");
@@ -306,33 +520,19 @@ try {
 
 
     $product =
-        $stmt->fetch();
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
 
 
-} catch (
-    PDOException $e
-) {
+} catch (Throwable $e) {
 
-    if (APP_DEBUG) {
-
-        http_response_code(500);
-
-        echo json_encode([
-            'success' => false,
-            'message' => $e->getMessage()
-        ]);
-
-    } else {
-
-        http_response_code(500);
-
-        echo json_encode([
-            'success' => false,
-            'message' => 'Unable to load product.'
-        ]);
-    }
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Unable to load product.',
+        [],
+        500
+    );
 }
 
 
@@ -342,19 +542,48 @@ try {
 |--------------------------------------------------------------------------
 */
 
-if (
-    !$product
-) {
+if (!$product) {
 
-    http_response_code(404);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Product not found.'
-    ]);
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Product not found.',
+        [],
+        404
+    );
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| NORMALIZE STATUS
+|--------------------------------------------------------------------------
+*/
+
+$productStatus =
+    strtolower(
+        trim(
+            (string)
+            $product['status']
+        )
+    );
+
+
+$vendorApproval =
+    strtolower(
+        trim(
+            (string)
+            $product['approval_status']
+        )
+    );
+
+
+$vendorUserStatus =
+    strtolower(
+        trim(
+            (string)
+            $product['vendor_user_status']
+        )
+    );
 
 
 /*
@@ -364,49 +593,90 @@ if (
 */
 
 if (
-    $product['status']
-    !== 'Available'
+    !in_array(
+        $productStatus,
+        [
+            'available',
+            'active'
+        ],
+        true
+    )
 ) {
 
-    http_response_code(400);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'This product is currently unavailable.'
-    ]);
-
-    exit;
+    cartJsonResponse(
+        false,
+        'This product is currently unavailable.',
+        [],
+        400
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| STOCK VALIDATION
+| VENDOR APPROVAL
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $vendorApproval !==
+    'approved'
+) {
+
+    cartJsonResponse(
+        false,
+        'This seller is not currently approved.',
+        [],
+        400
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| VENDOR ACCOUNT
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $vendorUserStatus !==
+    'active'
+) {
+
+    cartJsonResponse(
+        false,
+        'This seller is currently unavailable.',
+        [],
+        400
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| STOCK
 |--------------------------------------------------------------------------
 */
 
 $stockQuantity =
-    (int) $product['stock_quantity'];
+    (int)
+    $product['stock_quantity'];
 
 
-if (
-    $stockQuantity <= 0
-) {
+if ($stockQuantity <= 0) {
 
-    http_response_code(400);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'This product is out of stock.'
-    ]);
-
-    exit;
+    cartJsonResponse(
+        false,
+        'This product is out of stock.',
+        [],
+        400
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CHECK EXISTING CART ITEM
+| EXISTING CART
 |--------------------------------------------------------------------------
 */
 
@@ -415,6 +685,7 @@ try {
     $stmt =
         $db->prepare("
             SELECT
+
                 cart_id,
                 quantity
 
@@ -435,48 +706,33 @@ try {
 
 
     $existingCart =
-        $stmt->fetch();
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
 
 
-} catch (
-    PDOException $e
-) {
+} catch (Throwable $e) {
 
-    if (APP_DEBUG) {
-
-        http_response_code(500);
-
-        echo json_encode([
-            'success' => false,
-            'message' => $e->getMessage()
-        ]);
-
-    } else {
-
-        http_response_code(500);
-
-        echo json_encode([
-            'success' => false,
-            'message' => 'Unable to check your cart.'
-        ]);
-    }
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Unable to check your cart.',
+        [],
+        500
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CALCULATE NEW QUANTITY
+| NEW QUANTITY
 |--------------------------------------------------------------------------
 */
 
-if (
-    $existingCart
-) {
+if ($existingCart) {
 
     $newQuantity =
-        (int) $existingCart['quantity']
+        (int)
+        $existingCart['quantity']
         +
         $quantity;
 
@@ -494,26 +750,24 @@ if (
 */
 
 if (
-    $newQuantity > $stockQuantity
+    $newQuantity >
+    $stockQuantity
 ) {
 
-    http_response_code(400);
-
-    echo json_encode([
-        'success' => false,
-        'message' =>
-            'Only '
-            . $stockQuantity
-            . ' item(s) available in stock.'
-    ]);
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Only ' .
+        $stockQuantity .
+        ' item(s) available in stock.',
+        [],
+        400
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| DATABASE TRANSACTION
+| SAVE CART
 |--------------------------------------------------------------------------
 */
 
@@ -522,15 +776,14 @@ try {
     $db->beginTransaction();
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | UPDATE EXISTING ITEM
-    |--------------------------------------------------------------------------
-    */
+    if ($existingCart) {
 
-    if (
-        $existingCart
-    ) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE
+        |--------------------------------------------------------------------------
+        */
 
         $stmt =
             $db->prepare("
@@ -546,28 +799,32 @@ try {
 
         $stmt->execute([
             $newQuantity,
+            (int)
             $existingCart['cart_id'],
             $customerId
         ]);
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | INSERT NEW ITEM
-    |--------------------------------------------------------------------------
-    */
-
     } else {
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | INSERT
+        |--------------------------------------------------------------------------
+        */
 
         $stmt =
             $db->prepare("
-                INSERT INTO cart (
+                INSERT INTO cart
+                (
                     customer_id,
                     product_id,
                     quantity
                 )
 
-                VALUES (
+                VALUES
+                (
                     ?,
                     ?,
                     ?
@@ -585,15 +842,33 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | GET UPDATED CART COUNT
+    | CART COUNT
     |--------------------------------------------------------------------------
     */
 
+    $stmt =
+        $db->prepare("
+            SELECT
+
+                COALESCE(
+                    SUM(quantity),
+                    0
+                )
+
+            FROM cart
+
+            WHERE customer_id = ?
+        ");
+
+
+    $stmt->execute([
+        $customerId
+    ]);
+
+
     $cartCount =
-        getCartCount(
-            $db,
-            $customerId
-        );
+        (int)
+        $stmt->fetchColumn();
 
 
     /*
@@ -607,33 +882,29 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | SUCCESS RESPONSE
+    | SUCCESS
     |--------------------------------------------------------------------------
     */
 
-    echo json_encode([
-        'success' => true,
-        'message' =>
-            $product['product_name']
-            . ' has been added to your cart.',
-        'cart_count' => $cartCount,
-        'product_id' => $productId,
-        'quantity' => $newQuantity
-    ]);
+    cartJsonResponse(
+        true,
+        $product['product_name'] .
+        ' has been added to your cart.',
+        [
+            'cart_count' =>
+                $cartCount,
 
-    exit;
+            'product_id' =>
+                $productId,
+
+            'quantity' =>
+                $newQuantity
+        ]
+    );
 
 
-} catch (
-    PDOException $e
-) {
+} catch (Throwable $e) {
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | ROLLBACK
-    |--------------------------------------------------------------------------
-    */
 
     if (
         $db->inTransaction()
@@ -643,31 +914,10 @@ try {
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | ERROR RESPONSE
-    |--------------------------------------------------------------------------
-    */
-
-    http_response_code(500);
-
-
-    if (
-        APP_DEBUG
-    ) {
-
-        echo json_encode([
-            'success' => false,
-            'message' => $e->getMessage()
-        ]);
-
-    } else {
-
-        echo json_encode([
-            'success' => false,
-            'message' => 'Unable to add product to cart.'
-        ]);
-    }
-
-    exit;
+    cartJsonResponse(
+        false,
+        'Unable to add product to cart.',
+        [],
+        500
+    );
 }
