@@ -1,14 +1,19 @@
-/* =========================================================
-   HOCHIPOHUB - GLASSMORPHISM AUTH MODAL
-   Login + Register Modal
-========================================================= */
+/*
+=========================================================
+HOCHIPOHUB - GLASSMORPHISM AUTH MODAL
+Login + Register Modal
+=========================================================
+*/
 
 
-/* =========================================================
-   OVERLAY
-========================================================= */
+/*
+=========================================================
+MODAL OVERLAY
+=========================================================
+*/
 
 .modal-overlay {
+
     display: none !important;
 
     position: fixed !important;
@@ -42,58 +47,80 @@
         rgba(2, 6, 23, 0.68) !important;
 
     backdrop-filter: blur(8px) !important;
+
     -webkit-backdrop-filter: blur(8px) !important;
 
     z-index: 2147483646 !important;
 
     opacity: 0 !important;
+
     visibility: hidden !important;
+
     pointer-events: none !important;
 
     transition:
         opacity 0.25s ease,
         visibility 0.25s ease !important;
+
 }
 
 
-/* =========================================================
-   SHOW LOGIN / REGISTER
-   IMPORTANT:
-   modal.js uses .active
-========================================================= */
+/*
+=========================================================
+MODAL ACTIVE
+=========================================================
+*/
 
 .modal-overlay.active {
+
     display: flex !important;
 
     opacity: 1 !important;
+
     visibility: visible !important;
+
     pointer-events: auto !important;
+
 }
 
 
-/* Also support .show */
+/*
+=========================================================
+MODAL SHOW
+=========================================================
+*/
+
 .modal-overlay.show {
+
     display: flex !important;
 
     opacity: 1 !important;
+
     visibility: visible !important;
+
     pointer-events: auto !important;
+
 }
 
 
-/* =========================================================
-   GLASS MODAL BOX
-========================================================= */
+/*
+=========================================================
+MODAL BOX
+=========================================================
+*/
 
 .modal-overlay .auth-modal {
+
     display: block !important;
 
     position: relative !important;
 
     width: 100% !important;
+
     max-width: 460px !important;
 
-    max-height: calc(100vh - 40px) !important;
+    max-height:
+        calc(100vh - 40px) !important;
 
     margin: auto !important;
 
@@ -118,38 +145,56 @@
         blur(28px)
         saturate(160%) !important;
 
-    border: 1px solid rgba(255, 255, 255, 0.32) !important;
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.32) !important;
 
     border-radius: 24px !important;
 
     box-shadow:
-        0 30px 80px rgba(0, 0, 0, 0.45),
-        0 10px 35px rgba(37, 99, 235, 0.18),
-        inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+        0 30px 80px
+        rgba(0, 0, 0, 0.45),
+
+        0 10px 35px
+        rgba(37, 99, 235, 0.18),
+
+        inset 0 1px 0
+        rgba(255, 255, 255, 0.35) !important;
 
     color: #ffffff !important;
 
-    transform: translateY(0) scale(1) !important;
+    transform:
+        translateY(0)
+        scale(1) !important;
 
     opacity: 1 !important;
+
     visibility: visible !important;
+
 }
 
 
-/* =========================================================
-   REGISTER MODAL
-========================================================= */
+/*
+=========================================================
+REGISTER MODAL
+=========================================================
+*/
 
 .modal-overlay .auth-modal-register {
+
     max-width: 560px !important;
+
 }
 
 
-/* =========================================================
-   GLASS TOP HIGHLIGHT
-========================================================= */
+/*
+=========================================================
+GLASS TOP HIGHLIGHT
+=========================================================
+*/
 
 .modal-overlay .auth-modal::before {
+
     content: "" !important;
 
     position: absolute !important;
@@ -158,6 +203,7 @@
     left: 10% !important;
 
     width: 80% !important;
+
     height: 1px !important;
 
     background:
@@ -169,14 +215,18 @@
         ) !important;
 
     pointer-events: none !important;
+
 }
 
 
-/* =========================================================
-   CLOSE BUTTON
-========================================================= */
+/*
+=========================================================
+CLOSE BUTTON
+=========================================================
+*/
 
 .modal-overlay .modal-close {
+
     position: absolute !important;
 
     top: 14px !important;
@@ -191,13 +241,17 @@
     justify-content: center !important;
 
     margin: 0 !important;
+
     padding: 0 !important;
 
-    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.22) !important;
 
     border-radius: 50% !important;
 
-    background: rgba(255, 255, 255, 0.12) !important;
+    background:
+        rgba(255, 255, 255, 0.12) !important;
 
     color: #ffffff !important;
 
@@ -207,55 +261,74 @@
 
     cursor: pointer !important;
 
-    z-index: 10 !important;
+    z-index: 100 !important;
+
+    pointer-events: auto !important;
 
     backdrop-filter: blur(10px) !important;
+
     -webkit-backdrop-filter: blur(10px) !important;
 
     transition:
         background 0.2s ease,
         transform 0.2s ease !important;
+
 }
 
 
 .modal-overlay .modal-close:hover {
-    background: rgba(255, 255, 255, 0.22) !important;
+
+    background:
+        rgba(255, 255, 255, 0.22) !important;
 
     color: #ffffff !important;
 
-    transform: rotate(90deg) !important;
+    transform:
+        rotate(90deg) !important;
+
 }
 
 
-/* =========================================================
-   HEADER
-========================================================= */
+/*
+=========================================================
+AUTH HEADER
+=========================================================
+*/
 
 .auth-modal-header {
+
     display: block !important;
 
     width: 100% !important;
 
-    margin: 0 0 24px !important;
+    margin:
+        0 0 24px !important;
 
     text-align: center !important;
+
 }
 
 
-/* =========================================================
-   ICON
-========================================================= */
+/*
+=========================================================
+ICON
+=========================================================
+*/
 
 .auth-modal-icon {
+
     width: 58px !important;
+
     height: 58px !important;
 
     display: flex !important;
 
     align-items: center !important;
+
     justify-content: center !important;
 
-    margin: 0 auto 12px !important;
+    margin:
+        0 auto 12px !important;
 
     border-radius: 18px !important;
 
@@ -266,47 +339,64 @@
             rgba(99, 102, 241, 0.85)
         ) !important;
 
-    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.28) !important;
 
     color: #ffffff !important;
 
     font-size: 27px !important;
 
     box-shadow:
-        0 10px 25px rgba(37, 99, 235, 0.30),
-        inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+        0 10px 25px
+        rgba(37, 99, 235, 0.30),
+
+        inset 0 1px 0
+        rgba(255, 255, 255, 0.35) !important;
+
 }
 
 
-/* =========================================================
-   EYEBROW
-========================================================= */
+/*
+=========================================================
+EYEBROW
+=========================================================
+*/
 
 .auth-eyebrow {
+
     display: block !important;
 
-    margin: 0 0 5px !important;
+    margin:
+        0 0 5px !important;
 
-    color: #93c5fd !important;
+    color:
+        #93c5fd !important;
 
     font-size: 11px !important;
 
     font-weight: 800 !important;
 
     letter-spacing: 1.5px !important;
+
 }
 
 
-/* =========================================================
-   TITLE
-========================================================= */
+/*
+=========================================================
+TITLE
+=========================================================
+*/
 
 .auth-modal-header h2 {
+
     display: block !important;
 
-    margin: 0 0 7px !important;
+    margin:
+        0 0 7px !important;
 
-    color: #ffffff !important;
+    color:
+        #ffffff !important;
 
     font-size: 25px !important;
 
@@ -315,41 +405,53 @@
     line-height: 1.25 !important;
 
     text-shadow:
-        0 2px 12px rgba(0, 0, 0, 0.20) !important;
+        0 2px 12px
+        rgba(0, 0, 0, 0.20) !important;
+
 }
 
 
-/* =========================================================
-   DESCRIPTION
-========================================================= */
+/*
+=========================================================
+DESCRIPTION
+=========================================================
+*/
 
 .auth-modal-header p {
+
     display: block !important;
 
     margin: 0 !important;
 
-    color: rgba(255, 255, 255, 0.72) !important;
+    color:
+        rgba(255, 255, 255, 0.72) !important;
 
     font-size: 14px !important;
 
     line-height: 1.5 !important;
+
 }
 
 
-/* =========================================================
-   ALERT
-========================================================= */
+/*
+=========================================================
+ALERT
+=========================================================
+*/
 
 .auth-alert {
+
     display: block !important;
 
     width: 100% !important;
 
     box-sizing: border-box !important;
 
-    padding: 12px 14px !important;
+    padding:
+        12px 14px !important;
 
-    margin: 0 0 18px !important;
+    margin:
+        0 0 18px !important;
 
     border-radius: 12px !important;
 
@@ -357,34 +459,53 @@
 
     line-height: 1.5 !important;
 
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
+    backdrop-filter:
+        blur(12px) !important;
+
+    -webkit-backdrop-filter:
+        blur(12px) !important;
+
 }
 
 
 .auth-alert-success {
-    background: rgba(16, 185, 129, 0.16) !important;
 
-    border: 1px solid rgba(110, 231, 183, 0.35) !important;
+    background:
+        rgba(16, 185, 129, 0.16) !important;
 
-    color: #a7f3d0 !important;
+    border:
+        1px solid
+        rgba(110, 231, 183, 0.35) !important;
+
+    color:
+        #a7f3d0 !important;
+
 }
 
 
 .auth-alert-error {
-    background: rgba(239, 68, 68, 0.16) !important;
 
-    border: 1px solid rgba(252, 165, 165, 0.35) !important;
+    background:
+        rgba(239, 68, 68, 0.16) !important;
 
-    color: #fecaca !important;
+    border:
+        1px solid
+        rgba(252, 165, 165, 0.35) !important;
+
+    color:
+        #fecaca !important;
+
 }
 
 
-/* =========================================================
-   FORM
-========================================================= */
+/*
+=========================================================
+FORM
+=========================================================
+*/
 
 .auth-form {
+
     display: block !important;
 
     width: 100% !important;
@@ -392,41 +513,54 @@
     margin: 0 !important;
 
     padding: 0 !important;
+
 }
 
 
-/* =========================================================
-   FORM GROUP
-========================================================= */
+/*
+=========================================================
+FORM GROUP
+=========================================================
+*/
 
 .form-group {
+
     display: block !important;
 
     width: 100% !important;
 
-    margin: 0 0 17px !important;
+    margin:
+        0 0 17px !important;
+
 }
 
 
 .form-group label {
+
     display: block !important;
 
-    margin: 0 0 7px !important;
+    margin:
+        0 0 7px !important;
 
-    color: rgba(255, 255, 255, 0.88) !important;
+    color:
+        rgba(255, 255, 255, 0.88) !important;
 
     font-size: 13px !important;
 
     font-weight: 700 !important;
+
 }
 
 
-/* =========================================================
-   INPUTS
-========================================================= */
+/*
+=========================================================
+INPUT
+=========================================================
+*/
 
 .auth-form input:not([type="checkbox"]):not([type="hidden"]),
 .auth-form select {
+
     display: block !important;
 
     width: 100% !important;
@@ -437,17 +571,22 @@
 
     margin: 0 !important;
 
-    padding: 0 14px !important;
+    padding:
+        0 14px !important;
 
     box-sizing: border-box !important;
 
-    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.24) !important;
 
     border-radius: 12px !important;
 
-    background: rgba(255, 255, 255, 0.10) !important;
+    background:
+        rgba(255, 255, 255, 0.10) !important;
 
-    color: #ffffff !important;
+    color:
+        #ffffff !important;
 
     font-family: inherit !important;
 
@@ -455,178 +594,229 @@
 
     outline: none !important;
 
-    backdrop-filter: blur(12px) !important;
+    backdrop-filter:
+        blur(12px) !important;
 
-    -webkit-backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter:
+        blur(12px) !important;
 
     transition:
         background 0.2s ease,
         border-color 0.2s ease,
         box-shadow 0.2s ease !important;
+
 }
 
-
-/* =========================================================
-   PLACEHOLDER
-========================================================= */
 
 .auth-form input::placeholder {
-    color: rgba(255, 255, 255, 0.50) !important;
+
+    color:
+        rgba(255, 255, 255, 0.50) !important;
+
 }
 
-
-/* =========================================================
-   INPUT FOCUS
-========================================================= */
 
 .auth-form input:not([type="checkbox"]):not([type="hidden"]):focus,
 .auth-form select:focus {
-    background: rgba(255, 255, 255, 0.16) !important;
 
-    border-color: rgba(147, 197, 253, 0.75) !important;
+    background:
+        rgba(255, 255, 255, 0.16) !important;
+
+    border-color:
+        rgba(147, 197, 253, 0.75) !important;
 
     box-shadow:
-        0 0 0 4px rgba(59, 130, 246, 0.14),
-        0 8px 25px rgba(0, 0, 0, 0.10) !important;
+        0 0 0 4px
+        rgba(59, 130, 246, 0.14),
+
+        0 8px 25px
+        rgba(0, 0, 0, 0.10) !important;
+
 }
 
-
-/* =========================================================
-   SELECT
-========================================================= */
 
 .auth-form select option {
-    background: #1e293b !important;
 
-    color: #ffffff !important;
+    background:
+        #1e293b !important;
+
+    color:
+        #ffffff !important;
+
 }
 
 
-/* =========================================================
-   PASSWORD
-========================================================= */
+/*
+=========================================================
+PASSWORD
+=========================================================
+*/
 
 .password-input {
+
     position: relative !important;
 
     display: block !important;
 
     width: 100% !important;
+
 }
 
 
 .password-input input {
-    padding-right: 48px !important;
+
+    padding-right:
+        48px !important;
+
 }
 
 
-/* =========================================================
-   PASSWORD TOGGLE
-========================================================= */
+/*
+=========================================================
+PASSWORD TOGGLE
+=========================================================
+*/
 
 .password-toggle {
+
     position: absolute !important;
 
     top: 50% !important;
+
     right: 8px !important;
 
     width: 34px !important;
+
     height: 34px !important;
 
     min-width: 34px !important;
 
     margin: 0 !important;
+
     padding: 0 !important;
 
-    transform: translateY(-50%) !important;
+    transform:
+        translateY(-50%) !important;
 
     border: none !important;
 
     border-radius: 8px !important;
 
-    background: transparent !important;
+    background:
+        transparent !important;
 
-    color: rgba(255, 255, 255, 0.75) !important;
+    color:
+        rgba(255, 255, 255, 0.75) !important;
 
     font-size: 17px !important;
 
     cursor: pointer !important;
 
-    z-index: 5 !important;
+    z-index: 20 !important;
+
+    pointer-events: auto !important;
+
 }
 
 
 .password-toggle:hover {
-    background: rgba(255, 255, 255, 0.12) !important;
 
-    color: #ffffff !important;
+    background:
+        rgba(255, 255, 255, 0.12) !important;
+
+    color:
+        #ffffff !important;
+
 }
 
 
-/* =========================================================
-   TWO COLUMN
-========================================================= */
+/*
+=========================================================
+TWO COLUMN
+=========================================================
+*/
 
 .form-grid-2 {
+
     display: grid !important;
 
-    grid-template-columns: 1fr 1fr !important;
+    grid-template-columns:
+        1fr 1fr !important;
 
-    gap: 14px !important;
+    gap:
+        14px !important;
 
     width: 100% !important;
+
 }
 
 
-/* =========================================================
-   LABEL ROW
-========================================================= */
+/*
+=========================================================
+LABEL ROW
+=========================================================
+*/
 
 .form-label-row {
+
     display: flex !important;
 
     align-items: center !important;
 
-    justify-content: space-between !important;
+    justify-content:
+        space-between !important;
 
     gap: 10px !important;
 
     margin-bottom: 7px !important;
+
 }
 
 
 .form-label-row label {
+
     margin: 0 !important;
+
 }
 
 
-/* =========================================================
-   LINKS
-========================================================= */
+/*
+=========================================================
+LINK
+=========================================================
+*/
 
 .form-link {
-    color: #93c5fd !important;
+
+    color:
+        #93c5fd !important;
 
     font-size: 12px !important;
 
     text-decoration: none !important;
 
-    transition: color 0.2s ease !important;
 }
 
 
 .form-link:hover {
-    color: #dbeafe !important;
 
-    text-decoration: underline !important;
+    color:
+        #dbeafe !important;
+
+    text-decoration:
+        underline !important;
+
 }
 
 
-/* =========================================================
-   CHECKBOX
-========================================================= */
+/*
+=========================================================
+CHECKBOX
+=========================================================
+*/
 
 .checkbox-row {
+
     display: flex !important;
 
     align-items: flex-start !important;
@@ -635,59 +825,62 @@
 
     width: 100% !important;
 
-    margin: 4px 0 18px !important;
+    margin:
+        4px 0 18px !important;
 
     padding: 0 !important;
 
-    color: rgba(255, 255, 255, 0.70) !important;
+    color:
+        rgba(255, 255, 255, 0.70) !important;
 
     font-size: 12px !important;
 
     line-height: 1.5 !important;
 
     cursor: pointer !important;
+
 }
 
 
 .checkbox-row input[type="checkbox"] {
+
     width: 16px !important;
+
     height: 16px !important;
 
     min-width: 16px !important;
+
     min-height: 16px !important;
 
-    margin: 1px 0 0 !important;
+    margin:
+        1px 0 0 !important;
 
     padding: 0 !important;
 
-    accent-color: #60a5fa !important;
+    accent-color:
+        #60a5fa !important;
+
 }
 
 
 .checkbox-row input[type="checkbox"]:disabled {
+
     opacity: 0.45 !important;
 
-    cursor: not-allowed !important;
+    cursor:
+        not-allowed !important;
+
 }
 
 
-.checkbox-row a {
-    color: #93c5fd !important;
-
-    text-decoration: none !important;
-}
-
-
-.checkbox-row a:hover {
-    text-decoration: underline !important;
-}
-
-
-/* =========================================================
-   TERMS LINK
-========================================================= */
+/*
+=========================================================
+TERMS LINK
+=========================================================
+*/
 
 .terms-link-button {
+
     display: inline-block !important;
 
     position: relative !important;
@@ -708,9 +901,11 @@
 
     border-radius: 0 !important;
 
-    background: transparent !important;
+    background:
+        transparent !important;
 
-    color: #93c5fd !important;
+    color:
+        #93c5fd !important;
 
     font-family: inherit !important;
 
@@ -720,7 +915,8 @@
 
     line-height: inherit !important;
 
-    text-decoration: underline !important;
+    text-decoration:
+        underline !important;
 
     cursor: pointer !important;
 
@@ -729,30 +925,24 @@
     transform: none !important;
 
     pointer-events: auto !important;
+
 }
 
 
-.terms-link-button:hover {
-    color: #dbeafe !important;
-
-    background: transparent !important;
-
-    text-decoration: underline !important;
-
-    transform: none !important;
-}
-
-
-/* =========================================================
-   SUBMIT BUTTON
-========================================================= */
+/*
+=========================================================
+SUBMIT BUTTON
+=========================================================
+*/
 
 .auth-submit {
+
     display: flex !important;
 
     align-items: center !important;
 
-    justify-content: space-between !important;
+    justify-content:
+        space-between !important;
 
     width: 100% !important;
 
@@ -760,11 +950,14 @@
 
     margin: 0 !important;
 
-    padding: 0 18px !important;
+    padding:
+        0 18px !important;
 
     box-sizing: border-box !important;
 
-    border: 1px solid rgba(255, 255, 255, 0.20) !important;
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.20) !important;
 
     border-radius: 13px !important;
 
@@ -775,7 +968,8 @@
             rgba(79, 70, 229, 0.90)
         ) !important;
 
-    color: #ffffff !important;
+    color:
+        #ffffff !important;
 
     font-family: inherit !important;
 
@@ -785,82 +979,120 @@
 
     cursor: pointer !important;
 
+    pointer-events: auto !important;
+
+    position: relative !important;
+
+    z-index: 10 !important;
+
     box-shadow:
-        0 8px 25px rgba(37, 99, 235, 0.30),
-        inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+        0 8px 25px
+        rgba(37, 99, 235, 0.30),
+
+        inset 0 1px 0
+        rgba(255, 255, 255, 0.25) !important;
 
     transition:
         transform 0.2s ease,
         box-shadow 0.2s ease !important;
+
 }
 
 
 .auth-submit:hover {
-    transform: translateY(-2px) !important;
+
+    transform:
+        translateY(-2px) !important;
 
     box-shadow:
-        0 14px 32px rgba(37, 99, 235, 0.40),
-        inset 0 1px 0 rgba(255, 255, 255, 0.30) !important;
+        0 14px 32px
+        rgba(37, 99, 235, 0.40),
+
+        inset 0 1px 0
+        rgba(255, 255, 255, 0.30) !important;
+
 }
 
 
 .auth-submit:active {
-    transform: translateY(0) !important;
+
+    transform:
+        translateY(0) !important;
+
 }
 
 
-/* =========================================================
-   DIVIDER
-========================================================= */
+/*
+=========================================================
+DIVIDER
+=========================================================
+*/
 
 .auth-divider {
+
     display: flex !important;
 
     align-items: center !important;
 
     gap: 12px !important;
 
-    margin: 21px 0 17px !important;
+    margin:
+        21px 0 17px !important;
 
-    color: rgba(255, 255, 255, 0.45) !important;
+    color:
+        rgba(255, 255, 255, 0.45) !important;
 
     font-size: 11px !important;
 
     font-weight: 700 !important;
+
 }
 
 
 .auth-divider::before,
 .auth-divider::after {
+
     content: "" !important;
 
     flex: 1 !important;
 
     height: 1px !important;
 
-    background: rgba(255, 255, 255, 0.18) !important;
+    background:
+        rgba(255, 255, 255, 0.18) !important;
+
 }
 
 
-/* =========================================================
-   SWITCH
-========================================================= */
+/*
+=========================================================
+SWITCH
+=========================================================
+*/
 
 .auth-switch {
+
     display: block !important;
 
     margin: 0 !important;
 
     text-align: center !important;
 
-    color: rgba(255, 255, 255, 0.65) !important;
+    color:
+        rgba(255, 255, 255, 0.65) !important;
 
     font-size: 13px !important;
+
 }
 
 
 .auth-switch-button {
+
     display: inline !important;
+
+    position: relative !important;
+
+    z-index: 100 !important;
 
     width: auto !important;
 
@@ -872,9 +1104,11 @@
 
     border: none !important;
 
-    background: transparent !important;
+    background:
+        transparent !important;
 
-    color: #93c5fd !important;
+    color:
+        #93c5fd !important;
 
     font-family: inherit !important;
 
@@ -883,58 +1117,133 @@
     font-weight: 800 !important;
 
     cursor: pointer !important;
+
+    pointer-events: auto !important;
+
 }
 
 
 .auth-switch-button:hover {
-    color: #dbeafe !important;
 
-    text-decoration: underline !important;
+    color:
+        #dbeafe !important;
+
+    text-decoration:
+        underline !important;
+
 }
 
 
-/* =========================================================
-   BODY WHEN MODAL OPEN
-========================================================= */
+/*
+=========================================================
+BODY MODAL OPEN
+=========================================================
+*/
 
 body.modal-open {
+
     overflow: hidden !important;
+
 }
 
 
-/* =========================================================
-   AUTH SCROLLBAR
-========================================================= */
+/*
+=========================================================
+AUTH SCROLLBAR
+=========================================================
+*/
 
 .auth-modal::-webkit-scrollbar {
+
     width: 6px !important;
+
 }
 
 
 .auth-modal::-webkit-scrollbar-track {
-    background: transparent !important;
+
+    background:
+        transparent !important;
+
 }
 
 
 .auth-modal::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.25) !important;
 
-    border-radius: 10px !important;
+    background:
+        rgba(255, 255, 255, 0.25) !important;
+
+    border-radius:
+        10px !important;
+
 }
 
 
-/* =========================================================
-   =========================================================
-   TERMS & CONDITIONS POPUP
-   =========================================================
-========================================================= */
+/*
+=========================================================
+IMPORTANT NAVBAR BUTTON FIX
+=========================================================
+*/
+
+.auth-buttons {
+
+    position: relative !important;
+
+    z-index: 1000 !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+
+    gap: 10px !important;
+
+    pointer-events: auto !important;
+
+}
 
 
-/* =========================================================
-   TERMS OVERLAY
-========================================================= */
+.auth-buttons .btn-login,
+.auth-buttons .btn-register {
+
+    position: relative !important;
+
+    z-index: 1001 !important;
+
+    pointer-events: auto !important;
+
+    cursor: pointer !important;
+
+}
+
+
+/*
+=========================================================
+MOBILE AUTH BUTTON
+=========================================================
+*/
+
+.mobile-login-button,
+.mobile-register-button {
+
+    position: relative !important;
+
+    z-index: 1001 !important;
+
+    pointer-events: auto !important;
+
+    cursor: pointer !important;
+
+}
+
+
+/*
+=========================================================
+TERMS MODAL
+=========================================================
+*/
 
 #termsModal {
+
     display: none !important;
 
     position: fixed !important;
@@ -952,6 +1261,7 @@ body.modal-open {
     box-sizing: border-box !important;
 
     align-items: center !important;
+
     justify-content: center !important;
 
     background:
@@ -967,25 +1277,26 @@ body.modal-open {
         ),
         rgba(2, 6, 23, 0.82) !important;
 
-    backdrop-filter: blur(10px) !important;
+    backdrop-filter:
+        blur(10px) !important;
 
-    -webkit-backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter:
+        blur(10px) !important;
 
-    z-index: 2147483647 !important;
+    z-index:
+        2147483647 !important;
 
     opacity: 0 !important;
 
     visibility: hidden !important;
 
     pointer-events: none !important;
+
 }
 
 
-/* =========================================================
-   TERMS OPEN
-========================================================= */
-
 #termsModal.show {
+
     display: flex !important;
 
     opacity: 1 !important;
@@ -993,14 +1304,18 @@ body.modal-open {
     visibility: visible !important;
 
     pointer-events: auto !important;
+
 }
 
 
-/* =========================================================
-   TERMS MODAL BOX
-========================================================= */
+/*
+=========================================================
+TERMS MODAL BOX
+=========================================================
+*/
 
 #termsModal .terms-modal {
+
     position: relative !important;
 
     display: block !important;
@@ -1009,7 +1324,8 @@ body.modal-open {
 
     max-width: 650px !important;
 
-    max-height: calc(100vh - 40px) !important;
+    max-height:
+        calc(100vh - 40px) !important;
 
     margin: auto !important;
 
@@ -1050,233 +1366,61 @@ body.modal-open {
         inset 0 1px 0
         rgba(255, 255, 255, 0.35) !important;
 
-    color: #ffffff !important;
+    color:
+        #ffffff !important;
 
-    z-index: 2147483647 !important;
+    z-index:
+        2147483647 !important;
+
 }
 
 
-/* =========================================================
-   TERMS HEADER
-========================================================= */
-
-.terms-modal-header {
-    display: flex !important;
-
-    align-items: center !important;
-
-    gap: 15px !important;
-
-    width: 100% !important;
-
-    margin: 0 0 20px !important;
-
-    padding: 0 0 18px !important;
-
-    box-sizing: border-box !important;
-
-    border-bottom:
-        1px solid
-        rgba(255, 255, 255, 0.15) !important;
-}
-
-
-/* =========================================================
-   TERMS ICON
-========================================================= */
-
-.terms-icon {
-    width: 56px !important;
-
-    height: 56px !important;
-
-    min-width: 56px !important;
-
-    display: flex !important;
-
-    align-items: center !important;
-
-    justify-content: center !important;
-
-    border-radius: 17px !important;
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(59, 130, 246, 0.85),
-            rgba(99, 102, 241, 0.85)
-        ) !important;
-
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.28) !important;
-
-    color: #ffffff !important;
-
-    font-size: 26px !important;
-
-    box-shadow:
-        0 10px 25px
-        rgba(37, 99, 235, 0.30),
-
-        inset 0 1px 0
-        rgba(255, 255, 255, 0.35) !important;
-}
-
-
-/* =========================================================
-   TERMS EYEBROW
-========================================================= */
-
-.terms-eyebrow {
-    display: block !important;
-
-    margin: 0 0 4px !important;
-
-    color: #93c5fd !important;
-
-    font-size: 11px !important;
-
-    font-weight: 800 !important;
-
-    letter-spacing: 1.5px !important;
-}
-
-
-/* =========================================================
-   TERMS TITLE
-========================================================= */
-
-.terms-modal-header h2 {
-    display: block !important;
-
-    margin: 0 !important;
-
-    color: #ffffff !important;
-
-    font-size: 25px !important;
-
-    font-weight: 800 !important;
-
-    line-height: 1.25 !important;
-}
-
-
-/* =========================================================
-   TERMS CONTENT
-========================================================= */
+/*
+=========================================================
+TERMS CONTENT
+=========================================================
+*/
 
 #termsContent {
-    display: block !important;
 
-    width: 100% !important;
+    max-height:
+        350px !important;
 
-    max-height: 390px !important;
+    overflow-y:
+        auto !important;
 
-    overflow-y: auto !important;
-
-    padding-right: 10px !important;
-
-    margin: 0 0 20px !important;
-
-    box-sizing: border-box !important;
-
-    scroll-behavior: smooth !important;
 }
 
 
-/* =========================================================
-   TERMS HEADINGS
-========================================================= */
-
-#termsContent h3 {
-    display: block !important;
-
-    margin: 0 0 7px !important;
-
-    color: #ffffff !important;
-
-    font-size: 15px !important;
-
-    font-weight: 800 !important;
-
-    line-height: 1.4 !important;
-}
-
-
-/* =========================================================
-   TERMS PARAGRAPHS
-========================================================= */
-
-#termsContent p {
-    display: block !important;
-
-    margin: 0 0 18px !important;
-
-    color:
-        rgba(255, 255, 255, 0.76) !important;
-
-    font-size: 13px !important;
-
-    line-height: 1.7 !important;
-}
-
-
-/* =========================================================
-   TERMS STRONG
-========================================================= */
-
-#termsContent strong {
-    color: #ffffff !important;
-
-    font-weight: 800 !important;
-}
-
-
-/* =========================================================
-   TERMS SCROLLBAR
-========================================================= */
-
-#termsContent::-webkit-scrollbar {
-    width: 6px !important;
-}
-
-
-#termsContent::-webkit-scrollbar-track {
-    background: transparent !important;
-}
-
-
-#termsContent::-webkit-scrollbar-thumb {
-    background:
-        rgba(255, 255, 255, 0.25) !important;
-
-    border-radius: 10px !important;
-}
-
-
-/* =========================================================
-   TERMS AGREE BUTTON
-========================================================= */
+/*
+=========================================================
+TERMS AGREE
+=========================================================
+*/
 
 #termsAgreeButton {
+
     position: relative !important;
 
-    z-index: 2147483647 !important;
+    z-index:
+        2147483647 !important;
 
     display: flex !important;
 
     align-items: center !important;
 
-    justify-content: space-between !important;
+    justify-content:
+        space-between !important;
 
     width: 100% !important;
 
-    min-height: 50px !important;
+    min-height:
+        50px !important;
 
     margin: 0 !important;
 
-    padding: 0 18px !important;
+    padding:
+        0 18px !important;
 
     box-sizing: border-box !important;
 
@@ -1284,7 +1428,8 @@ body.modal-open {
         1px solid
         rgba(255, 255, 255, 0.20) !important;
 
-    border-radius: 13px !important;
+    border-radius:
+        13px !important;
 
     background:
         linear-gradient(
@@ -1293,220 +1438,162 @@ body.modal-open {
             rgba(79, 70, 229, 0.95)
         ) !important;
 
-    color: #ffffff !important;
+    color:
+        #ffffff !important;
 
-    font-family: inherit !important;
+    font-family:
+        inherit !important;
 
-    font-size: 14px !important;
+    font-size:
+        14px !important;
 
-    font-weight: 800 !important;
+    font-weight:
+        800 !important;
 
-    cursor: pointer !important;
+    cursor:
+        pointer !important;
 
-    pointer-events: auto !important;
+    pointer-events:
+        auto !important;
 
-    box-shadow:
-        0 8px 25px
-        rgba(37, 99, 235, 0.30),
-
-        inset 0 1px 0
-        rgba(255, 255, 255, 0.25) !important;
-
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease !important;
 }
 
 
-/* =========================================================
-   DISABLED AGREE BUTTON
-========================================================= */
+/*
+=========================================================
+TERMS DISABLED
+=========================================================
+*/
 
 #termsAgreeButton:disabled {
-    opacity: 0.45 !important;
 
-    cursor: not-allowed !important;
+    opacity:
+        0.45 !important;
 
-    transform: none !important;
+    cursor:
+        not-allowed !important;
 
-    box-shadow: none !important;
 }
 
 
-/* =========================================================
-   ENABLED AGREE BUTTON
-========================================================= */
-
-#termsAgreeButton:not(:disabled):hover {
-    transform: translateY(-2px) !important;
-
-    box-shadow:
-        0 14px 32px
-        rgba(37, 99, 235, 0.40),
-
-        inset 0 1px 0
-        rgba(255, 255, 255, 0.30) !important;
-}
-
-
-#termsAgreeButton:not(:disabled):active {
-    transform: translateY(0) !important;
-}
-
-
-/* =========================================================
-   BODY TERMS OPEN
-========================================================= */
-
-body.terms-open {
-    overflow: hidden !important;
-}
-
-
-/* =========================================================
-   MOBILE
-========================================================= */
+/*
+=========================================================
+MOBILE
+=========================================================
+*/
 
 @media (max-width: 600px) {
 
     .modal-overlay {
-        padding: 14px !important;
+
+        padding:
+            14px !important;
+
     }
 
 
     .modal-overlay .auth-modal,
     .modal-overlay .auth-modal-register {
-        width: 100% !important;
 
-        max-width: 100% !important;
+        width:
+            100% !important;
 
-        max-height: calc(100vh - 28px) !important;
+        max-width:
+            100% !important;
 
-        padding: 26px 20px !important;
+        max-height:
+            calc(100vh - 28px) !important;
 
-        border-radius: 20px !important;
+        padding:
+            26px 20px !important;
+
+        border-radius:
+            20px !important;
+
     }
 
 
     .form-grid-2 {
-        grid-template-columns: 1fr !important;
 
-        gap: 0 !important;
+        grid-template-columns:
+            1fr !important;
+
+        gap:
+            0 !important;
+
     }
 
 
     .auth-modal-header h2 {
-        font-size: 22px !important;
+
+        font-size:
+            22px !important;
+
     }
 
 
     .auth-modal-icon {
-        width: 52px !important;
 
-        height: 52px !important;
+        width:
+            52px !important;
 
-        border-radius: 16px !important;
+        height:
+            52px !important;
 
-        font-size: 24px !important;
+        border-radius:
+            16px !important;
+
+        font-size:
+            24px !important;
+
     }
 
 
     .modal-overlay .modal-close {
-        top: 10px !important;
 
-        right: 10px !important;
+        top:
+            10px !important;
 
-        width: 34px !important;
+        right:
+            10px !important;
 
-        height: 34px !important;
+        width:
+            34px !important;
 
-        font-size: 22px !important;
+        height:
+            34px !important;
+
+        font-size:
+            22px !important;
+
     }
 
 
     #termsModal {
-        padding: 14px !important;
+
+        padding:
+            14px !important;
+
     }
 
 
     #termsModal .terms-modal {
-        width: 100% !important;
 
-        max-width: 100% !important;
+        width:
+            100% !important;
 
-        max-height: calc(100vh - 28px) !important;
+        max-width:
+            100% !important;
 
-        padding: 24px 20px !important;
+        max-height:
+            calc(100vh - 28px) !important;
 
-        border-radius: 20px !important;
-    }
+        padding:
+            24px 20px !important;
 
+        border-radius:
+            20px !important;
 
-    #termsModal .terms-modal-header {
-        gap: 12px !important;
-
-        margin-bottom: 16px !important;
-
-        padding-bottom: 15px !important;
-    }
-
-
-    #termsModal .terms-icon {
-        width: 48px !important;
-
-        height: 48px !important;
-
-        min-width: 48px !important;
-
-        border-radius: 14px !important;
-
-        font-size: 22px !important;
-    }
-
-
-    #termsModal .terms-modal-header h2 {
-        font-size: 21px !important;
-    }
-
-
-    #termsContent {
-        max-height: 350px !important;
-    }
-
-
-    #termsContent h3 {
-        font-size: 14px !important;
-    }
-
-
-    #termsContent p {
-        font-size: 12px !important;
-
-        line-height: 1.65 !important;
-    }
-
-
-    #termsAgreeButton {
-        min-height: 48px !important;
-
-        font-size: 13px !important;
-    }
-
-}
-
-
-/* =========================================================
-   REDUCED MOTION
-========================================================= */
-
-@media (prefers-reduced-motion: reduce) {
-
-    .modal-overlay,
-    .auth-submit,
-    .modal-close,
-    #termsModal,
-    #termsAgreeButton {
-        transition: none !important;
     }
 
 }
