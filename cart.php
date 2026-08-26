@@ -2,17 +2,27 @@
 
 /*
 |--------------------------------------------------------------------------
-| HOCHIPO HUB - CART
+| HOCHIPOHUB - CUSTOMER CART
 |--------------------------------------------------------------------------
-| File: cart.php
+| File:
+| cart.php
+|--------------------------------------------------------------------------
 |
 | Purpose:
-| - Display customer's shopping cart
-| - Support multiple vendors in one cart
+| - Display customer shopping cart
+| - Support multiple vendors
+| - Update quantity
+| - Remove cart items
 | - Calculate subtotal
-| - Allow quantity update
-| - Remove product from cart
-| - Proceed to checkout
+| - Continue to checkout
+|
+|--------------------------------------------------------------------------
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE / SESSION / FUNCTIONS
 |--------------------------------------------------------------------------
 */
 
@@ -23,119 +33,313 @@ require_once __DIR__ . '/includes/functions.php';
 
 /*
 |--------------------------------------------------------------------------
-| REQUIRE LOGIN
+| SESSION
+|--------------------------------------------------------------------------
+*/
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| LOGIN CHECK
 |--------------------------------------------------------------------------
 */
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: index.php");
+
+    header('Location: index.php');
     exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| USER INFORMATION
+| DATABASE
 |--------------------------------------------------------------------------
 */
-
-$user_id = (int) $_SESSION['user_id'];
 
 $db = getDB();
 
 
+if (!($db instanceof PDO)) {
+    die('Database connection is not available.');
+}
+
+
 /*
 |--------------------------------------------------------------------------
-| HANDLE REMOVE ITEM
+| USER
 |--------------------------------------------------------------------------
 */
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_cart'])) {
+$userId = (int) $_SESSION['user_id'];
 
-    $cart_id = filter_input(INPUT_POST, 'cart_id', FILTER_VALIDATE_INT);
 
-    if ($cart_id) {
+/*
+|--------------------------------------------------------------------------
+| HELPERS
+|--------------------------------------------------------------------------
+*/
 
-        $stmt = $db->prepare("
-            DELETE FROM cart
-            WHERE cart_id = ?
-            AND customer_id = ?
-        ");
+if (!function_exists('cartEscape')) {
+
+    function cartEscape($value): string
+    {
+        return htmlspecialchars(
+            (string) $value,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    }
+}
+
+
+if (!function_exists('cartProductImage')) {
+
+    function cartProductImage($image): string
+    {
+        $image = trim((string) $image);
+
+        if ($image === '') {
+            return '';
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ALREADY FULL / RELATIVE PATH
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            str_starts_with($image, 'http://') ||
+            str_starts_with($image, 'https://') ||
+            str_starts_with($image, 'uploads/')
+        ) {
+            return $image;
+        }
+
+
+        return
+            'uploads/products/' .
+            rawurlencode(
+                basename($image)
+            );
+    }
+}
+
+
+if (!function_exists('cartVendorLogo')) {
+
+    function cartVendorLogo($image): string
+    {
+        $image = trim((string) $image);
+
+        if ($image === '') {
+            return '';
+        }
+
+
+        if (
+            str_starts_with($image, 'http://') ||
+            str_starts_with($image, 'https://') ||
+            str_starts_with($image, 'uploads/')
+        ) {
+            return $image;
+        }
+
+
+        return
+            'uploads/vendors/' .
+            rawurlencode(
+                basename($image)
+            );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| REMOVE CART ITEM
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['remove_cart'])
+) {
+
+    $cartId =
+        filter_input(
+            INPUT_POST,
+            'cart_id',
+            FILTER_VALIDATE_INT
+        );
+
+
+    if ($cartId) {
+
+        $stmt =
+            $db->prepare("
+                DELETE FROM cart
+
+                WHERE cart_id = ?
+
+                AND customer_id = ?
+            ");
+
 
         $stmt->execute([
-            $cart_id,
-            $user_id
+            $cartId,
+            $userId
         ]);
     }
 
-    header("Location: cart.php");
+
+    header(
+        'Location: cart.php?success=removed'
+    );
+
     exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| HANDLE UPDATE QUANTITY
+| UPDATE QUANTITY
 |--------------------------------------------------------------------------
 */
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_cart'])) {
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['update_cart'])
+) {
 
-    $cart_id = filter_input(INPUT_POST, 'cart_id', FILTER_VALIDATE_INT);
-    $quantity = filter_input(INPUT_POST, 'quantity', FILTER_VALIDATE_INT);
+    $cartId =
+        filter_input(
+            INPUT_POST,
+            'cart_id',
+            FILTER_VALIDATE_INT
+        );
 
-    if ($cart_id && $quantity !== false && $quantity > 0) {
+
+    $quantity =
+        filter_input(
+            INPUT_POST,
+            'quantity',
+            FILTER_VALIDATE_INT
+        );
+
+
+    if (
+        $cartId &&
+        $quantity !== false &&
+        $quantity > 0
+    ) {
+
 
         /*
         |--------------------------------------------------------------------------
-        | CHECK AVAILABLE STOCK
+        | CHECK PRODUCT + STOCK + STATUS
         |--------------------------------------------------------------------------
         */
 
-        $stockStmt = $db->prepare("
-            SELECT p.stock_quantity
-            FROM cart c
-            INNER JOIN products p
-                ON c.product_id = p.product_id
-            WHERE c.cart_id = ?
-            AND c.customer_id = ?
-            LIMIT 1
-        ");
+        $stockStmt =
+            $db->prepare("
+                SELECT
+
+                    p.stock_quantity,
+                    p.status
+
+                FROM cart c
+
+                INNER JOIN products p
+                    ON c.product_id = p.product_id
+
+                WHERE c.cart_id = ?
+
+                AND c.customer_id = ?
+
+                LIMIT 1
+            ");
+
 
         $stockStmt->execute([
-            $cart_id,
-            $user_id
+            $cartId,
+            $userId
         ]);
 
-        $stock = $stockStmt->fetch(PDO::FETCH_ASSOC);
+
+        $stock =
+            $stockStmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
 
         if ($stock) {
 
-            $availableStock = (int) $stock['stock_quantity'];
+            $availableStock =
+                (int) $stock['stock_quantity'];
 
-            if ($availableStock > 0) {
+
+            $productStatus =
+                trim(
+                    (string) $stock['status']
+                );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ONLY UPDATE IF AVAILABLE
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $availableStock > 0 &&
+                $productStatus === 'Available'
+            ) {
 
                 if ($quantity > $availableStock) {
                     $quantity = $availableStock;
                 }
 
-                $stmt = $db->prepare("
-                    UPDATE cart
-                    SET quantity = ?
-                    WHERE cart_id = ?
-                    AND customer_id = ?
-                ");
+
+                $stmt =
+                    $db->prepare("
+                        UPDATE cart
+
+                        SET quantity = ?
+
+                        WHERE cart_id = ?
+
+                        AND customer_id = ?
+                    ");
+
 
                 $stmt->execute([
                     $quantity,
-                    $cart_id,
-                    $user_id
+                    $cartId,
+                    $userId
                 ]);
+
+
+                header(
+                    'Location: cart.php?success=updated'
+                );
+
+                exit;
             }
         }
     }
 
-    header("Location: cart.php");
+
+    header(
+        'Location: cart.php?error=quantity'
+    );
+
     exit;
 }
 
@@ -146,663 +350,553 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_cart'])) {
 |--------------------------------------------------------------------------
 */
 
-$stmt = $db->prepare("
-    SELECT
-        c.cart_id,
-        c.product_id,
-        c.quantity,
+$stmt =
+    $db->prepare("
+        SELECT
 
-        p.product_name,
-        p.description,
-        p.price,
-        p.stock_quantity,
-        p.image,
-        p.status,
+            c.cart_id,
+            c.product_id,
+            c.quantity,
 
-        v.vendor_id,
-        v.business_name,
-        v.business_logo,
+            p.product_name,
+            p.description,
+            p.price,
+            p.stock_quantity,
+            p.image,
+            p.status,
 
-        cat.category_id,
-        cat.category_name
+            v.vendor_id,
+            v.business_name,
+            v.business_logo,
 
-    FROM cart c
+            cat.category_id,
+            cat.category_name
 
-    INNER JOIN products p
-        ON c.product_id = p.product_id
+        FROM cart c
 
-    INNER JOIN vendors v
-        ON p.vendor_id = v.vendor_id
+        INNER JOIN products p
+            ON c.product_id = p.product_id
 
-    INNER JOIN categories cat
-        ON p.category_id = cat.category_id
+        INNER JOIN vendors v
+            ON p.vendor_id = v.vendor_id
 
-    WHERE c.customer_id = ?
+        INNER JOIN categories cat
+            ON p.category_id = cat.category_id
 
-    ORDER BY v.business_name ASC, p.product_name ASC
-");
+        WHERE c.customer_id = ?
 
-$stmt->execute([$user_id]);
+        ORDER BY
+            v.business_name ASC,
+            p.product_name ASC
+    ");
 
-$cartItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$stmt->execute([
+    $userId
+]);
+
+
+$cartItems =
+    $stmt->fetchAll(
+        PDO::FETCH_ASSOC
+    );
 
 
 /*
 |--------------------------------------------------------------------------
-| CALCULATE TOTALS
+| TOTALS
 |--------------------------------------------------------------------------
 */
 
 $subtotal = 0;
+
 $totalItems = 0;
+
+$hasUnavailableItems = false;
+
 
 foreach ($cartItems as $item) {
 
-    $quantity = (int) $item['quantity'];
-    $price = (float) $item['price'];
+    $quantity =
+        (int) $item['quantity'];
 
-    $subtotal += ($price * $quantity);
-    $totalItems += $quantity;
+
+    $price =
+        (float) $item['price'];
+
+
+    $subtotal +=
+        $price * $quantity;
+
+
+    $totalItems +=
+        $quantity;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CHECK WHETHER CHECKOUT SHOULD BE ALLOWED
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $item['status'] !== 'Available' ||
+        (int) $item['stock_quantity'] <= 0 ||
+        $quantity > (int) $item['stock_quantity']
+    ) {
+
+        $hasUnavailableItems = true;
+    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| DELIVERY FEE
-|--------------------------------------------------------------------------
-| Delivery fee is handled during checkout.
+| DELIVERY
 |--------------------------------------------------------------------------
 */
 
 $deliveryFee = 0;
 
-$total = $subtotal + $deliveryFee;
+$total =
+    $subtotal +
+    $deliveryFee;
 
 
 /*
 |--------------------------------------------------------------------------
-| PAGE TITLE
+| SIDEBAR CART BADGE
 |--------------------------------------------------------------------------
 */
 
-$pageTitle = "My Cart";
-
-?>
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>
-        <?php echo htmlspecialchars($pageTitle); ?> | HochipoHub
-    </title>
-
-    <link
-        rel="stylesheet"
-        href="css/style.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="css/cart.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="css/dashboard.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="css/responsive.css"
-    >
-
-</head>
-
-<body>
+$cartCount =
+    $totalItems;
 
 
-<?php
 /*
 |--------------------------------------------------------------------------
-| NAVBAR
+| WISHLIST COUNT
 |--------------------------------------------------------------------------
 */
 
-require_once __DIR__ . '/includes/navbar.php';
-require_once __DIR__ . '/includes/customer_sidebar.php';
+$wishlistCount = 0;
+
+
+try {
+
+    $wishlistStmt =
+        $db->prepare("
+            SELECT COUNT(*) AS total
+
+            FROM wishlist
+
+            WHERE customer_id = ?
+        ");
+
+
+    $wishlistStmt->execute([
+        $userId
+    ]);
+
+
+    $wishlistRow =
+        $wishlistStmt->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+
+    $wishlistCount =
+        (int) (
+            $wishlistRow['total']
+            ?? 0
+        );
+
+} catch (Throwable $e) {
+
+    $wishlistCount = 0;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GROUP CART BY VENDOR
+|--------------------------------------------------------------------------
+*/
+
+$vendors = [];
+
+
+foreach ($cartItems as $item) {
+
+    $vendorId =
+        (int) $item['vendor_id'];
+
+
+    if (!isset($vendors[$vendorId])) {
+
+        $vendors[$vendorId] = [
+
+            'vendor_id' =>
+                $vendorId,
+
+            'business_name' =>
+                $item['business_name'],
+
+            'business_logo' =>
+                $item['business_logo'],
+
+            'items' => []
+
+        ];
+    }
+
+
+    $vendors[$vendorId]['items'][] =
+        $item;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PAGE CONFIG
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| Catalog uses includes/header.php.
+| Cart now uses the same shared header too.
+|
+|--------------------------------------------------------------------------
+*/
+
+$pageTitle =
+    'My Cart';
+
+
+$extraCSS = [
+    'cart.css',
+    'dashboard.css'
+];
+
+
+$hideSiteMainWrapper =
+    true;
+
+
+/*
+|--------------------------------------------------------------------------
+| SHARED HEADER
+|--------------------------------------------------------------------------
+*/
+
+require_once __DIR__ .
+    '/includes/header.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| CUSTOMER NAVIGATION
+|--------------------------------------------------------------------------
+*/
+
+require_once __DIR__ .
+    '/includes/customer_sidebar.php';
+
 ?>
 
 
-<main class="cart-page">
+<!-- ===============================================================
+     CART PAGE
+================================================================ -->
+
+<main class="hh-cart-page">
 
 
-    <!-- =====================================================
-         PAGE HEADER
-    ====================================================== -->
-
-    <section class="cart-header">
-
-        <div class="cart-header-content">
-
-            <span class="cart-label">
-                YOUR SHOPPING BAG
-            </span>
-
-            <h1>
-                My Cart
-            </h1>
-
-            <p>
-                Review your items before checking out.
-            </p>
-
-        </div>
-
-    </section>
+    <div class="hh-cart-container">
 
 
-    <!-- =====================================================
-         CART CONTENT
-    ====================================================== -->
+        <!-- =======================================================
+             HERO
+        ======================================================== -->
 
-    <section class="cart-container">
+        <section class="hh-cart-hero">
 
-        <?php if (empty($cartItems)): ?>
 
-            <!-- =================================================
-                 EMPTY CART
-            ================================================== -->
+            <div class="hh-cart-hero-content">
 
-            <div class="empty-cart">
 
-                <div class="empty-cart-icon">
-                    🛒
-                </div>
+                <span class="hh-cart-hero-pill">
 
-                <h2>
-                    Your cart is empty
-                </h2>
+                    <i class="bi bi-cart3"></i>
+
+                    YOUR SHOPPING BAG
+
+                </span>
+
+
+                <h1>
+
+                    Your Cart,
+                    <span>Ready When You Are.</span>
+
+                </h1>
+
 
                 <p>
-                    Looks like you haven't added anything yet.
+
+                    Review your favourite finds, adjust quantities
+                    and continue to secure checkout when everything
+                    looks perfect.
+
                 </p>
 
-                <a
-                    href="catalog.php"
-                    class="btn-primary"
-                >
-                    Explore Products
-                </a>
 
-            </div>
+                <div class="hh-cart-hero-actions">
 
-        <?php else: ?>
 
+                    <a
+                        href="catalog.php"
+                        class="hh-cart-hero-primary"
+                    >
 
-            <div class="cart-layout">
+                        <i class="bi bi-bag"></i>
 
+                        Continue Shopping
 
-                <!-- =============================================
-                     CART ITEMS
-                ============================================== -->
+                    </a>
 
-                <div class="cart-items-section">
 
-
-                    <div class="cart-items-header">
-
-                        <div>
-                            <h2>
-                                Cart Items
-                            </h2>
-
-                            <span>
-                                <?php echo $totalItems; ?>
-                                item<?php echo $totalItems != 1 ? 's' : ''; ?>
-                            </span>
-                        </div>
-
-                    </div>
-
-
-                    <?php
-                    /*
-                    |--------------------------------------------------------------------------
-                    | GROUP ITEMS BY VENDOR
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $vendors = [];
-
-                    foreach ($cartItems as $item) {
-
-                        $vendorId = $item['vendor_id'];
-
-                        if (!isset($vendors[$vendorId])) {
-                            $vendors[$vendorId] = [
-                                'vendor_id' => $vendorId,
-                                'business_name' => $item['business_name'],
-                                'business_logo' => $item['business_logo'],
-                                'items' => []
-                            ];
-                        }
-
-                        $vendors[$vendorId]['items'][] = $item;
-                    }
-                    ?>
-
-
-                    <?php foreach ($vendors as $vendor): ?>
-
-                        <div class="cart-vendor-group">
-
-
-                            <!-- Vendor Header -->
-
-                            <div class="cart-vendor-header">
-
-                                <div class="vendor-info">
-
-                                    <?php if (!empty($vendor['business_logo'])): ?>
-
-                                        <img
-                                            src="<?php echo htmlspecialchars($vendor['business_logo']); ?>"
-                                            alt="<?php echo htmlspecialchars($vendor['business_name']); ?>"
-                                        >
-
-                                    <?php else: ?>
-
-                                        <div class="vendor-placeholder">
-                                            🏪
-                                        </div>
-
-                                    <?php endif; ?>
-
-
-                                    <div>
-
-                                        <span>
-                                            SELLER
-                                        </span>
-
-                                        <strong>
-                                            <?php
-                                            echo htmlspecialchars(
-                                                $vendor['business_name']
-                                            );
-                                            ?>
-                                        </strong>
-
-                                    </div>
-
-                                </div>
-
-                            </div>
-
-
-                            <!-- Vendor Products -->
-
-                            <?php foreach ($vendor['items'] as $item): ?>
-
-                                <?php
-
-                                $quantity = (int) $item['quantity'];
-                                $price = (float) $item['price'];
-
-                                $itemSubtotal = $price * $quantity;
-
-                                ?>
-
-
-                                <div class="cart-item">
-
-
-                                    <!-- Product Image -->
-
-                                    <div class="cart-product-image">
-
-                                        <?php if (!empty($item['image'])): ?>
-
-                                            <img
-                                                src="<?php echo htmlspecialchars($item['image']); ?>"
-                                                alt="<?php echo htmlspecialchars($item['product_name']); ?>"
-                                            >
-
-                                        <?php else: ?>
-
-                                            <div class="product-placeholder">
-                                                📦
-                                            </div>
-
-                                        <?php endif; ?>
-
-                                    </div>
-
-
-                                    <!-- Product Information -->
-
-                                    <div class="cart-product-info">
-
-                                        <span class="cart-category">
-
-                                            <?php
-                                            echo htmlspecialchars(
-                                                $item['category_name']
-                                            );
-                                            ?>
-
-                                        </span>
-
-                                        <h3>
-
-                                            <a
-                                                href="product_details.php?id=<?php echo (int) $item['product_id']; ?>"
-                                            >
-
-                                                <?php
-                                                echo htmlspecialchars(
-                                                    $item['product_name']
-                                                );
-                                                ?>
-
-                                            </a>
-
-                                        </h3>
-
-                                        <p class="cart-price">
-
-                                            RM
-                                            <?php
-                                            echo number_format(
-                                                $price,
-                                                2
-                                            );
-                                            ?>
-
-                                        </p>
-
-
-                                        <?php if ($item['status'] !== 'Available'): ?>
-
-                                            <span class="cart-warning">
-                                                Product unavailable
-                                            </span>
-
-                                        <?php elseif ($item['stock_quantity'] <= 0): ?>
-
-                                            <span class="cart-warning">
-                                                Out of stock
-                                            </span>
-
-                                        <?php elseif ($quantity > $item['stock_quantity']): ?>
-
-                                            <span class="cart-warning">
-                                                Only
-                                                <?php
-                                                echo (int) $item['stock_quantity'];
-                                                ?>
-                                                available
-                                            </span>
-
-                                        <?php endif; ?>
-
-                                    </div>
-
-
-                                    <!-- Quantity -->
-
-                                    <div class="cart-quantity">
-
-                                        <form
-                                            method="POST"
-                                            action="cart.php"
-                                        >
-
-                                            <input
-                                                type="hidden"
-                                                name="cart_id"
-                                                value="<?php echo (int) $item['cart_id']; ?>"
-                                            >
-
-                                            <label>
-                                                Qty
-                                            </label>
-
-                                            <input
-                                                type="number"
-                                                name="quantity"
-                                                value="<?php echo $quantity; ?>"
-                                                min="1"
-                                                max="<?php echo max(1, (int) $item['stock_quantity']); ?>"
-                                            >
-
-                                            <button
-                                                type="submit"
-                                                name="update_cart"
-                                                class="btn-update-cart"
-                                            >
-                                                Update
-                                            </button>
-
-                                        </form>
-
-                                    </div>
-
-
-                                    <!-- Subtotal -->
-
-                                    <div class="cart-item-total">
-
-                                        <span>
-                                            Subtotal
-                                        </span>
-
-                                        <strong>
-
-                                            RM
-                                            <?php
-                                            echo number_format(
-                                                $itemSubtotal,
-                                                2
-                                            );
-                                            ?>
-
-                                        </strong>
-
-                                    </div>
-
-
-                                    <!-- Remove -->
-
-                                    <div class="cart-remove">
-
-                                        <form
-                                            method="POST"
-                                            action="cart.php"
-                                            onsubmit="return confirm('Remove this product from your cart?');"
-                                        >
-
-                                            <input
-                                                type="hidden"
-                                                name="cart_id"
-                                                value="<?php echo (int) $item['cart_id']; ?>"
-                                            >
-
-                                            <button
-                                                type="submit"
-                                                name="remove_cart"
-                                                class="btn-remove-cart"
-                                                title="Remove item"
-                                            >
-                                                ×
-                                            </button>
-
-                                        </form>
-
-                                    </div>
-
-
-                                </div>
-
-                            <?php endforeach; ?>
-
-                        </div>
-
-                    <?php endforeach; ?>
-
-
-                    <!-- Continue Shopping -->
-
-                    <div class="cart-continue">
-
-                        <a
-                            href="catalog.php"
-                            class="btn-secondary"
-                        >
-                            ← Continue Shopping
-                        </a>
-
-                    </div>
-
-
-                </div>
-
-
-                <!-- =============================================
-                     ORDER SUMMARY
-                ============================================== -->
-
-                <aside class="cart-summary">
-
-                    <div class="summary-card">
-
-                        <div class="summary-heading">
-
-                            <span>
-                                ORDER SUMMARY
-                            </span>
-
-                            <h2>
-                                Your Total
-                            </h2>
-
-                        </div>
-
-
-                        <div class="summary-row">
-
-                            <span>
-                                Items
-                            </span>
-
-                            <strong>
-                                <?php echo $totalItems; ?>
-                            </strong>
-
-                        </div>
-
-
-                        <div class="summary-row">
-
-                            <span>
-                                Subtotal
-                            </span>
-
-                            <strong>
-
-                                RM
-                                <?php
-                                echo number_format(
-                                    $subtotal,
-                                    2
-                                );
-                                ?>
-
-                            </strong>
-
-                        </div>
-
-
-                        <div class="summary-row">
-
-                            <span>
-                                Delivery
-                            </span>
-
-                            <strong>
-                                Calculated at checkout
-                            </strong>
-
-                        </div>
-
-
-                        <div class="summary-divider"></div>
-
-
-                        <div class="summary-total">
-
-                            <span>
-                                Estimated Total
-                            </span>
-
-                            <strong>
-
-                                RM
-                                <?php
-                                echo number_format(
-                                    $total,
-                                    2
-                                );
-                                ?>
-
-                            </strong>
-
-                        </div>
+                    <?php if (
+                        !empty($cartItems) &&
+                        !$hasUnavailableItems
+                    ): ?>
 
 
                         <a
                             href="checkout.php"
-                            class="btn-checkout"
+                            class="hh-cart-hero-secondary"
                         >
-                            Proceed to Checkout
-                            →
+
+                            Checkout
+
+                            <i class="bi bi-arrow-right"></i>
+
                         </a>
 
 
-                        <div class="secure-checkout">
-
-                            🔒 Secure checkout
-
-                        </div>
-
-                    </div>
+                    <?php endif; ?>
 
 
-                    <!-- Multi Vendor Notice -->
+                </div>
 
-                    <div class="multi-vendor-note">
+
+            </div>
+
+
+
+            <!-- ===================================================
+                 HERO VISUAL
+            ==================================================== -->
+
+            <div class="hh-cart-hero-visual">
+
+
+                <div class="hh-cart-big-icon">
+
+                    <i class="bi bi-cart-check"></i>
+
+                </div>
+
+
+                <div class="hh-cart-floating-card card-one">
+
+                    <span>
+
+                        <i class="bi bi-bag-check"></i>
+
+                    </span>
+
+
+                    <div>
+
+                        <small>
+                            ITEMS
+                        </small>
 
                         <strong>
-                            🏪 Multiple Sellers?
+                            <?= number_format(
+                                $totalItems
+                            ) ?>
                         </strong>
-
-                        <p>
-                            Your order can contain products from
-                            different vendors. Each vendor will
-                            process their own items separately.
-                        </p>
 
                     </div>
 
-                </aside>
+                </div>
+
+
+                <div class="hh-cart-floating-card card-two">
+
+                    <span>
+
+                        <i class="bi bi-shield-check"></i>
+
+                    </span>
+
+
+                    <div>
+
+                        <small>
+                            CHECKOUT
+                        </small>
+
+                        <strong>
+                            Secure
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =======================================================
+             QUICK STATS
+        ======================================================== -->
+
+        <section class="hh-cart-stats">
+
+
+            <article class="hh-cart-stat">
+
+
+                <div class="hh-cart-stat-icon blue">
+
+                    <i class="bi bi-bag"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        ITEMS IN CART
+                    </span>
+
+                    <strong>
+                        <?= number_format(
+                            $totalItems
+                        ) ?>
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+
+            <article class="hh-cart-stat">
+
+
+                <div class="hh-cart-stat-icon purple">
+
+                    <i class="bi bi-shop"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        SELLERS
+                    </span>
+
+                    <strong>
+                        <?= number_format(
+                            count($vendors)
+                        ) ?>
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+
+            <article class="hh-cart-stat">
+
+
+                <div class="hh-cart-stat-icon green">
+
+                    <i class="bi bi-wallet2"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        ESTIMATED TOTAL
+                    </span>
+
+                    <strong>
+
+                        RM
+                        <?= number_format(
+                            $total,
+                            2
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+        </section>
+
+
+
+        <!-- =======================================================
+             MESSAGE
+        ======================================================== -->
+
+        <?php if (
+            isset($_GET['success'])
+        ): ?>
+
+
+            <div class="hh-cart-alert success">
+
+
+                <i class="bi bi-check-circle-fill"></i>
+
+
+                <?php if (
+                    $_GET['success'] === 'removed'
+                ): ?>
+
+                    Item removed from your cart.
+
+                <?php elseif (
+                    $_GET['success'] === 'updated'
+                ): ?>
+
+                    Cart quantity updated successfully.
+
+                <?php else: ?>
+
+                    Cart updated successfully.
+
+                <?php endif; ?>
 
 
             </div>
@@ -810,18 +904,1131 @@ require_once __DIR__ . '/includes/customer_sidebar.php';
 
         <?php endif; ?>
 
-    </section>
+
+        <?php if (
+            isset($_GET['error'])
+        ): ?>
+
+
+            <div class="hh-cart-alert error">
+
+
+                <i class="bi bi-exclamation-circle-fill"></i>
+
+                We couldn't update that item.
+                Check its availability and stock quantity.
+
+            </div>
+
+
+        <?php endif; ?>
+
+
+
+        <!-- =======================================================
+             EMPTY CART
+        ======================================================== -->
+
+        <?php if (empty($cartItems)): ?>
+
+
+            <section class="hh-empty-cart">
+
+
+                <div class="hh-empty-art">
+
+
+                    <div class="hh-empty-circle circle-one"></div>
+
+                    <div class="hh-empty-circle circle-two"></div>
+
+
+                    <div class="hh-empty-cart-icon">
+
+                        <i class="bi bi-cart3"></i>
+
+                    </div>
+
+
+                    <div class="hh-empty-mini-box box-one">
+
+                        <i class="bi bi-bag-heart"></i>
+
+                    </div>
+
+
+                    <div class="hh-empty-mini-box box-two">
+
+                        <i class="bi bi-box-seam"></i>
+
+                    </div>
+
+
+                </div>
+
+
+                <div class="hh-empty-copy">
+
+
+                    <span>
+                        YOUR NEXT FIND IS WAITING
+                    </span>
+
+
+                    <h2>
+
+                        Your cart is feeling
+                        a little empty.
+
+                    </h2>
+
+
+                    <p>
+
+                        Explore products from HochipoHub's local
+                        sellers and add something you love.
+                        Everything you add will appear right here.
+
+                    </p>
+
+
+                    <div class="hh-empty-actions">
+
+
+                        <a
+                            href="catalog.php"
+                            class="hh-empty-primary"
+                        >
+
+                            <i class="bi bi-bag"></i>
+
+                            Explore Products
+
+                        </a>
+
+
+                        <a
+                            href="wishlist.php"
+                            class="hh-empty-secondary"
+                        >
+
+                            <i class="bi bi-heart"></i>
+
+                            View Wishlist
+
+                        </a>
+
+
+                    </div>
+
+
+                </div>
+
+
+            </section>
+
+
+
+            <!-- ===================================================
+                 EMPTY PAGE BENEFITS
+            ==================================================== -->
+
+            <section class="hh-cart-benefits">
+
+
+                <article>
+
+
+                    <div>
+
+                        <i class="bi bi-shop"></i>
+
+                    </div>
+
+
+                    <span>
+                        SHOP LOCAL
+                    </span>
+
+
+                    <h3>
+                        Discover local sellers
+                    </h3>
+
+
+                    <p>
+
+                        Browse products from independent
+                        HochipoHub vendors in one marketplace.
+
+                    </p>
+
+
+                </article>
+
+
+
+                <article>
+
+
+                    <div>
+
+                        <i class="bi bi-shield-check"></i>
+
+                    </div>
+
+
+                    <span>
+                        SHOP SAFELY
+                    </span>
+
+
+                    <h3>
+                        Secure checkout flow
+                    </h3>
+
+
+                    <p>
+
+                        Review your order and delivery information
+                        before confirming your purchase.
+
+                    </p>
+
+
+                </article>
+
+
+
+                <article>
+
+
+                    <div>
+
+                        <i class="bi bi-box-seam"></i>
+
+                    </div>
+
+
+                    <span>
+                        ORDER TRACKING
+                    </span>
+
+
+                    <h3>
+                        Keep track of purchases
+                    </h3>
+
+
+                    <p>
+
+                        Your orders stay organised in one place
+                        after checkout.
+
+                    </p>
+
+
+                </article>
+
+
+            </section>
+
+
+        <?php else: ?>
+
+
+            <!-- ===================================================
+                 UNAVAILABLE WARNING
+            ==================================================== -->
+
+            <?php if ($hasUnavailableItems): ?>
+
+
+                <div class="hh-cart-alert warning">
+
+
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+
+
+                    <div>
+
+                        <strong>
+                            Some items need your attention.
+                        </strong>
+
+                        Remove or update unavailable items
+                        before proceeding to checkout.
+
+                    </div>
+
+
+                </div>
+
+
+            <?php endif; ?>
+
+
+
+            <!-- ===================================================
+                 CART BODY
+            ==================================================== -->
+
+            <section class="hh-cart-layout">
+
+
+                <!-- =================================================
+                     ITEMS
+                ================================================== -->
+
+                <div class="hh-cart-items">
+
+
+                    <div class="hh-cart-section-header">
+
+
+                        <div class="hh-cart-section-title">
+
+
+                            <div class="hh-cart-section-icon">
+
+                                <i class="bi bi-bag-check"></i>
+
+                            </div>
+
+
+                            <div>
+
+                                <span>
+                                    SHOPPING CART
+                                </span>
+
+                                <h2>
+                                    Your Items
+                                </h2>
+
+                                <p>
+
+                                    <?= number_format(
+                                        $totalItems
+                                    ) ?>
+
+                                    item<?= $totalItems !== 1
+                                        ? 's'
+                                        : '' ?>
+
+                                    from
+
+                                    <?= number_format(
+                                        count($vendors)
+                                    ) ?>
+
+                                    seller<?= count($vendors) !== 1
+                                        ? 's'
+                                        : '' ?>.
+
+                                </p>
+
+                            </div>
+
+
+                        </div>
+
+
+                    </div>
+
+
+
+                    <!-- =============================================
+                         VENDORS
+                    ============================================== -->
+
+                    <?php foreach (
+                        $vendors
+                        as $vendor
+                    ): ?>
+
+
+                        <?php
+
+                        $vendorLogo =
+                            cartVendorLogo(
+                                $vendor['business_logo']
+                            );
+
+                        ?>
+
+
+                        <article class="hh-cart-vendor">
+
+
+                            <!-- =====================================
+                                 VENDOR HEADER
+                            ====================================== -->
+
+                            <div class="hh-cart-vendor-header">
+
+
+                                <div class="hh-cart-vendor-info">
+
+
+                                    <div class="hh-cart-vendor-logo">
+
+
+                                        <?php if (
+                                            $vendorLogo !== ''
+                                        ): ?>
+
+
+                                            <img
+                                                src="<?= cartEscape(
+                                                    $vendorLogo
+                                                ) ?>"
+                                                alt="<?= cartEscape(
+                                                    $vendor['business_name']
+                                                ) ?>"
+                                                onerror="
+                                                    this.style.display='none';
+                                                    this.parentElement.innerHTML='<i class=&quot;bi bi-shop&quot;></i>';
+                                                "
+                                            >
+
+
+                                        <?php else: ?>
+
+
+                                            <i class="bi bi-shop"></i>
+
+
+                                        <?php endif; ?>
+
+
+                                    </div>
+
+
+                                    <div>
+
+
+                                        <span>
+                                            SELLER
+                                        </span>
+
+
+                                        <strong>
+
+                                            <?= cartEscape(
+                                                $vendor['business_name']
+                                            ) ?>
+
+                                        </strong>
+
+
+                                    </div>
+
+
+                                </div>
+
+
+                                <a
+                                    href="vendor.php?id=<?= (int)
+                                        $vendor['vendor_id'] ?>"
+                                    class="hh-cart-view-store"
+                                >
+
+                                    View Store
+
+                                    <i class="bi bi-arrow-right"></i>
+
+                                </a>
+
+
+                            </div>
+
+
+
+                            <!-- =====================================
+                                 PRODUCTS
+                            ====================================== -->
+
+                            <div class="hh-cart-product-list">
+
+
+                                <?php foreach (
+                                    $vendor['items']
+                                    as $item
+                                ): ?>
+
+
+                                    <?php
+
+                                    $quantity =
+                                        (int) $item['quantity'];
+
+
+                                    $price =
+                                        (float) $item['price'];
+
+
+                                    $itemSubtotal =
+                                        $price *
+                                        $quantity;
+
+
+                                    $stockQuantity =
+                                        (int) $item['stock_quantity'];
+
+
+                                    $productStatus =
+                                        (string) $item['status'];
+
+
+                                    $productAvailable =
+                                        $productStatus === 'Available' &&
+                                        $stockQuantity > 0;
+
+
+                                    $productImage =
+                                        cartProductImage(
+                                            $item['image']
+                                        );
+
+                                    ?>
+
+
+                                    <div
+                                        class="
+                                            hh-cart-product
+                                            <?= !$productAvailable
+                                                ? 'unavailable'
+                                                : '' ?>
+                                        "
+                                    >
+
+
+                                        <!-- IMAGE -->
+
+                                        <a
+                                            href="product_details.php?id=<?= (int)
+                                                $item['product_id'] ?>"
+                                            class="hh-cart-product-image"
+                                        >
+
+
+                                            <?php if (
+                                                $productImage !== ''
+                                            ): ?>
+
+
+                                                <img
+                                                    src="<?= cartEscape(
+                                                        $productImage
+                                                    ) ?>"
+                                                    alt="<?= cartEscape(
+                                                        $item['product_name']
+                                                    ) ?>"
+                                                    onerror="
+                                                        this.style.display='none';
+                                                        this.parentElement.innerHTML='<i class=&quot;bi bi-image&quot;></i>';
+                                                    "
+                                                >
+
+
+                                            <?php else: ?>
+
+
+                                                <i class="bi bi-image"></i>
+
+
+                                            <?php endif; ?>
+
+
+                                        </a>
+
+
+
+                                        <!-- INFO -->
+
+                                        <div class="hh-cart-product-info">
+
+
+                                            <span class="hh-cart-category">
+
+                                                <?= cartEscape(
+                                                    $item['category_name']
+                                                ) ?>
+
+                                            </span>
+
+
+                                            <h3>
+
+
+                                                <a
+                                                    href="product_details.php?id=<?= (int)
+                                                        $item['product_id'] ?>"
+                                                >
+
+                                                    <?= cartEscape(
+                                                        $item['product_name']
+                                                    ) ?>
+
+                                                </a>
+
+
+                                            </h3>
+
+
+                                            <div class="hh-cart-product-price">
+
+                                                RM
+                                                <?= number_format(
+                                                    $price,
+                                                    2
+                                                ) ?>
+
+                                            </div>
+
+
+
+                                            <!-- STATUS -->
+
+                                            <?php if (
+                                                $productStatus === 'Hidden'
+                                            ): ?>
+
+
+                                                <div class="hh-product-warning">
+
+                                                    <i class="bi bi-eye-slash"></i>
+
+                                                    Product is no longer available.
+
+                                                </div>
+
+
+                                            <?php elseif (
+                                                $productStatus !== 'Available'
+                                            ): ?>
+
+
+                                                <div class="hh-product-warning">
+
+                                                    <i class="bi bi-x-circle"></i>
+
+                                                    <?= cartEscape(
+                                                        $productStatus
+                                                    ) ?>
+
+                                                </div>
+
+
+                                            <?php elseif (
+                                                $stockQuantity <= 0
+                                            ): ?>
+
+
+                                                <div class="hh-product-warning">
+
+                                                    <i class="bi bi-x-circle"></i>
+
+                                                    Out of stock.
+
+                                                </div>
+
+
+                                            <?php elseif (
+                                                $quantity >
+                                                $stockQuantity
+                                            ): ?>
+
+
+                                                <div class="hh-product-warning">
+
+                                                    <i class="bi bi-exclamation-circle"></i>
+
+                                                    Only
+                                                    <?= $stockQuantity ?>
+                                                    available.
+
+                                                </div>
+
+
+                                            <?php else: ?>
+
+
+                                                <div class="hh-product-available">
+
+                                                    <i class="bi bi-check-circle"></i>
+
+                                                    In stock
+
+                                                </div>
+
+
+                                            <?php endif; ?>
+
+
+                                        </div>
+
+
+
+                                        <!-- QUANTITY -->
+
+                                        <div class="hh-cart-product-quantity">
+
+
+                                            <span>
+                                                QUANTITY
+                                            </span>
+
+
+                                            <form
+                                                method="POST"
+                                                action="cart.php"
+                                                class="hh-quantity-form"
+                                            >
+
+
+                                                <input
+                                                    type="hidden"
+                                                    name="cart_id"
+                                                    value="<?= (int)
+                                                        $item['cart_id'] ?>"
+                                                >
+
+
+                                                <input
+                                                    type="number"
+                                                    name="quantity"
+                                                    value="<?= $quantity ?>"
+                                                    min="1"
+                                                    max="<?= max(
+                                                        1,
+                                                        $stockQuantity
+                                                    ) ?>"
+                                                    <?= !$productAvailable
+                                                        ? 'disabled'
+                                                        : '' ?>
+                                                >
+
+
+                                                <button
+                                                    type="submit"
+                                                    name="update_cart"
+                                                    <?= !$productAvailable
+                                                        ? 'disabled'
+                                                        : '' ?>
+                                                >
+
+                                                    Update
+
+                                                </button>
+
+
+                                            </form>
+
+
+                                        </div>
+
+
+
+                                        <!-- PRICE -->
+
+                                        <div class="hh-cart-product-total">
+
+
+                                            <span>
+                                                SUBTOTAL
+                                            </span>
+
+
+                                            <strong>
+
+                                                RM
+                                                <?= number_format(
+                                                    $itemSubtotal,
+                                                    2
+                                                ) ?>
+
+                                            </strong>
+
+
+                                        </div>
+
+
+
+                                        <!-- REMOVE -->
+
+                                        <form
+                                            method="POST"
+                                            action="cart.php"
+                                            class="hh-cart-remove-form"
+                                            onsubmit="
+                                                return confirm(
+                                                    'Remove this product from your cart?'
+                                                );
+                                            "
+                                        >
+
+
+                                            <input
+                                                type="hidden"
+                                                name="cart_id"
+                                                value="<?= (int)
+                                                    $item['cart_id'] ?>"
+                                            >
+
+
+                                            <button
+                                                type="submit"
+                                                name="remove_cart"
+                                                class="hh-cart-remove"
+                                                title="Remove item"
+                                                aria-label="Remove item"
+                                            >
+
+                                                <i class="bi bi-trash3"></i>
+
+                                            </button>
+
+
+                                        </form>
+
+
+                                    </div>
+
+
+                                <?php endforeach; ?>
+
+
+                            </div>
+
+
+                        </article>
+
+
+                    <?php endforeach; ?>
+
+
+
+                    <!-- =============================================
+                         CONTINUE
+                    ============================================== -->
+
+                    <a
+                        href="catalog.php"
+                        class="hh-cart-continue"
+                    >
+
+                        <i class="bi bi-arrow-left"></i>
+
+                        Continue Shopping
+
+                    </a>
+
+
+                </div>
+
+
+
+                <!-- =================================================
+                     SUMMARY
+                ================================================== -->
+
+                <aside class="hh-cart-summary">
+
+
+                    <div class="hh-cart-summary-card">
+
+
+                        <div class="hh-summary-icon">
+
+                            <i class="bi bi-receipt"></i>
+
+                        </div>
+
+
+                        <span class="hh-summary-label">
+
+                            ORDER SUMMARY
+
+                        </span>
+
+
+                        <h2>
+
+                            Your Total
+
+                        </h2>
+
+
+                        <p class="hh-summary-description">
+
+                            Review your cart before moving
+                            to checkout.
+
+                        </p>
+
+
+
+                        <!-- ROW -->
+
+                        <div class="hh-summary-row">
+
+
+                            <span>
+                                Items
+                            </span>
+
+
+                            <strong>
+                                <?= number_format(
+                                    $totalItems
+                                ) ?>
+                            </strong>
+
+
+                        </div>
+
+
+
+                        <!-- ROW -->
+
+                        <div class="hh-summary-row">
+
+
+                            <span>
+                                Sellers
+                            </span>
+
+
+                            <strong>
+                                <?= number_format(
+                                    count($vendors)
+                                ) ?>
+                            </strong>
+
+
+                        </div>
+
+
+
+                        <!-- ROW -->
+
+                        <div class="hh-summary-row">
+
+
+                            <span>
+                                Subtotal
+                            </span>
+
+
+                            <strong>
+
+                                RM
+                                <?= number_format(
+                                    $subtotal,
+                                    2
+                                ) ?>
+
+                            </strong>
+
+
+                        </div>
+
+
+
+                        <!-- ROW -->
+
+                        <div class="hh-summary-row">
+
+
+                            <span>
+                                Delivery
+                            </span>
+
+
+                            <strong class="delivery-text">
+
+                                At checkout
+
+                            </strong>
+
+
+                        </div>
+
+
+
+                        <div class="hh-summary-divider"></div>
+
+
+
+                        <!-- TOTAL -->
+
+                        <div class="hh-summary-total">
+
+
+                            <div>
+
+                                <span>
+                                    ESTIMATED TOTAL
+                                </span>
+
+                                <small>
+                                    Excluding delivery fee
+                                </small>
+
+                            </div>
+
+
+                            <strong>
+
+                                RM
+                                <?= number_format(
+                                    $total,
+                                    2
+                                ) ?>
+
+                            </strong>
+
+
+                        </div>
+
+
+
+                        <!-- CHECKOUT -->
+
+                        <?php if (
+                            !$hasUnavailableItems
+                        ): ?>
+
+
+                            <a
+                                href="checkout.php"
+                                class="hh-checkout-button"
+                            >
+
+                                <span>
+
+                                    <i class="bi bi-lock-fill"></i>
+
+                                    Proceed to Checkout
+
+                                </span>
+
+
+                                <i class="bi bi-arrow-right"></i>
+
+                            </a>
+
+
+                        <?php else: ?>
+
+
+                            <div class="hh-checkout-disabled">
+
+
+                                <i class="bi bi-exclamation-triangle"></i>
+
+                                Resolve unavailable items first
+
+                            </div>
+
+
+                        <?php endif; ?>
+
+
+
+                        <!-- SECURE -->
+
+                        <div class="hh-secure-row">
+
+
+                            <i class="bi bi-shield-check"></i>
+
+
+                            <div>
+
+                                <strong>
+                                    Secure checkout
+                                </strong>
+
+                                <span>
+                                    Review before confirming
+                                </span>
+
+                            </div>
+
+
+                        </div>
+
+
+                    </div>
+
+
+
+                    <!-- =============================================
+                         MULTI VENDOR
+                    ============================================== -->
+
+                    <div class="hh-multi-vendor">
+
+
+                        <div>
+
+                            <i class="bi bi-shop-window"></i>
+
+                        </div>
+
+
+                        <section>
+
+                            <strong>
+                                Shopping from multiple sellers?
+                            </strong>
+
+
+                            <p>
+
+                                Each HochipoHub vendor will
+                                process their part of your
+                                order independently.
+
+                            </p>
+
+                        </section>
+
+
+                    </div>
+
+
+                </aside>
+
+
+            </section>
+
+
+        <?php endif; ?>
+
+
+    </div>
+
 
 </main>
 
 
 <?php
-require_once __DIR__ . '/includes/footer.php';
+
+/*
+|--------------------------------------------------------------------------
+| FOOTER
+|--------------------------------------------------------------------------
+*/
+
+require_once __DIR__ .
+    '/includes/footer.php';
+
 ?>
 
 
 <script src="js/cart.js"></script>
 <script src="js/script.js"></script>
-
-</body>
-</html>
