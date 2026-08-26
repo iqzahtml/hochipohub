@@ -1,7 +1,7 @@
 /*
 =========================================================
-HOCHIPOHUB - GLASSMORPHISM AUTH MODAL
-Login + Register Modal
+HOCHIPOHUB - AUTH MODAL CSS
+LOGIN + REGISTER
 =========================================================
 */
 
@@ -13,8 +13,6 @@ MODAL OVERLAY
 */
 
 .modal-overlay {
-
-    display: none !important;
 
     position: fixed !important;
 
@@ -29,6 +27,8 @@ MODAL OVERLAY
     padding: 20px !important;
 
     box-sizing: border-box !important;
+
+    display: none !important;
 
     align-items: center !important;
     justify-content: center !important;
@@ -50,7 +50,7 @@ MODAL OVERLAY
 
     -webkit-backdrop-filter: blur(8px) !important;
 
-    z-index: 2147483646 !important;
+    z-index: 999999 !important;
 
     opacity: 0 !important;
 
@@ -61,35 +61,16 @@ MODAL OVERLAY
     transition:
         opacity 0.25s ease,
         visibility 0.25s ease !important;
-
 }
 
 
 /*
 =========================================================
-MODAL ACTIVE
+MODAL OPEN
 =========================================================
 */
 
-.modal-overlay.active {
-
-    display: flex !important;
-
-    opacity: 1 !important;
-
-    visibility: visible !important;
-
-    pointer-events: auto !important;
-
-}
-
-
-/*
-=========================================================
-MODAL SHOW
-=========================================================
-*/
-
+.modal-overlay.active,
 .modal-overlay.show {
 
     display: flex !important;
@@ -99,21 +80,20 @@ MODAL SHOW
     visibility: visible !important;
 
     pointer-events: auto !important;
-
 }
 
 
 /*
 =========================================================
-MODAL BOX
+AUTH MODAL
 =========================================================
 */
 
 .modal-overlay .auth-modal {
 
-    display: block !important;
-
     position: relative !important;
+
+    display: block !important;
 
     width: 100% !important;
 
@@ -163,33 +143,19 @@ MODAL BOX
 
     color: #ffffff !important;
 
-    transform:
-        translateY(0)
-        scale(1) !important;
-
-    opacity: 1 !important;
-
-    visibility: visible !important;
-
+    z-index: 1000000 !important;
 }
 
-
-/*
-=========================================================
-REGISTER MODAL
-=========================================================
-*/
 
 .modal-overlay .auth-modal-register {
 
     max-width: 560px !important;
-
 }
 
 
 /*
 =========================================================
-GLASS TOP HIGHLIGHT
+MODAL TOP HIGHLIGHT
 =========================================================
 */
 
@@ -215,7 +181,6 @@ GLASS TOP HIGHLIGHT
         ) !important;
 
     pointer-events: none !important;
-
 }
 
 
@@ -241,7 +206,6 @@ CLOSE BUTTON
     justify-content: center !important;
 
     margin: 0 !important;
-
     padding: 0 !important;
 
     border:
@@ -261,7 +225,7 @@ CLOSE BUTTON
 
     cursor: pointer !important;
 
-    z-index: 100 !important;
+    z-index: 1000001 !important;
 
     pointer-events: auto !important;
 
@@ -272,7 +236,6 @@ CLOSE BUTTON
     transition:
         background 0.2s ease,
         transform 0.2s ease !important;
-
 }
 
 
@@ -283,9 +246,7 @@ CLOSE BUTTON
 
     color: #ffffff !important;
 
-    transform:
-        rotate(90deg) !important;
-
+    transform: rotate(90deg) !important;
 }
 
 
@@ -305,7 +266,6 @@ AUTH HEADER
         0 0 24px !important;
 
     text-align: center !important;
-
 }
 
 
@@ -318,13 +278,11 @@ ICON
 .auth-modal-icon {
 
     width: 58px !important;
-
     height: 58px !important;
 
     display: flex !important;
 
     align-items: center !important;
-
     justify-content: center !important;
 
     margin:
@@ -353,7 +311,6 @@ ICON
 
         inset 0 1px 0
         rgba(255, 255, 255, 0.35) !important;
-
 }
 
 
@@ -378,7 +335,6 @@ EYEBROW
     font-weight: 800 !important;
 
     letter-spacing: 1.5px !important;
-
 }
 
 
@@ -403,11 +359,6 @@ TITLE
     font-weight: 800 !important;
 
     line-height: 1.25 !important;
-
-    text-shadow:
-        0 2px 12px
-        rgba(0, 0, 0, 0.20) !important;
-
 }
 
 
@@ -429,7 +380,6 @@ DESCRIPTION
     font-size: 14px !important;
 
     line-height: 1.5 !important;
-
 }
 
 
@@ -458,13 +408,6 @@ ALERT
     font-size: 13px !important;
 
     line-height: 1.5 !important;
-
-    backdrop-filter:
-        blur(12px) !important;
-
-    -webkit-backdrop-filter:
-        blur(12px) !important;
-
 }
 
 
@@ -479,7 +422,6 @@ ALERT
 
     color:
         #a7f3d0 !important;
-
 }
 
 
@@ -494,7 +436,6 @@ ALERT
 
     color:
         #fecaca !important;
-
 }
 
 
@@ -513,15 +454,8 @@ FORM
     margin: 0 !important;
 
     padding: 0 !important;
-
 }
 
-
-/*
-=========================================================
-FORM GROUP
-=========================================================
-*/
 
 .form-group {
 
@@ -531,7 +465,6 @@ FORM GROUP
 
     margin:
         0 0 17px !important;
-
 }
 
 
@@ -548,7 +481,6 @@ FORM GROUP
     font-size: 13px !important;
 
     font-weight: 700 !important;
-
 }
 
 
@@ -594,17 +526,10 @@ INPUT
 
     outline: none !important;
 
-    backdrop-filter:
-        blur(12px) !important;
-
-    -webkit-backdrop-filter:
-        blur(12px) !important;
-
     transition:
         background 0.2s ease,
         border-color 0.2s ease,
         box-shadow 0.2s ease !important;
-
 }
 
 
@@ -612,7 +537,6 @@ INPUT
 
     color:
         rgba(255, 255, 255, 0.50) !important;
-
 }
 
 
@@ -627,11 +551,7 @@ INPUT
 
     box-shadow:
         0 0 0 4px
-        rgba(59, 130, 246, 0.14),
-
-        0 8px 25px
-        rgba(0, 0, 0, 0.10) !important;
-
+        rgba(59, 130, 246, 0.14) !important;
 }
 
 
@@ -642,7 +562,6 @@ INPUT
 
     color:
         #ffffff !important;
-
 }
 
 
@@ -659,7 +578,6 @@ PASSWORD
     display: block !important;
 
     width: 100% !important;
-
 }
 
 
@@ -667,7 +585,6 @@ PASSWORD
 
     padding-right:
         48px !important;
-
 }
 
 
@@ -686,13 +603,11 @@ PASSWORD TOGGLE
     right: 8px !important;
 
     width: 34px !important;
-
     height: 34px !important;
 
     min-width: 34px !important;
 
     margin: 0 !important;
-
     padding: 0 !important;
 
     transform:
@@ -712,10 +627,9 @@ PASSWORD TOGGLE
 
     cursor: pointer !important;
 
-    z-index: 20 !important;
+    z-index: 1000001 !important;
 
     pointer-events: auto !important;
-
 }
 
 
@@ -726,7 +640,6 @@ PASSWORD TOGGLE
 
     color:
         #ffffff !important;
-
 }
 
 
@@ -747,7 +660,6 @@ TWO COLUMN
         14px !important;
 
     width: 100% !important;
-
 }
 
 
@@ -769,14 +681,12 @@ LABEL ROW
     gap: 10px !important;
 
     margin-bottom: 7px !important;
-
 }
 
 
 .form-label-row label {
 
     margin: 0 !important;
-
 }
 
 
@@ -794,7 +704,6 @@ LINK
     font-size: 12px !important;
 
     text-decoration: none !important;
-
 }
 
 
@@ -805,7 +714,6 @@ LINK
 
     text-decoration:
         underline !important;
-
 }
 
 
@@ -838,18 +746,15 @@ CHECKBOX
     line-height: 1.5 !important;
 
     cursor: pointer !important;
-
 }
 
 
 .checkbox-row input[type="checkbox"] {
 
     width: 16px !important;
-
     height: 16px !important;
 
     min-width: 16px !important;
-
     min-height: 16px !important;
 
     margin:
@@ -859,17 +764,6 @@ CHECKBOX
 
     accent-color:
         #60a5fa !important;
-
-}
-
-
-.checkbox-row input[type="checkbox"]:disabled {
-
-    opacity: 0.45 !important;
-
-    cursor:
-        not-allowed !important;
-
 }
 
 
@@ -885,21 +779,16 @@ TERMS LINK
 
     position: relative !important;
 
-    z-index: 100 !important;
+    z-index: 1000001 !important;
 
     width: auto !important;
 
     height: auto !important;
 
-    min-height: 0 !important;
-
     margin: 0 !important;
-
     padding: 0 !important;
 
     border: none !important;
-
-    border-radius: 0 !important;
 
     background:
         transparent !important;
@@ -920,12 +809,7 @@ TERMS LINK
 
     cursor: pointer !important;
 
-    box-shadow: none !important;
-
-    transform: none !important;
-
     pointer-events: auto !important;
-
 }
 
 
@@ -983,19 +867,15 @@ SUBMIT BUTTON
 
     position: relative !important;
 
-    z-index: 10 !important;
+    z-index: 1000001 !important;
 
     box-shadow:
         0 8px 25px
-        rgba(37, 99, 235, 0.30),
-
-        inset 0 1px 0
-        rgba(255, 255, 255, 0.25) !important;
+        rgba(37, 99, 235, 0.30) !important;
 
     transition:
         transform 0.2s ease,
         box-shadow 0.2s ease !important;
-
 }
 
 
@@ -1006,11 +886,7 @@ SUBMIT BUTTON
 
     box-shadow:
         0 14px 32px
-        rgba(37, 99, 235, 0.40),
-
-        inset 0 1px 0
-        rgba(255, 255, 255, 0.30) !important;
-
+        rgba(37, 99, 235, 0.40) !important;
 }
 
 
@@ -1018,7 +894,6 @@ SUBMIT BUTTON
 
     transform:
         translateY(0) !important;
-
 }
 
 
@@ -1045,7 +920,6 @@ DIVIDER
     font-size: 11px !important;
 
     font-weight: 700 !important;
-
 }
 
 
@@ -1060,7 +934,6 @@ DIVIDER
 
     background:
         rgba(255, 255, 255, 0.18) !important;
-
 }
 
 
@@ -1082,7 +955,6 @@ SWITCH
         rgba(255, 255, 255, 0.65) !important;
 
     font-size: 13px !important;
-
 }
 
 
@@ -1092,14 +964,13 @@ SWITCH
 
     position: relative !important;
 
-    z-index: 100 !important;
+    z-index: 1000001 !important;
 
     width: auto !important;
 
     height: auto !important;
 
     margin: 0 !important;
-
     padding: 0 !important;
 
     border: none !important;
@@ -1119,7 +990,6 @@ SWITCH
     cursor: pointer !important;
 
     pointer-events: auto !important;
-
 }
 
 
@@ -1130,33 +1000,30 @@ SWITCH
 
     text-decoration:
         underline !important;
-
 }
 
 
 /*
 =========================================================
-BODY MODAL OPEN
+BODY
 =========================================================
 */
 
 body.modal-open {
 
     overflow: hidden !important;
-
 }
 
 
 /*
 =========================================================
-AUTH SCROLLBAR
+SCROLLBAR
 =========================================================
 */
 
 .auth-modal::-webkit-scrollbar {
 
     width: 6px !important;
-
 }
 
 
@@ -1164,7 +1031,6 @@ AUTH SCROLLBAR
 
     background:
         transparent !important;
-
 }
 
 
@@ -1175,13 +1041,12 @@ AUTH SCROLLBAR
 
     border-radius:
         10px !important;
-
 }
 
 
 /*
 =========================================================
-IMPORTANT NAVBAR BUTTON FIX
+NAVBAR AUTH BUTTONS
 =========================================================
 */
 
@@ -1189,7 +1054,7 @@ IMPORTANT NAVBAR BUTTON FIX
 
     position: relative !important;
 
-    z-index: 1000 !important;
+    z-index: 10000 !important;
 
     display: flex !important;
 
@@ -1198,7 +1063,6 @@ IMPORTANT NAVBAR BUTTON FIX
     gap: 10px !important;
 
     pointer-events: auto !important;
-
 }
 
 
@@ -1207,18 +1071,17 @@ IMPORTANT NAVBAR BUTTON FIX
 
     position: relative !important;
 
-    z-index: 1001 !important;
+    z-index: 10001 !important;
 
     pointer-events: auto !important;
 
     cursor: pointer !important;
-
 }
 
 
 /*
 =========================================================
-MOBILE AUTH BUTTON
+MOBILE AUTH
 =========================================================
 */
 
@@ -1227,12 +1090,11 @@ MOBILE AUTH BUTTON
 
     position: relative !important;
 
-    z-index: 1001 !important;
+    z-index: 10001 !important;
 
     pointer-events: auto !important;
 
     cursor: pointer !important;
-
 }
 
 
@@ -1261,20 +1123,9 @@ TERMS MODAL
     box-sizing: border-box !important;
 
     align-items: center !important;
-
     justify-content: center !important;
 
     background:
-        radial-gradient(
-            circle at 20% 20%,
-            rgba(59, 130, 246, 0.20),
-            transparent 35%
-        ),
-        radial-gradient(
-            circle at 80% 80%,
-            rgba(139, 92, 246, 0.18),
-            transparent 35%
-        ),
         rgba(2, 6, 23, 0.82) !important;
 
     backdrop-filter:
@@ -1283,19 +1134,18 @@ TERMS MODAL
     -webkit-backdrop-filter:
         blur(10px) !important;
 
-    z-index:
-        2147483647 !important;
+    z-index: 2147483647 !important;
 
     opacity: 0 !important;
 
     visibility: hidden !important;
 
     pointer-events: none !important;
-
 }
 
 
-#termsModal.show {
+#termsModal.show,
+#termsModal.active {
 
     display: flex !important;
 
@@ -1304,15 +1154,8 @@ TERMS MODAL
     visibility: visible !important;
 
     pointer-events: auto !important;
-
 }
 
-
-/*
-=========================================================
-TERMS MODAL BOX
-=========================================================
-*/
 
 #termsModal .terms-modal {
 
@@ -1358,28 +1201,15 @@ TERMS MODAL BOX
 
     box-shadow:
         0 30px 80px
-        rgba(0, 0, 0, 0.55),
-
-        0 10px 35px
-        rgba(37, 99, 235, 0.20),
-
-        inset 0 1px 0
-        rgba(255, 255, 255, 0.35) !important;
+        rgba(0, 0, 0, 0.55) !important;
 
     color:
         #ffffff !important;
 
     z-index:
         2147483647 !important;
-
 }
 
-
-/*
-=========================================================
-TERMS CONTENT
-=========================================================
-*/
 
 #termsContent {
 
@@ -1388,15 +1218,8 @@ TERMS CONTENT
 
     overflow-y:
         auto !important;
-
 }
 
-
-/*
-=========================================================
-TERMS AGREE
-=========================================================
-*/
 
 #termsAgreeButton {
 
@@ -1455,15 +1278,8 @@ TERMS AGREE
 
     pointer-events:
         auto !important;
-
 }
 
-
-/*
-=========================================================
-TERMS DISABLED
-=========================================================
-*/
 
 #termsAgreeButton:disabled {
 
@@ -1472,7 +1288,6 @@ TERMS DISABLED
 
     cursor:
         not-allowed !important;
-
 }
 
 
@@ -1488,7 +1303,6 @@ MOBILE
 
         padding:
             14px !important;
-
     }
 
 
@@ -1509,7 +1323,6 @@ MOBILE
 
         border-radius:
             20px !important;
-
     }
 
 
@@ -1520,7 +1333,6 @@ MOBILE
 
         gap:
             0 !important;
-
     }
 
 
@@ -1528,7 +1340,6 @@ MOBILE
 
         font-size:
             22px !important;
-
     }
 
 
@@ -1545,7 +1356,6 @@ MOBILE
 
         font-size:
             24px !important;
-
     }
 
 
@@ -1565,7 +1375,6 @@ MOBILE
 
         font-size:
             22px !important;
-
     }
 
 
@@ -1573,7 +1382,6 @@ MOBILE
 
         padding:
             14px !important;
-
     }
 
 
@@ -1593,7 +1401,6 @@ MOBILE
 
         border-radius:
             20px !important;
-
     }
 
 }
