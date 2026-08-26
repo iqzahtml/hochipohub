@@ -148,13 +148,14 @@ foreach ($orders as $order) {
 
 
 $pageTitle = 'My Orders';
+$hideSiteMainWrapper = true;
 $extraCSS = [
+    'dashboard.css',
     'order.css'
 ];
 
 
 require_once __DIR__ . '/includes/header.php';
-require_once __DIR__ . '/includes/navbar.php';
 require_once __DIR__ . '/includes/customer_sidebar.php';
 
 ?>
