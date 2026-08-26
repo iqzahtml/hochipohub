@@ -1,9 +1,25 @@
 <?php
 
-require_once dirname(__DIR__) . '/database/db.php';
-require_once dirname(__DIR__) . '/includes/session.php';
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - ADMIN USERS
+|--------------------------------------------------------------------------
+| File: admin/users.php
+|--------------------------------------------------------------------------
+*/
+
+require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE
+|--------------------------------------------------------------------------
+*/
 
 $db = getDB();
+
 
 /*
 |--------------------------------------------------------------------------
@@ -12,7 +28,8 @@ $db = getDB();
 */
 
 if (!function_exists('e')) {
-    function e($value)
+
+    function e($value): string
     {
         return htmlspecialchars(
             (string) $value,
@@ -21,6 +38,7 @@ if (!function_exists('e')) {
         );
     }
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -32,6 +50,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
 /*
 |--------------------------------------------------------------------------
 | ADMIN ACCESS
@@ -42,11 +61,37 @@ if (
     !isset($_SESSION['user_id']) ||
     ($_SESSION['role'] ?? '') !== 'admin'
 ) {
+
     header('Location: ../index.php');
     exit;
 }
 
-$admin_id = (int) $_SESSION['user_id'];
+
+$adminId =
+    (int) $_SESSION['user_id'];
+
+
+/*
+|--------------------------------------------------------------------------
+| CSRF TOKEN
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !isset($_SESSION['csrf_token']) ||
+    empty($_SESSION['csrf_token'])
+) {
+
+    $_SESSION['csrf_token'] =
+        bin2hex(
+            random_bytes(32)
+        );
+}
+
+
+$csrfToken =
+    $_SESSION['csrf_token'];
+
 
 /*
 |--------------------------------------------------------------------------
@@ -58,9 +103,56 @@ if (
     $_SERVER['REQUEST_METHOD'] === 'POST' &&
     isset($_POST['update_user'])
 ) {
-    $user_id = (int) ($_POST['user_id'] ?? 0);
-    $role = $_POST['role'] ?? '';
-    $status = $_POST['status'] ?? '';
+
+    /*
+    |--------------------------------------------------------------------------
+    | CSRF
+    |--------------------------------------------------------------------------
+    */
+
+    $submittedToken =
+        $_POST['csrf_token']
+        ?? '';
+
+
+    if (
+        empty($submittedToken) ||
+        !hash_equals(
+            $csrfToken,
+            $submittedToken
+        )
+    ) {
+
+        header(
+            'Location: users.php?error=security'
+        );
+
+        exit;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FORM DATA
+    |--------------------------------------------------------------------------
+    */
+
+    $userId =
+        (int) (
+            $_POST['user_id']
+            ?? 0
+        );
+
+
+    $role =
+        $_POST['role']
+        ?? '';
+
+
+    $status =
+        $_POST['status']
+        ?? '';
+
 
     /*
     |--------------------------------------------------------------------------
@@ -69,7 +161,8 @@ if (
     */
 
     if (
-        $user_id <= 0 ||
+        $userId <= 0 ||
+
         !in_array(
             $role,
             [
@@ -79,6 +172,7 @@ if (
             ],
             true
         ) ||
+
         !in_array(
             $status,
             [
@@ -90,22 +184,41 @@ if (
             true
         )
     ) {
-        header('Location: users.php?error=invalid');
+
+        header(
+            'Location: users.php?error=invalid'
+        );
+
         exit;
     }
+
 
     /*
     |--------------------------------------------------------------------------
-    | PREVENT ADMIN FROM MODIFYING OWN ACCOUNT
+    | PREVENT SELF MODIFICATION
     |--------------------------------------------------------------------------
     */
 
-    if ($user_id === $admin_id) {
-        header('Location: users.php?error=self');
+    if ($userId === $adminId) {
+
+        header(
+            'Location: users.php?error=self'
+        );
+
         exit;
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE DATABASE
+    |--------------------------------------------------------------------------
+    */
+
     try {
+
+        $db->beginTransaction();
+
 
         /*
         |--------------------------------------------------------------------------
@@ -113,40 +226,65 @@ if (
         |--------------------------------------------------------------------------
         */
 
-        $stmt = $db->prepare(
-            "SELECT role, status
-             FROM users
-             WHERE user_id = ?
-             LIMIT 1"
-        );
+        $stmt =
+            $db->prepare("
+                SELECT
+                    user_id,
+                    role,
+                    status
+                FROM users
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+
 
         $stmt->execute([
-            $user_id
+            $userId
         ]);
 
-        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
-            header('Location: users.php?error=notfound');
+
+        $existingUser =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        if (!$existingUser) {
+
+            $db->rollBack();
+
+            header(
+                'Location: users.php?error=notfound'
+            );
+
             exit;
         }
 
+
         /*
         |--------------------------------------------------------------------------
-        | UPDATE
+        | UPDATE USER
         |--------------------------------------------------------------------------
         */
 
-        $stmt = $db->prepare(
-            "UPDATE users
-             SET role = ?,
-                 status = ?
-             WHERE user_id = ?"
-        );
+        $stmt =
+            $db->prepare("
+                UPDATE users
+                SET
+                    role = ?,
+                    status = ?
+                WHERE user_id = ?
+            ");
+
 
         $stmt->execute([
+
             $role,
             $status,
-            $user_id
+            $userId
+
         ]);
+
 
         /*
         |--------------------------------------------------------------------------
@@ -154,41 +292,69 @@ if (
         |--------------------------------------------------------------------------
         */
 
-        $stmt = $db->prepare(
-            "INSERT INTO admin_logs
+        $stmt =
+            $db->prepare("
+                INSERT INTO admin_logs
                 (
                     admin_id,
                     action,
                     target_type,
                     target_id
                 )
-             VALUES
+                VALUES
                 (
                     ?,
                     ?,
                     ?,
                     ?
-                )"
-        );
+                )
+            ");
+
 
         $stmt->execute([
-            $admin_id,
-            "Updated user #{$user_id} role to {$role} and status to {$status}",
+
+            $adminId,
+
+            "Updated user #{$userId} role to {$role} and status to {$status}",
+
             'user',
-            $user_id
+
+            $userId
+
         ]);
 
-        header('Location: users.php?success=updated');
+
+        $db->commit();
+
+
+        header(
+            'Location: users.php?success=updated'
+        );
+
         exit;
 
-    } catch (PDOException $e) {
+    }
 
-        error_log($e->getMessage());
+    catch (Throwable $e) {
 
-        header('Location: users.php?error=update');
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+
+
+        error_log(
+            $e->getMessage()
+        );
+
+
+        header(
+            'Location: users.php?error=update'
+        );
+
         exit;
     }
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -196,9 +362,22 @@ if (
 |--------------------------------------------------------------------------
 */
 
-$search = trim($_GET['search'] ?? '');
-$role_filter = $_GET['role'] ?? '';
-$status_filter = $_GET['status'] ?? '';
+$search =
+    trim(
+        $_GET['search']
+        ?? ''
+    );
+
+
+$roleFilter =
+    $_GET['role']
+    ?? '';
+
+
+$statusFilter =
+    $_GET['status']
+    ?? '';
+
 
 /*
 |--------------------------------------------------------------------------
@@ -208,6 +387,7 @@ $status_filter = $_GET['status'] ?? '';
 
 $sql = "
     SELECT
+
         u.user_id,
         u.name,
         u.email,
@@ -216,16 +396,22 @@ $sql = "
         u.status,
         u.mfa_enabled,
         u.created_at,
+
         v.vendor_id,
         v.business_name,
         v.approval_status
+
     FROM users u
+
     LEFT JOIN vendors v
         ON u.user_id = v.user_id
+
     WHERE 1 = 1
 ";
 
+
 $params = [];
+
 
 /*
 |--------------------------------------------------------------------------
@@ -236,22 +422,31 @@ $params = [];
 if ($search !== '') {
 
     $sql .= "
-        AND (
+        AND
+        (
             u.name LIKE ?
             OR u.email LIKE ?
             OR u.phone LIKE ?
         )
     ";
 
-    $v = "%{$search}%";
 
-    array_push(
-        $params,
-        $v,
-        $v,
-        $v
-    );
+    $searchValue =
+        '%' .
+        $search .
+        '%';
+
+
+    $params[] =
+        $searchValue;
+
+    $params[] =
+        $searchValue;
+
+    $params[] =
+        $searchValue;
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -261,7 +456,7 @@ if ($search !== '') {
 
 if (
     in_array(
-        $role_filter,
+        $roleFilter,
         [
             'customer',
             'vendor',
@@ -275,8 +470,11 @@ if (
         AND u.role = ?
     ";
 
-    $params[] = $role_filter;
+
+    $params[] =
+        $roleFilter;
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -286,7 +484,7 @@ if (
 
 if (
     in_array(
-        $status_filter,
+        $statusFilter,
         [
             'active',
             'inactive',
@@ -301,8 +499,11 @@ if (
         AND u.status = ?
     ";
 
-    $params[] = $status_filter;
+
+    $params[] =
+        $statusFilter;
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -312,13 +513,49 @@ if (
 
 $sql .= "
     ORDER BY
-        u.created_at DESC
+        u.created_at DESC,
+        u.user_id DESC
 ";
 
-$stmt = $db->prepare($sql);
-$stmt->execute($params);
 
-$users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+/*
+|--------------------------------------------------------------------------
+| EXECUTE
+|--------------------------------------------------------------------------
+*/
+
+$users = [];
+
+
+try {
+
+    $stmt =
+        $db->prepare(
+            $sql
+        );
+
+
+    $stmt->execute(
+        $params
+    );
+
+
+    $users =
+        $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        );
+
+}
+
+catch (Throwable $e) {
+
+    $users = [];
+
+    error_log(
+        $e->getMessage()
+    );
+}
+
 
 /*
 |--------------------------------------------------------------------------
@@ -326,40 +563,67 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 |--------------------------------------------------------------------------
 */
 
-$total_users = (int) $db
-    ->query(
-        "SELECT COUNT(*)
-         FROM users"
-    )
-    ->fetchColumn();
+$totalUsers = 0;
+$totalCustomers = 0;
+$totalVendors = 0;
+$totalAdmins = 0;
 
-$total_customers = (int) $db
-    ->query(
-        "SELECT COUNT(*)
-         FROM users
-         WHERE role = 'customer'"
-    )
-    ->fetchColumn();
 
-$total_vendors = (int) $db
-    ->query(
-        "SELECT COUNT(*)
-         FROM users
-         WHERE role = 'vendor'"
-    )
-    ->fetchColumn();
+try {
 
-$total_admins = (int) $db
-    ->query(
-        "SELECT COUNT(*)
-         FROM users
-         WHERE role = 'admin'"
-    )
-    ->fetchColumn();
+    $totalUsers =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM users
+            ")
+            ->fetchColumn();
+
+
+    $totalCustomers =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM users
+                WHERE role = 'customer'
+            ")
+            ->fetchColumn();
+
+
+    $totalVendors =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM users
+                WHERE role = 'vendor'
+            ")
+            ->fetchColumn();
+
+
+    $totalAdmins =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM users
+                WHERE role = 'admin'
+            ")
+            ->fetchColumn();
+
+}
+
+catch (Throwable $e) {
+
+    error_log(
+        $e->getMessage()
+    );
+}
 
 ?>
-
-<!doctype html>
+<!DOCTYPE html>
 
 <html lang="en">
 
@@ -376,7 +640,10 @@ $total_admins = (int) $db
         Users | HochipoHub Admin
     </title>
 
-    <!-- FONT -->
+
+    <!-- ============================================================
+         FONT
+    ============================================================= -->
 
     <link
         rel="preconnect"
@@ -394,7 +661,10 @@ $total_admins = (int) $db
         rel="stylesheet"
     >
 
-    <!-- EXISTING ADMIN CSS -->
+
+    <!-- ============================================================
+         ADMIN CSS
+    ============================================================= -->
 
     <link
         rel="stylesheet"
@@ -406,1761 +676,2937 @@ $total_admins = (int) $db
         href="../css/responsive.css"
     >
 
+
     <style>
 
-    /* =========================================================
-       HOCHIPOHUB USERS PAGE
-       BLUE ADMIN THEME
-    ========================================================= */
+        /*
+        |--------------------------------------------------------------------------
+        | ROOT
+        |--------------------------------------------------------------------------
+        */
 
-    :root {
-        --users-navy: #071a3d;
-        --users-navy-2: #0b2454;
-        --users-blue: #2563eb;
-        --users-blue-dark: #1d4ed8;
-        --users-blue-light: #3b82f6;
-        --users-blue-soft: #eff6ff;
-        --users-blue-pale: #dbeafe;
-        --users-bg: #f5f8fd;
-        --users-white: #ffffff;
-        --users-text: #0f172a;
-        --users-text-2: #1e293b;
-        --users-muted: #64748b;
-        --users-muted-2: #94a3b8;
-        --users-border: #e2e8f0;
-        --users-border-blue: #bfdbfe;
-        --users-shadow: 0 10px 30px rgba(15, 23, 42, .055);
-    }
+        :root {
 
-    /*
-    |--------------------------------------------------------------------------
-    | GLOBAL
-    |--------------------------------------------------------------------------
-    */
+            --users-blue:
+                #2563eb;
 
-    * {
-        box-sizing: border-box;
-    }
+            --users-blue-dark:
+                #1647a8;
 
-    html {
-        scroll-behavior: smooth;
-    }
+            --users-navy:
+                #09275b;
 
-    body {
-        margin: 0;
+            --users-bg:
+                #eef5fd;
 
-        background:
-            linear-gradient(
-                135deg,
-                #f8fbff 0%,
-                #f3f7fd 100%
-            );
+            --users-white:
+                #ffffff;
 
-        color: var(--users-text);
+            --users-text:
+                #0b2d63;
 
-        font-family:
-            "Poppins",
-            Inter,
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
-    }
+            --users-muted:
+                #8294b3;
 
-    button,
-    input,
-    select {
-        font-family: inherit;
-    }
+            --users-border:
+                #dbe5f1;
 
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN WRAPPER
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-wrapper {
-        min-height: 100vh;
-        background: var(--users-bg);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | BLUE SIDEBAR OVERRIDE
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-sidebar {
-        background:
-            linear-gradient(
-                180deg,
-                #071a3d 0%,
-                #0a1e46 52%,
-                #06152f 100%
-            ) !important;
-    }
-
-    .admin-sidebar .admin-nav-item.active,
-    .admin-sidebar .admin-menu-item.active {
-        background:
-            linear-gradient(
-                135deg,
-                #2563eb,
-                #1d4ed8
-            ) !important;
-
-        color: #ffffff !important;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | MAIN
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-main {
-        min-width: 0;
-        min-height: 100vh;
-        padding-left: 0;
-        padding-bottom: 50px;
-        background: transparent;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | TOP HEADER
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-topbar {
-        position: sticky;
-        top: 0;
-        z-index: 50;
-
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-
-        min-height: 92px;
-
-        padding: 20px 38px;
-
-        background: rgba(255, 255, 255, .94);
-
-        border-bottom:
-            1px solid
-            rgba(226, 232, 240, .9);
-
-        backdrop-filter: blur(16px);
-    }
-
-    .admin-header-left {
-        display: flex;
-        align-items: center;
-        gap: 17px;
-        min-width: 0;
-    }
-
-    .admin-header-left > div:last-child {
-        min-width: 0;
-    }
-
-    .admin-topbar h1 {
-        margin: 0;
-
-        color: var(--users-text);
-
-        font-size: 29px;
-        line-height: 1.15;
-        font-weight: 800;
-
-        letter-spacing: -.8px;
-    }
-
-    .admin-topbar p {
-        margin: 6px 0 0;
-
-        color: var(--users-muted);
-
-        font-size: 12px;
-        font-weight: 500;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | PAGE CONTENT
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-main > section,
-    .admin-main > .admin-alert {
-        width: min(
-            calc(100% - 76px),
-            1480px
-        );
-
-        margin-left: auto;
-        margin-right: auto;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | ALERT
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-alert {
-        margin-top: 22px;
-        margin-bottom: 0;
-
-        padding: 13px 17px;
-
-        border:
-            1px solid
-            var(--users-border-blue);
-
-        border-radius: 13px;
-
-        background: var(--users-blue-soft);
-
-        color: var(--users-blue-dark);
-
-        font-size: 11px;
-        font-weight: 600;
-    }
-
-    .admin-alert.success {
-        border-color: #bfdbfe;
-        background: #eff6ff;
-        color: #1d4ed8;
-    }
-
-    .admin-alert.error {
-        border-color: #93c5fd;
-        background: #eff6ff;
-        color: #1e40af;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | STATISTICS
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-stats {
-        display: grid;
-
-        grid-template-columns:
-            repeat(
-                4,
-                minmax(0, 1fr)
-            );
-
-        gap: 15px;
-
-        margin-top: 28px;
-        margin-bottom: 22px;
-    }
-
-    .stat-card {
-        position: relative;
-        overflow: hidden;
-
-        min-height: 135px;
-
-        padding: 20px;
-
-        border:
-            1px solid
-            var(--users-border);
-
-        border-radius: 18px;
-
-        background: #ffffff;
-
-        box-shadow: var(--users-shadow);
-
-        transition:
-            transform .22s ease,
-            box-shadow .22s ease,
-            border-color .22s ease;
-    }
-
-    .stat-card::after {
-        content: "";
-
-        position: absolute;
-
-        right: -38px;
-        bottom: -48px;
-
-        width: 115px;
-        height: 115px;
-
-        border-radius: 50%;
-
-        background: var(--users-blue-soft);
-    }
-
-    .stat-card:hover {
-        transform: translateY(-3px);
-
-        border-color:
-            var(--users-border-blue);
-
-        box-shadow:
-            0 15px 34px
-            rgba(
-                37,
-                99,
-                235,
-                .09
-            );
-    }
-
-    .stat-card::before {
-        content: "";
-
-        position: absolute;
-
-        top: 0;
-        left: 0;
-
-        width: 100%;
-        height: 3px;
-
-        background:
-            linear-gradient(
-                90deg,
-                #2563eb,
-                #60a5fa
-            );
-    }
-
-    .stat-label {
-        position: relative;
-        z-index: 1;
-
-        display: block;
-
-        margin-bottom: 9px;
-
-        color: var(--users-muted);
-
-        font-size: 10px;
-        font-weight: 600;
-
-        text-transform: uppercase;
-        letter-spacing: .55px;
-    }
-
-    .stat-card strong {
-        position: relative;
-        z-index: 1;
-
-        display: block;
-
-        color: var(--users-text);
-
-        font-size: 30px;
-        line-height: 1;
-        font-weight: 800;
-
-        letter-spacing: -1px;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | STAT ICONS
-    |--------------------------------------------------------------------------
-    */
-
-    .stat-card .stat-label::before {
-        display: inline-flex;
-
-        align-items: center;
-        justify-content: center;
-
-        width: 25px;
-        height: 25px;
-
-        margin-right: 8px;
-
-        border-radius: 8px;
-
-        background: var(--users-blue-soft);
-        color: var(--users-blue);
-
-        content: "•";
-
-        font-size: 18px;
-        vertical-align: middle;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | PANEL
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-panel {
-        overflow: hidden;
-
-        margin-bottom: 22px;
-
-        border:
-            1px solid
-            var(--users-border);
-
-        border-radius: 18px;
-
-        background: #ffffff;
-
-        box-shadow: var(--users-shadow);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | FILTER PANEL
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-filter-form {
-        display: grid;
-
-        grid-template-columns:
-            minmax(260px, 1.8fr)
-            minmax(150px, .7fr)
-            minmax(150px, .7fr)
-            auto
-            auto;
-
-        align-items: center;
-
-        gap: 10px;
-
-        padding: 18px;
-    }
-
-    .admin-filter-form input,
-    .admin-filter-form select {
-        width: 100%;
-        min-height: 43px;
-
-        padding: 0 13px;
-
-        border:
-            1px solid
-            var(--users-border);
-
-        border-radius: 11px;
-
-        outline: none;
-
-        background: #ffffff;
-
-        color: var(--users-text-2);
-
-        font-size: 11px;
-        font-weight: 500;
-
-        transition: .2s ease;
-    }
-
-    .admin-filter-form input::placeholder {
-        color: #94a3b8;
-    }
-
-    .admin-filter-form input:hover,
-    .admin-filter-form select:hover {
-        border-color: #cbd5e1;
-    }
-
-    .admin-filter-form input:focus,
-    .admin-filter-form select:focus {
-        border-color: var(--users-blue);
-
-        box-shadow:
-            0 0 0 3px
-            rgba(
-                37,
-                99,
-                235,
-                .10
-            );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | BUTTONS
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-btn {
-        min-height: 42px;
-
-        display: inline-flex;
-
-        align-items: center;
-        justify-content: center;
-
-        padding: 0 17px;
-
-        border:
-            1px solid
-            transparent;
-
-        border-radius: 11px;
-
-        font-size: 10px;
-        font-weight: 700;
-
-        text-decoration: none;
-
-        cursor: pointer;
-        white-space: nowrap;
-
-        transition:
-            transform .2s ease,
-            box-shadow .2s ease,
-            background .2s ease,
-            border-color .2s ease;
-    }
-
-    .admin-btn.primary {
-        background:
-            linear-gradient(
-                135deg,
-                #2563eb,
-                #1d4ed8
-            );
-
-        color: #ffffff;
-
-        box-shadow:
-            0 7px 17px
-            rgba(
-                37,
-                99,
-                235,
-                .18
-            );
-    }
-
-    .admin-btn.primary:hover {
-        background:
-            linear-gradient(
-                135deg,
-                #1d4ed8,
-                #1e40af
-            );
-
-        transform: translateY(-1px);
-
-        box-shadow:
-            0 10px 22px
-            rgba(
-                37,
-                99,
-                235,
-                .25
-            );
-    }
-
-    .admin-btn.secondary {
-        background: #f8fafc;
-
-        border-color: var(--users-border);
-
-        color: var(--users-muted);
-    }
-
-    .admin-btn.secondary:hover {
-        background: var(--users-blue-soft);
-
-        border-color:
-            var(--users-border-blue);
-
-        color: var(--users-blue-dark);
-
-        transform: translateY(-1px);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | PANEL HEADER
-    |--------------------------------------------------------------------------
-    */
-
-    .panel-header {
-        display: flex;
-
-        align-items: center;
-        justify-content: space-between;
-
-        gap: 15px;
-
-        padding: 20px 21px;
-
-        border-bottom:
-            1px solid
-            #edf1f6;
-
-        background:
-            linear-gradient(
-                180deg,
-                #ffffff,
-                #fbfdff
-            );
-    }
-
-    .panel-header h2 {
-        margin: 0;
-
-        color: var(--users-text);
-
-        font-size: 17px;
-        font-weight: 800;
-
-        letter-spacing: -.35px;
-    }
-
-    .panel-header p {
-        margin: 5px 0 0;
-
-        color: var(--users-muted);
-
-        font-size: 9px;
-        font-weight: 500;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | TABLE WRAPPER
-    |--------------------------------------------------------------------------
-    */
-
-    .table-wrapper {
-        width: 100%;
-        overflow-x: auto;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | TABLE
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-table {
-        width: 100%;
-        min-width: 1000px;
-
-        border-collapse: collapse;
-        border-spacing: 0;
-    }
-
-    .admin-table thead {
-        background: #f7faff;
-    }
-
-    .admin-table th {
-        padding: 13px 15px;
-
-        border-bottom:
-            1px solid
-            var(--users-border);
-
-        color: #64748b;
-
-        font-size: 8px;
-        font-weight: 800;
-
-        letter-spacing: .65px;
-
-        text-align: left;
-        text-transform: uppercase;
-
-        white-space: nowrap;
-    }
-
-    .admin-table th:first-child {
-        padding-left: 21px;
-    }
-
-    .admin-table td {
-        padding: 15px;
-
-        border-bottom:
-            1px solid
-            #edf1f6;
-
-        color: var(--users-text-2);
-
-        font-size: 10px;
-        font-weight: 500;
-
-        vertical-align: middle;
-
-        white-space: nowrap;
-    }
-
-    .admin-table td:first-child {
-        padding-left: 21px;
-
-        color: #94a3b8;
-
-        font-weight: 700;
-    }
-
-    .admin-table tbody tr {
-        transition: background .18s ease;
-    }
-
-    .admin-table tbody tr:hover {
-        background: #f8fbff;
-    }
-
-    .admin-table tbody tr:last-child td {
-        border-bottom: 0;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | USER CELL
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-table td:nth-child(2) {
-        min-width: 220px;
-        white-space: normal;
-    }
-
-    .admin-table td:nth-child(2) strong {
-        display: block;
-
-        margin-bottom: 3px;
-
-        color: var(--users-text);
-
-        font-size: 11px;
-        font-weight: 750;
-    }
-
-    .admin-table td:nth-child(2) small {
-        display: block;
-
-        margin-top: 2px;
-
-        color: var(--users-muted);
-
-        font-size: 8px;
-        font-weight: 500;
-    }
-
-    .admin-table td:nth-child(2) small:last-child {
-        color: var(--users-blue);
-        font-weight: 600;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | INLINE FORM
-    |--------------------------------------------------------------------------
-    */
-
-    .inline-form {
-        display: inline-flex;
-
-        align-items: center;
-
-        margin: 0;
-    }
-
-    .inline-form select {
-        min-width: 110px;
-        height: 34px;
-
-        padding: 0 30px 0 10px;
-
-        border:
-            1px solid
-            #dbe3ef;
-
-        border-radius: 9px;
-
-        outline: none;
-
-        background: #ffffff;
-
-        color: var(--users-text-2);
-
-        font-family: inherit;
-
-        font-size: 9px;
-        font-weight: 600;
-
-        cursor: pointer;
-
-        transition: .2s ease;
-    }
-
-    .inline-form select:hover {
-        border-color: #93c5fd;
-        background: #f8fbff;
-    }
-
-    .inline-form select:focus {
-        border-color: var(--users-blue);
-
-        box-shadow:
-            0 0 0 3px
-            rgba(
-                37,
-                99,
-                235,
-                .10
-            );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN ROLE
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-table td > span:not(.admin-status) {
-        display: inline-flex;
-
-        align-items: center;
-
-        min-height: 30px;
-
-        padding: 0 10px;
-
-        border:
-            1px solid
-            var(--users-border-blue);
-
-        border-radius: 8px;
-
-        background: var(--users-blue-soft);
-
-        color: var(--users-blue-dark);
-
-        font-size: 9px;
-        font-weight: 700;
-
-        text-transform: capitalize;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | STATUS BADGES
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-status {
-        display: inline-flex;
-
-        align-items: center;
-
-        gap: 6px;
-
-        min-height: 30px;
-
-        padding: 0 10px;
-
-        border:
-            1px solid
-            var(--users-border-blue);
-
-        border-radius: 999px;
-
-        background: var(--users-blue-soft);
-
-        color: var(--users-blue-dark);
-
-        font-size: 8px;
-        font-weight: 750;
-
-        text-transform: capitalize;
-    }
-
-    .admin-status::before {
-        content: "";
-
-        width: 6px;
-        height: 6px;
-
-        border-radius: 50%;
-
-        background: var(--users-blue);
-
-        box-shadow:
-            0 0 0 3px
-            rgba(
-                37,
-                99,
-                235,
-                .10
-            );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | SELECT STATUS BLUE THEME
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-table select {
-        color: var(--users-text-2);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | MFA
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-table td:nth-child(6) {
-        color: var(--users-blue-dark);
-
-        font-size: 9px;
-        font-weight: 650;
-    }
-
-    .admin-table td:nth-child(6)::before {
-        content: "";
-
-        display: inline-block;
-
-        width: 6px;
-        height: 6px;
-
-        margin-right: 6px;
-
-        border-radius: 50%;
-
-        background: var(--users-blue);
-
-        vertical-align: middle;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | VIEW BUTTON
-    |--------------------------------------------------------------------------
-    */
-
-    .admin-btn.small {
-        min-height: 32px;
-
-        padding: 0 12px;
-
-        border:
-            1px solid
-            #bfdbfe;
-
-        border-radius: 9px;
-
-        background: #eff6ff;
-
-        color: #1d4ed8;
-
-        font-size: 9px;
-        font-weight: 750;
-    }
-
-    .admin-btn.small:hover {
-        border-color: #93c5fd;
-
-        background: #dbeafe;
-
-        color: #1e40af;
-
-        transform: translateY(-1px);
-
-        box-shadow:
-            0 5px 14px
-            rgba(
-                37,
-                99,
-                235,
-                .12
-            );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | EMPTY STATE
-    |--------------------------------------------------------------------------
-    */
-
-    .empty-state {
-        padding: 55px 20px !important;
-
-        color: #94a3b8 !important;
-
-        font-size: 11px !important;
-        font-weight: 600 !important;
-
-        text-align: center;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | SCROLLBAR
-    |--------------------------------------------------------------------------
-    */
-
-    .table-wrapper::-webkit-scrollbar {
-        height: 8px;
-    }
-
-    .table-wrapper::-webkit-scrollbar-track {
-        background: #f1f5f9;
-    }
-
-    .table-wrapper::-webkit-scrollbar-thumb {
-        border-radius: 999px;
-        background: #bfdbfe;
-    }
-
-    .table-wrapper::-webkit-scrollbar-thumb:hover {
-        background: #93c5fd;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | RESPONSIVE 1200
-    |--------------------------------------------------------------------------
-    */
-
-    @media (max-width: 1200px) {
-
-        .admin-main > section,
-        .admin-main > .admin-alert {
-            width: calc(100% - 48px);
         }
 
-        .admin-stats {
-            grid-template-columns:
-                repeat(
-                    2,
-                    minmax(0, 1fr)
+
+        /*
+        |--------------------------------------------------------------------------
+        | GLOBAL
+        |--------------------------------------------------------------------------
+        */
+
+        * {
+
+            box-sizing: border-box;
+
+        }
+
+
+        html,
+        body {
+
+            margin: 0;
+
+            padding: 0;
+
+            min-height: 100%;
+
+            font-family:
+                'Poppins',
+                sans-serif;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #f4f8fd,
+                    #eaf3ff
                 );
+
         }
 
-        .admin-filter-form {
-            grid-template-columns: 1fr 1fr;
+
+        body {
+
+            overflow-x: hidden;
+
         }
 
-        .admin-filter-form input {
-            grid-column: 1 / -1;
-        }
-    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | RESPONSIVE 900
-    |--------------------------------------------------------------------------
-    */
+        button,
+        input,
+        select {
 
-    @media (max-width: 900px) {
+            font-family: inherit;
 
-        .admin-topbar {
-            min-height: 78px;
-            padding: 16px 24px;
         }
 
-        .admin-topbar h1 {
-            font-size: 24px;
+
+        /*
+        |--------------------------------------------------------------------------
+        | ADMIN WRAPPER
+        |--------------------------------------------------------------------------
+        */
+
+        .admin-wrapper {
+
+            min-height: 100vh;
+
         }
 
-        .admin-topbar p {
-            font-size: 10px;
+
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN
+        |--------------------------------------------------------------------------
+        */
+
+        .users-main {
+
+            min-height: 100vh;
+
+            margin-left: 260px;
+
+            width:
+                calc(
+                    100% - 260px
+                );
+
+            background:
+
+                radial-gradient(
+                    circle at 90% 2%,
+                    rgba(
+                        37,
+                        99,
+                        235,
+                        .12
+                    ),
+                    transparent 24%
+                ),
+
+                linear-gradient(
+                    135deg,
+                    #f4f8fd,
+                    #eaf3ff
+                );
+
         }
 
-        .admin-main > section,
-        .admin-main > .admin-alert {
-            width: calc(100% - 36px);
-        }
-    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | RESPONSIVE 650
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | CONTENT
+        |--------------------------------------------------------------------------
+        */
 
-    @media (max-width: 650px) {
+        .users-content {
 
-        .admin-topbar {
-            padding: 14px 17px;
-        }
-
-        .admin-header-left {
-            gap: 11px;
-        }
-
-        .admin-topbar h1 {
-            font-size: 21px;
-        }
-
-        .admin-topbar p {
-            margin-top: 4px;
-            font-size: 9px;
-        }
-
-        .admin-main > section,
-        .admin-main > .admin-alert {
-            width: calc(100% - 24px);
-        }
-
-        .admin-stats {
-            grid-template-columns: 1fr;
-
-            gap: 11px;
-
-            margin-top: 18px;
-        }
-
-        .stat-card {
-            min-height: 115px;
-        }
-
-        .admin-filter-form {
-            grid-template-columns: 1fr;
-            padding: 14px;
-        }
-
-        .admin-filter-form input {
-            grid-column: auto;
-        }
-
-        .admin-filter-form .admin-btn {
             width: 100%;
+
+            max-width: 1450px;
+
+            margin:
+                0
+                auto;
+
+            padding:
+
+                38px
+                35px
+                70px;
+
         }
 
-        .panel-header {
-            padding: 17px;
+
+        /*
+        |--------------------------------------------------------------------------
+        | HERO
+        |--------------------------------------------------------------------------
+        */
+
+        .users-hero {
+
+            position: relative;
+
+            min-height: 155px;
+
+            overflow: hidden;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            padding:
+
+                34px
+                38px;
+
+            margin-bottom: 26px;
+
+            color: #ffffff;
+
+            background:
+
+                linear-gradient(
+                    110deg,
+                    #08265a 0%,
+                    #123c8c 47%,
+                    #2480ed 100%
+                );
+
+            border-radius: 26px;
+
+            box-shadow:
+
+                0
+                20px
+                45px
+                rgba(
+                    18,
+                    70,
+                    150,
+                    .15
+                );
+
         }
 
-        .panel-header h2 {
-            font-size: 15px;
+
+        .users-hero::before {
+
+            content: "";
+
+            position: absolute;
+
+            width: 260px;
+            height: 260px;
+
+            right: -70px;
+            top: -140px;
+
+            border-radius: 50%;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .07
+                );
+
         }
-    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | RESPONSIVE 450
-    |--------------------------------------------------------------------------
-    */
 
-    @media (max-width: 450px) {
+        .users-hero::after {
 
-        .admin-topbar h1 {
-            font-size: 19px;
+            content: "";
+
+            position: absolute;
+
+            width: 170px;
+            height: 170px;
+
+            right: 155px;
+            bottom: -110px;
+
+            border-radius: 50%;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .045
+                );
+
         }
 
-        .admin-topbar p {
-            display: none;
+
+        .users-hero-text {
+
+            position: relative;
+
+            z-index: 2;
+
         }
 
-        .stat-card {
-            padding: 17px;
+
+        .users-hero h1 {
+
+            margin:
+
+                0
+                0
+                8px;
+
+            color: #ffffff;
+
+            font-size: 38px;
+
+            line-height: 1.05;
+
+            font-weight: 800;
+
+            letter-spacing: -1.5px;
+
         }
 
-        .stat-card strong {
-            font-size: 27px;
+
+        .users-hero p {
+
+            margin: 0;
+
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .82
+                );
+
+            font-size: 14px;
+
+            font-weight: 500;
+
         }
-    }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | HERO ICON
+        |--------------------------------------------------------------------------
+        */
+
+        .users-hero-icon {
+
+            position: relative;
+
+            z-index: 2;
+
+            width: 82px;
+            height: 82px;
+
+            flex-shrink: 0;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            border:
+
+                1px solid
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .25
+                );
+
+            border-radius: 22px;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .14
+                );
+
+            color: #ffffff;
+
+            font-size: 34px;
+
+            font-weight: 800;
+
+            box-shadow:
+
+                inset
+                0
+                0
+                20px
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .06
+                );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ALERT
+        |--------------------------------------------------------------------------
+        */
+
+        .users-alert {
+
+            margin-bottom: 22px;
+
+            padding:
+
+                14px
+                17px;
+
+            border-radius: 12px;
+
+            font-size: 11px;
+
+            font-weight: 600;
+
+        }
+
+
+        .users-alert.success {
+
+            color: #166534;
+
+            background: #ecfdf5;
+
+            border:
+
+                1px solid
+                #bbf7d0;
+
+        }
+
+
+        .users-alert.error {
+
+            color: #991b1b;
+
+            background: #fff1f2;
+
+            border:
+
+                1px solid
+                #fecdd3;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATISTICS
+        |--------------------------------------------------------------------------
+        */
+
+        .users-stats {
+
+            display: grid;
+
+            grid-template-columns:
+
+                repeat(
+                    4,
+                    minmax(
+                        0,
+                        1fr
+                    )
+                );
+
+            gap: 18px;
+
+            margin-bottom: 30px;
+
+        }
+
+
+        .user-stat-card {
+
+            position: relative;
+
+            min-height: 150px;
+
+            overflow: hidden;
+
+            padding:
+
+                26px
+                24px;
+
+            background: #ffffff;
+
+            border:
+
+                1px solid
+                #dce7f3;
+
+            border-top:
+
+                4px solid
+                #2563eb;
+
+            border-radius: 20px;
+
+            box-shadow:
+
+                0
+                12px
+                28px
+                rgba(
+                    20,
+                    60,
+                    120,
+                    .055
+                );
+
+        }
+
+
+        .user-stat-card::after {
+
+            content: "";
+
+            position: absolute;
+
+            right: -29px;
+            bottom: -45px;
+
+            width: 110px;
+            height: 110px;
+
+            border-radius: 50%;
+
+            background: #edf4ff;
+
+        }
+
+
+        .user-stat-card.customers {
+
+            border-top-color: #16a34a;
+
+        }
+
+
+        .user-stat-card.customers::after {
+
+            background: #eaf9ef;
+
+        }
+
+
+        .user-stat-card.vendors {
+
+            border-top-color: #f59e0b;
+
+        }
+
+
+        .user-stat-card.vendors::after {
+
+            background: #fff7df;
+
+        }
+
+
+        .user-stat-card.admins {
+
+            border-top-color: #8b5cf6;
+
+        }
+
+
+        .user-stat-card.admins::after {
+
+            background: #f4efff;
+
+        }
+
+
+        .user-stat-label {
+
+            position: relative;
+
+            z-index: 2;
+
+            display: block;
+
+            margin-bottom: 15px;
+
+            color: #61728e;
+
+            font-size: 10px;
+
+            font-weight: 800;
+
+            letter-spacing: .75px;
+
+            text-transform: uppercase;
+
+        }
+
+
+        .user-stat-value {
+
+            position: relative;
+
+            z-index: 2;
+
+            display: block;
+
+            color: #0b326d;
+
+            font-size: 32px;
+
+            line-height: 1;
+
+            font-weight: 800;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN PANEL
+        |--------------------------------------------------------------------------
+        */
+
+        .users-panel {
+
+            overflow: hidden;
+
+            background: #ffffff;
+
+            border:
+
+                1px solid
+                #dce7f3;
+
+            border-radius: 24px;
+
+            box-shadow:
+
+                0
+                14px
+                35px
+                rgba(
+                    24,
+                    64,
+                    120,
+                    .055
+                );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PANEL HEADER
+        |--------------------------------------------------------------------------
+        */
+
+        .users-panel-header {
+
+            min-height: 115px;
+
+            padding:
+
+                27px
+                30px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            gap: 20px;
+
+            border-bottom:
+
+                1px solid
+                #e7edf5;
+
+        }
+
+
+        .users-panel-title {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 16px;
+
+        }
+
+
+        .users-panel-icon {
+
+            width: 53px;
+            height: 53px;
+
+            flex-shrink: 0;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 16px;
+
+            color: #ffffff;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #1476e8,
+                    #1d95f3
+                );
+
+            font-size: 22px;
+
+            font-weight: 800;
+
+            box-shadow:
+
+                0
+                9px
+                20px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .22
+                );
+
+        }
+
+
+        .users-panel-header h2 {
+
+            margin:
+
+                0
+                0
+                5px;
+
+            color: #092e65;
+
+            font-size: 20px;
+
+            font-weight: 800;
+
+        }
+
+
+        .users-panel-header p {
+
+            margin: 0;
+
+            color: #8999b4;
+
+            font-size: 11px;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | COUNT BADGE
+        |--------------------------------------------------------------------------
+        */
+
+        .users-count-badge {
+
+            min-height: 36px;
+
+            padding:
+
+                0
+                16px;
+
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            color: #2563eb;
+
+            background: #eff6ff;
+
+            border:
+
+                1px solid
+                #d6e7ff;
+
+            border-radius: 999px;
+
+            font-size: 10px;
+
+            font-weight: 800;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER
+        |--------------------------------------------------------------------------
+        */
+
+        .users-filter-wrapper {
+
+            padding:
+
+                22px
+                28px;
+
+            border-bottom:
+
+                1px solid
+                #edf1f6;
+
+            background: #fbfdff;
+
+        }
+
+
+        .users-filter {
+
+            display: grid;
+
+            grid-template-columns:
+
+                minmax(
+                    260px,
+                    1.7fr
+                )
+
+                minmax(
+                    145px,
+                    .6fr
+                )
+
+                minmax(
+                    145px,
+                    .6fr
+                )
+
+                auto
+
+                auto;
+
+            gap: 10px;
+
+        }
+
+
+        .users-filter input,
+        .users-filter select {
+
+            width: 100%;
+
+            height: 43px;
+
+            padding:
+
+                0
+                13px;
+
+            outline: none;
+
+            color: #26354e;
+
+            background: #ffffff;
+
+            border:
+
+                1px solid
+                #d8e3ef;
+
+            border-radius: 10px;
+
+            font-size: 10px;
+
+        }
+
+
+        .users-filter input::placeholder {
+
+            color: #96a5b9;
+
+        }
+
+
+        .users-filter input:focus,
+        .users-filter select:focus {
+
+            border-color: #3b82f6;
+
+            box-shadow:
+
+                0
+                0
+                0
+                3px
+                rgba(
+                    59,
+                    130,
+                    246,
+                    .08
+                );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | BUTTONS
+        |--------------------------------------------------------------------------
+        */
+
+        .users-btn {
+
+            min-height: 43px;
+
+            padding:
+
+                0
+                17px;
+
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 10px;
+
+            font-size: 10px;
+
+            font-weight: 800;
+
+            text-decoration: none;
+
+            cursor: pointer;
+
+            white-space: nowrap;
+
+        }
+
+
+        .users-btn.primary {
+
+            color: #ffffff;
+
+            border: 0;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #1d65d8
+                );
+
+            box-shadow:
+
+                0
+                7px
+                15px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .20
+                );
+
+        }
+
+
+        .users-btn.secondary {
+
+            color: #66758b;
+
+            border:
+
+                1px solid
+                #d7e2ee;
+
+            background: #ffffff;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TABLE
+        |--------------------------------------------------------------------------
+        */
+
+        .users-table-wrapper {
+
+            width: 100%;
+
+            overflow-x: auto;
+
+        }
+
+
+        .users-table {
+
+            width: 100%;
+
+            min-width: 1050px;
+
+            border-collapse: collapse;
+
+        }
+
+
+        .users-table thead {
+
+            background: #f6f9fd;
+
+        }
+
+
+        .users-table th {
+
+            height: 44px;
+
+            padding:
+
+                0
+                18px;
+
+            color: #65758f;
+
+            border-bottom:
+
+                1px solid
+                #dfe7f0;
+
+            font-size: 8px;
+
+            font-weight: 800;
+
+            text-align: left;
+
+            letter-spacing: .55px;
+
+            text-transform: uppercase;
+
+            white-space: nowrap;
+
+        }
+
+
+        .users-table td {
+
+            padding:
+
+                16px
+                18px;
+
+            color: #435169;
+
+            border-bottom:
+
+                1px solid
+                #edf1f6;
+
+            font-size: 9px;
+
+            vertical-align: middle;
+
+        }
+
+
+        .users-table tbody tr {
+
+            transition:
+                background
+                .15s ease;
+
+        }
+
+
+        .users-table tbody tr:hover {
+
+            background: #f9fbff;
+
+        }
+
+
+        .users-table tbody tr:last-child td {
+
+            border-bottom: 0;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ID
+        |--------------------------------------------------------------------------
+        */
+
+        .user-id {
+
+            color: #8796ac;
+
+            font-weight: 700;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | USER CELL
+        |--------------------------------------------------------------------------
+        */
+
+        .user-cell {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 11px;
+
+            min-width: 210px;
+
+        }
+
+
+        .user-avatar {
+
+            width: 39px;
+            height: 39px;
+
+            flex-shrink: 0;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 10px;
+
+            color: #ffffff;
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #60a5fa
+                );
+
+            font-size: 12px;
+
+            font-weight: 800;
+
+        }
+
+
+        .user-cell-info {
+
+            min-width: 0;
+
+        }
+
+
+        .user-cell strong {
+
+            display: block;
+
+            margin-bottom: 3px;
+
+            color: #112b55;
+
+            font-size: 10px;
+
+            font-weight: 800;
+
+        }
+
+
+        .user-cell small {
+
+            display: block;
+
+            max-width: 200px;
+
+            overflow: hidden;
+
+            color: #8897ac;
+
+            font-size: 8px;
+
+            text-overflow: ellipsis;
+
+            white-space: nowrap;
+
+        }
+
+
+        .user-cell small.business {
+
+            margin-top: 2px;
+
+            color: #2563eb;
+
+            font-weight: 600;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ROLE / STATUS SELECT
+        |--------------------------------------------------------------------------
+        */
+
+        .user-inline-form {
+
+            display: inline-block;
+
+            margin: 0;
+
+        }
+
+
+        .user-inline-form select {
+
+            min-width: 108px;
+
+            height: 33px;
+
+            padding:
+
+                0
+                9px;
+
+            outline: none;
+
+            color: #334155;
+
+            background: #ffffff;
+
+            border:
+
+                1px solid
+                #d7e2ef;
+
+            border-radius: 8px;
+
+            font-size: 8px;
+
+            font-weight: 700;
+
+            cursor: pointer;
+
+        }
+
+
+        .user-inline-form select:focus {
+
+            border-color: #3b82f6;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ROLE BADGE
+        |--------------------------------------------------------------------------
+        */
+
+        .user-role-badge {
+
+            min-height: 30px;
+
+            padding:
+
+                0
+                10px;
+
+            display: inline-flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            color: #2563eb;
+
+            background: #eff6ff;
+
+            border:
+
+                1px solid
+                #d6e7ff;
+
+            border-radius: 8px;
+
+            font-size: 8px;
+
+            font-weight: 800;
+
+            text-transform: capitalize;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATUS BADGE
+        |--------------------------------------------------------------------------
+        */
+
+        .user-status-badge {
+
+            min-height: 28px;
+
+            padding:
+
+                0
+                10px;
+
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 5px;
+
+            border-radius: 999px;
+
+            font-size: 8px;
+
+            font-weight: 800;
+
+            text-transform: capitalize;
+
+        }
+
+
+        .user-status-badge::before {
+
+            content: "";
+
+            width: 5px;
+            height: 5px;
+
+            border-radius: 50%;
+
+        }
+
+
+        .user-status-badge.active {
+
+            color: #15803d;
+
+            background: #ecfdf3;
+
+        }
+
+
+        .user-status-badge.active::before {
+
+            background: #22c55e;
+
+        }
+
+
+        .user-status-badge.inactive {
+
+            color: #64748b;
+
+            background: #f1f5f9;
+
+        }
+
+
+        .user-status-badge.inactive::before {
+
+            background: #94a3b8;
+
+        }
+
+
+        .user-status-badge.pending {
+
+            color: #a16207;
+
+            background: #fffbea;
+
+        }
+
+
+        .user-status-badge.pending::before {
+
+            background: #eab308;
+
+        }
+
+
+        .user-status-badge.suspended {
+
+            color: #b91c1c;
+
+            background: #fff1f2;
+
+        }
+
+
+        .user-status-badge.suspended::before {
+
+            background: #ef4444;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MFA
+        |--------------------------------------------------------------------------
+        */
+
+        .user-mfa {
+
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 5px;
+
+            color: #2563eb;
+
+            font-size: 8px;
+
+            font-weight: 700;
+
+        }
+
+
+        .user-mfa::before {
+
+            content: "";
+
+            width: 5px;
+            height: 5px;
+
+            border-radius: 50%;
+
+            background: #2563eb;
+
+        }
+
+
+        .user-mfa.disabled {
+
+            color: #94a3b8;
+
+        }
+
+
+        .user-mfa.disabled::before {
+
+            background: #94a3b8;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | VIEW BUTTON
+        |--------------------------------------------------------------------------
+        */
+
+        .user-view-btn {
+
+            min-height: 31px;
+
+            padding:
+
+                0
+                11px;
+
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            color: #2563eb;
+
+            background: #eff6ff;
+
+            border:
+
+                1px solid
+                #cfe1ff;
+
+            border-radius: 8px;
+
+            font-size: 8px;
+
+            font-weight: 800;
+
+            text-decoration: none;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | EMPTY
+        |--------------------------------------------------------------------------
+        */
+
+        .users-empty {
+
+            padding:
+
+                70px
+                20px !important;
+
+            color: #94a3b8 !important;
+
+            text-align: center;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSIVE
+        |--------------------------------------------------------------------------
+        */
+
+        @media (max-width: 1200px) {
+
+            .users-stats {
+
+                grid-template-columns:
+
+                    repeat(
+                        2,
+                        1fr
+                    );
+
+            }
+
+
+            .users-filter {
+
+                grid-template-columns:
+
+                    1fr
+                    1fr;
+
+            }
+
+
+            .users-filter input {
+
+                grid-column:
+
+                    1 /
+                    -1;
+
+            }
+
+        }
+
+
+        @media (max-width: 900px) {
+
+            .users-main {
+
+                margin-left: 0;
+
+                width: 100%;
+
+            }
+
+
+            .users-content {
+
+                padding:
+
+                    25px
+                    20px
+                    50px;
+
+            }
+
+
+            .users-hero {
+
+                min-height: 140px;
+
+                padding:
+
+                    28px
+                    28px;
+
+            }
+
+
+            .users-hero h1 {
+
+                font-size: 31px;
+
+            }
+
+
+            .users-hero-icon {
+
+                width: 67px;
+                height: 67px;
+
+            }
+
+        }
+
+
+        @media (max-width: 650px) {
+
+            .users-content {
+
+                padding:
+
+                    18px
+                    13px
+                    40px;
+
+            }
+
+
+            .users-hero {
+
+                min-height: auto;
+
+                padding:
+
+                    25px
+                    21px;
+
+                border-radius: 20px;
+
+            }
+
+
+            .users-hero h1 {
+
+                font-size: 27px;
+
+            }
+
+
+            .users-hero p {
+
+                max-width: 230px;
+
+                font-size: 11px;
+
+            }
+
+
+            .users-hero-icon {
+
+                width: 55px;
+                height: 55px;
+
+                border-radius: 15px;
+
+                font-size: 24px;
+
+            }
+
+
+            .users-stats {
+
+                grid-template-columns: 1fr;
+
+                gap: 12px;
+
+            }
+
+
+            .user-stat-card {
+
+                min-height: 120px;
+
+            }
+
+
+            .users-panel-header {
+
+                padding:
+
+                    20px
+                    17px;
+
+                flex-direction: column;
+
+                align-items: flex-start;
+
+            }
+
+
+            .users-filter {
+
+                grid-template-columns: 1fr;
+
+            }
+
+
+            .users-filter input {
+
+                grid-column: auto;
+
+            }
+
+
+            .users-btn {
+
+                width: 100%;
+
+            }
+
+        }
 
     </style>
 
 </head>
 
+
 <body>
+
 
 <div class="admin-wrapper">
 
+
     <?php
-    require_once dirname(__DIR__) .
-        '/includes/admin_sidebar.php';
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN SIDEBAR
+    |--------------------------------------------------------------------------
+    */
+
+    require_once __DIR__ .
+        '/../includes/admin_sidebar.php';
+
     ?>
 
-    <main class="admin-main">
 
-        <!-- =====================================================
-             HEADER
-        ====================================================== -->
+    <main class="users-main">
 
-        <header class="admin-topbar">
 
-            <div class="admin-header-left">
+        <div class="users-content">
 
-                <div>
+
+            <!-- =====================================================
+                 HERO
+            ====================================================== -->
+
+            <section class="users-hero">
+
+
+                <div class="users-hero-text">
 
                     <h1>
                         Users
                     </h1>
 
                     <p>
-                        Manage HochipoHub user accounts and access.
+                        Monitor and manage all HochipoHub user accounts.
                     </p>
 
                 </div>
 
-            </div>
 
-        </header>
+                <div class="users-hero-icon">
 
-        <!-- =====================================================
-             SUCCESS MESSAGE
-        ====================================================== -->
+                    👥
 
-        <?php if (isset($_GET['success'])): ?>
+                </div>
 
-            <div class="admin-alert success">
-                User updated successfully.
-            </div>
 
-        <?php endif; ?>
+            </section>
 
-        <!-- =====================================================
-             ERROR MESSAGE
-        ====================================================== -->
 
-        <?php if (isset($_GET['error'])): ?>
+            <!-- =====================================================
+                 SUCCESS MESSAGE
+            ====================================================== -->
 
-            <div class="admin-alert error">
+            <?php if (
+                isset($_GET['success']) &&
+                $_GET['success'] === 'updated'
+            ): ?>
 
-                <?php
 
-                $err = $_GET['error'];
+                <div
+                    class="
+                        users-alert
+                        success
+                    "
+                >
 
-                echo $err === 'self'
-                    ? 'You cannot modify your own administrator account from this page.'
-                    : (
-                        $err === 'notfound'
-                            ? 'User not found.'
-                            : (
-                                $err === 'invalid'
-                                    ? 'Invalid user information.'
-                                    : 'Unable to process the request.'
-                            )
-                    );
+                    User updated successfully.
 
-                ?>
+                </div>
 
-            </div>
 
-        <?php endif; ?>
+            <?php endif; ?>
 
-        <!-- =====================================================
-             STATISTICS
-        ====================================================== -->
 
-        <section class="admin-stats">
+            <!-- =====================================================
+                 ERROR MESSAGE
+            ====================================================== -->
 
-            <?php
+            <?php if (isset($_GET['error'])): ?>
 
-            $statistics = [
-                [
-                    'Total Users',
-                    $total_users
-                ],
-                [
-                    'Customers',
-                    $total_customers
-                ],
-                [
-                    'Vendors',
-                    $total_vendors
-                ],
-                [
-                    'Admins',
-                    $total_admins
-                ]
-            ];
 
-            ?>
+                <div
+                    class="
+                        users-alert
+                        error
+                    "
+                >
 
-            <?php foreach ($statistics as $s): ?>
 
-                <div class="stat-card">
+                    <?php
 
-                    <span class="stat-label">
-                        <?= e($s[0]) ?>
+                    $error =
+                        $_GET['error'];
+
+
+                    if ($error === 'self') {
+
+                        echo
+                            'You cannot modify your own administrator account from this page.';
+
+                    }
+
+                    elseif ($error === 'notfound') {
+
+                        echo
+                            'User not found.';
+
+                    }
+
+                    elseif ($error === 'invalid') {
+
+                        echo
+                            'Invalid user information.';
+
+                    }
+
+                    elseif ($error === 'security') {
+
+                        echo
+                            'Invalid security token. Please refresh the page.';
+
+                    }
+
+                    else {
+
+                        echo
+                            'Unable to process the request.';
+
+                    }
+
+                    ?>
+
+
+                </div>
+
+
+            <?php endif; ?>
+
+
+            <!-- =====================================================
+                 STATISTICS
+            ====================================================== -->
+
+            <section class="users-stats">
+
+
+                <!-- TOTAL USERS -->
+
+                <div class="user-stat-card">
+
+                    <span class="user-stat-label">
+
+                        Total Users
+
                     </span>
 
-                    <strong>
-                        <?= number_format($s[1]) ?>
+
+                    <strong class="user-stat-value">
+
+                        <?= number_format(
+                            $totalUsers
+                        ) ?>
+
                     </strong>
 
                 </div>
 
-            <?php endforeach; ?>
 
-        </section>
+                <!-- CUSTOMERS -->
 
-        <!-- =====================================================
-             SEARCH & FILTER
-        ====================================================== -->
-
-        <section class="admin-panel">
-
-            <form
-                method="GET"
-                class="admin-filter-form"
-            >
-
-                <input
-                    type="text"
-                    name="search"
-                    placeholder="Search name, email or phone..."
-                    value="<?= e($search) ?>"
-                    autocomplete="off"
+                <div
+                    class="
+                        user-stat-card
+                        customers
+                    "
                 >
 
-                <select
-                    name="role"
-                    aria-label="Filter by role"
-                >
+                    <span class="user-stat-label">
 
-                    <option value="">
-                        All Roles
-                    </option>
+                        Customers
 
-                    <?php foreach (
-                        [
-                            'customer',
-                            'vendor',
-                            'admin'
-                        ]
-                        as $r
-                    ): ?>
+                    </span>
 
-                        <option
-                            value="<?= e($r) ?>"
-                            <?= $role_filter === $r
-                                ? 'selected'
-                                : ''
-                            ?>
-                        >
-                            <?= ucfirst(e($r)) ?>
-                        </option>
 
-                    <?php endforeach; ?>
+                    <strong class="user-stat-value">
 
-                </select>
+                        <?= number_format(
+                            $totalCustomers
+                        ) ?>
 
-                <select
-                    name="status"
-                    aria-label="Filter by status"
-                >
-
-                    <option value="">
-                        All Status
-                    </option>
-
-                    <?php foreach (
-                        [
-                            'active',
-                            'inactive',
-                            'pending',
-                            'suspended'
-                        ]
-                        as $s
-                    ): ?>
-
-                        <option
-                            value="<?= e($s) ?>"
-                            <?= $status_filter === $s
-                                ? 'selected'
-                                : ''
-                            ?>
-                        >
-                            <?= ucfirst(e($s)) ?>
-                        </option>
-
-                    <?php endforeach; ?>
-
-                </select>
-
-                <button
-                    class="admin-btn primary"
-                    type="submit"
-                >
-                    Search
-                </button>
-
-                <a
-                    class="admin-btn secondary"
-                    href="users.php"
-                >
-                    Reset
-                </a>
-
-            </form>
-
-        </section>
-
-        <!-- =====================================================
-             USER LIST
-        ====================================================== -->
-
-        <section class="admin-panel">
-
-            <div class="panel-header">
-
-                <div>
-
-                    <h2>
-                        User List
-                    </h2>
-
-                    <p>
-                        <?= number_format(count($users)) ?>
-                        user(s) found
-                    </p>
+                    </strong>
 
                 </div>
 
-            </div>
 
-            <div class="table-wrapper">
+                <!-- VENDORS -->
 
-                <table class="admin-table">
+                <div
+                    class="
+                        user-stat-card
+                        vendors
+                    "
+                >
 
-                    <thead>
+                    <span class="user-stat-label">
 
-                        <tr>
+                        Vendors
 
-                            <th>
-                                ID
-                            </th>
+                    </span>
 
-                            <th>
-                                User
-                            </th>
 
-                            <th>
-                                Phone
-                            </th>
+                    <strong class="user-stat-value">
 
-                            <th>
-                                Role
-                            </th>
+                        <?= number_format(
+                            $totalVendors
+                        ) ?>
 
-                            <th>
-                                Status
-                            </th>
+                    </strong>
 
-                            <th>
-                                MFA
-                            </th>
+                </div>
 
-                            <th>
-                                Joined
-                            </th>
 
-                            <th>
-                                Action
-                            </th>
+                <!-- ADMINS -->
 
-                        </tr>
+                <div
+                    class="
+                        user-stat-card
+                        admins
+                    "
+                >
 
-                    </thead>
+                    <span class="user-stat-label">
 
-                    <tbody>
+                        Admins
 
-                    <?php if (!$users): ?>
+                    </span>
 
-                        <tr>
 
-                            <td
-                                colspan="8"
-                                class="empty-state"
-                            >
-                                No users found.
-                            </td>
+                    <strong class="user-stat-value">
 
-                        </tr>
+                        <?= number_format(
+                            $totalAdmins
+                        ) ?>
 
-                    <?php else: ?>
+                    </strong>
 
-                        <?php foreach ($users as $u): ?>
+                </div>
+
+
+            </section>
+
+
+            <!-- =====================================================
+                 USERS PANEL
+            ====================================================== -->
+
+            <section class="users-panel">
+
+
+                <!-- =================================================
+                     PANEL HEADER
+                ================================================== -->
+
+                <div class="users-panel-header">
+
+
+                    <div class="users-panel-title">
+
+
+                        <div class="users-panel-icon">
+
+                            👤
+
+                        </div>
+
+
+                        <div>
+
+                            <h2>
+                                User Accounts
+                            </h2>
+
+                            <p>
+                                Manage user roles, account status and access.
+                            </p>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <div class="users-count-badge">
+
+                        <?= number_format(
+                            count(
+                                $users
+                            )
+                        ) ?>
+
+                        users
+
+                    </div>
+
+
+                </div>
+
+
+                <!-- =================================================
+                     FILTER
+                ================================================== -->
+
+                <div class="users-filter-wrapper">
+
+
+                    <form
+                        method="GET"
+                        action="users.php"
+                        class="users-filter"
+                    >
+
+
+                        <!-- SEARCH -->
+
+                        <input
+                            type="search"
+                            name="search"
+                            value="<?= e($search) ?>"
+                            placeholder="Search name, email or phone..."
+                            autocomplete="off"
+                        >
+
+
+                        <!-- ROLE -->
+
+                        <select
+                            name="role"
+                            aria-label="Filter role"
+                        >
+
+                            <option value="">
+                                All Roles
+                            </option>
+
+
+                            <?php foreach (
+                                [
+                                    'customer',
+                                    'vendor',
+                                    'admin'
+                                ]
+                                as $role
+                            ): ?>
+
+
+                                <option
+                                    value="<?= e(
+                                        $role
+                                    ) ?>"
+                                    <?= $roleFilter === $role
+                                        ? 'selected'
+                                        : '' ?>
+                                >
+
+                                    <?= ucfirst(
+                                        e(
+                                            $role
+                                        )
+                                    ) ?>
+
+                                </option>
+
+
+                            <?php endforeach; ?>
+
+
+                        </select>
+
+
+                        <!-- STATUS -->
+
+                        <select
+                            name="status"
+                            aria-label="Filter status"
+                        >
+
+                            <option value="">
+                                All Status
+                            </option>
+
+
+                            <?php foreach (
+                                [
+                                    'active',
+                                    'inactive',
+                                    'pending',
+                                    'suspended'
+                                ]
+                                as $status
+                            ): ?>
+
+
+                                <option
+                                    value="<?= e(
+                                        $status
+                                    ) ?>"
+                                    <?= $statusFilter === $status
+                                        ? 'selected'
+                                        : '' ?>
+                                >
+
+                                    <?= ucfirst(
+                                        e(
+                                            $status
+                                        )
+                                    ) ?>
+
+                                </option>
+
+
+                            <?php endforeach; ?>
+
+
+                        </select>
+
+
+                        <!-- SEARCH BUTTON -->
+
+                        <button
+                            type="submit"
+                            class="
+                                users-btn
+                                primary
+                            "
+                        >
+
+                            Search
+
+                        </button>
+
+
+                        <!-- RESET -->
+
+                        <a
+                            href="users.php"
+                            class="
+                                users-btn
+                                secondary
+                            "
+                        >
+
+                            Reset
+
+                        </a>
+
+
+                    </form>
+
+
+                </div>
+
+
+                <!-- =================================================
+                     TABLE
+                ================================================== -->
+
+                <div class="users-table-wrapper">
+
+
+                    <table class="users-table">
+
+
+                        <thead>
 
                             <tr>
 
-                                <!-- ID -->
+                                <th>
+                                    ID
+                                </th>
 
-                                <td>
-                                    #
-                                    <?= (int) $u['user_id'] ?>
-                                </td>
+                                <th>
+                                    User
+                                </th>
 
-                                <!-- USER -->
+                                <th>
+                                    Phone
+                                </th>
 
-                                <td>
+                                <th>
+                                    Role
+                                </th>
 
-                                    <strong>
-                                        <?= e($u['name']) ?>
-                                    </strong>
+                                <th>
+                                    Status
+                                </th>
 
-                                    <small>
-                                        <?= e($u['email']) ?>
-                                    </small>
+                                <th>
+                                    MFA
+                                </th>
 
-                                    <?php if (
-                                        !empty(
-                                            $u['business_name']
-                                        )
-                                    ): ?>
+                                <th>
+                                    Joined
+                                </th>
 
-                                        <small>
-                                            <?= e(
-                                                $u['business_name']
-                                            ) ?>
-                                        </small>
+                                <th>
+                                    Action
+                                </th>
 
-                                    <?php endif; ?>
+                            </tr>
 
-                                </td>
+                        </thead>
 
-                                <!-- PHONE -->
 
-                                <td>
-                                    <?= e(
-                                        $u['phone'] ?? '-'
-                                    ) ?>
-                                </td>
+                        <tbody>
 
-                                <!-- ROLE -->
 
-                                <td>
+                            <?php if (empty($users)): ?>
 
-                                    <?php if (
-                                        (int) $u['user_id'] ===
-                                        $admin_id
-                                    ): ?>
 
-                                        <span>
-                                            <?= e($u['role']) ?>
-                                        </span>
+                                <tr>
 
-                                    <?php else: ?>
+                                    <td
+                                        colspan="8"
+                                        class="users-empty"
+                                    >
 
-                                        <form
-                                            method="POST"
-                                            class="inline-form"
-                                        >
+                                        No users found.
 
-                                            <input
-                                                type="hidden"
-                                                name="update_user"
-                                                value="1"
-                                            >
+                                    </td>
 
-                                            <input
-                                                type="hidden"
-                                                name="user_id"
-                                                value="<?= (int) $u['user_id'] ?>"
-                                            >
+                                </tr>
 
-                                            <input
-                                                type="hidden"
-                                                name="status"
-                                                value="<?= e($u['status']) ?>"
-                                            >
 
-                                            <select
-                                                name="role"
-                                                onchange="this.form.submit()"
-                                                aria-label="Change role"
-                                            >
+                            <?php else: ?>
 
-                                                <?php foreach (
-                                                    [
-                                                        'customer',
-                                                        'vendor',
-                                                        'admin'
-                                                    ]
-                                                    as $r
-                                                ): ?>
 
-                                                    <option
-                                                        value="<?= e($r) ?>"
-                                                        <?= $u['role'] === $r
-                                                            ? 'selected'
-                                                            : ''
-                                                        ?>
-                                                    >
-                                                        <?= ucfirst(e($r)) ?>
-                                                    </option>
+                                <?php foreach ($users as $user): ?>
 
-                                                <?php endforeach; ?>
-
-                                            </select>
-
-                                        </form>
-
-                                    <?php endif; ?>
-
-                                </td>
-
-                                <!-- STATUS -->
-
-                                <td>
-
-                                    <?php if (
-                                        (int) $u['user_id'] ===
-                                        $admin_id
-                                    ): ?>
-
-                                        <span
-                                            class="admin-status status-active"
-                                        >
-                                            <?= e($u['status']) ?>
-                                        </span>
-
-                                    <?php else: ?>
-
-                                        <form
-                                            method="POST"
-                                            class="inline-form"
-                                        >
-
-                                            <input
-                                                type="hidden"
-                                                name="update_user"
-                                                value="1"
-                                            >
-
-                                            <input
-                                                type="hidden"
-                                                name="user_id"
-                                                value="<?= (int) $u['user_id'] ?>"
-                                            >
-
-                                            <input
-                                                type="hidden"
-                                                name="role"
-                                                value="<?= e($u['role']) ?>"
-                                            >
-
-                                            <select
-                                                name="status"
-                                                onchange="this.form.submit()"
-                                                aria-label="Change status"
-                                            >
-
-                                                <?php foreach (
-                                                    [
-                                                        'active',
-                                                        'inactive',
-                                                        'pending',
-                                                        'suspended'
-                                                    ]
-                                                    as $s
-                                                ): ?>
-
-                                                    <option
-                                                        value="<?= e($s) ?>"
-                                                        <?= $u['status'] === $s
-                                                            ? 'selected'
-                                                            : ''
-                                                        ?>
-                                                    >
-                                                        <?= ucfirst(e($s)) ?>
-                                                    </option>
-
-                                                <?php endforeach; ?>
-
-                                            </select>
-
-                                        </form>
-
-                                    <?php endif; ?>
-
-                                </td>
-
-                                <!-- MFA -->
-
-                                <td>
-
-                                    <?= !empty(
-                                        $u['mfa_enabled']
-                                    )
-                                        ? 'Enabled'
-                                        : 'Disabled'
-                                    ?>
-
-                                </td>
-
-                                <!-- JOINED -->
-
-                                <td>
 
                                     <?php
 
+                                    $initial =
+                                        strtoupper(
+                                            substr(
+                                                trim(
+                                                    $user['name']
+                                                    ?? 'U'
+                                                ),
+                                                0,
+                                                1
+                                            )
+                                        );
+
+
                                     $createdTimestamp =
                                         !empty(
-                                            $u['created_at']
+                                            $user[
+                                                'created_at'
+                                            ]
                                         )
                                             ? strtotime(
-                                                $u['created_at']
+                                                $user[
+                                                    'created_at'
+                                                ]
                                             )
                                             : false;
 
                                     ?>
 
-                                    <?= $createdTimestamp
-                                        ? e(
-                                            date(
-                                                'd M Y',
-                                                $createdTimestamp
-                                            )
-                                        )
-                                        : '-'
-                                    ?>
 
-                                </td>
+                                    <tr>
 
-                                <!-- ACTION -->
 
-                                <td>
+                                        <!-- ID -->
 
-                                    <a
-                                        class="admin-btn small"
-                                        href="../profile.php?id=<?= (int) $u['user_id'] ?>"
-                                        target="_blank"
-                                    >
-                                        View
-                                    </a>
+                                        <td>
 
-                                </td>
+                                            <span class="user-id">
 
-                            </tr>
+                                                #<?= (int)
+                                                    $user[
+                                                        'user_id'
+                                                    ] ?>
 
-                        <?php endforeach; ?>
+                                            </span>
 
-                    <?php endif; ?>
+                                        </td>
 
-                    </tbody>
 
-                </table>
+                                        <!-- USER -->
 
-            </div>
+                                        <td>
 
-        </section>
+
+                                            <div class="user-cell">
+
+
+                                                <div class="user-avatar">
+
+                                                    <?= e(
+                                                        $initial
+                                                    ) ?>
+
+                                                </div>
+
+
+                                                <div class="user-cell-info">
+
+                                                    <strong>
+
+                                                        <?= e(
+                                                            $user[
+                                                                'name'
+                                                            ]
+                                                        ) ?>
+
+                                                    </strong>
+
+
+                                                    <small>
+
+                                                        <?= e(
+                                                            $user[
+                                                                'email'
+                                                            ]
+                                                        ) ?>
+
+                                                    </small>
+
+
+                                                    <?php if (
+                                                        !empty(
+                                                            $user[
+                                                                'business_name'
+                                                            ]
+                                                        )
+                                                    ): ?>
+
+
+                                                        <small class="business">
+
+                                                            <?= e(
+                                                                $user[
+                                                                    'business_name'
+                                                                ]
+                                                            ) ?>
+
+                                                        </small>
+
+
+                                                    <?php endif; ?>
+
+
+                                                </div>
+
+
+                                            </div>
+
+
+                                        </td>
+
+
+                                        <!-- PHONE -->
+
+                                        <td>
+
+                                            <?= e(
+                                                $user[
+                                                    'phone'
+                                                ]
+                                                ?? '-'
+                                            ) ?>
+
+                                        </td>
+
+
+                                        <!-- ROLE -->
+
+                                        <td>
+
+
+                                            <?php if (
+                                                (int)
+                                                $user[
+                                                    'user_id'
+                                                ]
+                                                ===
+                                                $adminId
+                                            ): ?>
+
+
+                                                <span class="user-role-badge">
+
+                                                    <?= e(
+                                                        $user[
+                                                            'role'
+                                                        ]
+                                                    ) ?>
+
+                                                </span>
+
+
+                                            <?php else: ?>
+
+
+                                                <form
+                                                    method="POST"
+                                                    action="users.php"
+                                                    class="user-inline-form"
+                                                >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="csrf_token"
+                                                        value="<?= e(
+                                                            $csrfToken
+                                                        ) ?>"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="update_user"
+                                                        value="1"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="user_id"
+                                                        value="<?= (int)
+                                                            $user[
+                                                                'user_id'
+                                                            ] ?>"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="status"
+                                                        value="<?= e(
+                                                            $user[
+                                                                'status'
+                                                            ]
+                                                        ) ?>"
+                                                    >
+
+
+                                                    <select
+                                                        name="role"
+                                                        aria-label="Change role"
+                                                        onchange="
+                                                            if (
+                                                                confirm(
+                                                                    'Change this user role to ' +
+                                                                    this.value +
+                                                                    '?'
+                                                                )
+                                                            ) {
+                                                                this.form.submit();
+                                                            } else {
+                                                                window.location.reload();
+                                                            }
+                                                        "
+                                                    >
+
+
+                                                        <?php foreach (
+                                                            [
+                                                                'customer',
+                                                                'vendor',
+                                                                'admin'
+                                                            ]
+                                                            as $role
+                                                        ): ?>
+
+
+                                                            <option
+                                                                value="<?= e(
+                                                                    $role
+                                                                ) ?>"
+                                                                <?= $user[
+                                                                    'role'
+                                                                ] === $role
+                                                                    ? 'selected'
+                                                                    : '' ?>
+                                                            >
+
+                                                                <?= ucfirst(
+                                                                    e(
+                                                                        $role
+                                                                    )
+                                                                ) ?>
+
+                                                            </option>
+
+
+                                                        <?php endforeach; ?>
+
+
+                                                    </select>
+
+
+                                                </form>
+
+
+                                            <?php endif; ?>
+
+
+                                        </td>
+
+
+                                        <!-- STATUS -->
+
+                                        <td>
+
+
+                                            <?php if (
+                                                (int)
+                                                $user[
+                                                    'user_id'
+                                                ]
+                                                ===
+                                                $adminId
+                                            ): ?>
+
+
+                                                <span
+                                                    class="
+                                                        user-status-badge
+                                                        <?= e(
+                                                            $user[
+                                                                'status'
+                                                            ]
+                                                        ) ?>
+                                                    "
+                                                >
+
+                                                    <?= e(
+                                                        $user[
+                                                            'status'
+                                                        ]
+                                                    ) ?>
+
+                                                </span>
+
+
+                                            <?php else: ?>
+
+
+                                                <form
+                                                    method="POST"
+                                                    action="users.php"
+                                                    class="user-inline-form"
+                                                >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="csrf_token"
+                                                        value="<?= e(
+                                                            $csrfToken
+                                                        ) ?>"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="update_user"
+                                                        value="1"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="user_id"
+                                                        value="<?= (int)
+                                                            $user[
+                                                                'user_id'
+                                                            ] ?>"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="role"
+                                                        value="<?= e(
+                                                            $user[
+                                                                'role'
+                                                            ]
+                                                        ) ?>"
+                                                    >
+
+
+                                                    <select
+                                                        name="status"
+                                                        aria-label="Change status"
+                                                        onchange="
+                                                            if (
+                                                                confirm(
+                                                                    'Change this user status to ' +
+                                                                    this.value +
+                                                                    '?'
+                                                                )
+                                                            ) {
+                                                                this.form.submit();
+                                                            } else {
+                                                                window.location.reload();
+                                                            }
+                                                        "
+                                                    >
+
+
+                                                        <?php foreach (
+                                                            [
+                                                                'active',
+                                                                'inactive',
+                                                                'pending',
+                                                                'suspended'
+                                                            ]
+                                                            as $status
+                                                        ): ?>
+
+
+                                                            <option
+                                                                value="<?= e(
+                                                                    $status
+                                                                ) ?>"
+                                                                <?= $user[
+                                                                    'status'
+                                                                ] === $status
+                                                                    ? 'selected'
+                                                                    : '' ?>
+                                                            >
+
+                                                                <?= ucfirst(
+                                                                    e(
+                                                                        $status
+                                                                    )
+                                                                ) ?>
+
+                                                            </option>
+
+
+                                                        <?php endforeach; ?>
+
+
+                                                    </select>
+
+
+                                                </form>
+
+
+                                            <?php endif; ?>
+
+
+                                        </td>
+
+
+                                        <!-- MFA -->
+
+                                        <td>
+
+
+                                            <span
+                                                class="
+                                                    user-mfa
+                                                    <?= empty(
+                                                        $user[
+                                                            'mfa_enabled'
+                                                        ]
+                                                    )
+                                                        ? 'disabled'
+                                                        : '' ?>
+                                                "
+                                            >
+
+                                                <?= !empty(
+                                                    $user[
+                                                        'mfa_enabled'
+                                                    ]
+                                                )
+                                                    ? 'Enabled'
+                                                    : 'Disabled' ?>
+
+                                            </span>
+
+
+                                        </td>
+
+
+                                        <!-- JOINED -->
+
+                                        <td>
+
+                                            <?= $createdTimestamp
+                                                ? e(
+                                                    date(
+                                                        'd M Y',
+                                                        $createdTimestamp
+                                                    )
+                                                )
+                                                : '-' ?>
+
+                                        </td>
+
+
+                                        <!-- ACTION -->
+
+                                        <td>
+
+                                            <a
+                                                href="../profile.php?id=<?= (int)
+                                                    $user[
+                                                        'user_id'
+                                                    ] ?>"
+                                                target="_blank"
+                                                class="user-view-btn"
+                                            >
+
+                                                View
+
+                                            </a>
+
+                                        </td>
+
+
+                                    </tr>
+
+
+                                <?php endforeach; ?>
+
+
+                            <?php endif; ?>
+
+
+                        </tbody>
+
+
+                    </table>
+
+
+                </div>
+
+
+            </section>
+
+
+        </div>
+
 
     </main>
 
+
 </div>
+
+
+<!-- ===============================================================
+     SIDEBAR WIDTH SYNC
+================================================================ -->
+
+<script>
+
+    /*
+    |--------------------------------------------------------------------------
+    | AUTO DETECT REAL SIDEBAR WIDTH
+    |--------------------------------------------------------------------------
+    |
+    | Supaya content Users tak masuk belakang sidebar.
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    function syncUsersSidebarWidth() {
+
+        const main =
+            document.querySelector(
+                '.users-main'
+            );
+
+
+        if (!main) {
+
+            return;
+
+        }
+
+
+        if (
+            window.innerWidth <= 900
+        ) {
+
+            main.style.marginLeft =
+                '0px';
+
+            main.style.width =
+                '100%';
+
+            return;
+
+        }
+
+
+        const sidebar =
+            document.querySelector(
+                '.admin-sidebar'
+            ) ||
+            document.querySelector(
+                '.dashboard-sidebar'
+            ) ||
+            document.querySelector(
+                '.sidebar'
+            ) ||
+            document.querySelector(
+                'aside'
+            );
+
+
+        if (!sidebar) {
+
+            main.style.marginLeft =
+                '260px';
+
+            main.style.width =
+                'calc(100% - 260px)';
+
+            return;
+
+        }
+
+
+        const sidebarRect =
+            sidebar.getBoundingClientRect();
+
+
+        if (
+            sidebarRect.right > 0
+        ) {
+
+            main.style.marginLeft =
+                sidebarRect.right +
+                'px';
+
+
+            main.style.width =
+                'calc(100% - ' +
+                sidebarRect.right +
+                'px)';
+
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAD
+    |--------------------------------------------------------------------------
+    */
+
+    document.addEventListener(
+        'DOMContentLoaded',
+        function () {
+
+            syncUsersSidebarWidth();
+
+
+            setTimeout(
+                syncUsersSidebarWidth,
+                100
+            );
+
+
+            setTimeout(
+                syncUsersSidebarWidth,
+                400
+            );
+
+        }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESIZE
+    |--------------------------------------------------------------------------
+    */
+
+    window.addEventListener(
+        'resize',
+        syncUsersSidebarWidth
+    );
+
+</script>
+
 
 </body>
 
