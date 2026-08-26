@@ -41,15 +41,9 @@ if (!function_exists('customerSidebarActive')) {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| LOGOUT ONLY ON CUSTOMER DASHBOARD
-|--------------------------------------------------------------------------
-*/
-
+/* Keep logout available throughout the customer area. */
 $showCustomerLogout =
-    strtolower($userRole) === 'customer'
-    && $currentPage === 'dashboard.php';
+    strtolower($userRole) === 'customer';
 
 ?>
 
