@@ -432,7 +432,16 @@ try {
    HEADER
 ===================================================== */
 
+$extraCSS = ['dashboard.css'];
+
 require_once __DIR__ . '/includes/header.php';
+
+if (
+    isset($_SESSION['role']) &&
+    strtolower($_SESSION['role']) === 'customer'
+) {
+    require_once __DIR__ . '/includes/customer_sidebar.php';
+}
 
 ?>
 
