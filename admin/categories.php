@@ -55,20 +55,7 @@ $db = getDB();
 
 /*
 |--------------------------------------------------------------------------
-| VARIABLES
-|--------------------------------------------------------------------------
-*/
-
-$pageTitle = 'Categories';
-
-$errors = [];
-$success = '';
-$editCategory = null;
-
-
-/*
-|--------------------------------------------------------------------------
-| ESCAPE
+| HELPER
 |--------------------------------------------------------------------------
 */
 
@@ -87,6 +74,17 @@ if (!function_exists('categoryEscape')) {
 
 /*
 |--------------------------------------------------------------------------
+| VARIABLES
+|--------------------------------------------------------------------------
+*/
+
+$errors = [];
+$success = '';
+$editCategory = null;
+
+
+/*
+|--------------------------------------------------------------------------
 | CSRF TOKEN
 |--------------------------------------------------------------------------
 */
@@ -95,14 +93,10 @@ if (
     !isset($_SESSION['csrf_token']) ||
     empty($_SESSION['csrf_token'])
 ) {
-    $_SESSION['csrf_token'] =
-        bin2hex(
-            random_bytes(32)
-        );
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-$csrfToken =
-    $_SESSION['csrf_token'];
+$csrfToken = $_SESSION['csrf_token'];
 
 
 /*
@@ -111,10 +105,7 @@ $csrfToken =
 |--------------------------------------------------------------------------
 */
 
-$search =
-    isset($_GET['search'])
-        ? trim($_GET['search'])
-        : '';
+$search = trim($_GET['search'] ?? '');
 
 
 /*
@@ -123,23 +114,16 @@ $search =
 |--------------------------------------------------------------------------
 */
 
-$uploadDirectory =
-    __DIR__ .
-    '/../uploads/categories/';
+$uploadDirectory = __DIR__ . '/../uploads/categories/';
 
 if (!is_dir($uploadDirectory)) {
-
-    @mkdir(
-        $uploadDirectory,
-        0755,
-        true
-    );
+    @mkdir($uploadDirectory, 0755, true);
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| DELETE CATEGORY IMAGE
+| DELETE IMAGE
 |--------------------------------------------------------------------------
 */
 
@@ -152,25 +136,20 @@ function deleteCategoryImage(
         return;
     }
 
-    $imageName =
-        basename($imageName);
-
-    $filePath =
-        $uploadDirectory .
-        $imageName;
+    $file = $uploadDirectory . basename($imageName);
 
     if (
-        file_exists($filePath) &&
-        is_file($filePath)
+        file_exists($file) &&
+        is_file($file)
     ) {
-        @unlink($filePath);
+        @unlink($file);
     }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| UPLOAD CATEGORY IMAGE
+| UPLOAD IMAGE
 |--------------------------------------------------------------------------
 */
 
@@ -187,133 +166,65 @@ function uploadCategoryImage(
         return null;
     }
 
-
     if ($file['error'] !== UPLOAD_ERR_OK) {
 
-        $errors[] =
-            'There was a problem uploading the category image.';
-
+        $errors[] = 'There was a problem uploading the category image.';
         return null;
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | MAX SIZE 5MB
-    |--------------------------------------------------------------------------
-    */
-
-    $maxSize =
-        5 * 1024 * 1024;
-
+    $maxSize = 5 * 1024 * 1024;
 
     if (
         !isset($file['size']) ||
         $file['size'] > $maxSize
     ) {
 
-        $errors[] =
-            'Category image must not exceed 5MB.';
-
+        $errors[] = 'Category image must not exceed 5MB.';
         return null;
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | VALID UPLOAD
-    |--------------------------------------------------------------------------
-    */
 
     if (
         empty($file['tmp_name']) ||
         !is_uploaded_file($file['tmp_name'])
     ) {
 
-        $errors[] =
-            'Invalid uploaded category image.';
-
+        $errors[] = 'Invalid uploaded image.';
         return null;
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | MIME TYPE
-    |--------------------------------------------------------------------------
-    */
 
     if (!class_exists('finfo')) {
 
-        $errors[] =
-            'PHP Fileinfo extension is required for image uploads.';
-
+        $errors[] = 'PHP Fileinfo extension is required for image uploads.';
         return null;
     }
 
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
 
-    $finfo =
-        new finfo(
-            FILEINFO_MIME_TYPE
-        );
+    $mime = $finfo->file($file['tmp_name']);
 
-
-    $mimeType =
-        $finfo->file(
-            $file['tmp_name']
-        );
-
-
-    $allowedTypes = [
+    $allowed = [
         'image/jpeg' => 'jpg',
         'image/png'  => 'png',
         'image/webp' => 'webp'
     ];
 
+    if (!$mime || !isset($allowed[$mime])) {
 
-    if (
-        !$mimeType ||
-        !isset(
-            $allowedTypes[$mimeType]
-        )
-    ) {
-
-        $errors[] =
-            'Only JPG, PNG and WEBP images are allowed.';
-
+        $errors[] = 'Only JPG, PNG and WEBP images are allowed.';
         return null;
     }
 
+    $extension = $allowed[$mime];
 
-    /*
-    |--------------------------------------------------------------------------
-    | FILE NAME
-    |--------------------------------------------------------------------------
-    */
-
-    $extension =
-        $allowedTypes[$mimeType];
-
-
-    $imageName =
+    $fileName =
         'category_' .
-        bin2hex(
-            random_bytes(12)
-        ) .
+        bin2hex(random_bytes(12)) .
         '.' .
         $extension;
 
-
     $destination =
         $uploadDirectory .
-        $imageName;
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | MOVE FILE
-    |--------------------------------------------------------------------------
-    */
+        $fileName;
 
     if (
         !move_uploaded_file(
@@ -322,36 +233,24 @@ function uploadCategoryImage(
         )
     ) {
 
-        $errors[] =
-            'Failed to save category image.';
-
+        $errors[] = 'Failed to save category image.';
         return null;
     }
 
-
-    return $imageName;
+    return $fileName;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| POST REQUEST
+| POST ACTIONS
 |--------------------------------------------------------------------------
 */
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | CSRF CHECK
-    |--------------------------------------------------------------------------
-    */
-
     $submittedToken =
-        $_POST['csrf_token']
-        ?? '';
-
+        $_POST['csrf_token'] ?? '';
 
     if (
         empty($submittedToken) ||
@@ -365,16 +264,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'Invalid security token. Please refresh the page and try again.';
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | ACTION
-    |--------------------------------------------------------------------------
-    */
-
     $action =
-        $_POST['action']
-        ?? '';
+        $_POST['action'] ?? '';
 
 
     /*
@@ -390,16 +281,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $categoryName =
             trim(
-                $_POST['category_name']
-                ?? ''
+                $_POST['category_name'] ?? ''
             );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | VALIDATION
-        |--------------------------------------------------------------------------
-        */
 
         if ($categoryName === '') {
 
@@ -407,11 +290,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Category name is required.';
         }
 
-
         if (
-            mb_strlen(
-                $categoryName
-            ) > 100
+            mb_strlen($categoryName) > 100
         ) {
 
             $errors[] =
@@ -421,7 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /*
         |--------------------------------------------------------------------------
-        | DUPLICATE CHECK
+        | DUPLICATE
         |--------------------------------------------------------------------------
         */
 
@@ -437,25 +317,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         LIMIT 1
                     ");
 
-
                 $stmt->execute([
                     $categoryName
                 ]);
 
-
-                if (
-                    $stmt->fetch(
-                        PDO::FETCH_ASSOC
-                    )
-                ) {
+                if ($stmt->fetch(PDO::FETCH_ASSOC)) {
 
                     $errors[] =
                         'This category already exists.';
                 }
 
-            }
-
-            catch (PDOException $e) {
+            } catch (Throwable $e) {
 
                 $errors[] =
                     'Unable to validate category name.';
@@ -469,24 +341,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         |--------------------------------------------------------------------------
         */
 
-        $imageName =
-            null;
-
+        $imageName = null;
 
         if (
             empty($errors) &&
-            isset(
-                $_FILES[
-                    'category_image'
-                ]
-            )
+            isset($_FILES['category_image'])
         ) {
 
             $imageName =
                 uploadCategoryImage(
-                    $_FILES[
-                        'category_image'
-                    ],
+                    $_FILES['category_image'],
                     $uploadDirectory,
                     $errors
                 );
@@ -517,12 +381,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         )
                     ");
 
-
                 $stmt->execute([
                     $categoryName,
                     $imageName
                 ]);
-
 
                 header(
                     'Location: categories.php?success=added'
@@ -530,10 +392,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 exit;
 
-            }
-
-            catch (PDOException $e) {
-
+            } catch (Throwable $e) {
 
                 if (!empty($imageName)) {
 
@@ -542,7 +401,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $uploadDirectory
                     );
                 }
-
 
                 $errors[] =
                     'Unable to add category. Please try again.';
@@ -563,26 +421,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ) {
 
         $categoryId =
-            isset(
-                $_POST['category_id']
-            )
-                ? (int)
-                  $_POST['category_id']
-                : 0;
-
+            (int) (
+                $_POST['category_id'] ?? 0
+            );
 
         $categoryName =
             trim(
-                $_POST['category_name']
-                ?? ''
+                $_POST['category_name'] ?? ''
             );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | VALIDATION
-        |--------------------------------------------------------------------------
-        */
 
         if ($categoryId <= 0) {
 
@@ -590,18 +436,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Invalid category ID.';
         }
 
-
         if ($categoryName === '') {
 
             $errors[] =
                 'Category name is required.';
         }
 
-
         if (
-            mb_strlen(
-                $categoryName
-            ) > 100
+            mb_strlen($categoryName) > 100
         ) {
 
             $errors[] =
@@ -615,9 +457,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         |--------------------------------------------------------------------------
         */
 
-        $existingCategory =
-            null;
-
+        $existingCategory = null;
 
         if (empty($errors)) {
 
@@ -634,17 +474,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         LIMIT 1
                     ");
 
-
                 $stmt->execute([
                     $categoryId
                 ]);
-
 
                 $existingCategory =
                     $stmt->fetch(
                         PDO::FETCH_ASSOC
                     );
-
 
                 if (!$existingCategory) {
 
@@ -652,9 +489,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'Category was not found.';
                 }
 
-            }
-
-            catch (PDOException $e) {
+            } catch (Throwable $e) {
 
                 $errors[] =
                     'Unable to load category.';
@@ -664,7 +499,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /*
         |--------------------------------------------------------------------------
-        | DUPLICATE CHECK
+        | DUPLICATE
         |--------------------------------------------------------------------------
         */
 
@@ -681,26 +516,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         LIMIT 1
                     ");
 
-
                 $stmt->execute([
                     $categoryName,
                     $categoryId
                 ]);
 
-
-                if (
-                    $stmt->fetch(
-                        PDO::FETCH_ASSOC
-                    )
-                ) {
+                if ($stmt->fetch(PDO::FETCH_ASSOC)) {
 
                     $errors[] =
                         'Another category already uses this name.';
                 }
 
-            }
-
-            catch (PDOException $e) {
+            } catch (Throwable $e) {
 
                 $errors[] =
                     'Unable to validate category name.';
@@ -710,55 +537,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /*
         |--------------------------------------------------------------------------
-        | IMAGE
+        | NEW IMAGE
         |--------------------------------------------------------------------------
         */
 
         $oldImage =
-            $existingCategory[
-                'category_image'
-            ]
+            $existingCategory['category_image']
             ?? null;
-
 
         $newImage =
             $oldImage;
 
-
         $hasNewImage =
             false;
 
-
         if (
             empty($errors) &&
-            isset(
-                $_FILES[
-                    'category_image'
-                ]
-            ) &&
-            $_FILES[
-                'category_image'
-            ]['error'] !== UPLOAD_ERR_NO_FILE
+            isset($_FILES['category_image']) &&
+            $_FILES['category_image']['error']
+                !== UPLOAD_ERR_NO_FILE
         ) {
 
-            $uploadedImage =
+            $uploaded =
                 uploadCategoryImage(
-                    $_FILES[
-                        'category_image'
-                    ],
+                    $_FILES['category_image'],
                     $uploadDirectory,
                     $errors
                 );
 
-
             if (
                 empty($errors) &&
-                !empty($uploadedImage)
+                !empty($uploaded)
             ) {
 
                 $newImage =
-                    $uploadedImage;
-
+                    $uploaded;
 
                 $hasNewImage =
                     true;
@@ -785,13 +598,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         WHERE category_id = ?
                     ");
 
-
                 $stmt->execute([
                     $categoryName,
                     $newImage,
                     $categoryId
                 ]);
-
 
                 if (
                     $hasNewImage &&
@@ -805,17 +616,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     );
                 }
 
-
                 header(
                     'Location: categories.php?success=updated'
                 );
 
                 exit;
 
-            }
-
-            catch (PDOException $e) {
-
+            } catch (Throwable $e) {
 
                 if (
                     $hasNewImage &&
@@ -827,7 +634,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $uploadDirectory
                     );
                 }
-
 
                 $errors[] =
                     'Unable to update category. Please try again.';
@@ -848,13 +654,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ) {
 
         $categoryId =
-            isset(
-                $_POST['category_id']
-            )
-                ? (int)
-                  $_POST['category_id']
-                : 0;
-
+            (int) (
+                $_POST['category_id'] ?? 0
+            );
 
         if ($categoryId <= 0) {
 
@@ -862,16 +664,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Invalid category ID.';
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | LOAD CATEGORY
-        |--------------------------------------------------------------------------
-        */
-
-        $category =
-            null;
-
+        $category = null;
 
         if (empty($errors)) {
 
@@ -888,17 +681,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         LIMIT 1
                     ");
 
-
                 $stmt->execute([
                     $categoryId
                 ]);
-
 
                 $category =
                     $stmt->fetch(
                         PDO::FETCH_ASSOC
                     );
-
 
                 if (!$category) {
 
@@ -906,9 +696,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'Category was not found.';
                 }
 
-            }
-
-            catch (PDOException $e) {
+            } catch (Throwable $e) {
 
                 $errors[] =
                     'Unable to load category.';
@@ -918,7 +706,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /*
         |--------------------------------------------------------------------------
-        | CHECK PRODUCTS
+        | PRODUCT CHECK
         |--------------------------------------------------------------------------
         */
 
@@ -933,24 +721,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         WHERE category_id = ?
                     ");
 
-
                 $stmt->execute([
                     $categoryId
                 ]);
-
 
                 $productCount =
                     (int)
                     $stmt->fetchColumn();
 
-
                 if ($productCount > 0) {
 
                     $errors[] =
                         'Cannot delete "' .
-                        $category[
-                            'category_name'
-                        ] .
+                        $category['category_name'] .
                         '" because it contains ' .
                         $productCount .
                         (
@@ -960,9 +743,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         );
                 }
 
-            }
-
-            catch (PDOException $e) {
+            } catch (Throwable $e) {
 
                 $errors[] =
                     'Unable to check products using this category.';
@@ -982,30 +763,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $db->beginTransaction();
 
-
                 $stmt =
                     $db->prepare("
                         DELETE FROM categories
                         WHERE category_id = ?
                     ");
 
-
                 $stmt->execute([
                     $categoryId
                 ]);
 
-
                 $db->commit();
 
-
                 deleteCategoryImage(
-                    $category[
-                        'category_image'
-                    ]
+                    $category['category_image']
                     ?? null,
                     $uploadDirectory
                 );
-
 
                 header(
                     'Location: categories.php?success=deleted'
@@ -1013,18 +787,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 exit;
 
-            }
+            } catch (Throwable $e) {
 
-            catch (PDOException $e) {
-
-
-                if (
-                    $db->inTransaction()
-                ) {
-
+                if ($db->inTransaction()) {
                     $db->rollBack();
                 }
-
 
                 $errors[] =
                     'Unable to delete category. Please try again.';
@@ -1036,7 +803,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 /*
 |--------------------------------------------------------------------------
-| SUCCESS MESSAGE
+| SUCCESS
 |--------------------------------------------------------------------------
 */
 
@@ -1051,14 +818,12 @@ if (isset($_GET['success'])) {
 
             break;
 
-
         case 'updated':
 
             $success =
                 'Category updated successfully.';
 
             break;
-
 
         case 'deleted':
 
@@ -1072,7 +837,7 @@ if (isset($_GET['success'])) {
 
 /*
 |--------------------------------------------------------------------------
-| LOAD EDIT CATEGORY
+| EDIT CATEGORY
 |--------------------------------------------------------------------------
 */
 
@@ -1083,7 +848,6 @@ if (
 
     $editId =
         (int) $_GET['edit'];
-
 
     try {
 
@@ -1099,17 +863,14 @@ if (
                 LIMIT 1
             ");
 
-
         $stmt->execute([
             $editId
         ]);
-
 
         $editCategory =
             $stmt->fetch(
                 PDO::FETCH_ASSOC
             );
-
 
         if (!$editCategory) {
 
@@ -1117,9 +878,7 @@ if (
                 'Category selected for editing was not found.';
         }
 
-    }
-
-    catch (PDOException $e) {
+    } catch (Throwable $e) {
 
         $errors[] =
             'Unable to load category for editing.';
@@ -1129,12 +888,11 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| LOAD CATEGORIES
+| ALL CATEGORIES
 |--------------------------------------------------------------------------
 */
 
 $categories = [];
-
 
 try {
 
@@ -1145,16 +903,12 @@ try {
             c.category_image,
             c.created_at,
             COUNT(p.product_id) AS product_count
-
         FROM categories c
-
         LEFT JOIN products p
             ON p.category_id = c.category_id
     ";
 
-
     $params = [];
-
 
     if ($search !== '') {
 
@@ -1162,13 +916,11 @@ try {
             WHERE c.category_name LIKE ?
         ";
 
-
         $params[] =
             '%' .
             $search .
             '%';
     }
-
 
     $sql .= "
         GROUP BY
@@ -1176,34 +928,27 @@ try {
             c.category_name,
             c.category_image,
             c.created_at
-
         ORDER BY
             c.category_id DESC
     ";
-
 
     $stmt =
         $db->prepare(
             $sql
         );
 
-
     $stmt->execute(
         $params
     );
-
 
     $categories =
         $stmt->fetchAll(
             PDO::FETCH_ASSOC
         );
 
-}
-
-catch (PDOException $e) {
+} catch (Throwable $e) {
 
     $categories = [];
-
 
     $errors[] =
         'Unable to load categories.';
@@ -1216,37 +961,49 @@ catch (PDOException $e) {
 |--------------------------------------------------------------------------
 */
 
-$totalCategories =
-    count($categories);
+$totalCategories = 0;
+$categoriesInUse = 0;
+$totalProductsAssigned = 0;
 
+try {
 
-$categoriesWithProducts =
-    0;
-
-
-$totalProductsInCategories =
-    0;
-
-
-foreach (
-    $categories as $category
-) {
-
-    $count =
+    $totalCategories =
         (int)
-        $category[
-            'product_count'
-        ];
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM categories
+            ")
+            ->fetchColumn();
 
 
-    if ($count > 0) {
+    $categoriesInUse =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(DISTINCT category_id)
+                FROM products
+                WHERE category_id IS NOT NULL
+            ")
+            ->fetchColumn();
 
-        $categoriesWithProducts++;
-    }
 
+    $totalProductsAssigned =
+        (int)
+        $db
+            ->query("
+                SELECT COUNT(*)
+                FROM products
+                WHERE category_id IS NOT NULL
+            ")
+            ->fetchColumn();
 
-    $totalProductsInCategories +=
-        $count;
+} catch (Throwable $e) {
+
+    error_log(
+        'Category statistics error: ' .
+        $e->getMessage()
+    );
 }
 
 ?>
@@ -1268,9 +1025,7 @@ foreach (
     </title>
 
 
-    <!-- ============================================================
-         POPPINS
-    ============================================================= -->
+    <!-- GOOGLE FONT -->
 
     <link
         rel="preconnect"
@@ -1289,9 +1044,7 @@ foreach (
     >
 
 
-    <!-- ============================================================
-         ADMIN CSS
-    ============================================================= -->
+    <!-- PROJECT CSS -->
 
     <link
         rel="stylesheet"
@@ -1306,63 +1059,45 @@ foreach (
 
     <style>
 
-        /*
-        |--------------------------------------------------------------------------
-        | ROOT
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           ROOT
+        ========================================================== */
 
         :root {
 
-            --category-sidebar-width:
-                260px;
+            --category-sidebar-width: 260px;
 
-            --category-blue:
+            --blue:
                 #2563eb;
 
-            --category-navy:
+            --navy:
                 #08265a;
 
-            --category-bg:
-                #eef5fd;
-
-            --category-border:
+            --border:
                 #dce7f3;
 
-            --category-text:
-                #0b2d63;
-
-            --category-muted:
+            --muted:
                 #8294b3;
 
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | RESET
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           GLOBAL
+        ========================================================== */
 
         * {
-
-            box-sizing:
-                border-box;
-
+            box-sizing: border-box;
         }
 
 
         html,
         body {
 
-            margin:
-                0;
+            margin: 0;
+            padding: 0;
 
-            padding:
-                0;
-
-            min-height:
-                100%;
+            min-height: 100%;
 
             font-family:
                 'Poppins',
@@ -1375,10 +1110,7 @@ foreach (
 
 
         body {
-
-            overflow-x:
-                hidden;
-
+            overflow-x: hidden;
         }
 
 
@@ -1391,12 +1123,6 @@ foreach (
 
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | FORCE POPPINS
-        |--------------------------------------------------------------------------
-        */
 
         .admin-wrapper,
         .admin-wrapper *,
@@ -1412,11 +1138,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | MAIN
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           MAIN
+        ========================================================== */
 
         .categories-main {
 
@@ -1458,16 +1182,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | CONTENT
-        |--------------------------------------------------------------------------
-        */
-
         .categories-content {
 
-            width:
-                100%;
+            width: 100%;
 
             max-width:
                 1450px;
@@ -1483,11 +1200,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | HERO
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           HERO
+        ========================================================== */
 
         .categories-hero {
 
@@ -1548,8 +1263,7 @@ foreach (
 
         .categories-hero::before {
 
-            content:
-                "";
+            content: "";
 
             position:
                 absolute;
@@ -1582,8 +1296,7 @@ foreach (
 
         .categories-hero::after {
 
-            content:
-                "";
+            content: "";
 
             position:
                 absolute;
@@ -1652,8 +1365,7 @@ foreach (
 
         .categories-hero p {
 
-            margin:
-                0;
+            margin: 0;
 
             color:
                 rgba(
@@ -1671,12 +1383,6 @@ foreach (
 
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | HERO EMOJI
-        |--------------------------------------------------------------------------
-        */
 
         .categories-hero-icon {
 
@@ -1710,7 +1416,7 @@ foreach (
                     255,
                     255,
                     255,
-                    .26
+                    .28
                 );
 
             border-radius:
@@ -1730,7 +1436,7 @@ foreach (
                         255,
                         255,
                         255,
-                        .10
+                        .08
                     )
                 );
 
@@ -1766,11 +1472,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | ALERT
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           ALERT
+        ========================================================== */
 
         .categories-alert {
 
@@ -1796,21 +1500,6 @@ foreach (
         }
 
 
-        .categories-alert.error {
-
-            color:
-                #991b1b;
-
-            background:
-                #fff1f2;
-
-            border:
-                1px solid
-                #fecdd3;
-
-        }
-
-
         .categories-alert.success {
 
             color:
@@ -1822,6 +1511,21 @@ foreach (
             border:
                 1px solid
                 #bbf7d0;
+
+        }
+
+
+        .categories-alert.error {
+
+            color:
+                #991b1b;
+
+            background:
+                #fff1f2;
+
+            border:
+                1px solid
+                #fecdd3;
 
         }
 
@@ -1839,11 +1543,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | STATS
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           STATS
+        ========================================================== */
 
         .categories-stats {
 
@@ -1869,7 +1571,7 @@ foreach (
         }
 
 
-        .category-stat-card {
+        .category-stat {
 
             position:
                 relative;
@@ -1890,7 +1592,7 @@ foreach (
             border:
                 1px solid
                 var(
-                    --category-border
+                    --border
                 );
 
             border-top:
@@ -1915,25 +1617,24 @@ foreach (
         }
 
 
-        .category-stat-card::after {
+        .category-stat::after {
 
-            content:
-                "";
+            content: "";
 
             position:
                 absolute;
-
-            right:
-                -29px;
-
-            bottom:
-                -45px;
 
             width:
                 110px;
 
             height:
                 110px;
+
+            right:
+                -29px;
+
+            bottom:
+                -45px;
 
             border-radius:
                 50%;
@@ -1944,7 +1645,7 @@ foreach (
         }
 
 
-        .category-stat-card.used {
+        .category-stat.used {
 
             border-top-color:
                 #16a34a;
@@ -1952,7 +1653,7 @@ foreach (
         }
 
 
-        .category-stat-card.used::after {
+        .category-stat.used::after {
 
             background:
                 #eaf9ef;
@@ -1960,7 +1661,7 @@ foreach (
         }
 
 
-        .category-stat-card.products {
+        .category-stat.products {
 
             border-top-color:
                 #8b5cf6;
@@ -1968,7 +1669,7 @@ foreach (
         }
 
 
-        .category-stat-card.products::after {
+        .category-stat.products::after {
 
             background:
                 #f4efff;
@@ -2034,11 +1735,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | PANEL
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           MAIN PANEL
+        ========================================================== */
 
         .categories-panel {
 
@@ -2051,7 +1750,7 @@ foreach (
             border:
                 1px solid
                 var(
-                    --category-border
+                    --border
                 );
 
             border-radius:
@@ -2071,12 +1770,6 @@ foreach (
 
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | PANEL HEADER
-        |--------------------------------------------------------------------------
-        */
 
         .categories-panel-header {
 
@@ -2119,12 +1812,6 @@ foreach (
 
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | PANEL EMOJI
-        |--------------------------------------------------------------------------
-        */
 
         .categories-panel-icon {
 
@@ -2178,7 +1865,7 @@ foreach (
         }
 
 
-        .categories-panel-header h2 {
+        .categories-panel-title h2 {
 
             margin:
                 0
@@ -2197,7 +1884,7 @@ foreach (
         }
 
 
-        .categories-panel-header p {
+        .categories-panel-title p {
 
             margin:
                 0;
@@ -2211,11 +1898,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | ADD BUTTON
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           ADD BUTTON
+        ========================================================== */
 
         .category-add-btn {
 
@@ -2238,12 +1923,6 @@ foreach (
             color:
                 #ffffff;
 
-            border:
-                0;
-
-            border-radius:
-                10px;
-
             background:
 
                 linear-gradient(
@@ -2251,6 +1930,12 @@ foreach (
                     #2563eb,
                     #1d65d8
                 );
+
+            border:
+                none;
+
+            border-radius:
+                10px;
 
             box-shadow:
 
@@ -2276,11 +1961,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | FILTER
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           FILTER
+        ========================================================== */
 
         .categories-filter-wrapper {
 
@@ -2331,14 +2014,14 @@ foreach (
                 0
                 13px;
 
-            outline:
-                none;
-
             color:
                 #26354e;
 
             background:
                 #ffffff;
+
+            outline:
+                none;
 
             border:
                 1px solid
@@ -2349,14 +2032,6 @@ foreach (
 
             font-size:
                 10px;
-
-        }
-
-
-        .categories-filter input::placeholder {
-
-            color:
-                #96a5b9;
 
         }
 
@@ -2382,11 +2057,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | BUTTON
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           BUTTON
+        ========================================================== */
 
         .category-btn {
 
@@ -2432,9 +2105,6 @@ foreach (
             color:
                 #ffffff;
 
-            border:
-                0;
-
             background:
 
                 linear-gradient(
@@ -2442,6 +2112,9 @@ foreach (
                     #2563eb,
                     #1d65d8
                 );
+
+            border:
+                0;
 
         }
 
@@ -2461,11 +2134,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | TABLE
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           TABLE
+        ========================================================== */
 
         .category-table-wrapper {
 
@@ -2531,9 +2202,6 @@ foreach (
             text-transform:
                 uppercase;
 
-            white-space:
-                nowrap;
-
         }
 
 
@@ -2567,19 +2235,9 @@ foreach (
         }
 
 
-        .category-table tbody tr:last-child td {
-
-            border-bottom:
-                0;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CATEGORY INFO
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           CATEGORY ITEM
+        ========================================================== */
 
         .category-info {
 
@@ -2606,6 +2264,9 @@ foreach (
             flex-shrink:
                 0;
 
+            overflow:
+                hidden;
+
             display:
                 flex;
 
@@ -2614,9 +2275,6 @@ foreach (
 
             justify-content:
                 center;
-
-            overflow:
-                hidden;
 
             background:
                 #eff6ff;
@@ -2630,9 +2288,6 @@ foreach (
 
             font-size:
                 18px;
-
-            line-height:
-                1;
 
         }
 
@@ -2651,7 +2306,7 @@ foreach (
         }
 
 
-        .category-info-name {
+        .category-name {
 
             margin-bottom:
                 3px;
@@ -2668,7 +2323,7 @@ foreach (
         }
 
 
-        .category-info-sub {
+        .category-sub {
 
             color:
                 #8897ac;
@@ -2685,16 +2340,14 @@ foreach (
                 #8796ac;
 
             font-weight:
-                700;
+                800;
 
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | PRODUCT COUNT
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           PRODUCT BADGE
+        ========================================================== */
 
         .category-product-badge {
 
@@ -2747,11 +2400,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | ACTION
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           ACTION
+        ========================================================== */
 
         .category-actions {
 
@@ -2775,7 +2426,7 @@ foreach (
         }
 
 
-        .category-action-btn {
+        .category-action {
 
             min-height:
                 32px;
@@ -2811,7 +2462,7 @@ foreach (
         }
 
 
-        .category-edit-btn {
+        .category-edit {
 
             color:
                 #1d4ed8;
@@ -2826,7 +2477,7 @@ foreach (
         }
 
 
-        .category-delete-btn {
+        .category-delete {
 
             color:
                 #b91c1c;
@@ -2841,7 +2492,7 @@ foreach (
         }
 
 
-        .category-delete-btn.disabled {
+        .category-delete.disabled {
 
             color:
                 #94a3b8;
@@ -2858,13 +2509,11 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | EMPTY
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           EMPTY STATE
+        ========================================================== */
 
-        .category-empty-state {
+        .category-empty {
 
             padding:
                 70px
@@ -2879,15 +2528,15 @@ foreach (
         .category-empty-icon {
 
             width:
-                58px;
+                60px;
 
             height:
-                58px;
+                60px;
 
             margin:
                 0
                 auto
-                14px;
+                15px;
 
             display:
                 flex;
@@ -2906,7 +2555,7 @@ foreach (
                 #dbeafe;
 
             border-radius:
-                15px;
+                17px;
 
             font-size:
                 27px;
@@ -2914,7 +2563,7 @@ foreach (
         }
 
 
-        .category-empty-state h3 {
+        .category-empty h3 {
 
             margin:
                 0
@@ -2927,10 +2576,13 @@ foreach (
             font-size:
                 14px;
 
+            font-weight:
+                800;
+
         }
 
 
-        .category-empty-state p {
+        .category-empty p {
 
             margin:
                 0;
@@ -2944,11 +2596,9 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | MODAL OVERLAY
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           GLASS MODAL OVERLAY
+        ========================================================== */
 
         .category-modal-overlay {
 
@@ -2974,32 +2624,61 @@ foreach (
                 center;
 
             background:
+
+                radial-gradient(
+                    circle at 20% 20%,
+                    rgba(
+                        59,
+                        130,
+                        246,
+                        .18
+                    ),
+                    transparent 35%
+                ),
+
+                radial-gradient(
+                    circle at 80% 80%,
+                    rgba(
+                        96,
+                        165,
+                        250,
+                        .12
+                    ),
+                    transparent 35%
+                ),
+
                 rgba(
-                    8,
-                    38,
-                    90,
-                    .62
+                    6,
+                    30,
+                    70,
+                    .48
                 );
 
+            -webkit-backdrop-filter:
+                blur(14px)
+                saturate(125%);
+
             backdrop-filter:
-                blur(4px);
+                blur(14px)
+                saturate(125%);
 
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | MODAL
-        |--------------------------------------------------------------------------
-        */
+        /* ==========================================================
+           GLASS MODAL
+        ========================================================== */
 
         .category-modal {
+
+            position:
+                relative;
 
             width:
                 100%;
 
             max-width:
-                520px;
+                550px;
 
             max-height:
                 90vh;
@@ -3008,34 +2687,174 @@ foreach (
                 auto;
 
             padding:
-                27px;
+                30px;
 
             background:
-                #ffffff;
+
+                linear-gradient(
+                    135deg,
+                    rgba(
+                        255,
+                        255,
+                        255,
+                        .76
+                    ),
+                    rgba(
+                        225,
+                        239,
+                        255,
+                        .55
+                    )
+                );
 
             border:
                 1px solid
-                #dce7f3;
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .72
+                );
 
             border-radius:
-                22px;
+                27px;
+
+            -webkit-backdrop-filter:
+                blur(28px)
+                saturate(175%);
+
+            backdrop-filter:
+                blur(28px)
+                saturate(175%);
 
             box-shadow:
 
                 0
-                30px
-                80px
+                40px
+                100px
                 rgba(
-                    8,
-                    38,
-                    90,
-                    .30
+                    1,
+                    20,
+                    60,
+                    .34
+                ),
+
+                0
+                10px
+                30px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .10
+                ),
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .95
                 );
 
         }
 
 
+        .category-modal::before {
+
+            content: "";
+
+            position:
+                absolute;
+
+            top:
+                0;
+
+            left:
+                0;
+
+            right:
+                0;
+
+            height:
+                120px;
+
+            pointer-events:
+                none;
+
+            border-radius:
+                27px
+                27px
+                0
+                0;
+
+            background:
+
+                linear-gradient(
+                    180deg,
+                    rgba(
+                        255,
+                        255,
+                        255,
+                        .32
+                    ),
+                    transparent
+                );
+
+        }
+
+
+        .category-modal::after {
+
+            content: "";
+
+            position:
+                absolute;
+
+            width:
+                160px;
+
+            height:
+                160px;
+
+            top:
+                -90px;
+
+            right:
+                -70px;
+
+            border-radius:
+                50%;
+
+            pointer-events:
+                none;
+
+            background:
+
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .16
+                );
+
+        }
+
+
+        /* ==========================================================
+           MODAL HEADER
+        ========================================================== */
+
         .category-modal-header {
+
+            position:
+                relative;
+
+            z-index:
+                2;
 
             display:
                 flex;
@@ -3050,7 +2869,7 @@ foreach (
                 15px;
 
             margin-bottom:
-                24px;
+                28px;
 
         }
 
@@ -3064,7 +2883,7 @@ foreach (
                 center;
 
             gap:
-                12px;
+                14px;
 
         }
 
@@ -3072,10 +2891,10 @@ foreach (
         .category-modal-icon {
 
             width:
-                42px;
+                48px;
 
             height:
-                42px;
+                48px;
 
             flex-shrink:
                 0;
@@ -3093,15 +2912,57 @@ foreach (
 
                 linear-gradient(
                     135deg,
-                    #1476e8,
-                    #1d95f3
+                    rgba(
+                        20,
+                        118,
+                        232,
+                        .96
+                    ),
+                    rgba(
+                        29,
+                        149,
+                        243,
+                        .90
+                    )
+                );
+
+            border:
+                1px solid
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .45
                 );
 
             border-radius:
-                12px;
+                14px;
+
+            box-shadow:
+
+                0
+                10px
+                25px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .24
+                ),
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .35
+                );
 
             font-size:
-                19px;
+                21px;
 
         }
 
@@ -3111,16 +2972,19 @@ foreach (
             margin:
                 0
                 0
-                5px;
+                4px;
 
             color:
-                #092e65;
+                #08265a;
 
             font-size:
                 20px;
 
             font-weight:
                 800;
+
+            letter-spacing:
+                -.4px;
 
         }
 
@@ -3131,21 +2995,28 @@ foreach (
                 0;
 
             color:
-                #8999b4;
+                #7285a5;
 
             font-size:
                 10px;
 
+            font-weight:
+                500;
+
         }
 
+
+        /* ==========================================================
+           CLOSE BUTTON
+        ========================================================== */
 
         .category-modal-close {
 
             width:
-                35px;
+                39px;
 
             height:
-                35px;
+                39px;
 
             flex-shrink:
                 0;
@@ -3163,20 +3034,63 @@ foreach (
                 0;
 
             color:
-                #536174;
+                #45617f;
 
             background:
-                #f3f6fa;
+
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .38
+                );
 
             border:
                 1px solid
-                #e1e8f0;
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .78
+                );
 
             border-radius:
-                10px;
+                12px;
+
+            -webkit-backdrop-filter:
+                blur(12px);
+
+            backdrop-filter:
+                blur(12px);
+
+            box-shadow:
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .90
+                ),
+
+                0
+                5px
+                14px
+                rgba(
+                    20,
+                    60,
+                    110,
+                    .08
+                );
 
             font-size:
-                19px;
+                20px;
+
+            font-weight:
+                500;
 
             text-decoration:
                 none;
@@ -3184,19 +3098,48 @@ foreach (
             cursor:
                 pointer;
 
+            transition:
+                .2s ease;
+
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | FORM
-        |--------------------------------------------------------------------------
-        */
+        .category-modal-close:hover {
+
+            background:
+
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .72
+                );
+
+            transform:
+                translateY(-1px);
+
+        }
+
+
+        /* ==========================================================
+           FORM
+        ========================================================== */
+
+        .category-modal form {
+
+            position:
+                relative;
+
+            z-index:
+                2;
+
+        }
+
 
         .category-form-group {
 
             margin-bottom:
-                19px;
+                20px;
 
         }
 
@@ -3207,10 +3150,10 @@ foreach (
                 block;
 
             margin-bottom:
-                7px;
+                8px;
 
             color:
-                #374151;
+                #253c5d;
 
             font-size:
                 10px;
@@ -3221,13 +3164,17 @@ foreach (
         }
 
 
-        .category-required {
+        .required {
 
             color:
                 #ef4444;
 
         }
 
+
+        /* ==========================================================
+           GLASS INPUT
+        ========================================================== */
 
         .category-form-group input[type="text"],
         .category-form-group input[type="file"] {
@@ -3236,30 +3183,81 @@ foreach (
                 100%;
 
             min-height:
-                44px;
+                48px;
 
             padding:
-                10px
-                12px;
-
-            outline:
-                none;
+                11px
+                14px;
 
             color:
                 #172033;
 
+            outline:
+                none;
+
             background:
-                #fbfdff;
+
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .40
+                );
 
             border:
                 1px solid
-                #d7e0eb;
+                rgba(
+                    170,
+                    197,
+                    229,
+                    .65
+                );
 
             border-radius:
-                10px;
+                13px;
+
+            -webkit-backdrop-filter:
+                blur(12px);
+
+            backdrop-filter:
+                blur(12px);
+
+            box-shadow:
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .90
+                ),
+
+                0
+                4px
+                15px
+                rgba(
+                    31,
+                    80,
+                    140,
+                    .035
+                );
 
             font-size:
                 10px;
+
+            transition:
+                .2s ease;
+
+        }
+
+
+        .category-form-group input::placeholder {
+
+            color:
+                #8191a9;
 
         }
 
@@ -3267,10 +3265,21 @@ foreach (
         .category-form-group input:focus {
 
             background:
-                #ffffff;
+
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .70
+                );
 
             border-color:
-                #3478f6;
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .78
+                );
 
             box-shadow:
 
@@ -3279,11 +3288,76 @@ foreach (
                 0
                 3px
                 rgba(
-                    52,
-                    120,
-                    246,
-                    .08
+                    37,
+                    99,
+                    235,
+                    .10
+                ),
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .95
                 );
+
+        }
+
+
+        /* ==========================================================
+           FILE BUTTON
+        ========================================================== */
+
+        .category-form-group
+        input[type="file"]::file-selector-button {
+
+            margin-right:
+                12px;
+
+            padding:
+                8px
+                13px;
+
+            color:
+                #174a94;
+
+            background:
+
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .70
+                );
+
+            border:
+                1px solid
+                rgba(
+                    155,
+                    187,
+                    225,
+                    .68
+                );
+
+            border-radius:
+                8px;
+
+            font-family:
+                'Poppins',
+                sans-serif;
+
+            font-size:
+                9px;
+
+            font-weight:
+                700;
+
+            cursor:
+                pointer;
 
         }
 
@@ -3294,24 +3368,31 @@ foreach (
                 block;
 
             margin-top:
-                6px;
+                7px;
 
             color:
-                #97a3b2;
+                #7386a3;
 
             font-size:
                 8px;
 
+            font-weight:
+                500;
+
         }
 
+
+        /* ==========================================================
+           IMAGE PREVIEW
+        ========================================================== */
 
         .category-current-image {
 
             width:
-                88px;
+                90px;
 
             height:
-                88px;
+                90px;
 
             display:
                 flex;
@@ -3326,14 +3407,54 @@ foreach (
                 hidden;
 
             background:
-                #eff6ff;
+
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .40
+                );
 
             border:
                 1px solid
-                #dbeafe;
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .78
+                );
 
             border-radius:
-                12px;
+                15px;
+
+            -webkit-backdrop-filter:
+                blur(12px);
+
+            backdrop-filter:
+                blur(12px);
+
+            box-shadow:
+
+                0
+                8px
+                20px
+                rgba(
+                    20,
+                    60,
+                    110,
+                    .10
+                ),
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .88
+                );
 
             font-size:
                 30px;
@@ -3355,6 +3476,10 @@ foreach (
         }
 
 
+        /* ==========================================================
+           MODAL BUTTONS
+        ========================================================== */
+
         .category-modal-actions {
 
             display:
@@ -3367,23 +3492,150 @@ foreach (
                 flex-end;
 
             gap:
-                9px;
+                10px;
 
             margin-top:
-                5px;
+                9px;
 
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | RESPONSIVE
-        |--------------------------------------------------------------------------
-        */
+        .category-modal-actions
+        .category-btn-secondary {
 
-        @media (
-            max-width: 1000px
-        ) {
+            color:
+                #405978;
+
+            background:
+
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .40
+                );
+
+            border:
+                1px solid
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .80
+                );
+
+            -webkit-backdrop-filter:
+                blur(10px);
+
+            backdrop-filter:
+                blur(10px);
+
+            box-shadow:
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .90
+                );
+
+        }
+
+
+        .category-modal-actions
+        .category-btn-secondary:hover {
+
+            background:
+
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .75
+                );
+
+        }
+
+
+        .category-modal-actions
+        .category-btn-primary {
+
+            color:
+                #ffffff;
+
+            border:
+                1px solid
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .20
+                );
+
+            background:
+
+                linear-gradient(
+                    135deg,
+                    #2673ed,
+                    #155ed5
+                );
+
+            box-shadow:
+
+                0
+                10px
+                22px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .25
+                ),
+
+                inset
+                0
+                1px
+                0
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .25
+                );
+
+        }
+
+
+        .category-modal-actions
+        .category-btn-primary:hover {
+
+            transform:
+                translateY(-1px);
+
+            box-shadow:
+
+                0
+                13px
+                27px
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .32
+                );
+
+        }
+
+
+        /* ==========================================================
+           RESPONSIVE
+        ========================================================== */
+
+        @media (max-width: 1000px) {
 
             .categories-stats {
 
@@ -3395,9 +3647,7 @@ foreach (
         }
 
 
-        @media (
-            max-width: 900px
-        ) {
+        @media (max-width: 900px) {
 
             :root {
 
@@ -3427,45 +3677,10 @@ foreach (
 
             }
 
-
-            .categories-hero {
-
-                min-height:
-                    140px;
-
-                padding:
-                    28px;
-
-            }
-
-
-            .categories-hero h1 {
-
-                font-size:
-                    31px;
-
-            }
-
-
-            .categories-hero-icon {
-
-                width:
-                    67px;
-
-                height:
-                    67px;
-
-                font-size:
-                    28px;
-
-            }
-
         }
 
 
-        @media (
-            max-width: 650px
-        ) {
+        @media (max-width: 650px) {
 
             .categories-content {
 
@@ -3567,6 +3782,17 @@ foreach (
             }
 
 
+            .category-modal {
+
+                padding:
+                    22px;
+
+                border-radius:
+                    22px;
+
+            }
+
+
             .category-modal-actions {
 
                 flex-direction:
@@ -3597,12 +3823,6 @@ foreach (
 
 
     <?php
-
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN SIDEBAR
-    |--------------------------------------------------------------------------
-    */
 
     require_once __DIR__ .
         '/../includes/admin_sidebar.php';
@@ -3667,9 +3887,7 @@ foreach (
 
                     <ul>
 
-
                         <?php foreach ($errors as $error): ?>
-
 
                             <li>
 
@@ -3679,9 +3897,7 @@ foreach (
 
                             </li>
 
-
                         <?php endforeach; ?>
-
 
                     </ul>
 
@@ -3725,7 +3941,7 @@ foreach (
 
                 <!-- TOTAL -->
 
-                <div class="category-stat-card">
+                <div class="category-stat">
 
                     <span class="category-stat-label">
 
@@ -3749,7 +3965,7 @@ foreach (
 
                 <div
                     class="
-                        category-stat-card
+                        category-stat
                         used
                     "
                 >
@@ -3764,7 +3980,7 @@ foreach (
                     <strong class="category-stat-value">
 
                         <?= number_format(
-                            $categoriesWithProducts
+                            $categoriesInUse
                         ) ?>
 
                     </strong>
@@ -3776,7 +3992,7 @@ foreach (
 
                 <div
                     class="
-                        category-stat-card
+                        category-stat
                         products
                     "
                 >
@@ -3791,7 +4007,7 @@ foreach (
                     <strong class="category-stat-value">
 
                         <?= number_format(
-                            $totalProductsInCategories
+                            $totalProductsAssigned
                         ) ?>
 
                     </strong>
@@ -3809,9 +4025,7 @@ foreach (
             <section class="categories-panel">
 
 
-                <!-- =================================================
-                     PANEL HEADER
-                ================================================== -->
+                <!-- HEADER -->
 
                 <div class="categories-panel-header">
 
@@ -3914,12 +4128,10 @@ foreach (
 
 
                 <!-- =================================================
-                     TABLE
+                     CATEGORY TABLE
                 ================================================== -->
 
-                <?php if (
-                    !empty($categories)
-                ): ?>
+                <?php if (!empty($categories)): ?>
 
 
                     <div class="category-table-wrapper">
@@ -3960,50 +4172,36 @@ foreach (
                             <tbody>
 
 
-                                <?php foreach (
-                                    $categories
-                                    as $category
-                                ): ?>
+                                <?php foreach ($categories as $category): ?>
 
 
                                     <?php
 
                                     $categoryId =
                                         (int)
-                                        $category[
-                                            'category_id'
-                                        ];
+                                        $category['category_id'];
 
 
                                     $categoryName =
-                                        $category[
-                                            'category_name'
-                                        ];
+                                        $category['category_name'];
 
 
                                     $categoryImage =
-                                        $category[
-                                            'category_image'
-                                        ];
+                                        $category['category_image']
+                                        ?? '';
 
 
                                     $productCount =
                                         (int)
-                                        $category[
-                                            'product_count'
-                                        ];
+                                        $category['product_count'];
 
 
-                                    $createdTimestamp =
+                                    $created =
                                         !empty(
-                                            $category[
-                                                'created_at'
-                                            ]
+                                            $category['created_at']
                                         )
                                             ? strtotime(
-                                                $category[
-                                                    'created_at'
-                                                ]
+                                                $category['created_at']
                                             )
                                             : false;
 
@@ -4078,7 +4276,7 @@ foreach (
                                                 <div>
 
 
-                                                    <div class="category-info-name">
+                                                    <div class="category-name">
 
                                                         <?= categoryEscape(
                                                             $categoryName
@@ -4087,7 +4285,7 @@ foreach (
                                                     </div>
 
 
-                                                    <div class="category-info-sub">
+                                                    <div class="category-sub">
 
                                                         HochipoHub category
 
@@ -4103,7 +4301,7 @@ foreach (
                                         </td>
 
 
-                                        <!-- PRODUCT COUNT -->
+                                        <!-- PRODUCTS -->
 
                                         <td>
 
@@ -4133,11 +4331,11 @@ foreach (
 
                                         <td>
 
-                                            <?= $createdTimestamp
+                                            <?= $created
                                                 ? categoryEscape(
                                                     date(
                                                         'd M Y',
-                                                        $createdTimestamp
+                                                        $created
                                                     )
                                                 )
                                                 : '-' ?>
@@ -4153,13 +4351,11 @@ foreach (
                                             <div class="category-actions">
 
 
-                                                <!-- EDIT -->
-
                                                 <a
                                                     href="categories.php?edit=<?= $categoryId ?>"
                                                     class="
-                                                        category-action-btn
-                                                        category-edit-btn
+                                                        category-action
+                                                        category-edit
                                                     "
                                                 >
 
@@ -4168,22 +4364,18 @@ foreach (
                                                 </a>
 
 
-                                                <!-- DELETE -->
-
-                                                <?php if (
-                                                    $productCount > 0
-                                                ): ?>
+                                                <?php if ($productCount > 0): ?>
 
 
                                                     <button
                                                         type="button"
                                                         class="
-                                                            category-action-btn
-                                                            category-delete-btn
+                                                            category-action
+                                                            category-delete
                                                             disabled
                                                         "
                                                         disabled
-                                                        title="Cannot delete this category because products are assigned to it."
+                                                        title="Products are assigned to this category."
                                                     >
 
                                                         Delete
@@ -4197,7 +4389,7 @@ foreach (
                                                     <form
                                                         method="POST"
                                                         action="categories.php"
-                                                        onsubmit="return confirmDelete(
+                                                        onsubmit="return confirmCategoryDelete(
                                                             <?= htmlspecialchars(
                                                                 json_encode(
                                                                     $categoryName
@@ -4235,8 +4427,8 @@ foreach (
                                                         <button
                                                             type="submit"
                                                             class="
-                                                                category-action-btn
-                                                                category-delete-btn
+                                                                category-action
+                                                                category-delete
                                                             "
                                                         >
 
@@ -4275,7 +4467,7 @@ foreach (
                 <?php else: ?>
 
 
-                    <div class="category-empty-state">
+                    <div class="category-empty">
 
 
                         <div class="category-empty-icon">
@@ -4285,15 +4477,12 @@ foreach (
                         </div>
 
 
-                        <?php if (
-                            $search !== ''
-                        ): ?>
+                        <?php if ($search !== ''): ?>
 
 
                             <h3>
                                 No categories found
                             </h3>
-
 
                             <p>
                                 Try another category name.
@@ -4306,7 +4495,6 @@ foreach (
                             <h3>
                                 No categories yet
                             </h3>
-
 
                             <p>
                                 Add your first category to get started.
@@ -4335,14 +4523,14 @@ foreach (
 
 
 <!-- ===============================================================
-     ADD CATEGORY MODAL
+     ADD CATEGORY GLASS MODAL
 ================================================================ -->
 
 <div
     id="addCategoryModal"
     class="category-modal-overlay"
     style="display:none;"
-    onclick="closeAddModalOverlay(event)"
+    onclick="closeAddOverlay(event)"
 >
 
 
@@ -4371,7 +4559,6 @@ foreach (
                         Add Category
                     </h2>
 
-
                     <p>
                         Create a new marketplace category.
                     </p>
@@ -4386,6 +4573,7 @@ foreach (
                 type="button"
                 class="category-modal-close"
                 onclick="closeAddCategoryModal()"
+                aria-label="Close"
             >
 
                 ×
@@ -4428,7 +4616,7 @@ foreach (
 
                     Category Name
 
-                    <span class="category-required">
+                    <span class="required">
                         *
                     </span>
 
@@ -4470,8 +4658,7 @@ foreach (
 
                 <span class="category-form-help">
 
-                    JPG, PNG or WEBP.
-                    Maximum file size 5MB.
+                    JPG, PNG or WEBP. Maximum file size 5MB.
 
                 </span>
 
@@ -4479,7 +4666,7 @@ foreach (
             </div>
 
 
-            <!-- ACTION -->
+            <!-- BUTTON -->
 
             <div class="category-modal-actions">
 
@@ -4524,7 +4711,7 @@ foreach (
 
 
 <!-- ===============================================================
-     EDIT CATEGORY MODAL
+     EDIT CATEGORY GLASS MODAL
 ================================================================ -->
 
 <?php if ($editCategory): ?>
@@ -4533,7 +4720,7 @@ foreach (
     <div
         id="editCategoryModal"
         class="category-modal-overlay"
-        onclick="closeEditModalOverlay(event)"
+        onclick="closeEditOverlay(event)"
     >
 
 
@@ -4562,7 +4749,6 @@ foreach (
                             Edit Category
                         </h2>
 
-
                         <p>
                             Update category information.
                         </p>
@@ -4576,6 +4762,7 @@ foreach (
                 <a
                     href="categories.php"
                     class="category-modal-close"
+                    aria-label="Close"
                 >
 
                     ×
@@ -4613,9 +4800,7 @@ foreach (
                     type="hidden"
                     name="category_id"
                     value="<?= (int)
-                        $editCategory[
-                            'category_id'
-                        ] ?>"
+                        $editCategory['category_id'] ?>"
                 >
 
 
@@ -4628,7 +4813,7 @@ foreach (
 
                         Category Name
 
-                        <span class="category-required">
+                        <span class="required">
                             *
                         </span>
 
@@ -4640,12 +4825,12 @@ foreach (
                         id="edit_category_name"
                         name="category_name"
                         maxlength="100"
-                        required
                         value="<?= categoryEscape(
                             $editCategory[
                                 'category_name'
                             ]
                         ) ?>"
+                        required
                     >
 
 
@@ -4662,16 +4847,16 @@ foreach (
                     </label>
 
 
-                    <?php if (
-                        !empty(
-                            $editCategory[
-                                'category_image'
-                            ]
-                        )
-                    ): ?>
+                    <div class="category-current-image">
 
 
-                        <div class="category-current-image">
+                        <?php if (
+                            !empty(
+                                $editCategory[
+                                    'category_image'
+                                ]
+                            )
+                        ): ?>
 
 
                             <img
@@ -4697,20 +4882,16 @@ foreach (
                             >
 
 
-                        </div>
+                        <?php else: ?>
 
-
-                    <?php else: ?>
-
-
-                        <div class="category-current-image">
 
                             📁
 
-                        </div>
+
+                        <?php endif; ?>
 
 
-                    <?php endif; ?>
+                    </div>
 
 
                 </div>
@@ -4738,8 +4919,7 @@ foreach (
 
                     <span class="category-form-help">
 
-                        Leave empty to keep the current image.
-                        Maximum 5MB.
+                        Leave empty to keep the current image. Maximum 5MB.
 
                     </span>
 
@@ -4747,7 +4927,7 @@ foreach (
                 </div>
 
 
-                <!-- ACTION -->
+                <!-- BUTTON -->
 
                 <div class="category-modal-actions">
 
@@ -4797,7 +4977,7 @@ foreach (
 
     /*
     |--------------------------------------------------------------------------
-    | SIDEBAR WIDTH SYNC
+    | SIDEBAR WIDTH
     |--------------------------------------------------------------------------
     */
 
@@ -4814,12 +4994,6 @@ foreach (
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | MOBILE
-        |--------------------------------------------------------------------------
-        */
-
         if (
             window.innerWidth <= 900
         ) {
@@ -4831,16 +5005,9 @@ foreach (
                     '0px'
                 );
 
-
             return;
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | FIND SIDEBAR
-        |--------------------------------------------------------------------------
-        */
 
         const sidebar =
             document.querySelector(
@@ -4866,20 +5033,12 @@ foreach (
                     '260px'
                 );
 
-
             return;
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | REAL SIDEBAR WIDTH
-        |--------------------------------------------------------------------------
-        */
-
         const rect =
-            sidebar
-                .getBoundingClientRect();
+            sidebar.getBoundingClientRect();
 
 
         if (rect.right > 0) {
@@ -4896,7 +5055,7 @@ foreach (
 
     /*
     |--------------------------------------------------------------------------
-    | OPEN ADD MODAL
+    | ADD MODAL
     |--------------------------------------------------------------------------
     */
 
@@ -4915,6 +5074,10 @@ foreach (
 
         modal.style.display =
             'flex';
+
+
+        document.body.style.overflow =
+            'hidden';
 
 
         const input =
@@ -4937,12 +5100,6 @@ foreach (
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | CLOSE ADD MODAL
-    |--------------------------------------------------------------------------
-    */
-
     function closeAddCategoryModal() {
 
         const modal =
@@ -4958,18 +5115,14 @@ foreach (
 
         modal.style.display =
             'none';
+
+
+        document.body.style.overflow =
+            '';
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | CLICK OUTSIDE ADD
-    |--------------------------------------------------------------------------
-    */
-
-    function closeAddModalOverlay(
-        event
-    ) {
+    function closeAddOverlay(event) {
 
         if (
             event.target ===
@@ -4983,13 +5136,11 @@ foreach (
 
     /*
     |--------------------------------------------------------------------------
-    | CLICK OUTSIDE EDIT
+    | EDIT MODAL
     |--------------------------------------------------------------------------
     */
 
-    function closeEditModalOverlay(
-        event
-    ) {
+    function closeEditOverlay(event) {
 
         if (
             event.target ===
@@ -5008,7 +5159,7 @@ foreach (
     |--------------------------------------------------------------------------
     */
 
-    function confirmDelete(
+    function confirmCategoryDelete(
         categoryName
     ) {
 
@@ -5023,7 +5174,7 @@ foreach (
 
     /*
     |--------------------------------------------------------------------------
-    | ESC KEY
+    | ESCAPE KEY
     |--------------------------------------------------------------------------
     */
 
@@ -5031,10 +5182,7 @@ foreach (
         'keydown',
         function (event) {
 
-            if (
-                event.key !==
-                'Escape'
-            ) {
+            if (event.key !== 'Escape') {
                 return;
             }
 
@@ -5047,8 +5195,7 @@ foreach (
 
             if (
                 addModal &&
-                addModal.style.display !==
-                    'none'
+                addModal.style.display !== 'none'
             ) {
 
                 closeAddCategoryModal();
@@ -5075,7 +5222,7 @@ foreach (
 
     /*
     |--------------------------------------------------------------------------
-    | LOAD
+    | PAGE LOAD
     |--------------------------------------------------------------------------
     */
 
@@ -5096,6 +5243,19 @@ foreach (
                 syncCategorySidebar,
                 400
             );
+
+
+            const editModal =
+                document.getElementById(
+                    'editCategoryModal'
+                );
+
+
+            if (editModal) {
+
+                document.body.style.overflow =
+                    'hidden';
+            }
 
         }
     );
