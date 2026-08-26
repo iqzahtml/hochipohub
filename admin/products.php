@@ -2895,7 +2895,7 @@ catch (Throwable $e) {
 
 
                 <div class="products-hero-icon">
-                    ◇
+                    📦
                 </div>
 
 
@@ -3039,7 +3039,7 @@ catch (Throwable $e) {
 
 
                         <div class="products-panel-icon">
-                            ◇
+                            🛍️
                         </div>
 
 
@@ -3395,7 +3395,7 @@ catch (Throwable $e) {
                                                             ) ?>"
                                                             onerror="
                                                                 this.style.display='none';
-                                                                this.parentElement.innerHTML='◇';
+                                                                this.parentElement.innerHTML='📦';
                                                             "
                                                         >
 
@@ -3403,7 +3403,7 @@ catch (Throwable $e) {
                                                     <?php else: ?>
 
 
-                                                        ◇
+                                                        📦
 
 
                                                     <?php endif; ?>
