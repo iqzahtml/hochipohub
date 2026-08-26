@@ -22,105 +22,120 @@
 
     /*
     |--------------------------------------------------------------------------
-    | WAIT FOR PAGE
+    | INITIALIZE MODAL SYSTEM
     |--------------------------------------------------------------------------
     */
 
-    document.addEventListener(
-        'DOMContentLoaded',
-        function () {
+    function initModalSystem() {
+
+        const loginModal =
+            document.getElementById('loginModal');
+
+        const registerModal =
+            document.getElementById('registerModal');
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | GET MODALS
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | OPEN MODAL
+        |--------------------------------------------------------------------------
+        */
 
-            const loginModal =
-                document.getElementById('loginModal');
+        function openModal(modal) {
 
-            const registerModal =
-                document.getElementById('registerModal');
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | OPEN MODAL
-            |--------------------------------------------------------------------------
-            */
-
-            function openModal(modal) {
-
-                if (!modal) {
-                    return;
-                }
-
-
-                modal.classList.add('active');
-
-                modal.classList.add('show');
-
-                modal.setAttribute(
-                    'aria-hidden',
-                    'false'
-                );
-
-
-                document.body.classList.add(
-                    'modal-open'
-                );
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | FOCUS FIRST INPUT
-                |--------------------------------------------------------------------------
-                */
-
-                setTimeout(
-                    function () {
-
-                        const firstInput =
-                            modal.querySelector(
-                                'input:not([type="hidden"])'
-                            );
-
-                        if (firstInput) {
-
-                            firstInput.focus();
-
-                        }
-
-                    },
-                    200
-                );
-
+            if (!modal) {
+                return;
             }
 
 
+            modal.classList.add('active');
+
+            modal.classList.add('show');
+
+
+            modal.setAttribute(
+                'aria-hidden',
+                'false'
+            );
+
+
+            document.body.classList.add(
+                'modal-open'
+            );
+
+
             /*
             |--------------------------------------------------------------------------
-            | CLOSE MODAL
+            | FOCUS FIRST INPUT
             |--------------------------------------------------------------------------
             */
 
-            function closeModal(modal) {
+            setTimeout(function () {
 
-                if (!modal) {
-                    return;
+                const firstInput =
+                    modal.querySelector(
+                        'input:not([type="hidden"])'
+                    );
+
+
+                if (firstInput) {
+
+                    firstInput.focus();
+
                 }
 
+            }, 200);
 
-                modal.classList.remove('active');
+        }
 
-                modal.classList.remove('show');
 
-                modal.setAttribute(
-                    'aria-hidden',
-                    'true'
+        /*
+        |--------------------------------------------------------------------------
+        | CLOSE MODAL
+        |--------------------------------------------------------------------------
+        */
+
+        function closeModal(modal) {
+
+            if (!modal) {
+                return;
+            }
+
+
+            modal.classList.remove('active');
+
+            modal.classList.remove('show');
+
+
+            modal.setAttribute(
+                'aria-hidden',
+                'true'
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ONLY REMOVE BODY LOCK IF BOTH MODALS CLOSED
+            |--------------------------------------------------------------------------
+            */
+
+            const loginIsOpen =
+                loginModal &&
+                (
+                    loginModal.classList.contains('active') ||
+                    loginModal.classList.contains('show')
                 );
 
+
+            const registerIsOpen =
+                registerModal &&
+                (
+                    registerModal.classList.contains('active') ||
+                    registerModal.classList.contains('show')
+                );
+
+
+            if (!loginIsOpen && !registerIsOpen) {
 
                 document.body.classList.remove(
                     'modal-open'
@@ -128,556 +143,727 @@
 
             }
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | SWITCH MODAL
-            |--------------------------------------------------------------------------
-            */
-
-            function switchModal(
-                currentModal,
-                targetModal
-            ) {
-
-                if (currentModal) {
-
-                    closeModal(
-                        currentModal
-                    );
-
-                }
+        }
 
 
-                setTimeout(
-                    function () {
+        /*
+        |--------------------------------------------------------------------------
+        | SWITCH MODAL
+        |--------------------------------------------------------------------------
+        */
 
-                        if (targetModal) {
+        function switchModal(
+            currentModal,
+            targetModal
+        ) {
 
-                            openModal(
-                                targetModal
-                            );
+            if (currentModal) {
 
-                        }
-
-                    },
-                    150
+                closeModal(
+                    currentModal
                 );
 
             }
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | OPEN / SWITCH MODAL BUTTON
-            |--------------------------------------------------------------------------
-            */
+            setTimeout(function () {
 
-            document.addEventListener(
-                'click',
-                function (event) {
+                if (targetModal) {
 
-                    const button =
-                        event.target.closest(
-                            '[data-modal-target]'
-                        );
+                    openModal(
+                        targetModal
+                    );
 
+                }
 
-                    if (!button) {
-                        return;
-                    }
+            }, 150);
+
+        }
 
 
-                    event.preventDefault();
+        /*
+        |--------------------------------------------------------------------------
+        | OPEN / SWITCH MODAL BUTTON
+        |--------------------------------------------------------------------------
+        |
+        | SUPPORT:
+        |
+        | data-modal-open="loginModal"
+        | data-modal-open="registerModal"
+        |
+        | data-modal-target="loginModal"
+        | data-modal-target="registerModal"
+        |--------------------------------------------------------------------------
+        */
+
+        document.addEventListener(
+            'click',
+            function (event) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | SAFETY CHECK
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    !event.target ||
+                    typeof event.target.closest !== 'function'
+                ) {
+
+                    return;
+
+                }
 
 
-                    const targetId =
+                /*
+                |--------------------------------------------------------------------------
+                | FIND BUTTON
+                |--------------------------------------------------------------------------
+                */
+
+                const button =
+                    event.target.closest(
+                        '[data-modal-open], [data-modal-target]'
+                    );
+
+
+                if (!button) {
+
+                    return;
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | GET TARGET
+                |--------------------------------------------------------------------------
+                */
+
+                let targetId =
+                    button.getAttribute(
+                        'data-modal-open'
+                    );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | FALLBACK
+                |--------------------------------------------------------------------------
+                */
+
+                if (!targetId) {
+
+                    targetId =
                         button.getAttribute(
                             'data-modal-target'
                         );
 
-
-                    const targetModal =
-                        document.getElementById(
-                            targetId
-                        );
+                }
 
 
-                    const currentId =
-                        button.getAttribute(
-                            'data-modal-switch'
-                        );
+                if (!targetId) {
 
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SWITCH
-                    |--------------------------------------------------------------------------
-                    */
-
-                    if (currentId) {
-
-                        const currentModal =
-                            document.getElementById(
-                                currentId
-                            );
-
-
-                        switchModal(
-                            currentModal,
-                            targetModal
-                        );
-
-                    }
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | OPEN
-                    |--------------------------------------------------------------------------
-                    */
-
-                    else {
-
-                        openModal(
-                            targetModal
-                        );
-
-                    }
+                    return;
 
                 }
-            );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | CLOSE BUTTON
-            |--------------------------------------------------------------------------
-            */
+                /*
+                |--------------------------------------------------------------------------
+                | GET MODAL
+                |--------------------------------------------------------------------------
+                */
 
-            document.addEventListener(
-                'click',
-                function (event) {
-
-                    const closeButton =
-                        event.target.closest(
-                            '[data-modal-close]'
-                        );
+                const targetModal =
+                    document.getElementById(
+                        targetId
+                    );
 
 
-                    if (!closeButton) {
-                        return;
-                    }
+                if (!targetModal) {
+
+                    console.warn(
+                        'HOCHIPOHUB Modal not found:',
+                        targetId
+                    );
+
+                    return;
+
+                }
 
 
-                    const modalId =
-                        closeButton.getAttribute(
-                            'data-modal-close'
-                        );
+                /*
+                |--------------------------------------------------------------------------
+                | STOP NORMAL BUTTON ACTION
+                |--------------------------------------------------------------------------
+                */
+
+                event.preventDefault();
+
+                event.stopPropagation();
 
 
-                    const modal =
+                /*
+                |--------------------------------------------------------------------------
+                | CURRENT MODAL
+                |--------------------------------------------------------------------------
+                */
+
+                const currentId =
+                    button.getAttribute(
+                        'data-modal-switch'
+                    );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | SWITCH
+                |--------------------------------------------------------------------------
+                */
+
+                if (currentId) {
+
+                    const currentModal =
                         document.getElementById(
-                            modalId
+                            currentId
                         );
 
+
+                    switchModal(
+                        currentModal,
+                        targetModal
+                    );
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | NORMAL OPEN
+                |--------------------------------------------------------------------------
+                */
+
+                else {
+
+                    openModal(
+                        targetModal
+                    );
+
+                }
+
+            },
+            true
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CLOSE BUTTON
+        |--------------------------------------------------------------------------
+        */
+
+        document.addEventListener(
+            'click',
+            function (event) {
+
+                if (
+                    !event.target ||
+                    typeof event.target.closest !== 'function'
+                ) {
+
+                    return;
+
+                }
+
+
+                const closeButton =
+                    event.target.closest(
+                        '[data-modal-close]'
+                    );
+
+
+                if (!closeButton) {
+
+                    return;
+
+                }
+
+
+                event.preventDefault();
+
+                event.stopPropagation();
+
+
+                const modalId =
+                    closeButton.getAttribute(
+                        'data-modal-close'
+                    );
+
+
+                const modal =
+                    document.getElementById(
+                        modalId
+                    );
+
+
+                closeModal(
+                    modal
+                );
+
+            },
+            true
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CLICK OUTSIDE MODAL
+        |--------------------------------------------------------------------------
+        */
+
+        document.addEventListener(
+            'click',
+            function (event) {
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | LOGIN
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    loginModal &&
+                    event.target === loginModal
+                ) {
 
                     closeModal(
-                        modal
+                        loginModal
+                    );
+
+                    return;
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | REGISTER
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    registerModal &&
+                    event.target === registerModal
+                ) {
+
+                    closeModal(
+                        registerModal
+                    );
+
+                    return;
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | TERMS
+                |--------------------------------------------------------------------------
+                */
+
+                const termsModal =
+                    document.getElementById(
+                        'termsModal'
+                    );
+
+
+                if (
+                    termsModal &&
+                    event.target === termsModal
+                ) {
+
+                    termsModal.classList.remove(
+                        'show'
+                    );
+
+                    termsModal.classList.remove(
+                        'active'
+                    );
+
+
+                    termsModal.setAttribute(
+                        'aria-hidden',
+                        'true'
+                    );
+
+
+                    document.body.classList.remove(
+                        'terms-open'
                     );
 
                 }
-            );
+
+            }
+        );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | CLICK OUTSIDE MODAL
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | ESCAPE KEY
+        |--------------------------------------------------------------------------
+        */
 
-            document.addEventListener(
-                'click',
-                function (event) {
+        document.addEventListener(
+            'keydown',
+            function (event) {
 
+                if (
+                    event.key !== 'Escape'
+                ) {
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | LOGIN
-                    |--------------------------------------------------------------------------
-                    */
-
-                    if (
-                        loginModal &&
-                        event.target === loginModal
-                    ) {
-
-                        closeModal(
-                            loginModal
-                        );
-
-                    }
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | REGISTER
-                    |--------------------------------------------------------------------------
-                    */
-
-                    if (
-                        registerModal &&
-                        event.target === registerModal
-                    ) {
-
-                        closeModal(
-                            registerModal
-                        );
-
-                    }
-
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | TERMS
-                    |--------------------------------------------------------------------------
-                    */
-
-                    const termsModal =
-                        document.getElementById(
-                            'termsModal'
-                        );
-
-
-                    if (
-                        termsModal &&
-                        event.target === termsModal
-                    ) {
-
-                        termsModal.classList.remove(
-                            'show'
-                        );
-
-                        termsModal.setAttribute(
-                            'aria-hidden',
-                            'true'
-                        );
-
-                        document.body.classList.remove(
-                            'terms-open'
-                        );
-
-                    }
+                    return;
 
                 }
-            );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | ESCAPE KEY
-            |--------------------------------------------------------------------------
-            */
+                /*
+                |--------------------------------------------------------------------------
+                | TERMS
+                |--------------------------------------------------------------------------
+                */
 
-            document.addEventListener(
-                'keydown',
-                function (event) {
-
-                    if (event.key !== 'Escape') {
-                        return;
-                    }
+                const termsModal =
+                    document.getElementById(
+                        'termsModal'
+                    );
 
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | TERMS
-                    |--------------------------------------------------------------------------
-                    */
-
-                    const termsModal =
-                        document.getElementById(
-                            'termsModal'
-                        );
-
-
-                    if (
-                        termsModal &&
-                        (
-                            termsModal.classList.contains('show') ||
-                            termsModal.classList.contains('active')
-                        )
-                    ) {
-
-                        termsModal.classList.remove(
+                if (
+                    termsModal &&
+                    (
+                        termsModal.classList.contains(
                             'show'
-                        );
-
-                        termsModal.classList.remove(
+                        ) ||
+                        termsModal.classList.contains(
                             'active'
-                        );
+                        )
+                    )
+                ) {
 
-                        termsModal.setAttribute(
-                            'aria-hidden',
-                            'true'
-                        );
+                    termsModal.classList.remove(
+                        'show'
+                    );
 
-                        document.body.classList.remove(
-                            'terms-open'
-                        );
-
-                        return;
-
-                    }
+                    termsModal.classList.remove(
+                        'active'
+                    );
 
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | LOGIN
-                    |--------------------------------------------------------------------------
-                    */
-
-                    if (
-                        loginModal &&
-                        loginModal.classList.contains('active')
-                    ) {
-
-                        closeModal(
-                            loginModal
-                        );
-
-                        return;
-
-                    }
+                    termsModal.setAttribute(
+                        'aria-hidden',
+                        'true'
+                    );
 
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | REGISTER
-                    |--------------------------------------------------------------------------
-                    */
+                    document.body.classList.remove(
+                        'terms-open'
+                    );
 
-                    if (
-                        registerModal &&
-                        registerModal.classList.contains('active')
-                    ) {
 
-                        closeModal(
-                            registerModal
-                        );
-
-                    }
+                    return;
 
                 }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | LOGIN
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    loginModal &&
+                    (
+                        loginModal.classList.contains(
+                            'active'
+                        ) ||
+                        loginModal.classList.contains(
+                            'show'
+                        )
+                    )
+                ) {
+
+                    closeModal(
+                        loginModal
+                    );
+
+
+                    return;
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | REGISTER
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    registerModal &&
+                    (
+                        registerModal.classList.contains(
+                            'active'
+                        ) ||
+                        registerModal.classList.contains(
+                            'show'
+                        )
+                    )
+                ) {
+
+                    closeModal(
+                        registerModal
+                    );
+
+                }
+
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | URL PARAMETERS
+        |--------------------------------------------------------------------------
+        */
+
+        const urlParams =
+            new URLSearchParams(
+                window.location.search
             );
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | URL PARAMETERS
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | SUCCESSFUL REGISTRATION
+        |--------------------------------------------------------------------------
+        |
+        | index.php?login=1
+        |--------------------------------------------------------------------------
+        */
 
-            const urlParams =
-                new URLSearchParams(
-                    window.location.search
-                );
+        if (
+            loginModal &&
+            urlParams.get('login') === '1'
+        ) {
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | SUCCESSFUL REGISTRATION
-            |--------------------------------------------------------------------------
-            |
-            | index.php?login=1
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                loginModal &&
-                urlParams.get('login') === '1'
-            ) {
-
-                openModal(
-                    loginModal
-                );
+            openModal(
+                loginModal
+            );
 
 
-                setTimeout(
-                    function () {
+            setTimeout(function () {
 
-                        const loginEmail =
-                            document.getElementById(
-                                'loginEmail'
-                            );
-
-
-                        if (loginEmail) {
-
-                            loginEmail.focus();
-
-                        }
-
-                    },
-                    300
-                );
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | CLEAN URL
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    window.history &&
-                    window.history.replaceState
-                ) {
-
-                    window.history.replaceState(
-                        {},
-                        document.title,
-                        window.location.pathname
+                const loginEmail =
+                    document.getElementById(
+                        'loginEmail'
                     );
+
+
+                if (loginEmail) {
+
+                    loginEmail.focus();
 
                 }
 
-            }
+            }, 300);
 
 
             /*
             |--------------------------------------------------------------------------
-            | REGISTRATION ERROR
-            |--------------------------------------------------------------------------
-            |
-            | THIS IS THE IMPORTANT PART.
-            |
-            | When PHP sends:
-            |
-            | index.php?register=1
-            |
-            | the register modal opens automatically.
-            |
+            | CLEAN URL
             |--------------------------------------------------------------------------
             */
 
             if (
-                registerModal &&
-                urlParams.get('register') === '1'
+                window.history &&
+                window.history.replaceState
             ) {
 
-                /*
-                |--------------------------------------------------------------------------
-                | OPEN REGISTER MODAL IMMEDIATELY
-                |--------------------------------------------------------------------------
-                */
-
-                openModal(
-                    registerModal
-                );
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | FOCUS EMAIL
-                |--------------------------------------------------------------------------
-                */
-
-                setTimeout(
-                    function () {
-
-                        const registerEmail =
-                            document.getElementById(
-                                'registerEmail'
-                            );
-
-
-                        if (registerEmail) {
-
-                            registerEmail.focus();
-
-                        }
-
-                    },
-                    300
-                );
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | CLEAN URL
-                |--------------------------------------------------------------------------
-                |
-                | Remove ?register=1 after modal has opened.
-                |
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    window.history &&
-                    window.history.replaceState
-                ) {
-
-                    window.history.replaceState(
-                        {},
-                        document.title,
-                        window.location.pathname
-                    );
-
-                }
-
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | PHP ALREADY OPENED REGISTER MODAL
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                registerModal &&
-                registerModal.classList.contains('active')
-            ) {
-
-                registerModal.classList.add('show');
-
-                registerModal.setAttribute(
-                    'aria-hidden',
-                    'false'
-                );
-
-                document.body.classList.add(
-                    'modal-open'
-                );
-
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | PHP ALREADY OPENED LOGIN MODAL
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                loginModal &&
-                loginModal.classList.contains('active')
-            ) {
-
-                loginModal.classList.add('show');
-
-                loginModal.setAttribute(
-                    'aria-hidden',
-                    'false'
-                );
-
-                document.body.classList.add(
-                    'modal-open'
+                window.history.replaceState(
+                    {},
+                    document.title,
+                    window.location.pathname
                 );
 
             }
 
         }
-    );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | REGISTRATION ERROR
+        |--------------------------------------------------------------------------
+        |
+        | index.php?register=1
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            registerModal &&
+            urlParams.get('register') === '1'
+        ) {
+
+            openModal(
+                registerModal
+            );
+
+
+            setTimeout(function () {
+
+                const registerEmail =
+                    document.getElementById(
+                        'registerEmail'
+                    );
+
+
+                if (registerEmail) {
+
+                    registerEmail.focus();
+
+                }
+
+            }, 300);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CLEAN URL
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                window.history &&
+                window.history.replaceState
+            ) {
+
+                window.history.replaceState(
+                    {},
+                    document.title,
+                    window.location.pathname
+                );
+
+            }
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PHP ALREADY OPENED REGISTER MODAL
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            registerModal &&
+            (
+                registerModal.classList.contains(
+                    'active'
+                ) ||
+                registerModal.classList.contains(
+                    'show'
+                )
+            )
+        ) {
+
+            registerModal.classList.add(
+                'active'
+            );
+
+            registerModal.classList.add(
+                'show'
+            );
+
+
+            registerModal.setAttribute(
+                'aria-hidden',
+                'false'
+            );
+
+
+            document.body.classList.add(
+                'modal-open'
+            );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PHP ALREADY OPENED LOGIN MODAL
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            loginModal &&
+            (
+                loginModal.classList.contains(
+                    'active'
+                ) ||
+                loginModal.classList.contains(
+                    'show'
+                )
+            )
+        ) {
+
+            loginModal.classList.add(
+                'active'
+            );
+
+            loginModal.classList.add(
+                'show'
+            );
+
+
+            loginModal.setAttribute(
+                'aria-hidden',
+                'false'
+            );
+
+
+            document.body.classList.add(
+                'modal-open'
+            );
+
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | START
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        document.readyState === 'loading'
+    ) {
+
+        document.addEventListener(
+            'DOMContentLoaded',
+            initModalSystem
+        );
+
+    } else {
+
+        initModalSystem();
+
+    }
+
 
 })();
