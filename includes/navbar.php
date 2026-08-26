@@ -1,4 +1,5 @@
 <?php
+
 /*
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - GLOBAL NAVBAR
@@ -9,6 +10,7 @@
 | Login/Register menggunakan modal.
 |--------------------------------------------------------------------------
 */
+
 
 /*
 |--------------------------------------------------------------------------
@@ -128,9 +130,10 @@ if (!empty($userName)) {
 
 ?>
 
+
 <!-- =========================================================
      AUTH MODAL CSS
-     ========================================================= -->
+========================================================= -->
 
 <link
     rel="stylesheet"
@@ -144,7 +147,7 @@ if (!empty($userName)) {
 
 <!-- =========================================================
      NAVBAR
-     ========================================================= -->
+========================================================= -->
 
 <header class="site-header">
 
@@ -361,15 +364,6 @@ if (!empty($userName)) {
                     </a>
 
 
-                    <!--
-                    --------------------------------------------------
-                    CUSTOMER USER MENU DI BUANG
-                    --------------------------------------------------
-                    Profile / My Orders / Logout sekarang berada
-                    dalam customer_sidebar.php
-                    -->
-
-
                 <?php endif; ?>
 
 
@@ -426,9 +420,6 @@ if (!empty($userName)) {
                             id="userDropdown"
                         >
 
-
-                            <!-- USER INFO -->
-
                             <div class="dropdown-user-info">
 
                                 <span class="dropdown-avatar">
@@ -473,8 +464,6 @@ if (!empty($userName)) {
                             <div class="dropdown-divider"></div>
 
 
-                            <!-- PROFILE -->
-
                             <a
                                 href="<?= htmlspecialchars(
                                     navUrl('profile.php'),
@@ -486,10 +475,6 @@ if (!empty($userName)) {
                                 👤 Profile
                             </a>
 
-
-                            <!-- =================================================
-                                 VENDOR
-                            ================================================== -->
 
                             <?php if ($userRole === 'vendor'): ?>
 
@@ -538,10 +523,6 @@ if (!empty($userName)) {
 
                             <?php endif; ?>
 
-
-                            <!-- =================================================
-                                 ADMIN
-                            ================================================== -->
 
                             <?php if ($userRole === 'admin'): ?>
 
@@ -594,8 +575,6 @@ if (!empty($userName)) {
                             <div class="dropdown-divider"></div>
 
 
-                            <!-- LOGOUT -->
-
                             <a
                                 href="<?= htmlspecialchars(
                                     navUrl(
@@ -608,7 +587,6 @@ if (!empty($userName)) {
                             >
                                 ↪ Logout
                             </a>
-
 
                         </div>
 
@@ -628,18 +606,24 @@ if (!empty($userName)) {
                 <div class="auth-buttons">
 
 
+                    <!-- LOGIN -->
+
                     <button
                         type="button"
                         class="btn-login"
+                        id="navbarLoginButton"
                         data-modal-open="loginModal"
                     >
                         Login
                     </button>
 
 
+                    <!-- REGISTER -->
+
                     <button
                         type="button"
                         class="btn-register"
+                        id="navbarRegisterButton"
                         data-modal-open="registerModal"
                     >
                         Register
@@ -688,8 +672,6 @@ if (!empty($userName)) {
         <div class="mobile-menu-inner">
 
 
-            <!-- SEARCH -->
-
             <form
                 class="mobile-search"
                 action="<?= htmlspecialchars(
@@ -714,8 +696,6 @@ if (!empty($userName)) {
             </form>
 
 
-            <!-- HOME -->
-
             <a
                 href="<?= htmlspecialchars(
                     navUrl('index.php'),
@@ -726,8 +706,6 @@ if (!empty($userName)) {
                 🏠 Home
             </a>
 
-
-            <!-- CATALOG -->
 
             <a
                 href="<?= htmlspecialchars(
@@ -740,8 +718,6 @@ if (!empty($userName)) {
             </a>
 
 
-            <!-- CATEGORIES -->
-
             <a
                 href="<?= htmlspecialchars(
                     navUrl('category.php'),
@@ -752,8 +728,6 @@ if (!empty($userName)) {
                 📂 Categories
             </a>
 
-
-            <!-- VENDORS -->
 
             <a
                 href="<?= htmlspecialchars(
@@ -829,16 +803,16 @@ document.addEventListener(
     'DOMContentLoaded',
     function () {
 
-
-        /* =====================================================
-           USER DROPDOWN
-        ===================================================== */
+        /*
+        |--------------------------------------------------------------------------
+        | USER DROPDOWN
+        |--------------------------------------------------------------------------
+        */
 
         const userButton =
             document.getElementById(
                 'userMenuButton'
             );
-
 
         const userDropdown =
             document.getElementById(
@@ -851,24 +825,20 @@ document.addEventListener(
             userDropdown
         ) {
 
-
             userButton.addEventListener(
                 'click',
                 function (event) {
 
                     event.stopPropagation();
 
-
                     const isOpen =
                         userDropdown.classList.contains(
                             'show'
                         );
 
-
                     userDropdown.classList.toggle(
                         'show'
                     );
-
 
                     userButton.setAttribute(
                         'aria-expanded',
@@ -896,7 +866,6 @@ document.addEventListener(
                             'show'
                         );
 
-
                         userButton.setAttribute(
                             'aria-expanded',
                             'false'
@@ -910,15 +879,16 @@ document.addEventListener(
         }
 
 
-        /* =====================================================
-           MOBILE MENU
-        ===================================================== */
+        /*
+        |--------------------------------------------------------------------------
+        | MOBILE MENU
+        |--------------------------------------------------------------------------
+        */
 
         const mobileToggle =
             document.getElementById(
                 'mobileMenuToggle'
             );
-
 
         const mobileMenu =
             document.getElementById(
@@ -931,7 +901,6 @@ document.addEventListener(
             mobileMenu
         ) {
 
-
             mobileToggle.addEventListener(
                 'click',
                 function () {
@@ -941,16 +910,13 @@ document.addEventListener(
                             'show'
                         );
 
-
                     mobileMenu.classList.toggle(
                         'show'
                     );
 
-
                     mobileToggle.classList.toggle(
                         'active'
                     );
-
 
                     mobileToggle.setAttribute(
                         'aria-expanded',
@@ -963,7 +929,6 @@ document.addEventListener(
         }
 
     }
-
 );
 
 </script>
