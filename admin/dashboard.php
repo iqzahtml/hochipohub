@@ -1,11 +1,34 @@
 <?php
-/**
- * HOCHIPOHUB
- * Admin Dashboard
- */
+
+/*
+|--------------------------------------------------------------------------
+| HOCHIPO HUB - ADMIN DASHBOARD
+|--------------------------------------------------------------------------
+| File:
+|     admin/dashboard.php
+|
+| Purpose:
+|     Main administration dashboard.
+|
+|--------------------------------------------------------------------------
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| LOAD CONFIGURATION
+|--------------------------------------------------------------------------
+*/
 
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/includes/session.php';
+
+
+/*
+|--------------------------------------------------------------------------
+| REQUIRE ADMIN
+|--------------------------------------------------------------------------
+*/
 
 requireAdmin();
 
@@ -16,18 +39,48 @@ requireAdmin();
 |--------------------------------------------------------------------------
 */
 
-$adminId = getUserId();
+$adminId =
+    function_exists('getUserId')
+        ? getUserId()
+        : ($_SESSION['user_id'] ?? null);
 
-$adminName = getUserName();
+$adminName =
+    function_exists('getUserName')
+        ? getUserName()
+        : (
+            $_SESSION['name']
+            ?? $_SESSION['user_name']
+            ?? 'Administrator'
+        );
 
-$adminEmail = getUserEmail();
+$adminEmail =
+    function_exists('getUserEmail')
+        ? getUserEmail()
+        : (
+            $_SESSION['email']
+            ?? $_SESSION['user_email']
+            ?? ''
+        );
 
-$adminRole = getUserRole();
+$adminRole =
+    function_exists('getUserRole')
+        ? getUserRole()
+        : (
+            $_SESSION['role']
+            ?? $_SESSION['user_role']
+            ?? 'admin'
+        );
 
+
+/*
+|--------------------------------------------------------------------------
+| EXTRA SAFETY
+|--------------------------------------------------------------------------
+*/
 
 if (
     empty($adminId) ||
-    $adminRole !== 'admin'
+    strtolower((string) $adminRole) !== 'admin'
 ) {
 
     redirect(
@@ -40,18 +93,79 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| HELPER
+| ESCAPE
 |--------------------------------------------------------------------------
 */
 
-function adminEscape($value)
-{
-    return htmlspecialchars(
-        (string) $value,
-        ENT_QUOTES,
-        'UTF-8'
-    );
+if (!function_exists('adminEscape')) {
+
+    function adminEscape($value)
+    {
+        return htmlspecialchars(
+            (string) $value,
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    }
+
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| DEFAULT DASHBOARD DATA
+|--------------------------------------------------------------------------
+*/
+
+$dashboardStats = [
+
+    'users'       => 0,
+    'vendors'     => 0,
+    'products'    => 0,
+    'orders'      => 0,
+    'revenue'     => 0,
+    'customers'   => 0,
+    'payments'    => 0,
+    'reviews'     => 0,
+    'categories'  => 0,
+    'inventory'   => 0
+
+];
+
+
+$pendingVendors =
+    0;
+
+$pendingOrders =
+    0;
+
+$pendingPayments =
+    0;
+
+$hiddenReviews =
+    0;
+
+$lowStockProducts =
+    0;
+
+$outOfStockProducts =
+    0;
+
+$pendingApplications =
+    0;
+
+$dashboardError =
+    null;
+
+$recentOrders =
+    [];
+
+$recentApplications =
+    [];
+
+
+$pdo =
+    null;
 
 
 /*
@@ -60,2275 +174,3107 @@ function adminEscape($value)
 |--------------------------------------------------------------------------
 */
 
-$pdo = getDB();
-
-
-/*
-|--------------------------------------------------------------------------
-| DASHBOARD STATS
-|--------------------------------------------------------------------------
-*/
-
-$dashboardStats = [
-
-    'users' => 0,
-
-    'vendors' => 0,
-
-    'customers' => 0,
-
-    'products' => 0,
-
-    'orders' => 0,
-
-    'reviews' => 0,
-
-    'payments' => 0,
-
-    'revenue' => 0
-
-];
-
-
-$dashboardError = null;
-
-
-/*
-|--------------------------------------------------------------------------
-| USERS
-|--------------------------------------------------------------------------
-*/
-
 try {
 
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM users
-    ");
+    $pdo =
+        getDB();
 
-    $dashboardStats['users'] =
-        (int) $stmt->fetchColumn();
+
+    /*
+    |--------------------------------------------------------------------------
+    | USERS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM users
+            ");
+
+        $dashboardStats['users'] =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Users Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CUSTOMERS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM users
+                WHERE LOWER(role) = 'customer'
+            ");
+
+        $dashboardStats['customers'] =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Customers Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VENDORS
+    |--------------------------------------------------------------------------
+    |
+    | Prefer the vendors table because the project has a dedicated
+    | vendors table.
+    |
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM vendors
+            ");
+
+        $dashboardStats['vendors'] =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        /*
+        |--------------------------------------------------------------
+        | Fallback to users.role = vendor
+        |--------------------------------------------------------------
+        */
+
+        try {
+
+            $stmt =
+                $pdo->query("
+                    SELECT COUNT(*)
+                    FROM users
+                    WHERE LOWER(role) = 'vendor'
+                ");
+
+            $dashboardStats['vendors'] =
+                (int) $stmt->fetchColumn();
+
+        } catch (Throwable $fallbackError) {
+
+            error_log(
+                'Dashboard Vendors Error: '
+                . $fallbackError->getMessage()
+            );
+
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCTS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM products
+            ");
+
+        $dashboardStats['products'] =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Products Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CATEGORIES
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM categories
+            ");
+
+        $dashboardStats['categories'] =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Categories Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORDERS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM orders
+            ");
+
+        $dashboardStats['orders'] =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Orders Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | REVENUE
+    |--------------------------------------------------------------------------
+    |
+    | Only completed orders are counted.
+    |
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT
+                    COALESCE(
+                        SUM(total_amount),
+                        0
+                    )
+                FROM orders
+                WHERE order_status = 'Completed'
+            ");
+
+        $dashboardStats['revenue'] =
+            (float) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Revenue Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAYMENTS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM payments
+            ");
+
+        $dashboardStats['payments'] =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Payments Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | REVIEWS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM reviews
+            ");
+
+        $dashboardStats['reviews'] =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Reviews Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | INVENTORY
+    |--------------------------------------------------------------------------
+    |
+    | Number of inventory records.
+    |
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM inventory
+            ");
+
+        $dashboardStats['inventory'] =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Inventory Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOW STOCK
+    |--------------------------------------------------------------------------
+    |
+    | Products with quantity between 1 and 5.
+    |
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM inventory
+                WHERE quantity > 0
+                  AND quantity <= 5
+            ");
+
+        $lowStockProducts =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Low Stock Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | OUT OF STOCK
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM inventory
+                WHERE quantity <= 0
+            ");
+
+        $outOfStockProducts =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Out Of Stock Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PENDING VENDOR APPLICATIONS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM vendor_applications
+                WHERE status = 'Pending'
+            ");
+
+        $pendingVendors =
+            (int) $stmt->fetchColumn();
+
+        $pendingApplications =
+            $pendingVendors;
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Vendor Applications Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PENDING ORDERS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM orders
+                WHERE order_status = 'Pending'
+            ");
+
+        $pendingOrders =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Pending Orders Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PENDING PAYMENTS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM payments
+                WHERE payment_status = 'Pending'
+            ");
+
+        $pendingPayments =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Pending Payments Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | HIDDEN REVIEWS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT COUNT(*)
+                FROM reviews
+                WHERE status = 'Hidden'
+            ");
+
+        $hiddenReviews =
+            (int) $stmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Hidden Reviews Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RECENT ORDERS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT
+                    o.order_id,
+                    o.order_date,
+                    o.total_amount,
+                    o.order_status,
+                    u.name AS customer_name
+                FROM orders o
+                INNER JOIN users u
+                    ON o.customer_id = u.user_id
+                ORDER BY o.order_date DESC
+                LIMIT 5
+            ");
+
+        $recentOrders =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            );
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Recent Orders Error: '
+            . $e->getMessage()
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RECENT VENDOR APPLICATIONS
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+
+        $stmt =
+            $pdo->query("
+                SELECT
+                    va.application_id,
+                    va.business_name,
+                    va.status,
+                    va.created_at,
+                    u.name AS applicant_name
+                FROM vendor_applications va
+                INNER JOIN users u
+                    ON va.user_id = u.user_id
+                ORDER BY va.created_at DESC
+                LIMIT 5
+            ");
+
+        $recentApplications =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            );
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Dashboard Recent Applications Error: '
+            . $e->getMessage()
+        );
+
+    }
+
 
 } catch (Throwable $e) {
+
+    error_log(
+        'HochipoHub Admin Dashboard Error: '
+        . $e->getMessage()
+    );
+
 
     $dashboardError =
-        'Unable to load user statistics.';
+        'Unable to connect to the marketplace database.';
 
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VENDORS
+| PAGE TITLE
 |--------------------------------------------------------------------------
 */
 
-try {
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM users
-        WHERE LOWER(role) = 'vendor'
-    ");
-
-    $dashboardStats['vendors'] =
-        (int) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $dashboardStats['vendors'] = 0;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CUSTOMERS
-|--------------------------------------------------------------------------
-*/
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM users
-        WHERE LOWER(role) = 'customer'
-    ");
-
-    $dashboardStats['customers'] =
-        (int) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $dashboardStats['customers'] = 0;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| PRODUCTS
-|--------------------------------------------------------------------------
-*/
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM products
-    ");
-
-    $dashboardStats['products'] =
-        (int) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $dashboardStats['products'] = 0;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| ORDERS
-|--------------------------------------------------------------------------
-*/
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM orders
-    ");
-
-    $dashboardStats['orders'] =
-        (int) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $dashboardStats['orders'] = 0;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REVIEWS
-|--------------------------------------------------------------------------
-*/
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM reviews
-    ");
-
-    $dashboardStats['reviews'] =
-        (int) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $dashboardStats['reviews'] = 0;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| PAYMENTS
-|--------------------------------------------------------------------------
-*/
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM payments
-    ");
-
-    $dashboardStats['payments'] =
-        (int) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $dashboardStats['payments'] = 0;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| REVENUE
-|--------------------------------------------------------------------------
-*/
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT COALESCE(
-            SUM(total_amount),
-            0
-        )
-        FROM orders
-        WHERE order_status != 'Cancelled'
-    ");
-
-    $dashboardStats['revenue'] =
-        (float) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $dashboardStats['revenue'] = 0;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| RECENT ORDERS
-|--------------------------------------------------------------------------
-*/
-
-$recentOrders = [];
-
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT
-
-            o.order_id,
-
-            o.order_date,
-
-            o.total_amount,
-
-            o.order_status,
-
-            u.name AS customer_name
-
-        FROM orders o
-
-        INNER JOIN users u
-            ON o.customer_id = u.user_id
-
-        ORDER BY
-            o.order_date DESC
-
-        LIMIT 5
-    ");
-
-    $recentOrders =
-        $stmt->fetchAll(
-            PDO::FETCH_ASSOC
-        );
-
-} catch (Throwable $e) {
-
-    $recentOrders = [];
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| VENDOR APPLICATIONS
-|--------------------------------------------------------------------------
-*/
-
-$recentApplications = [];
-
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT
-
-            va.application_id,
-
-            va.business_name,
-
-            va.status,
-
-            va.created_at,
-
-            u.name AS applicant_name
-
-        FROM vendor_applications va
-
-        INNER JOIN users u
-            ON va.user_id = u.user_id
-
-        ORDER BY
-            va.created_at DESC
-
-        LIMIT 5
-    ");
-
-    $recentApplications =
-        $stmt->fetchAll(
-            PDO::FETCH_ASSOC
-        );
-
-} catch (Throwable $e) {
-
-    $recentApplications = [];
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| PENDING VENDOR APPLICATION COUNT
-|--------------------------------------------------------------------------
-*/
-
-$pendingApplications = 0;
-
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM vendor_applications
-        WHERE status = 'Pending'
-    ");
-
-    $pendingApplications =
-        (int) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $pendingApplications = 0;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| PENDING PAYMENT COUNT
-|--------------------------------------------------------------------------
-*/
-
-$pendingPayments = 0;
-
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM payments
-        WHERE payment_status = 'Pending'
-    ");
-
-    $pendingPayments =
-        (int) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $pendingPayments = 0;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| PENDING ORDER COUNT
-|--------------------------------------------------------------------------
-*/
-
-$pendingOrders = 0;
-
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM orders
-        WHERE order_status = 'Pending'
-    ");
-
-    $pendingOrders =
-        (int) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $pendingOrders = 0;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| HIDDEN REVIEW COUNT
-|--------------------------------------------------------------------------
-*/
-
-$hiddenReviews = 0;
-
-
-try {
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM reviews
-        WHERE status = 'Hidden'
-    ");
-
-    $hiddenReviews =
-        (int) $stmt->fetchColumn();
-
-} catch (Throwable $e) {
-
-    $hiddenReviews = 0;
-
-}
+$pageTitle =
+    'Admin Dashboard';
 
 ?>
+
 
 <!DOCTYPE html>
 
 <html lang="en">
 
+
 <head>
 
+
     <meta charset="UTF-8">
+
 
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
 
+
     <title>
-        Admin Dashboard | HochipoHub
+
+        <?= adminEscape($pageTitle) ?>
+
+        -
+
+        <?= adminEscape(
+            defined('SITE_NAME')
+                ? SITE_NAME
+                : 'HochipoHub'
+        ) ?>
+
     </title>
 
 
     <link
         rel="stylesheet"
-        href="../css/responsive.css"
+        href="<?= adminEscape(
+            BASE_URL
+        ) ?>css/admin.css"
+    >
+
+
+    <link
+        rel="stylesheet"
+        href="<?= adminEscape(
+            BASE_URL
+        ) ?>css/responsive.css"
+    >
+
+
+    <!-- =====================================================
+         DASHBOARD FONT
+    ====================================================== -->
+
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
+
+    <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossorigin
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet"
     >
 
 
     <style>
 
-    /* =====================================================
-       DASHBOARD
-    ====================================================== */
 
-    :root {
+        /*
+        |--------------------------------------------------------------------------
+        | DASHBOARD DESIGN SYSTEM
+        |--------------------------------------------------------------------------
+        */
 
-        --dash-bg: #f5f7fb;
+        :root {
 
-        --dash-card: #ffffff;
+            --dash-blue:
+                #2563eb;
 
-        --dash-text: #0f172a;
+            --dash-blue-dark:
+                #1d4ed8;
 
-        --dash-muted: #64748b;
+            --dash-blue-deep:
+                #172554;
 
-        --dash-border: #e6eaf1;
+            --dash-blue-soft:
+                #eff6ff;
 
-        --dash-red: #e5092f;
+            --dash-sky:
+                #0ea5e9;
 
-        --dash-red-dark: #b90726;
+            --dash-cyan:
+                #06b6d4;
 
-        --dash-blue: #2864f0;
+            --dash-indigo:
+                #4f46e5;
 
-        --dash-purple: #704cff;
+            --dash-violet:
+                #6366f1;
 
-        --dash-green: #16a34a;
+            --dash-green:
+                #10b981;
 
-        --dash-orange: #f97316;
+            --dash-bg:
+                #f5f8ff;
 
-        --dash-cyan: #0891b2;
-    }
+            --dash-card:
+                #ffffff;
 
+            --dash-text:
+                #172033;
 
-    * {
-        box-sizing: border-box;
-    }
+            --dash-muted:
+                #718096;
 
+            --dash-border:
+                #e5ebf4;
 
-    html {
-        scroll-behavior: smooth;
-    }
-
-
-    body {
-
-        margin: 0;
-
-        background:
-            linear-gradient(
-                135deg,
-                #f8fafc,
-                #f3f6fb
-            );
-
-        color:
-            var(--dash-text);
-
-        font-family:
-            Inter,
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
-    }
-
-
-    /* =====================================================
-       MAIN
-    ====================================================== */
-
-    .admin-dashboard-main {
-
-        min-height: 100vh;
-
-        padding-bottom: 50px;
-    }
-
-
-    /* =====================================================
-       TOP HEADER
-    ====================================================== */
-
-    .dashboard-header {
-
-        position: sticky;
-
-        top: 0;
-
-        z-index: 100;
-
-        display: flex;
-
-        align-items: center;
-
-        justify-content: space-between;
-
-        gap: 20px;
-
-        min-height: 82px;
-
-        padding:
-            17px
-            34px;
-
-        background:
-            rgba(255,255,255,.92);
-
-        border-bottom:
-            1px solid
-            rgba(226,232,240,.85);
-
-        backdrop-filter:
-            blur(14px);
-    }
-
-
-    .dashboard-header-left {
-
-        display: flex;
-
-        align-items: center;
-
-        gap: 15px;
-
-        min-width: 0;
-    }
-
-
-    .dashboard-title-wrap {
-
-        min-width: 0;
-    }
-
-
-    .dashboard-title {
-
-        margin: 0;
-
-        font-size: 25px;
-
-        font-weight: 850;
-
-        letter-spacing:
-            -.7px;
-    }
-
-
-    .dashboard-subtitle {
-
-        margin:
-            4px
-            0
-            0;
-
-        color:
-            var(--dash-muted);
-
-        font-size: 12px;
-    }
-
-
-    .dashboard-header-user {
-
-        display: flex;
-
-        align-items: center;
-
-        gap: 11px;
-
-        padding:
-            7px
-            10px
-            7px
-            7px;
-
-        border:
-            1px solid
-            var(--dash-border);
-
-        border-radius: 14px;
-
-        background: #ffffff;
-    }
-
-
-    .dashboard-user-avatar {
-
-        width: 38px;
-        height: 38px;
-
-        display: flex;
-
-        align-items: center;
-        justify-content: center;
-
-        border-radius: 11px;
-
-        background:
-            linear-gradient(
-                135deg,
-                #2864f0,
-                #704cff
-            );
-
-        color: #ffffff;
-
-        font-size: 13px;
-
-        font-weight: 850;
-    }
-
-
-    .dashboard-user-info strong {
-
-        display: block;
-
-        font-size: 12px;
-
-        font-weight: 800;
-    }
-
-
-    .dashboard-user-info span {
-
-        display: block;
-
-        margin-top: 2px;
-
-        color:
-            var(--dash-muted);
-
-        font-size: 9px;
-    }
-
-
-    .dashboard-admin-badge {
-
-        display: inline-flex;
-
-        margin-top: 3px;
-
-        padding:
-            3px
-            7px;
-
-        border-radius: 999px;
-
-        background:
-            #fff0f3;
-
-        color:
-            var(--dash-red);
-
-        font-size: 8px;
-
-        font-weight: 850;
-
-        text-transform: uppercase;
-
-        letter-spacing: .6px;
-    }
-
-
-    /* =====================================================
-       CONTENT
-    ====================================================== */
-
-    .dashboard-content {
-
-        width:
-            min(
-                calc(100% - 56px),
-                1450px
-            );
-
-        margin:
-            0 auto;
-
-        padding-top: 30px;
-    }
-
-
-    /* =====================================================
-       HERO
-    ====================================================== */
-
-    .dashboard-hero {
-
-        position: relative;
-
-        overflow: hidden;
-
-        display: flex;
-
-        align-items: center;
-
-        justify-content: space-between;
-
-        gap: 30px;
-
-        padding:
-            30px
-            34px;
-
-        margin-bottom: 25px;
-
-        border-radius: 25px;
-
-        color: #ffffff;
-
-        background:
-
-            radial-gradient(
-                circle at 80% 15%,
-                rgba(255,255,255,.22),
-                transparent 24%
-            ),
-
-            radial-gradient(
-                circle at 15% 100%,
-                rgba(40,100,240,.38),
-                transparent 32%
-            ),
-
-            linear-gradient(
-                120deg,
-                #e5092f 0%,
-                #c9082d 43%,
-                #8f123b 100%
-            );
-
-        box-shadow:
-            0 18px 45px
-            rgba(229,9,47,.18);
-    }
-
-
-    .dashboard-hero::after {
-
-        content: "";
-
-        position: absolute;
-
-        right: -75px;
-
-        bottom: -95px;
-
-        width: 260px;
-        height: 260px;
-
-        border-radius: 50%;
-
-        border:
-            35px solid
-            rgba(255,255,255,.08);
-    }
-
-
-    .dashboard-hero-content {
-
-        position: relative;
-
-        z-index: 1;
-
-        max-width: 700px;
-    }
-
-
-    .dashboard-hero-kicker {
-
-        display: inline-flex;
-
-        align-items: center;
-
-        gap: 7px;
-
-        margin-bottom: 9px;
-
-        padding:
-            6px
-            10px;
-
-        border:
-            1px solid
-            rgba(255,255,255,.16);
-
-        border-radius: 999px;
-
-        background:
-            rgba(255,255,255,.10);
-
-        font-size: 9px;
-
-        font-weight: 800;
-
-        letter-spacing: 1px;
-
-        text-transform: uppercase;
-    }
-
-
-    .dashboard-hero-kicker-dot {
-
-        width: 6px;
-        height: 6px;
-
-        border-radius: 50%;
-
-        background: #ffffff;
-
-        box-shadow:
-            0 0 0 4px
-            rgba(255,255,255,.12);
-    }
-
-
-    .dashboard-hero h2 {
-
-        margin: 0;
-
-        font-size: clamp(
-            25px,
-            3vw,
-            38px
-        );
-
-        line-height: 1.08;
-
-        letter-spacing:
-            -1.1px;
-    }
-
-
-    .dashboard-hero p {
-
-        max-width: 610px;
-
-        margin:
-            11px
-            0
-            0;
-
-        color:
-            rgba(255,255,255,.82);
-
-        font-size: 13px;
-
-        line-height: 1.7;
-    }
-
-
-    .dashboard-hero-actions {
-
-        position: relative;
-
-        z-index: 1;
-
-        display: flex;
-
-        flex-wrap: wrap;
-
-        gap: 9px;
-    }
-
-
-    .hero-button {
-
-        display: inline-flex;
-
-        align-items: center;
-
-        justify-content: center;
-
-        min-height: 42px;
-
-        padding:
-            0
-            16px;
-
-        border-radius: 12px;
-
-        text-decoration: none;
-
-        font-size: 11px;
-
-        font-weight: 800;
-
-        transition:
-            .2s ease;
-    }
-
-
-    .hero-button.primary {
-
-        background: #ffffff;
-
-        color:
-            var(--dash-red);
-
-        box-shadow:
-            0 8px 22px
-            rgba(0,0,0,.12);
-    }
-
-
-    .hero-button.primary:hover {
-
-        transform:
-            translateY(-2px);
-
-        box-shadow:
-            0 12px 28px
-            rgba(0,0,0,.17);
-    }
-
-
-    .hero-button.ghost {
-
-        border:
-            1px solid
-            rgba(255,255,255,.25);
-
-        background:
-            rgba(255,255,255,.08);
-
-        color: #ffffff;
-    }
-
-
-    .hero-button.ghost:hover {
-
-        background:
-            rgba(255,255,255,.15);
-
-        transform:
-            translateY(-2px);
-    }
-
-
-    /* =====================================================
-       STATS
-    ====================================================== */
-
-    .dashboard-section-title {
-
-        display: flex;
-
-        align-items: end;
-
-        justify-content: space-between;
-
-        gap: 15px;
-
-        margin:
-            0
-            0
-            13px;
-    }
-
-
-    .dashboard-section-title h2 {
-
-        margin: 0;
-
-        font-size: 18px;
-
-        font-weight: 850;
-
-        letter-spacing:
-            -.4px;
-    }
-
-
-    .dashboard-section-title p {
-
-        margin:
-            4px
-            0
-            0;
-
-        color:
-            var(--dash-muted);
-
-        font-size: 10px;
-    }
-
-
-    .dashboard-stats-grid {
-
-        display: grid;
-
-        grid-template-columns:
-            repeat(
-                4,
-                minmax(0, 1fr)
-            );
-
-        gap: 15px;
-
-        margin-bottom: 28px;
-    }
-
-
-    .dashboard-stat-card {
-
-        position: relative;
-
-        overflow: hidden;
-
-        padding: 19px;
-
-        border:
-            1px solid
-            var(--dash-border);
-
-        border-radius: 19px;
-
-        background: #ffffff;
-
-        box-shadow:
-            0 7px 24px
-            rgba(15,23,42,.035);
-
-        transition:
-            transform .22s ease,
-            box-shadow .22s ease;
-    }
-
-
-    .dashboard-stat-card:hover {
-
-        transform:
-            translateY(-4px);
-
-        box-shadow:
-            0 15px 32px
-            rgba(15,23,42,.08);
-    }
-
-
-    .dashboard-stat-card::after {
-
-        content: "";
-
-        position: absolute;
-
-        right: -35px;
-
-        bottom: -45px;
-
-        width: 100px;
-        height: 100px;
-
-        border-radius: 50%;
-
-        background:
-            rgba(40,100,240,.035);
-    }
-
-
-    .dashboard-stat-top {
-
-        display: flex;
-
-        align-items: center;
-
-        justify-content: space-between;
-
-        gap: 10px;
-    }
-
-
-    .dashboard-stat-icon {
-
-        width: 43px;
-        height: 43px;
-
-        display: flex;
-
-        align-items: center;
-        justify-content: center;
-
-        border-radius: 13px;
-    }
-
-
-    .dashboard-stat-icon svg {
-
-        width: 20px;
-        height: 20px;
-
-        fill: none;
-
-        stroke:
-            currentColor;
-
-        stroke-width: 1.8;
-
-        stroke-linecap: round;
-
-        stroke-linejoin: round;
-    }
-
-
-    .stat-red .dashboard-stat-icon {
-
-        background:
-            #fff0f3;
-
-        color:
-            var(--dash-red);
-    }
-
-
-    .stat-blue .dashboard-stat-icon {
-
-        background:
-            #edf3ff;
-
-        color:
-            var(--dash-blue);
-    }
-
-
-    .stat-purple .dashboard-stat-icon {
-
-        background:
-            #f2efff;
-
-        color:
-            var(--dash-purple);
-    }
-
-
-    .stat-green .dashboard-stat-icon {
-
-        background:
-            #ebfbf0;
-
-        color:
-            var(--dash-green);
-    }
-
-
-    .stat-orange .dashboard-stat-icon {
-
-        background:
-            #fff4eb;
-
-        color:
-            var(--dash-orange);
-    }
-
-
-    .dashboard-stat-label {
-
-        margin-top: 15px;
-
-        color:
-            var(--dash-muted);
-
-        font-size: 10px;
-
-        font-weight: 700;
-    }
-
-
-    .dashboard-stat-value {
-
-        margin-top: 3px;
-
-        color:
-            var(--dash-text);
-
-        font-size: 27px;
-
-        font-weight: 900;
-
-        letter-spacing:
-            -1px;
-    }
-
-
-    .dashboard-stat-meta {
-
-        display: flex;
-
-        align-items: center;
-
-        gap: 5px;
-
-        margin-top: 5px;
-
-        color:
-            #94a3b8;
-
-        font-size: 9px;
-    }
-
-
-    /* =====================================================
-       ATTENTION
-    ====================================================== */
-
-    .attention-grid {
-
-        display: grid;
-
-        grid-template-columns:
-            repeat(
-                4,
-                minmax(0, 1fr)
-            );
-
-        gap: 12px;
-
-        margin-bottom: 29px;
-    }
-
-
-    .attention-card {
-
-        display: flex;
-
-        align-items: center;
-
-        gap: 11px;
-
-        padding: 14px;
-
-        border:
-            1px solid
-            var(--dash-border);
-
-        border-radius: 16px;
-
-        background: #ffffff;
-
-        text-decoration: none;
-
-        transition:
-            .2s ease;
-    }
-
-
-    .attention-card:hover {
-
-        transform:
-            translateY(-2px);
-
-        border-color:
-            #d7deeb;
-
-        box-shadow:
-            0 10px 25px
-            rgba(15,23,42,.06);
-    }
-
-
-    .attention-icon {
-
-        width: 38px;
-        height: 38px;
-
-        flex: 0 0 38px;
-
-        display: flex;
-
-        align-items: center;
-        justify-content: center;
-
-        border-radius: 11px;
-    }
-
-
-    .attention-icon svg {
-
-        width: 18px;
-        height: 18px;
-
-        fill: none;
-
-        stroke: currentColor;
-
-        stroke-width: 1.8;
-
-        stroke-linecap: round;
-
-        stroke-linejoin: round;
-    }
-
-
-    .attention-warning {
-
-        background:
-            #fff5e8;
-
-        color:
-            #ea7b00;
-    }
-
-
-    .attention-payment {
-
-        background:
-            #edf3ff;
-
-        color:
-            var(--dash-blue);
-    }
-
-
-    .attention-review {
-
-        background:
-            #fff0f3;
-
-        color:
-            var(--dash-red);
-    }
-
-
-    .attention-vendor {
-
-        background:
-            #f2efff;
-
-        color:
-            var(--dash-purple);
-    }
-
-
-    .attention-info strong {
-
-        display: block;
-
-        color:
-            var(--dash-text);
-
-        font-size: 12px;
-    }
-
-
-    .attention-info span {
-
-        display: block;
-
-        margin-top: 2px;
-
-        color:
-            var(--dash-muted);
-
-        font-size: 9px;
-    }
-
-
-    /* =====================================================
-       QUICK MANAGEMENT
-    ====================================================== */
-
-    .quick-grid {
-
-        display: grid;
-
-        grid-template-columns:
-            repeat(
-                4,
-                minmax(0, 1fr)
-            );
-
-        gap: 13px;
-
-        margin-bottom: 30px;
-    }
-
-
-    .quick-card {
-
-        position: relative;
-
-        overflow: hidden;
-
-        min-height: 150px;
-
-        padding: 19px;
-
-        border:
-            1px solid
-            var(--dash-border);
-
-        border-radius: 18px;
-
-        background: #ffffff;
-
-        text-decoration: none;
-
-        transition:
-            transform .22s ease,
-            border-color .22s ease,
-            box-shadow .22s ease;
-    }
-
-
-    .quick-card:hover {
-
-        transform:
-            translateY(-4px);
-
-        border-color:
-            rgba(40,100,240,.20);
-
-        box-shadow:
-            0 15px 30px
-            rgba(15,23,42,.07);
-    }
-
-
-    .quick-card::after {
-
-        content: "→";
-
-        position: absolute;
-
-        top: 17px;
-
-        right: 18px;
-
-        width: 27px;
-        height: 27px;
-
-        display: flex;
-
-        align-items: center;
-        justify-content: center;
-
-        border-radius: 9px;
-
-        background:
-            #f5f7fb;
-
-        color:
-            #64748b;
-
-        font-size: 14px;
-
-        transition:
-            .2s ease;
-    }
-
-
-    .quick-card:hover::after {
-
-        background:
-            var(--dash-blue);
-
-        color: #ffffff;
-
-        transform:
-            translateX(2px);
-    }
-
-
-    .quick-icon {
-
-        width: 39px;
-        height: 39px;
-
-        display: flex;
-
-        align-items: center;
-        justify-content: center;
-
-        margin-bottom: 15px;
-
-        border-radius: 12px;
-    }
-
-
-    .quick-icon svg {
-
-        width: 18px;
-        height: 18px;
-
-        fill: none;
-
-        stroke: currentColor;
-
-        stroke-width: 1.8;
-
-        stroke-linecap: round;
-
-        stroke-linejoin: round;
-    }
-
-
-    .quick-red {
-
-        background:
-            #fff0f3;
-
-        color:
-            var(--dash-red);
-    }
-
-
-    .quick-blue {
-
-        background:
-            #edf3ff;
-
-        color:
-            var(--dash-blue);
-    }
-
-
-    .quick-purple {
-
-        background:
-            #f2efff;
-
-        color:
-            var(--dash-purple);
-    }
-
-
-    .quick-green {
-
-        background:
-            #ebfbf0;
-
-        color:
-            var(--dash-green);
-    }
-
-
-    .quick-orange {
-
-        background:
-            #fff4eb;
-
-        color:
-            var(--dash-orange);
-    }
-
-
-    .quick-cyan {
-
-        background:
-            #e9faff;
-
-        color:
-            var(--dash-cyan);
-    }
-
-
-    .quick-card-title {
-
-        padding-right: 30px;
-
-        color:
-            var(--dash-text);
-
-        font-size: 13px;
-
-        font-weight: 850;
-    }
-
-
-    .quick-card-description {
-
-        max-width: 220px;
-
-        margin-top: 7px;
-
-        color:
-            var(--dash-muted);
-
-        font-size: 9px;
-
-        line-height: 1.6;
-    }
-
-
-    /* =====================================================
-       BOTTOM GRID
-    ====================================================== */
-
-    .dashboard-bottom-grid {
-
-        display: grid;
-
-        grid-template-columns:
-            minmax(0, 1.3fr)
-            minmax(320px, .7fr);
-
-        gap: 16px;
-
-        margin-bottom: 30px;
-    }
-
-
-    .dashboard-panel {
-
-        overflow: hidden;
-
-        border:
-            1px solid
-            var(--dash-border);
-
-        border-radius: 19px;
-
-        background: #ffffff;
-
-        box-shadow:
-            0 7px 24px
-            rgba(15,23,42,.03);
-    }
-
-
-    .dashboard-panel-header {
-
-        display: flex;
-
-        align-items: center;
-
-        justify-content: space-between;
-
-        gap: 12px;
-
-        padding:
-            18px
-            19px;
-
-        border-bottom:
-            1px solid
-            #eef1f5;
-    }
-
-
-    .dashboard-panel-header h3 {
-
-        margin: 0;
-
-        font-size: 14px;
-
-        font-weight: 850;
-    }
-
-
-    .dashboard-panel-header p {
-
-        margin:
-            4px
-            0
-            0;
-
-        color:
-            var(--dash-muted);
-
-        font-size: 9px;
-    }
-
-
-    .dashboard-view-all {
-
-        color:
-            var(--dash-blue);
-
-        font-size: 9px;
-
-        font-weight: 800;
-
-        text-decoration: none;
-    }
-
-
-    .dashboard-view-all:hover {
-
-        text-decoration:
-            underline;
-    }
-
-
-    /* =====================================================
-       TABLE
-    ====================================================== */
-
-    .dashboard-table-wrap {
-
-        overflow-x: auto;
-    }
-
-
-    .dashboard-table {
-
-        width: 100%;
-
-        border-collapse:
-            collapse;
-    }
-
-
-    .dashboard-table th {
-
-        padding:
-            11px
-            15px;
-
-        background:
-            #f8fafc;
-
-        color:
-            #718096;
-
-        font-size: 8px;
-
-        font-weight: 800;
-
-        letter-spacing:
-            .4px;
-
-        text-align: left;
-
-        text-transform: uppercase;
-
-        white-space: nowrap;
-    }
-
-
-    .dashboard-table td {
-
-        padding:
-            13px
-            15px;
-
-        border-top:
-            1px solid
-            #f0f2f5;
-
-        color:
-            #334155;
-
-        font-size: 9px;
-
-        white-space: nowrap;
-    }
-
-
-    .dashboard-order-id {
-
-        color:
-            var(--dash-blue);
-
-        font-weight: 850;
-    }
-
-
-    .dashboard-customer {
-
-        color:
-            var(--dash-text);
-
-        font-weight: 750;
-    }
-
-
-    .dashboard-money {
-
-        color:
-            var(--dash-text);
-
-        font-weight: 800;
-    }
-
-
-    .dashboard-status {
-
-        display: inline-flex;
-
-        padding:
-            5px
-            8px;
-
-        border-radius: 999px;
-
-        font-size: 8px;
-
-        font-weight: 800;
-    }
-
-
-    .status-pending {
-
-        background:
-            #fff5e8;
-
-        color:
-            #c56a00;
-    }
-
-
-    .status-processing {
-
-        background:
-            #edf3ff;
-
-        color:
-            #2259d5;
-    }
-
-
-    .status-completed {
-
-        background:
-            #ebfbf0;
-
-        color:
-            #16823d;
-    }
-
-
-    .status-cancelled {
-
-        background:
-            #fff0f3;
-
-        color:
-            #c90a2e;
-    }
-
-
-    .status-default {
-
-        background:
-            #f1f5f9;
-
-        color:
-            #64748b;
-    }
-
-
-    /* =====================================================
-       VENDOR APPLICATIONS
-    ====================================================== */
-
-    .application-list {
-
-        padding: 4px 17px 10px;
-    }
-
-
-    .application-item {
-
-        display: flex;
-
-        align-items: center;
-
-        gap: 11px;
-
-        padding:
-            13px
-            0;
-
-        border-bottom:
-            1px solid
-            #eef1f5;
-    }
-
-
-    .application-item:last-child {
-
-        border-bottom:
-            0;
-    }
-
-
-    .application-avatar {
-
-        width: 36px;
-        height: 36px;
-
-        flex: 0 0 36px;
-
-        display: flex;
-
-        align-items: center;
-        justify-content: center;
-
-        border-radius: 11px;
-
-        background:
-            linear-gradient(
-                135deg,
-                #f1f5ff,
-                #e7edff
-            );
-
-        color:
-            var(--dash-blue);
-
-        font-size: 11px;
-
-        font-weight: 850;
-    }
-
-
-    .application-info {
-
-        min-width: 0;
-
-        flex: 1;
-    }
-
-
-    .application-name {
-
-        overflow: hidden;
-
-        color:
-            var(--dash-text);
-
-        font-size: 10px;
-
-        font-weight: 800;
-
-        white-space: nowrap;
-
-        text-overflow: ellipsis;
-    }
-
-
-    .application-business {
-
-        overflow: hidden;
-
-        margin-top: 3px;
-
-        color:
-            var(--dash-muted);
-
-        font-size: 8px;
-
-        white-space: nowrap;
-
-        text-overflow: ellipsis;
-    }
-
-
-    .application-status {
-
-        padding:
-            5px
-            7px;
-
-        border-radius: 999px;
-
-        background:
-            #fff5e8;
-
-        color:
-            #c56a00;
-
-        font-size: 7px;
-
-        font-weight: 850;
-
-        text-transform: uppercase;
-    }
-
-
-    /* =====================================================
-       ERROR
-    ====================================================== */
-
-    .dashboard-error {
-
-        margin-bottom: 20px;
-
-        padding:
-            14px
-            17px;
-
-        border:
-            1px solid
-            #fecaca;
-
-        border-radius: 13px;
-
-        background:
-            #fff1f2;
-
-        color:
-            #b91c1c;
-
-        font-size: 10px;
-    }
-
-
-    /* =====================================================
-       FOOTER
-    ====================================================== */
-
-    .dashboard-footer {
-
-        padding:
-            10px
-            0
-            30px;
-
-        color:
-            #94a3b8;
-
-        font-size: 9px;
-
-        text-align: center;
-    }
-
-
-    /* =====================================================
-       RESPONSIVE
-    ====================================================== */
-
-    @media (max-width: 1250px) {
-
-        .dashboard-stats-grid {
-
-            grid-template-columns:
-                repeat(
-                    2,
-                    minmax(0, 1fr)
-                );
         }
 
 
-        .attention-grid {
+        /*
+        |--------------------------------------------------------------------------
+        | BASE
+        |--------------------------------------------------------------------------
+        */
 
-            grid-template-columns:
-                repeat(
-                    2,
-                    minmax(0, 1fr)
-                );
-        }
-
-
-        .quick-grid {
-
-            grid-template-columns:
-                repeat(
-                    3,
-                    minmax(0, 1fr)
-                );
-        }
-
-    }
-
-
-    @media (max-width: 950px) {
-
-        .dashboard-header {
-
-            padding:
-                15px
-                22px;
-        }
-
-
-        .dashboard-content {
-
-            width:
-                min(
-                    calc(100% - 36px),
-                    1450px
-                );
-        }
-
-
-        .dashboard-bottom-grid {
-
-            grid-template-columns:
-                1fr;
-        }
-
-    }
-
-
-    @media (max-width: 720px) {
-
-        .dashboard-header {
+        .admin-dashboard-main {
 
             min-height:
-                72px;
+                100vh;
+
+            background:
+
+                radial-gradient(
+                    circle at 88% 8%,
+                    rgba(
+                        37,
+                        99,
+                        235,
+                        .07
+                    ),
+                    transparent 26%
+                ),
+
+                linear-gradient(
+                    180deg,
+                    #fafdff 0,
+                    var(--dash-bg) 520px
+                );
+
+        }
+
+
+        .dashboard-page {
+
+            width:
+                100%;
+
+            min-height:
+                100vh;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | HEADER
+        |--------------------------------------------------------------------------
+        */
+
+        .dashboard-header {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                space-between;
+
+            gap:
+                20px;
+
+            min-height:
+                86px;
 
             padding:
-                13px
-                17px;
+                18px 42px;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .90
+                );
+
+            border-bottom:
+                1px solid var(--dash-border);
+
+            backdrop-filter:
+                blur(18px);
+
+        }
+
+
+        .dashboard-header-left {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            gap:
+                14px;
+
         }
 
 
         .dashboard-title {
 
-            font-size: 21px;
+            margin:
+                0;
+
+            color:
+                var(--dash-text);
+
+            font-size:
+                24px;
+
+            font-weight:
+                850;
+
+            letter-spacing:
+                -.6px;
+
+        }
+
+
+        .dashboard-subtitle {
+
+            margin:
+                4px 0 0;
+
+            color:
+                var(--dash-muted);
+
+            font-size:
+                12px;
+
+        }
+
+
+        .dashboard-header-right {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            gap:
+                10px;
+
         }
 
 
         .dashboard-header-user {
 
-            padding: 4px;
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            gap:
+                9px;
+
+            padding:
+                8px 12px;
+
+            border:
+                1px solid var(--dash-border);
+
+            border-radius:
+                12px;
+
+            background:
+                #fff;
+
+            color:
+                var(--dash-text);
+
+            font-size:
+                12px;
+
+            font-weight:
+                750;
+
         }
 
 
-        .dashboard-user-info {
+        .dashboard-header-user-icon {
 
-            display: none;
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            width:
+                30px;
+
+            height:
+                30px;
+
+            border-radius:
+                9px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--dash-blue),
+                    var(--dash-indigo)
+                );
+
+            color:
+                #fff;
+
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | CONTENT
+        |--------------------------------------------------------------------------
+        */
 
         .dashboard-content {
 
             width:
-                calc(100% - 24px);
+                calc(100% - 72px);
 
-            padding-top: 18px;
+            max-width:
+                1420px;
+
+            margin:
+                0 auto;
+
+            padding:
+                28px 0 42px;
+
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | HERO
+        |--------------------------------------------------------------------------
+        */
 
         .dashboard-hero {
 
-            align-items:
-                flex-start;
+            position:
+                relative;
 
-            flex-direction:
-                column;
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                space-between;
+
+            gap:
+                25px;
+
+            overflow:
+                hidden;
 
             padding:
-                24px
-                22px;
+                29px 32px;
+
+            border:
+                1px solid rgba(
+                    255,
+                    255,
+                    255,
+                    .16
+                );
 
             border-radius:
-                20px;
-        }
+                22px;
 
+            background:
 
-        .dashboard-hero-actions {
+                radial-gradient(
+                    circle at 92% 15%,
+                    rgba(
+                        125,
+                        211,
+                        252,
+                        .24
+                    ),
+                    transparent 25%
+                ),
 
-            width: 100%;
-        }
+                radial-gradient(
+                    circle at 70% 120%,
+                    rgba(
+                        129,
+                        140,
+                        248,
+                        .22
+                    ),
+                    transparent 35%
+                ),
 
-
-        .hero-button {
-
-            flex: 1;
-        }
-
-
-        .quick-grid {
-
-            grid-template-columns:
-                repeat(
-                    2,
-                    minmax(0, 1fr)
+                linear-gradient(
+                    135deg,
+                    #123b92 0%,
+                    #2563eb 45%,
+                    #4f46e5 100%
                 );
-        }
 
-    }
+            box-shadow:
+                0 18px 42px rgba(
+                    37,
+                    99,
+                    235,
+                    .18
+                );
 
-
-    @media (max-width: 500px) {
-
-        .dashboard-stats-grid {
-
-            grid-template-columns:
-                1fr;
-        }
-
-
-        .attention-grid {
-
-            grid-template-columns:
-                1fr;
         }
 
 
-        .quick-grid {
+        .dashboard-hero::before {
 
-            grid-template-columns:
-                1fr;
+            content:
+                "";
+
+            position:
+                absolute;
+
+            width:
+                240px;
+
+            height:
+                240px;
+
+            right:
+                -80px;
+
+            top:
+                -130px;
+
+            border-radius:
+                50%;
+
+            border:
+                1px solid rgba(
+                    255,
+                    255,
+                    255,
+                    .13
+                );
+
+            box-shadow:
+                0 0 0 30px rgba(
+                    255,
+                    255,
+                    255,
+                    .025
+                );
+
         }
 
 
-        .dashboard-section-title {
+        .dashboard-hero-content {
+
+            position:
+                relative;
+
+            z-index:
+                1;
+
+            max-width:
+                750px;
+
+        }
+
+
+        .dashboard-hero-kicker {
+
+            display:
+                inline-flex;
 
             align-items:
-                flex-start;
+                center;
 
-            flex-direction:
-                column;
+            gap:
+                7px;
+
+            padding:
+                6px 10px;
+
+            border:
+                1px solid rgba(
+                    255,
+                    255,
+                    255,
+                    .18
+                );
+
+            border-radius:
+                999px;
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .10
+                );
+
+            color:
+                #dbeafe;
+
+            font-size:
+                9px;
+
+            font-weight:
+                800;
+
+            letter-spacing:
+                .7px;
+
+            text-transform:
+                uppercase;
+
+        }
+
+
+        .dashboard-hero-kicker-dot {
+
+            width:
+                6px;
+
+            height:
+                6px;
+
+            border-radius:
+                50%;
+
+            background:
+                #67e8f9;
+
+            box-shadow:
+                0 0 0 4px rgba(
+                    103,
+                    232,
+                    249,
+                    .12
+                );
+
         }
 
 
         .dashboard-hero h2 {
 
+            margin:
+                12px 0 0;
+
+            color:
+                #fff;
+
             font-size:
-                27px;
+                29px;
+
+            line-height:
+                1.15;
+
+            font-weight:
+                850;
+
+            letter-spacing:
+                -.8px;
+
         }
 
 
         .dashboard-hero p {
 
+            max-width:
+                650px;
+
+            margin:
+                8px 0 0;
+
+            color:
+                #dbeafe;
+
             font-size:
-                11px;
+                12px;
+
+            line-height:
+                1.6;
+
         }
 
-    }
+
+        .dashboard-hero-actions {
+
+            position:
+                relative;
+
+            z-index:
+                2;
+
+            display:
+                flex;
+
+            gap:
+                9px;
+
+            flex-shrink:
+                0;
+
+        }
+
+
+        .hero-button {
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            min-height:
+                39px;
+
+            padding:
+                0 15px;
+
+            border-radius:
+                10px;
+
+            text-decoration:
+                none;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+            transition:
+                .18s ease;
+
+        }
+
+
+        .hero-button:hover {
+
+            transform:
+                translateY(-2px);
+
+        }
+
+
+        .hero-button.primary {
+
+            background:
+                #fff;
+
+            color:
+                var(--dash-blue-dark);
+
+            box-shadow:
+                0 7px 20px rgba(
+                    15,
+                    23,
+                    42,
+                    .15
+                );
+
+        }
+
+
+        .hero-button.ghost {
+
+            border:
+                1px solid rgba(
+                    255,
+                    255,
+                    255,
+                    .25
+                );
+
+            background:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    .09
+                );
+
+            color:
+                #fff;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SECTION TITLE
+        |--------------------------------------------------------------------------
+        */
+
+        .dashboard-section-title {
+
+            display:
+                flex;
+
+            align-items:
+                flex-end;
+
+            justify-content:
+                space-between;
+
+            margin:
+                28px 0 13px;
+
+        }
+
+
+        .dashboard-section-title h2 {
+
+            margin:
+                0;
+
+            color:
+                var(--dash-text);
+
+            font-size:
+                16px;
+
+            font-weight:
+                850;
+
+            letter-spacing:
+                -.25px;
+
+        }
+
+
+        .dashboard-section-title p {
+
+            margin:
+                3px 0 0;
+
+            color:
+                var(--dash-muted);
+
+            font-size:
+                10px;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | STATS
+        |--------------------------------------------------------------------------
+        */
+
+        .dashboard-stats-grid {
+
+            display:
+                grid;
+
+            grid-template-columns:
+                repeat(
+                    4,
+                    minmax(
+                        0,
+                        1fr
+                    )
+                );
+
+            gap:
+                13px;
+
+        }
+
+
+        .dashboard-stat-card {
+
+            position:
+                relative;
+
+            min-height:
+                142px;
+
+            padding:
+                18px;
+
+            overflow:
+                hidden;
+
+            border:
+                1px solid var(--dash-border);
+
+            border-radius:
+                17px;
+
+            background:
+                #fff;
+
+            box-shadow:
+                0 8px 26px rgba(
+                    15,
+                    23,
+                    42,
+                    .045
+                );
+
+            transition:
+                .2s ease;
+
+        }
+
+
+        .dashboard-stat-card::after {
+
+            content:
+                "";
+
+            position:
+                absolute;
+
+            width:
+                105px;
+
+            height:
+                105px;
+
+            right:
+                -44px;
+
+            bottom:
+                -51px;
+
+            border-radius:
+                50%;
+
+            background:
+                rgba(
+                    37,
+                    99,
+                    235,
+                    .07
+                );
+
+        }
+
+
+        .dashboard-stat-card:hover,
+        .dashboard-stat-active {
+
+            transform:
+                translateY(-3px);
+
+            border-color:
+                #d2def6;
+
+            box-shadow:
+                0 16px 34px rgba(
+                    15,
+                    23,
+                    42,
+                    .08
+                );
+
+        }
+
+
+        .dashboard-stat-top {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                space-between;
+
+        }
+
+
+        .dashboard-stat-icon {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            width:
+                36px;
+
+            height:
+                36px;
+
+            border-radius:
+                11px;
+
+        }
+
+
+        .dashboard-stat-icon svg {
+
+            width:
+                18px;
+
+            height:
+                18px;
+
+            fill:
+                none;
+
+            stroke:
+                currentColor;
+
+            stroke-width:
+                1.8;
+
+            stroke-linecap:
+                round;
+
+            stroke-linejoin:
+                round;
+
+        }
+
+
+        .stat-blue {
+
+            background:
+                #eaf2ff;
+
+            color:
+                #2563eb;
+
+        }
+
+
+        .stat-sky {
+
+            background:
+                #e8f8ff;
+
+            color:
+                #0284c7;
+
+        }
+
+
+        .stat-cyan {
+
+            background:
+                #e7fbff;
+
+            color:
+                #0891b2;
+
+        }
+
+
+        .stat-indigo {
+
+            background:
+                #eef2ff;
+
+            color:
+                #4f46e5;
+
+        }
+
+
+        .stat-purple {
+
+            background:
+                #f0edff;
+
+            color:
+                #6366f1;
+
+        }
+
+
+        .stat-green {
+
+            background:
+                #eafaf3;
+
+            color:
+                #059669;
+
+        }
+
+
+        .stat-orange {
+
+            background:
+                #fff7df;
+
+            color:
+                #d97706;
+
+        }
+
+
+        .stat-teal {
+
+            background:
+                #e8fffb;
+
+            color:
+                #0f766e;
+
+        }
+
+
+        .dashboard-stat-label {
+
+            margin-top:
+                13px;
+
+            color:
+                var(--dash-muted);
+
+            font-size:
+                10px;
+
+            font-weight:
+                650;
+
+        }
+
+
+        .dashboard-stat-value {
+
+            margin-top:
+                4px;
+
+            color:
+                var(--dash-text);
+
+            font-size:
+                25px;
+
+            line-height:
+                1.1;
+
+            font-weight:
+                900;
+
+            letter-spacing:
+                -.7px;
+
+        }
+
+
+        .dashboard-stat-meta {
+
+            margin-top:
+                6px;
+
+            color:
+                #9aa7b8;
+
+            font-size:
+                9px;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ATTENTION
+        |--------------------------------------------------------------------------
+        */
+
+        .attention-grid {
+
+            display:
+                grid;
+
+            grid-template-columns:
+                repeat(
+                    4,
+                    minmax(
+                        0,
+                        1fr
+                    )
+                );
+
+            gap:
+                11px;
+
+        }
+
+
+        .attention-card {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            gap:
+                10px;
+
+            min-height:
+                68px;
+
+            padding:
+                12px;
+
+            border:
+                1px solid var(--dash-border);
+
+            border-radius:
+                13px;
+
+            background:
+                #fff;
+
+            text-decoration:
+                none;
+
+            transition:
+                .18s ease;
+
+        }
+
+
+        .attention-card:hover {
+
+            transform:
+                translateY(-2px);
+
+            border-color:
+                #c9d9f5;
+
+            box-shadow:
+                0 10px 24px rgba(
+                    15,
+                    23,
+                    42,
+                    .06
+                );
+
+        }
+
+
+        .attention-icon {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            width:
+                34px;
+
+            height:
+                34px;
+
+            flex:
+                0 0 34px;
+
+            border-radius:
+                10px;
+
+        }
+
+
+        .attention-icon svg {
+
+            width:
+                16px;
+
+            height:
+                16px;
+
+            fill:
+                none;
+
+            stroke:
+                currentColor;
+
+            stroke-width:
+                1.8;
+
+            stroke-linecap:
+                round;
+
+            stroke-linejoin:
+                round;
+
+        }
+
+
+        .attention-order {
+
+            background:
+                #eaf2ff;
+
+            color:
+                #2563eb;
+
+        }
+
+
+        .attention-payment {
+
+            background:
+                #e8f8ff;
+
+            color:
+                #0284c7;
+
+        }
+
+
+        .attention-review {
+
+            background:
+                #eef2ff;
+
+            color:
+                #4f46e5;
+
+        }
+
+
+        .attention-vendor {
+
+            background:
+                #e8fffb;
+
+            color:
+                #0f766e;
+
+        }
+
+
+        .attention-info {
+
+            display:
+                flex;
+
+            flex-direction:
+                column;
+
+            min-width:
+                0;
+
+        }
+
+
+        .attention-info strong {
+
+            color:
+                var(--dash-text);
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .attention-info span {
+
+            margin-top:
+                2px;
+
+            color:
+                #9aa7b8;
+
+            font-size:
+                8px;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | QUICK MANAGEMENT
+        |--------------------------------------------------------------------------
+        */
+
+        .quick-grid {
+
+            display:
+                grid;
+
+            grid-template-columns:
+                repeat(
+                    4,
+                    minmax(
+                        0,
+                        1fr
+                    )
+                );
+
+            gap:
+                12px;
+
+        }
+
+
+        .quick-card {
+
+            position:
+                relative;
+
+            display:
+                block;
+
+            min-height:
+                118px;
+
+            padding:
+                16px;
+
+            overflow:
+                hidden;
+
+            border:
+                1px solid var(--dash-border);
+
+            border-radius:
+                15px;
+
+            background:
+                #fff;
+
+            text-decoration:
+                none;
+
+            box-shadow:
+                0 6px 20px rgba(
+                    15,
+                    23,
+                    42,
+                    .035
+                );
+
+            transition:
+                .18s ease;
+
+        }
+
+
+        .quick-card::after {
+
+            content:
+                "→";
+
+            position:
+                absolute;
+
+            right:
+                13px;
+
+            top:
+                13px;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            width:
+                23px;
+
+            height:
+                23px;
+
+            border-radius:
+                7px;
+
+            background:
+                #f4f7fb;
+
+            color:
+                #9aa7b8;
+
+            font-size:
+                11px;
+
+            transition:
+                .18s ease;
+
+        }
+
+
+        .quick-card:hover {
+
+            transform:
+                translateY(-3px);
+
+            border-color:
+                #cbd9f4;
+
+            box-shadow:
+                0 15px 32px rgba(
+                    15,
+                    23,
+                    42,
+                    .075
+                );
+
+        }
+
+
+        .quick-card:hover::after {
+
+            background:
+                var(--dash-blue);
+
+            color:
+                #fff;
+
+        }
+
+
+        .quick-icon {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            width:
+                34px;
+
+            height:
+                34px;
+
+            margin-bottom:
+                12px;
+
+            border-radius:
+                10px;
+
+        }
+
+
+        .quick-icon svg {
+
+            width:
+                16px;
+
+            height:
+                16px;
+
+            fill:
+                none;
+
+            stroke:
+                currentColor;
+
+            stroke-width:
+                1.8;
+
+            stroke-linecap:
+                round;
+
+            stroke-linejoin:
+                round;
+
+        }
+
+
+        .quick-blue {
+
+            background:
+                #eaf2ff;
+
+            color:
+                #2563eb;
+
+        }
+
+
+        .quick-sky {
+
+            background:
+                #e8f8ff;
+
+            color:
+                #0284c7;
+
+        }
+
+
+        .quick-cyan {
+
+            background:
+                #e7fbff;
+
+            color:
+                #0891b2;
+
+        }
+
+
+        .quick-indigo {
+
+            background:
+                #eef2ff;
+
+            color:
+                #4f46e5;
+
+        }
+
+
+        .quick-green {
+
+            background:
+                #eafaf3;
+
+            color:
+                #059669;
+
+        }
+
+
+        .quick-violet {
+
+            background:
+                #f0edff;
+
+            color:
+                #6366f1;
+
+        }
+
+
+        .quick-teal {
+
+            background:
+                #e8fffb;
+
+            color:
+                #0f766e;
+
+        }
+
+
+        .quick-card-title {
+
+            color:
+                var(--dash-text);
+
+            font-size:
+                11px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .quick-card-description {
+
+            max-width:
+                220px;
+
+            margin-top:
+                5px;
+
+            color:
+                #8a98aa;
+
+            font-size:
+                8px;
+
+            line-height:
+                1.45;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | BOTTOM GRID
+        |--------------------------------------------------------------------------
+        */
+
+        .dashboard-bottom-grid {
+
+            display:
+                grid;
+
+            grid-template-columns:
+                minmax(
+                    0,
+                    1.55fr
+                )
+                minmax(
+                    320px,
+                    .85fr
+                );
+
+            gap:
+                13px;
+
+            margin-top:
+                22px;
+
+        }
+
+
+        .dashboard-panel {
+
+            overflow:
+                hidden;
+
+            border:
+                1px solid var(--dash-border);
+
+            border-radius:
+                16px;
+
+            background:
+                #fff;
+
+            box-shadow:
+                0 7px 23px rgba(
+                    15,
+                    23,
+                    42,
+                    .04
+                );
+
+        }
+
+
+        .dashboard-panel-header {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                space-between;
+
+            gap:
+                12px;
+
+            padding:
+                17px 18px;
+
+            border-bottom:
+                1px solid #edf1f6;
+
+        }
+
+
+        .dashboard-panel-header h3 {
+
+            margin:
+                0;
+
+            color:
+                var(--dash-text);
+
+            font-size:
+                12px;
+
+            font-weight:
+                850;
+
+        }
+
+
+        .dashboard-panel-header p {
+
+            margin:
+                3px 0 0;
+
+            color:
+                #9aa7b8;
+
+            font-size:
+                8px;
+
+        }
+
+
+        .dashboard-view-all {
+
+            color:
+                var(--dash-blue);
+
+            text-decoration:
+                none;
+
+            font-size:
+                8px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .dashboard-view-all:hover {
+
+            text-decoration:
+                underline;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TABLE
+        |--------------------------------------------------------------------------
+        */
+
+        .dashboard-table-wrap {
+
+            width:
+                100%;
+
+            overflow-x:
+                auto;
+
+        }
+
+
+        .dashboard-table {
+
+            width:
+                100%;
+
+            min-width:
+                530px;
+
+            border-collapse:
+                collapse;
+
+        }
+
+
+        .dashboard-table th {
+
+            padding:
+                10px 14px;
+
+            background:
+                #f8faff;
+
+            border-bottom:
+                1px solid #edf1f6;
+
+            color:
+                #8a98aa;
+
+            font-size:
+                7px;
+
+            font-weight:
+                850;
+
+            letter-spacing:
+                .6px;
+
+            text-align:
+                left;
+
+            text-transform:
+                uppercase;
+
+        }
+
+
+        .dashboard-table td {
+
+            padding:
+                12px 14px;
+
+            border-bottom:
+                1px solid #f0f3f7;
+
+            color:
+                var(--dash-text);
+
+            font-size:
+                9px;
+
+            vertical-align:
+                middle;
+
+        }
+
+
+        .dashboard-table tbody tr:last-child td {
+
+            border-bottom:
+                0;
+
+        }
+
+
+        .dashboard-table tbody tr {
+
+            transition:
+                .15s ease;
+
+        }
+
+
+        .dashboard-table tbody tr:hover {
+
+            background:
+                #fbfdff;
+
+        }
+
+
+        .dashboard-order-id {
+
+            color:
+                var(--dash-blue);
+
+            font-weight:
+                800;
+
+        }
+
+
+        .dashboard-customer {
+
+            display:
+                block;
+
+            max-width:
+                150px;
+
+            overflow:
+                hidden;
+
+            text-overflow:
+                ellipsis;
+
+            white-space:
+                nowrap;
+
+            font-weight:
+                700;
+
+        }
+
+
+        .dashboard-order-date {
+
+            display:
+                block;
+
+            margin-top:
+                2px;
+
+            color:
+                #a0acbc;
+
+            font-size:
+                7px;
+
+        }
+
+
+        .dashboard-status {
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            min-height:
+                22px;
+
+            padding:
+                0 8px;
+
+            border-radius:
+                999px;
+
+            background:
+                #edf4ff;
+
+            color:
+                #2563eb;
+
+            font-size:
+                7px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        .dashboard-status-ready {
+
+            box-shadow:
+                inset 0 0 0 1px rgba(
+                    37,
+                    99,
+                    235,
+                    .08
+                );
+
+        }
+
+
+        .dashboard-status.status-completed {
+
+            background:
+                #eafaf3;
+
+            color:
+                #059669;
+
+        }
+
+
+        .dashboard-status.status-processing {
+
+            background:
+                #e8f8ff;
+
+            color:
+                #0284c7;
+
+        }
+
+
+        .dashboard-status.status-cancelled {
+
+            background:
+                #f1f5f9;
+
+            color:
+                #64748b;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | APPLICATION LIST
+        |--------------------------------------------------------------------------
+        */
+
+        .application-list {
+
+            padding:
+                3px 0;
+
+        }
+
+
+        .application-item {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            gap:
+                10px;
+
+            padding:
+                12px 17px;
+
+            border-bottom:
+                1px solid #f0f3f7;
+
+        }
+
+
+        .application-item:last-child {
+
+            border-bottom:
+                0;
+
+        }
+
+
+        .application-avatar {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            width:
+                34px;
+
+            height:
+                34px;
+
+            flex:
+                0 0 34px;
+
+            border-radius:
+                10px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #eaf2ff,
+                    #eef2ff
+                );
+
+            color:
+                #3657c8;
+
+            font-size:
+                11px;
+
+            font-weight:
+                850;
+
+        }
+
+
+        .application-info {
+
+            min-width:
+                0;
+
+            flex:
+                1;
+
+        }
+
+
+        .application-info strong {
+
+            display:
+                block;
+
+            overflow:
+                hidden;
+
+            color:
+                var(--dash-text);
+
+            font-size:
+                9px;
+
+            font-weight:
+                800;
+
+            text-overflow:
+                ellipsis;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        .application-info span {
+
+            display:
+                block;
+
+            overflow:
+                hidden;
+
+            margin-top:
+                3px;
+
+            color:
+                #9aa7b8;
+
+            font-size:
+                7px;
+
+            text-overflow:
+                ellipsis;
+
+            white-space:
+                nowrap;
+
+        }
+
+
+        .application-status {
+
+            padding:
+                5px 7px;
+
+            border-radius:
+                999px;
+
+            background:
+                #eaf2ff;
+
+            color:
+                #2563eb;
+
+            font-size:
+                7px;
+
+            font-weight:
+                800;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | EMPTY STATE
+        |--------------------------------------------------------------------------
+        */
+
+        .dashboard-empty {
+
+            padding:
+                30px 15px;
+
+            color:
+                #9aa7b8;
+
+            font-size:
+                9px;
+
+            text-align:
+                center;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ERROR
+        |--------------------------------------------------------------------------
+        */
+
+        .dashboard-error {
+
+            margin-top:
+                16px;
+
+            padding:
+                12px 15px;
+
+            border:
+                1px solid #dbeafe;
+
+            border-radius:
+                11px;
+
+            background:
+                #eff6ff;
+
+            color:
+                #1d4ed8;
+
+            font-size:
+                10px;
+
+            font-weight:
+                650;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FOOTER
+        |--------------------------------------------------------------------------
+        */
+
+        .dashboard-footer {
+
+            padding:
+                20px 0 4px;
+
+            color:
+                #9aa7b8;
+
+            font-size:
+                8px;
+
+            text-align:
+                center;
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSIVE
+        |--------------------------------------------------------------------------
+        */
+
+        @media (max-width: 1250px) {
+
+            .dashboard-stats-grid {
+
+                grid-template-columns:
+                    repeat(
+                        4,
+                        minmax(
+                            0,
+                            1fr
+                        )
+                    );
+
+            }
+
+
+            .quick-grid {
+
+                grid-template-columns:
+                    repeat(
+                        2,
+                        minmax(
+                            0,
+                            1fr
+                        )
+                    );
+
+            }
+
+
+            .attention-grid {
+
+                grid-template-columns:
+                    repeat(
+                        2,
+                        minmax(
+                            0,
+                            1fr
+                        )
+                    );
+
+            }
+
+        }
+
+
+        @media (max-width: 1000px) {
+
+            .dashboard-content {
+
+                width:
+                    calc(100% - 40px);
+
+            }
+
+
+            .dashboard-header {
+
+                padding:
+                    16px 25px;
+
+            }
+
+
+            .dashboard-bottom-grid {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
+        }
+
+
+        @media (max-width: 760px) {
+
+            .dashboard-header {
+
+                min-height:
+                    72px;
+
+                padding:
+                    13px 17px;
+
+            }
+
+
+            .dashboard-title {
+
+                font-size:
+                    21px;
+
+            }
+
+
+            .dashboard-header-user {
+
+                padding:
+                    5px;
+
+            }
+
+
+            .dashboard-user-info {
+
+                display:
+                    none;
+
+            }
+
+
+            .dashboard-content {
+
+                width:
+                    calc(100% - 24px);
+
+                padding-top:
+                    18px;
+
+            }
+
+
+            .dashboard-hero {
+
+                align-items:
+                    flex-start;
+
+                flex-direction:
+                    column;
+
+                padding:
+                    24px 22px;
+
+                border-radius:
+                    20px;
+
+            }
+
+
+            .dashboard-hero-actions {
+
+                width:
+                    100%;
+
+            }
+
+
+            .hero-button {
+
+                flex:
+                    1;
+
+            }
+
+
+            .dashboard-stats-grid {
+
+                grid-template-columns:
+                    repeat(
+                        2,
+                        minmax(
+                            0,
+                            1fr
+                        )
+                    );
+
+            }
+
+
+            .quick-grid {
+
+                grid-template-columns:
+                    repeat(
+                        2,
+                        minmax(
+                            0,
+                            1fr
+                        )
+                    );
+
+            }
+
+        }
+
+
+        @media (max-width: 500px) {
+
+            .dashboard-stats-grid {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
+
+            .attention-grid {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
+
+            .quick-grid {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
+
+            .dashboard-section-title {
+
+                align-items:
+                    flex-start;
+
+                flex-direction:
+                    column;
+
+            }
+
+
+            .dashboard-hero h2 {
+
+                font-size:
+                    26px;
+
+            }
+
+
+            .dashboard-hero p {
+
+                font-size:
+                    10px;
+
+            }
+
+
+            .dashboard-header {
+
+                padding:
+                    12px;
+
+            }
+
+        }
 
     </style>
+
 
 </head>
 
@@ -2336,125 +3282,118 @@ try {
 <body>
 
 
-<div class="admin-wrapper">
+<div
+    class="admin-wrapper dashboard-page"
+>
 
+
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
 
     <?php
 
-    require_once dirname(__DIR__) .
+    require_once
+        dirname(__DIR__) .
         '/includes/admin_sidebar.php';
 
     ?>
 
 
-    <!-- MAIN -->
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
 
-    <main class="admin-main admin-dashboard-main">
-
-
-        <!-- MOBILE BUTTON + HEADER -->
-
-        <header class="dashboard-header">
-
-
-            <div class="dashboard-header-left">
+    <main
+        class="admin-main admin-dashboard-main"
+    >
 
 
-                <button
-                    type="button"
-                    class="admin-mobile-toggle"
-                    onclick="openAdminSidebar()"
-                    aria-label="Open admin menu"
-                >
+        <!-- =================================================
+             HEADER
+        ================================================== -->
 
-                    <svg viewBox="0 0 24 24">
-
-                        <line
-                            x1="4"
-                            y1="6"
-                            x2="20"
-                            y2="6"
-                        ></line>
-
-                        <line
-                            x1="4"
-                            y1="12"
-                            x2="20"
-                            y2="12"
-                        ></line>
-
-                        <line
-                            x1="4"
-                            y1="18"
-                            x2="20"
-                            y2="18"
-                        ></line>
-
-                    </svg>
-
-                </button>
+        <header
+            class="dashboard-header"
+        >
 
 
-                <div class="dashboard-title-wrap">
+            <div
+                class="dashboard-header-left"
+            >
 
-                    <h1 class="dashboard-title">
+
+                <div>
+
+                    <h1
+                        class="dashboard-title"
+                    >
                         Admin Dashboard
                     </h1>
 
-                    <p class="dashboard-subtitle">
-                        Manage your HochipoHub marketplace.
+
+                    <p
+                        class="dashboard-subtitle"
+                    >
+                        Monitor your HochipoHub marketplace from one place.
                     </p>
 
                 </div>
 
+
             </div>
 
 
-            <div class="dashboard-header-user">
+            <div
+                class="dashboard-header-right"
+            >
 
 
-                <div class="dashboard-user-avatar">
-
-                    <?= adminEscape(
-                        strtoupper(
-                            substr(
-                                trim(
-                                    $adminName
-                                ) !== ''
-                                    ? trim(
-                                        $adminName
-                                    )
-                                    : 'A',
-                                0,
-                                1
-                            )
-                        )
-                    ) ?>
-
-                </div>
+                <div
+                    class="dashboard-header-user"
+                >
 
 
-                <div class="dashboard-user-info">
+                    <span
+                        class="dashboard-header-user-icon"
+                    >
 
-                    <strong>
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="15"
+                            height="15"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+
+                            <path
+                                d="M20 21a8 8 0 0 0-16 0"
+                            ></path>
+
+                            <circle
+                                cx="12"
+                                cy="7"
+                                r="4"
+                            ></circle>
+
+                        </svg>
+
+                    </span>
+
+
+                    <span>
+
                         <?= adminEscape(
                             $adminName !== ''
                                 ? $adminName
                                 : 'Administrator'
                         ) ?>
-                    </strong>
 
-                    <span>
-                        <?= adminEscape(
-                            $adminEmail !== ''
-                                ? $adminEmail
-                                : 'No email available'
-                        ) ?>
                     </span>
 
-                    <span class="dashboard-admin-badge">
-                        Administrator
-                    </span>
 
                 </div>
 
@@ -2465,20 +3404,32 @@ try {
         </header>
 
 
-        <!-- CONTENT -->
+        <!-- =================================================
+             DASHBOARD CONTENT
+        ================================================== -->
 
-        <section class="dashboard-content">
-
-
-            <!-- HERO -->
-
-            <div class="dashboard-hero">
-
-
-                <div class="dashboard-hero-content">
+        <section
+            class="dashboard-content"
+        >
 
 
-                    <div class="dashboard-hero-kicker">
+            <!-- =================================================
+                 HERO
+            ================================================== -->
+
+            <div
+                class="dashboard-hero"
+            >
+
+
+                <div
+                    class="dashboard-hero-content"
+                >
+
+
+                    <div
+                        class="dashboard-hero-kicker"
+                    >
 
                         <span
                             class="dashboard-hero-kicker-dot"
@@ -2503,8 +3454,8 @@ try {
 
                     <p>
 
-                        Everything you need to monitor
-                        users, vendors, products, orders,
+                        Everything you need to monitor users,
+                        vendors, products, inventory, orders,
                         payments and marketplace activity
                         is right here.
 
@@ -2514,22 +3465,24 @@ try {
                 </div>
 
 
-                <div class="dashboard-hero-actions">
+                <div
+                    class="dashboard-hero-actions"
+                >
 
 
                     <a
                         href="orders.php"
-                        class="hero-button primary"
+                        class="hero-button primary dashboard-action"
                     >
                         View Orders
                     </a>
 
 
                     <a
-                        href="payments.php"
-                        class="hero-button ghost"
+                        href="inventory.php"
+                        class="hero-button ghost dashboard-action"
                     >
-                        Payments
+                        Inventory
                     </a>
 
 
@@ -2539,9 +3492,13 @@ try {
             </div>
 
 
-            <?php if ($dashboardError !== null): ?>
+            <?php if (
+                $dashboardError !== null
+            ): ?>
 
-                <div class="dashboard-error">
+                <div
+                    class="dashboard-error"
+                >
 
                     <?= adminEscape(
                         $dashboardError
@@ -2553,10 +3510,12 @@ try {
 
 
             <!-- =================================================
-                 OVERVIEW
+                 MARKETPLACE OVERVIEW
             ================================================== -->
 
-            <div class="dashboard-section-title">
+            <div
+                class="dashboard-section-title"
+            >
 
                 <div>
 
@@ -2573,16 +3532,24 @@ try {
             </div>
 
 
-            <div class="dashboard-stats-grid">
+            <div
+                class="dashboard-stats-grid"
+            >
 
 
                 <!-- USERS -->
 
-                <div class="dashboard-stat-card">
+                <div
+                    class="dashboard-stat dashboard-stat-card"
+                >
 
-                    <div class="dashboard-stat-top">
+                    <div
+                        class="dashboard-stat-top"
+                    >
 
-                        <div class="dashboard-stat-icon stat-red">
+                        <div
+                            class="dashboard-stat-icon stat-blue"
+                        >
 
                             <svg viewBox="0 0 24 24">
 
@@ -2611,19 +3578,25 @@ try {
                     </div>
 
 
-                    <div class="dashboard-stat-label">
+                    <div
+                        class="dashboard-stat-label"
+                    >
                         Total Users
                     </div>
 
-                    <div class="dashboard-stat-value">
 
+                    <div
+                        class="dashboard-stat-value"
+                    >
                         <?= number_format(
                             $dashboardStats['users']
                         ) ?>
-
                     </div>
 
-                    <div class="dashboard-stat-meta">
+
+                    <div
+                        class="dashboard-stat-meta"
+                    >
                         Customers & vendors
                     </div>
 
@@ -2632,11 +3605,17 @@ try {
 
                 <!-- VENDORS -->
 
-                <div class="dashboard-stat-card">
+                <div
+                    class="dashboard-stat dashboard-stat-card"
+                >
 
-                    <div class="dashboard-stat-top">
+                    <div
+                        class="dashboard-stat-top"
+                    >
 
-                        <div class="dashboard-stat-icon stat-blue">
+                        <div
+                            class="dashboard-stat-icon stat-sky"
+                        >
 
                             <svg viewBox="0 0 24 24">
 
@@ -2663,19 +3642,25 @@ try {
                     </div>
 
 
-                    <div class="dashboard-stat-label">
+                    <div
+                        class="dashboard-stat-label"
+                    >
                         Vendors
                     </div>
 
-                    <div class="dashboard-stat-value">
 
+                    <div
+                        class="dashboard-stat-value"
+                    >
                         <?= number_format(
                             $dashboardStats['vendors']
                         ) ?>
-
                     </div>
 
-                    <div class="dashboard-stat-meta">
+
+                    <div
+                        class="dashboard-stat-meta"
+                    >
                         Marketplace sellers
                     </div>
 
@@ -2684,16 +3669,22 @@ try {
 
                 <!-- PRODUCTS -->
 
-                <div class="dashboard-stat-card">
+                <div
+                    class="dashboard-stat dashboard-stat-card"
+                >
 
-                    <div class="dashboard-stat-top">
+                    <div
+                        class="dashboard-stat-top"
+                    >
 
-                        <div class="dashboard-stat-icon stat-purple">
+                        <div
+                            class="dashboard-stat-icon stat-indigo"
+                        >
 
                             <svg viewBox="0 0 24 24">
 
                                 <path
-                                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 2 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
                                 ></path>
 
                                 <polyline
@@ -2714,19 +3705,25 @@ try {
                     </div>
 
 
-                    <div class="dashboard-stat-label">
+                    <div
+                        class="dashboard-stat-label"
+                    >
                         Products
                     </div>
 
-                    <div class="dashboard-stat-value">
 
+                    <div
+                        class="dashboard-stat-value"
+                    >
                         <?= number_format(
                             $dashboardStats['products']
                         ) ?>
-
                     </div>
 
-                    <div class="dashboard-stat-meta">
+
+                    <div
+                        class="dashboard-stat-meta"
+                    >
                         Listed marketplace items
                     </div>
 
@@ -2735,11 +3732,17 @@ try {
 
                 <!-- ORDERS -->
 
-                <div class="dashboard-stat-card">
+                <div
+                    class="dashboard-stat dashboard-stat-card"
+                >
 
-                    <div class="dashboard-stat-top">
+                    <div
+                        class="dashboard-stat-top"
+                    >
 
-                        <div class="dashboard-stat-icon stat-green">
+                        <div
+                            class="dashboard-stat-icon stat-cyan"
+                        >
 
                             <svg viewBox="0 0 24 24">
 
@@ -2766,19 +3769,25 @@ try {
                     </div>
 
 
-                    <div class="dashboard-stat-label">
+                    <div
+                        class="dashboard-stat-label"
+                    >
                         Orders
                     </div>
 
-                    <div class="dashboard-stat-value">
 
+                    <div
+                        class="dashboard-stat-value"
+                    >
                         <?= number_format(
                             $dashboardStats['orders']
                         ) ?>
-
                     </div>
 
-                    <div class="dashboard-stat-meta">
+
+                    <div
+                        class="dashboard-stat-meta"
+                    >
                         <?= number_format(
                             $pendingOrders
                         ) ?>
@@ -2790,11 +3799,17 @@ try {
 
                 <!-- REVENUE -->
 
-                <div class="dashboard-stat-card">
+                <div
+                    class="dashboard-stat dashboard-stat-card"
+                >
 
-                    <div class="dashboard-stat-top">
+                    <div
+                        class="dashboard-stat-top"
+                    >
 
-                        <div class="dashboard-stat-icon stat-orange">
+                        <div
+                            class="dashboard-stat-icon stat-blue"
+                        >
 
                             <svg viewBox="0 0 24 24">
 
@@ -2816,11 +3831,16 @@ try {
                     </div>
 
 
-                    <div class="dashboard-stat-label">
+                    <div
+                        class="dashboard-stat-label"
+                    >
                         Marketplace Revenue
                     </div>
 
-                    <div class="dashboard-stat-value">
+
+                    <div
+                        class="dashboard-stat-value"
+                    >
 
                         RM
                         <?= number_format(
@@ -2830,8 +3850,11 @@ try {
 
                     </div>
 
-                    <div class="dashboard-stat-meta">
-                        Excludes cancelled orders
+
+                    <div
+                        class="dashboard-stat-meta"
+                    >
+                        Completed orders
                     </div>
 
                 </div>
@@ -2839,11 +3862,17 @@ try {
 
                 <!-- CUSTOMERS -->
 
-                <div class="dashboard-stat-card">
+                <div
+                    class="dashboard-stat dashboard-stat-card"
+                >
 
-                    <div class="dashboard-stat-top">
+                    <div
+                        class="dashboard-stat-top"
+                    >
 
-                        <div class="dashboard-stat-icon stat-blue">
+                        <div
+                            class="dashboard-stat-icon stat-sky"
+                        >
 
                             <svg viewBox="0 0 24 24">
 
@@ -2864,19 +3893,25 @@ try {
                     </div>
 
 
-                    <div class="dashboard-stat-label">
+                    <div
+                        class="dashboard-stat-label"
+                    >
                         Customers
                     </div>
 
-                    <div class="dashboard-stat-value">
 
+                    <div
+                        class="dashboard-stat-value"
+                    >
                         <?= number_format(
                             $dashboardStats['customers']
                         ) ?>
-
                     </div>
 
-                    <div class="dashboard-stat-meta">
+
+                    <div
+                        class="dashboard-stat-meta"
+                    >
                         Registered customers
                     </div>
 
@@ -2885,11 +3920,17 @@ try {
 
                 <!-- PAYMENTS -->
 
-                <div class="dashboard-stat-card">
+                <div
+                    class="dashboard-stat dashboard-stat-card"
+                >
 
-                    <div class="dashboard-stat-top">
+                    <div
+                        class="dashboard-stat-top"
+                    >
 
-                        <div class="dashboard-stat-icon stat-green">
+                        <div
+                            class="dashboard-stat-icon stat-cyan"
+                        >
 
                             <svg viewBox="0 0 24 24">
 
@@ -2915,19 +3956,25 @@ try {
                     </div>
 
 
-                    <div class="dashboard-stat-label">
+                    <div
+                        class="dashboard-stat-label"
+                    >
                         Payments
                     </div>
 
-                    <div class="dashboard-stat-value">
 
+                    <div
+                        class="dashboard-stat-value"
+                    >
                         <?= number_format(
                             $dashboardStats['payments']
                         ) ?>
-
                     </div>
 
-                    <div class="dashboard-stat-meta">
+
+                    <div
+                        class="dashboard-stat-meta"
+                    >
                         <?= number_format(
                             $pendingPayments
                         ) ?>
@@ -2939,11 +3986,17 @@ try {
 
                 <!-- REVIEWS -->
 
-                <div class="dashboard-stat-card">
+                <div
+                    class="dashboard-stat dashboard-stat-card"
+                >
 
-                    <div class="dashboard-stat-top">
+                    <div
+                        class="dashboard-stat-top"
+                    >
 
-                        <div class="dashboard-stat-icon stat-red">
+                        <div
+                            class="dashboard-stat-icon stat-indigo"
+                        >
 
                             <svg viewBox="0 0 24 24">
 
@@ -2958,23 +4011,172 @@ try {
                     </div>
 
 
-                    <div class="dashboard-stat-label">
+                    <div
+                        class="dashboard-stat-label"
+                    >
                         Reviews
                     </div>
 
-                    <div class="dashboard-stat-value">
 
+                    <div
+                        class="dashboard-stat-value"
+                    >
                         <?= number_format(
                             $dashboardStats['reviews']
                         ) ?>
-
                     </div>
 
-                    <div class="dashboard-stat-meta">
+
+                    <div
+                        class="dashboard-stat-meta"
+                    >
                         <?= number_format(
                             $hiddenReviews
                         ) ?>
                         hidden
+                    </div>
+
+                </div>
+
+
+                <!-- CATEGORIES -->
+
+                <div
+                    class="dashboard-stat dashboard-stat-card"
+                >
+
+                    <div
+                        class="dashboard-stat-top"
+                    >
+
+                        <div
+                            class="dashboard-stat-icon stat-purple"
+                        >
+
+                            <svg viewBox="0 0 24 24">
+
+                                <rect
+                                    x="4"
+                                    y="4"
+                                    width="6"
+                                    height="6"
+                                    rx="1"
+                                ></rect>
+
+                                <rect
+                                    x="14"
+                                    y="4"
+                                    width="6"
+                                    height="6"
+                                    rx="1"
+                                ></rect>
+
+                                <rect
+                                    x="4"
+                                    y="14"
+                                    width="6"
+                                    height="6"
+                                    rx="1"
+                                ></rect>
+
+                                <rect
+                                    x="14"
+                                    y="14"
+                                    width="6"
+                                    height="6"
+                                    rx="1"
+                                ></rect>
+
+                            </svg>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        class="dashboard-stat-label"
+                    >
+                        Categories
+                    </div>
+
+
+                    <div
+                        class="dashboard-stat-value"
+                    >
+                        <?= number_format(
+                            $dashboardStats['categories']
+                        ) ?>
+                    </div>
+
+
+                    <div
+                        class="dashboard-stat-meta"
+                    >
+                        Product categories
+                    </div>
+
+                </div>
+
+
+                <!-- INVENTORY -->
+
+                <div
+                    class="dashboard-stat dashboard-stat-card"
+                >
+
+                    <div
+                        class="dashboard-stat-top"
+                    >
+
+                        <div
+                            class="dashboard-stat-icon stat-teal"
+                        >
+
+                            <svg viewBox="0 0 24 24">
+
+                                <path
+                                    d="M21 8l-9-5-9 5 9 5 9-5z"
+                                ></path>
+
+                                <path
+                                    d="M3 8v8l9 5 9-5V8"
+                                ></path>
+
+                                <path
+                                    d="M12 13v8"
+                                ></path>
+
+                            </svg>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        class="dashboard-stat-label"
+                    >
+                        Inventory
+                    </div>
+
+
+                    <div
+                        class="dashboard-stat-value"
+                    >
+                        <?= number_format(
+                            $dashboardStats['inventory']
+                        ) ?>
+                    </div>
+
+
+                    <div
+                        class="dashboard-stat-meta"
+                    >
+                        <?= number_format(
+                            $lowStockProducts
+                        ) ?>
+                        low stock
                     </div>
 
                 </div>
@@ -2987,7 +4189,9 @@ try {
                  ATTENTION
             ================================================== -->
 
-            <div class="dashboard-section-title">
+            <div
+                class="dashboard-section-title"
+            >
 
                 <div>
 
@@ -3004,44 +4208,48 @@ try {
             </div>
 
 
-            <div class="attention-grid">
+            <div
+                class="attention-grid"
+            >
 
+
+                <!-- PENDING ORDERS -->
 
                 <a
                     href="orders.php"
-                    class="attention-card"
+                    class="attention-card dashboard-action"
                 >
 
                     <div
-                        class="attention-icon attention-warning"
+                        class="attention-icon attention-order"
                     >
 
                         <svg viewBox="0 0 24 24">
 
                             <path
-                                d="M10.3 3.2L2.2 17a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0z"
+                                d="M3 4h2l2.4 11.4a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"
                             ></path>
 
-                            <line
-                                x1="12"
-                                y1="9"
-                                x2="12"
-                                y2="13"
-                            ></line>
+                            <circle
+                                cx="9"
+                                cy="20"
+                                r="1"
+                            ></circle>
 
-                            <line
-                                x1="12"
-                                y1="17"
-                                x2="12"
-                                y2="17"
-                            ></line>
+                            <circle
+                                cx="19"
+                                cy="20"
+                                r="1"
+                            ></circle>
 
                         </svg>
 
                     </div>
 
 
-                    <div class="attention-info">
+                    <div
+                        class="attention-info"
+                    >
 
                         <strong>
                             <?= number_format(
@@ -3059,9 +4267,11 @@ try {
                 </a>
 
 
+                <!-- PENDING PAYMENTS -->
+
                 <a
                     href="payments.php"
-                    class="attention-card"
+                    class="attention-card dashboard-action"
                 >
 
                     <div
@@ -3090,7 +4300,9 @@ try {
                     </div>
 
 
-                    <div class="attention-info">
+                    <div
+                        class="attention-info"
+                    >
 
                         <strong>
                             <?= number_format(
@@ -3108,9 +4320,11 @@ try {
                 </a>
 
 
+                <!-- HIDDEN REVIEWS -->
+
                 <a
                     href="reviews.php"
-                    class="attention-card"
+                    class="attention-card dashboard-action"
                 >
 
                     <div
@@ -3128,7 +4342,9 @@ try {
                     </div>
 
 
-                    <div class="attention-info">
+                    <div
+                        class="attention-info"
+                    >
 
                         <strong>
                             <?= number_format(
@@ -3138,7 +4354,7 @@ try {
                         </strong>
 
                         <span>
-                            Manage customer reviews
+                            Manage customer feedback
                         </span>
 
                     </div>
@@ -3146,9 +4362,11 @@ try {
                 </a>
 
 
+                <!-- VENDOR APPLICATIONS -->
+
                 <a
                     href="vendors.php"
-                    class="attention-card"
+                    class="attention-card dashboard-action"
                 >
 
                     <div
@@ -3174,7 +4392,9 @@ try {
                     </div>
 
 
-                    <div class="attention-info">
+                    <div
+                        class="attention-info"
+                    >
 
                         <strong>
                             <?= number_format(
@@ -3196,10 +4416,239 @@ try {
 
 
             <!-- =================================================
+                 INVENTORY ALERT
+            ================================================== -->
+
+            <div
+                class="dashboard-section-title"
+            >
+
+                <div>
+
+                    <h2>
+                        Inventory Health
+                    </h2>
+
+                    <p>
+                        Keep an eye on marketplace stock levels.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div
+                class="attention-grid"
+            >
+
+
+                <a
+                    href="inventory.php"
+                    class="attention-card dashboard-action"
+                >
+
+                    <div
+                        class="attention-icon attention-order"
+                    >
+
+                        <svg viewBox="0 0 24 24">
+
+                            <path
+                                d="M21 8l-9-5-9 5 9 5 9-5z"
+                            ></path>
+
+                            <path
+                                d="M3 8v8l9 5 9-5V8"
+                            ></path>
+
+                        </svg>
+
+                    </div>
+
+
+                    <div
+                        class="attention-info"
+                    >
+
+                        <strong>
+                            <?= number_format(
+                                $lowStockProducts
+                            ) ?>
+                            Low Stock
+                        </strong>
+
+                        <span>
+                            Products with 1–5 units
+                        </span>
+
+                    </div>
+
+                </a>
+
+
+                <a
+                    href="inventory.php"
+                    class="attention-card dashboard-action"
+                >
+
+                    <div
+                        class="attention-icon attention-payment"
+                    >
+
+                        <svg viewBox="0 0 24 24">
+
+                            <path
+                                d="M12 3v18"
+                            ></path>
+
+                            <path
+                                d="M5 8h14"
+                            ></path>
+
+                            <path
+                                d="M5 16h14"
+                            ></path>
+
+                        </svg>
+
+                    </div>
+
+
+                    <div
+                        class="attention-info"
+                    >
+
+                        <strong>
+                            <?= number_format(
+                                $outOfStockProducts
+                            ) ?>
+                            Out of Stock
+                        </strong>
+
+                        <span>
+                            Products needing restock
+                        </span>
+
+                    </div>
+
+                </a>
+
+
+                <a
+                    href="categories.php"
+                    class="attention-card dashboard-action"
+                >
+
+                    <div
+                        class="attention-icon attention-review"
+                    >
+
+                        <svg viewBox="0 0 24 24">
+
+                            <rect
+                                x="4"
+                                y="4"
+                                width="6"
+                                height="6"
+                            ></rect>
+
+                            <rect
+                                x="14"
+                                y="4"
+                                width="6"
+                                height="6"
+                            ></rect>
+
+                            <rect
+                                x="4"
+                                y="14"
+                                width="6"
+                                height="6"
+                            ></rect>
+
+                            <rect
+                                x="14"
+                                y="14"
+                                width="6"
+                                height="6"
+                            ></rect>
+
+                        </svg>
+
+                    </div>
+
+
+                    <div
+                        class="attention-info"
+                    >
+
+                        <strong>
+                            <?= number_format(
+                                $dashboardStats['categories']
+                            ) ?>
+                            Categories
+                        </strong>
+
+                        <span>
+                            Organised marketplace catalog
+                        </span>
+
+                    </div>
+
+                </a>
+
+
+                <a
+                    href="products.php"
+                    class="attention-card dashboard-action"
+                >
+
+                    <div
+                        class="attention-icon attention-vendor"
+                    >
+
+                        <svg viewBox="0 0 24 24">
+
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                            ></path>
+
+                        </svg>
+
+                    </div>
+
+
+                    <div
+                        class="attention-info"
+                    >
+
+                        <strong>
+                            <?= number_format(
+                                $dashboardStats['products']
+                            ) ?>
+                            Products
+                        </strong>
+
+                        <span>
+                            Total marketplace listings
+                        </span>
+
+                    </div>
+
+                </a>
+
+
+            </div>
+
+
+            <!-- =================================================
                  QUICK MANAGEMENT
             ================================================== -->
 
-            <div class="dashboard-section-title">
+            <div
+                class="dashboard-section-title"
+            >
 
                 <div>
 
@@ -3216,17 +4665,21 @@ try {
             </div>
 
 
-            <div class="quick-grid">
+            <div
+                class="quick-grid"
+            >
 
 
                 <!-- USERS -->
 
                 <a
                     href="users.php"
-                    class="quick-card"
+                    class="quick-card dashboard-action"
                 >
 
-                    <div class="quick-icon quick-red">
+                    <div
+                        class="quick-icon quick-blue"
+                    >
 
                         <svg viewBox="0 0 24 24">
 
@@ -3244,12 +4697,18 @@ try {
 
                     </div>
 
-                    <div class="quick-card-title">
+
+                    <div
+                        class="quick-card-title"
+                    >
                         Manage Users
                     </div>
 
-                    <div class="quick-card-description">
-                        Manage customer, vendor and administrator accounts.
+
+                    <div
+                        class="quick-card-description"
+                    >
+                        Manage customer and administrator accounts.
                     </div>
 
                 </a>
@@ -3259,10 +4718,12 @@ try {
 
                 <a
                     href="vendors.php"
-                    class="quick-card"
+                    class="quick-card dashboard-action"
                 >
 
-                    <div class="quick-icon quick-blue">
+                    <div
+                        class="quick-icon quick-sky"
+                    >
 
                         <svg viewBox="0 0 24 24">
 
@@ -3282,12 +4743,18 @@ try {
 
                     </div>
 
-                    <div class="quick-card-title">
+
+                    <div
+                        class="quick-card-title"
+                    >
                         Manage Vendors
                     </div>
 
-                    <div class="quick-card-description">
-                        Review vendor accounts and applications.
+
+                    <div
+                        class="quick-card-description"
+                    >
+                        Review marketplace sellers and applications.
                     </div>
 
                 </a>
@@ -3297,10 +4764,12 @@ try {
 
                 <a
                     href="products.php"
-                    class="quick-card"
+                    class="quick-card dashboard-action"
                 >
 
-                    <div class="quick-icon quick-purple">
+                    <div
+                        class="quick-icon quick-indigo"
+                    >
 
                         <svg viewBox="0 0 24 24">
 
@@ -3312,12 +4781,122 @@ try {
 
                     </div>
 
-                    <div class="quick-card-title">
+
+                    <div
+                        class="quick-card-title"
+                    >
                         Manage Products
                     </div>
 
-                    <div class="quick-card-description">
+
+                    <div
+                        class="quick-card-description"
+                    >
                         Control products listed by marketplace vendors.
+                    </div>
+
+                </a>
+
+
+                <!-- CATEGORIES -->
+
+                <a
+                    href="categories.php"
+                    class="quick-card dashboard-action"
+                >
+
+                    <div
+                        class="quick-icon quick-violet"
+                    >
+
+                        <svg viewBox="0 0 24 24">
+
+                            <rect
+                                x="4"
+                                y="4"
+                                width="6"
+                                height="6"
+                            ></rect>
+
+                            <rect
+                                x="14"
+                                y="4"
+                                width="6"
+                                height="6"
+                            ></rect>
+
+                            <rect
+                                x="4"
+                                y="14"
+                                width="6"
+                                height="6"
+                            ></rect>
+
+                            <rect
+                                x="14"
+                                y="14"
+                                width="6"
+                                height="6"
+                            ></rect>
+
+                        </svg>
+
+                    </div>
+
+
+                    <div
+                        class="quick-card-title"
+                    >
+                        Categories
+                    </div>
+
+
+                    <div
+                        class="quick-card-description"
+                    >
+                        Organise and manage product categories.
+                    </div>
+
+                </a>
+
+
+                <!-- INVENTORY -->
+
+                <a
+                    href="inventory.php"
+                    class="quick-card dashboard-action"
+                >
+
+                    <div
+                        class="quick-icon quick-teal"
+                    >
+
+                        <svg viewBox="0 0 24 24">
+
+                            <path
+                                d="M21 8l-9-5-9 5 9 5 9-5z"
+                            ></path>
+
+                            <path
+                                d="M3 8v8l9 5 9-5V8"
+                            ></path>
+
+                        </svg>
+
+                    </div>
+
+
+                    <div
+                        class="quick-card-title"
+                    >
+                        Inventory
+                    </div>
+
+
+                    <div
+                        class="quick-card-description"
+                    >
+                        Monitor stock levels and restocking needs.
                     </div>
 
                 </a>
@@ -3327,10 +4906,12 @@ try {
 
                 <a
                     href="orders.php"
-                    class="quick-card"
+                    class="quick-card dashboard-action"
                 >
 
-                    <div class="quick-icon quick-green">
+                    <div
+                        class="quick-icon quick-cyan"
+                    >
 
                         <svg viewBox="0 0 24 24">
 
@@ -3354,12 +4935,18 @@ try {
 
                     </div>
 
-                    <div class="quick-card-title">
+
+                    <div
+                        class="quick-card-title"
+                    >
                         Manage Orders
                     </div>
 
-                    <div class="quick-card-description">
-                        Monitor customer orders and order status.
+
+                    <div
+                        class="quick-card-description"
+                    >
+                        Monitor customer orders and fulfilment.
                     </div>
 
                 </a>
@@ -3369,10 +4956,12 @@ try {
 
                 <a
                     href="payments.php"
-                    class="quick-card"
+                    class="quick-card dashboard-action"
                 >
 
-                    <div class="quick-icon quick-orange">
+                    <div
+                        class="quick-icon quick-blue"
+                    >
 
                         <svg viewBox="0 0 24 24">
 
@@ -3395,12 +4984,18 @@ try {
 
                     </div>
 
-                    <div class="quick-card-title">
+
+                    <div
+                        class="quick-card-title"
+                    >
                         Payments
                     </div>
 
-                    <div class="quick-card-description">
-                        Monitor payment transactions and statuses.
+
+                    <div
+                        class="quick-card-description"
+                    >
+                        Monitor payment transactions and status.
                     </div>
 
                 </a>
@@ -3410,19 +5005,18 @@ try {
 
                 <a
                     href="commission.php"
-                    class="quick-card"
+                    class="quick-card dashboard-action"
                 >
 
-                    <div class="quick-icon quick-cyan">
+                    <div
+                        class="quick-icon quick-sky"
+                    >
 
                         <svg viewBox="0 0 24 24">
 
-                            <line
-                                x1="12"
-                                y1="1"
-                                x2="12"
-                                y2="23"
-                            ></line>
+                            <path
+                                d="M12 1v22"
+                            ></path>
 
                             <path
                                 d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"
@@ -3432,12 +5026,18 @@ try {
 
                     </div>
 
-                    <div class="quick-card-title">
+
+                    <div
+                        class="quick-card-title"
+                    >
                         Commission
                     </div>
 
-                    <div class="quick-card-description">
-                        Track marketplace commission and vendor earnings.
+
+                    <div
+                        class="quick-card-description"
+                    >
+                        Track marketplace commission and earnings.
                     </div>
 
                 </a>
@@ -3447,10 +5047,12 @@ try {
 
                 <a
                     href="reviews.php"
-                    class="quick-card"
+                    class="quick-card dashboard-action"
                 >
 
-                    <div class="quick-icon quick-red">
+                    <div
+                        class="quick-icon quick-indigo"
+                    >
 
                         <svg viewBox="0 0 24 24">
 
@@ -3462,12 +5064,18 @@ try {
 
                     </div>
 
-                    <div class="quick-card-title">
+
+                    <div
+                        class="quick-card-title"
+                    >
                         Reviews
                     </div>
 
-                    <div class="quick-card-description">
-                        Monitor customer feedback and review visibility.
+
+                    <div
+                        class="quick-card-description"
+                    >
+                        Moderate customer feedback and reviews.
                     </div>
 
                 </a>
@@ -3477,32 +5085,38 @@ try {
 
                 <a
                     href="settings.php"
-                    class="quick-card"
+                    class="quick-card dashboard-action"
                 >
 
-                    <div class="quick-icon quick-purple">
+                    <div
+                        class="quick-icon quick-violet"
+                    >
 
                         <svg viewBox="0 0 24 24">
 
-                            <circle
-                                cx="12"
-                                cy="12"
-                                r="3"
-                            ></circle>
+                            <path
+                                d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"
+                            ></path>
 
                             <path
-                                d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20h-2.4v-.2a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.4 15a1.7 1.7 0 0 0-1.56-1.03H6v-2.4h.84A1.7 1.7 0 0 0 8.4 10a1.7 1.7 0 0 0-.34-1.88L8 8.06l1.7-1.7.06.06A1.7 1.7 0 0 0 11.64 6H12v-.84h2.4V6h.36a1.7 1.7 0 0 0 1.88.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 18 10a1.7 1.7 0 0 0 1.56 1.03h.84v2.4h-.84A1.7 1.7 0 0 0 19.4 15z"
+                                d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06A1.7 1.7 0 0 0 16.16 18a1.7 1.7 0 0 0-1.03 1.56V20h-2.4v-.44A1.7 1.7 0 0 0 11.7 18a1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.46 15a1.7 1.7 0 0 0-1.56-1.03H6v-2.4h.9A1.7 1.7 0 0 0 8.46 10a1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.7-1.7.06.06A1.7 1.7 0 0 0 11.7 6a1.7 1.7 0 0 0 1.03-1.56V4h2.4v.44A1.7 1.7 0 0 0 16.16 6a1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 19.4 10a1.7 1.7 0 0 0 1.56 1.03H22v2.4h-.9A1.7 1.7 0 0 0 19.4 15z"
                             ></path>
 
                         </svg>
 
                     </div>
 
-                    <div class="quick-card-title">
+
+                    <div
+                        class="quick-card-title"
+                    >
                         Admin Settings
                     </div>
 
-                    <div class="quick-card-description">
+
+                    <div
+                        class="quick-card-description"
+                    >
                         Manage administrator account and security.
                     </div>
 
@@ -3516,15 +5130,21 @@ try {
                  RECENT ACTIVITY
             ================================================== -->
 
-            <div class="dashboard-bottom-grid">
+            <div
+                class="dashboard-bottom-grid"
+            >
 
 
                 <!-- RECENT ORDERS -->
 
-                <div class="dashboard-panel">
+                <div
+                    class="dashboard-panel"
+                >
 
 
-                    <div class="dashboard-panel-header">
+                    <div
+                        class="dashboard-panel-header"
+                    >
 
                         <div>
 
@@ -3549,66 +5169,59 @@ try {
                     </div>
 
 
-                    <div class="dashboard-table-wrap">
+                    <div
+                        class="dashboard-table-wrap"
+                    >
 
 
-                        <table class="dashboard-table">
+                        <?php if (
+                            empty($recentOrders)
+                        ): ?>
+
+                            <div
+                                class="dashboard-empty"
+                            >
+                                No recent orders found.
+                            </div>
+
+                        <?php else: ?>
 
 
-                            <thead>
-
-                            <tr>
-
-                                <th>
-                                    Order
-                                </th>
-
-                                <th>
-                                    Customer
-                                </th>
-
-                                <th>
-                                    Date
-                                </th>
-
-                                <th>
-                                    Total
-                                </th>
-
-                                <th>
-                                    Status
-                                </th>
-
-                            </tr>
-
-                            </thead>
+                            <table
+                                class="dashboard-table"
+                            >
 
 
-                            <tbody>
-
-
-                            <?php if (
-                                empty(
-                                    $recentOrders
-                                )
-                            ): ?>
+                                <thead>
 
                                 <tr>
 
-                                    <td
-                                        colspan="5"
-                                        style="
-                                            text-align:center;
-                                            padding:28px;
-                                            color:#94a3b8;
-                                        "
-                                    >
-                                        No recent orders found.
-                                    </td>
+                                    <th>
+                                        Order
+                                    </th>
+
+                                    <th>
+                                        Customer
+                                    </th>
+
+                                    <th>
+                                        Date
+                                    </th>
+
+                                    <th>
+                                        Total
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
 
                                 </tr>
 
-                            <?php else: ?>
+                                </thead>
+
+
+                                <tbody>
 
 
                                 <?php foreach (
@@ -3620,40 +5233,37 @@ try {
                                     <?php
 
                                     $status =
-                                        strtolower(
-                                            trim(
-                                                $order[
-                                                    'order_status'
-                                                ] ?? ''
-                                            )
-                                        );
+                                        $order[
+                                            'order_status'
+                                        ]
+                                        ?? 'Unknown';
 
                                     $statusClass =
-                                        'status-default';
+                                        '';
+
 
                                     if (
-                                        $status === 'pending'
-                                    ) {
-
-                                        $statusClass =
-                                            'status-pending';
-
-                                    } elseif (
-                                        $status === 'processing'
-                                    ) {
-
-                                        $statusClass =
-                                            'status-processing';
-
-                                    } elseif (
-                                        $status === 'completed'
+                                        strtolower(
+                                            $status
+                                        ) === 'completed'
                                     ) {
 
                                         $statusClass =
                                             'status-completed';
 
                                     } elseif (
-                                        $status === 'cancelled'
+                                        strtolower(
+                                            $status
+                                        ) === 'processing'
+                                    ) {
+
+                                        $statusClass =
+                                            'status-processing';
+
+                                    } elseif (
+                                        strtolower(
+                                            $status
+                                        ) === 'cancelled'
                                     ) {
 
                                         $statusClass =
@@ -3669,15 +5279,18 @@ try {
 
                                         <td>
 
-                                            <span
-                                                class="dashboard-order-id"
+                                            <a
+                                                href="orders.php"
+                                                class="dashboard-order-id dashboard-view-link"
                                             >
-                                                #
-                                                <?= (int)
+
+                                                #<?= adminEscape(
                                                     $order[
                                                         'order_id'
-                                                    ] ?>
-                                            </span>
+                                                    ]
+                                                ) ?>
+
+                                            </a>
 
                                         </td>
 
@@ -3691,8 +5304,8 @@ try {
                                                 <?= adminEscape(
                                                     $order[
                                                         'customer_name'
-                                                    ] ??
-                                                    'Customer'
+                                                    ]
+                                                    ?? 'Customer'
                                                 ) ?>
 
                                             </span>
@@ -3702,45 +5315,36 @@ try {
 
                                         <td>
 
-                                            <?= !empty(
-                                                $order[
-                                                    'order_date'
-                                                ]
-                                            )
-                                                ? adminEscape(
-                                                    date(
-                                                        'd M Y',
-                                                        strtotime(
-                                                            $order[
-                                                                'order_date'
-                                                            ]
-                                                        )
-                                                    )
-                                                )
-                                                : '-'
-                                            ?>
+                                            <span>
+
+                                                <?= adminEscape(
+                                                    $order[
+                                                        'order_date'
+                                                    ]
+                                                    ?? '-'
+                                                ) ?>
+
+                                            </span>
 
                                         </td>
 
 
                                         <td>
 
-                                            <span
-                                                class="dashboard-money"
-                                            >
+                                            <strong>
 
                                                 RM
                                                 <?= number_format(
-                                                    (float)
-                                                    (
+                                                    (float) (
                                                         $order[
                                                             'total_amount'
-                                                        ] ?? 0
+                                                        ]
+                                                        ?? 0
                                                     ),
                                                     2
                                                 ) ?>
 
-                                            </span>
+                                            </strong>
 
                                         </td>
 
@@ -3748,17 +5352,11 @@ try {
                                         <td>
 
                                             <span
-                                                class="
-                                                    dashboard-status
-                                                    <?= $statusClass ?>
-                                                "
+                                                class="dashboard-status <?= adminEscape($statusClass) ?>"
                                             >
 
                                                 <?= adminEscape(
-                                                    $order[
-                                                        'order_status'
-                                                    ] ??
-                                                    'Unknown'
+                                                    $status
                                                 ) ?>
 
                                             </span>
@@ -3772,13 +5370,13 @@ try {
                                 <?php endforeach; ?>
 
 
-                            <?php endif; ?>
+                                </tbody>
 
 
-                            </tbody>
+                            </table>
 
 
-                        </table>
+                        <?php endif; ?>
 
 
                     </div>
@@ -3789,10 +5387,14 @@ try {
 
                 <!-- VENDOR APPLICATIONS -->
 
-                <div class="dashboard-panel">
+                <div
+                    class="dashboard-panel"
+                >
 
 
-                    <div class="dashboard-panel-header">
+                    <div
+                        class="dashboard-panel-header"
+                    >
 
                         <div>
 
@@ -3817,7 +5419,9 @@ try {
                     </div>
 
 
-                    <div class="application-list">
+                    <div
+                        class="application-list"
+                    >
 
 
                         <?php if (
@@ -3828,12 +5432,7 @@ try {
 
 
                             <div
-                                style="
-                                    padding:28px 0;
-                                    color:#94a3b8;
-                                    font-size:10px;
-                                    text-align:center;
-                                "
+                                class="dashboard-empty"
                             >
 
                                 No vendor applications found.
@@ -3850,7 +5449,32 @@ try {
                             ): ?>
 
 
-                                <div class="application-item">
+                                <?php
+
+                                $applicationName =
+                                    $application[
+                                        'applicant_name'
+                                    ]
+                                    ?? 'Vendor';
+
+
+                                $applicationInitial =
+                                    strtoupper(
+                                        substr(
+                                            trim(
+                                                $applicationName
+                                            ),
+                                            0,
+                                            1
+                                        )
+                                    );
+
+                                ?>
+
+
+                                <div
+                                    class="application-item"
+                                >
 
 
                                     <div
@@ -3858,58 +5482,35 @@ try {
                                     >
 
                                         <?= adminEscape(
-                                            strtoupper(
-                                                substr(
-                                                    trim(
-                                                        $application[
-                                                            'applicant_name'
-                                                        ] ?? 'V'
-                                                    ) !== ''
-                                                        ? trim(
-                                                            $application[
-                                                                'applicant_name'
-                                                            ] ?? 'V'
-                                                        )
-                                                        : 'V',
-                                                    0,
-                                                    1
-                                                )
-                                            )
+                                            $applicationInitial
                                         ) ?>
 
                                     </div>
 
 
-                                    <div class="application-info">
+                                    <div
+                                        class="application-info"
+                                    >
 
-
-                                        <div
-                                            class="application-name"
-                                        >
-
-                                            <?= adminEscape(
-                                                $application[
-                                                    'applicant_name'
-                                                ] ??
-                                                'Applicant'
-                                            ) ?>
-
-                                        </div>
-
-
-                                        <div
-                                            class="application-business"
-                                        >
+                                        <strong>
 
                                             <?= adminEscape(
                                                 $application[
                                                     'business_name'
-                                                ] ??
-                                                'Vendor application'
+                                                ]
+                                                ?? 'Business'
                                             ) ?>
 
-                                        </div>
+                                        </strong>
 
+
+                                        <span>
+
+                                            <?= adminEscape(
+                                                $applicationName
+                                            ) ?>
+
+                                        </span>
 
                                     </div>
 
@@ -3921,8 +5522,8 @@ try {
                                         <?= adminEscape(
                                             $application[
                                                 'status'
-                                            ] ??
-                                            'Pending'
+                                            ]
+                                            ?? 'Pending'
                                         ) ?>
 
                                     </span>
@@ -3946,12 +5547,17 @@ try {
             </div>
 
 
-            <!-- FOOTER -->
+            <!-- =================================================
+                 FOOTER
+            ================================================== -->
 
-            <div class="dashboard-footer">
+            <div
+                class="dashboard-footer"
+            >
 
                 HochipoHub Administration Panel
-                • <?= date('Y') ?>
+                ·
+                <?= date('Y') ?>
 
             </div>
 
@@ -3963,6 +5569,13 @@ try {
 
 
 </div>
+
+
+<script
+    src="<?= adminEscape(
+        BASE_URL
+    ) ?>js/dashboard.js"
+></script>
 
 
 </body>
