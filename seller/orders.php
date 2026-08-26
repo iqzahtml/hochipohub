@@ -514,21 +514,15 @@ $pageTitle = "Orders | Seller | HochipoHub";
         href="../css/responsive.css"
     >
 
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+
 </head>
 
 
-<body>
-
-
-<?php
-
-$navbar = dirname(__DIR__) . '/includes/navbar.php';
-
-if (file_exists($navbar)) {
-    include $navbar;
-}
-
-?>
+<body class="seller-dashboard-page seller-inner-page">
 
 
 <div class="dashboard-layout">
