@@ -256,6 +256,11 @@ $pageTitle = "My Cart";
 
     <link
         rel="stylesheet"
+        href="css/dashboard.css"
+    >
+
+    <link
+        rel="stylesheet"
         href="css/responsive.css"
     >
 
@@ -272,6 +277,7 @@ $pageTitle = "My Cart";
 */
 
 require_once __DIR__ . '/includes/navbar.php';
+require_once __DIR__ . '/includes/customer_sidebar.php';
 ?>
 
 
