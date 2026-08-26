@@ -68,9 +68,11 @@
 
 .customer-sidebar {
 
-    position: relative;
+    position: sticky;
 
-    z-index: 10;
+    top: 86px;
+
+    z-index: 900;
 
     padding: 18px 24px;
 
@@ -901,6 +903,8 @@
 @media (max-width: 900px) {
 
     .customer-sidebar {
+
+        top: 72px;
 
         padding: 12px 15px;
 
