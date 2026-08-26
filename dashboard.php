@@ -223,6 +223,8 @@ try {
 ?>
 <?php
 $pageTitle = 'Dashboard';
+$hideSiteMainWrapper = true;
+$extraCSS = ['dashboard.css'];
 
 require_once __DIR__ . '/includes/header.php';
 require_once __DIR__ . '/includes/customer_sidebar.php';
@@ -600,6 +602,12 @@ require_once __DIR__ . '/includes/customer_sidebar.php';
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
 
+</body>
+
+</html>
+
+<?php if (false): // Legacy duplicate dashboard kept disabled. ?>
+
 <!DOCTYPE html>
 
 <html lang="en">
@@ -893,3 +901,5 @@ if (file_exists($footer)) {
 </body>
 
 </html>
+
+<?php endif; ?>
