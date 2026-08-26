@@ -1,4 +1,5 @@
 <?php
+
 /*
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - GLOBAL HEADER
@@ -99,7 +100,9 @@ if (file_exists($functionsPath)) {
 |--------------------------------------------------------------------------
 */
 
-$currentPage = basename($_SERVER['PHP_SELF'] ?? '');
+$currentPage = basename(
+    $_SERVER['PHP_SELF'] ?? ''
+);
 
 
 /*
@@ -223,7 +226,8 @@ if (
 
     if (isset($_SESSION['wishlist_count'])) {
 
-        $wishlistCount = (int) $_SESSION['wishlist_count'];
+        $wishlistCount =
+            (int) $_SESSION['wishlist_count'];
 
     } else {
 
@@ -242,10 +246,11 @@ if (
                 $userId
             ) {
 
-                $wishlistCount = (int) getWishlistCount(
-                    $db,
-                    $userId
-                );
+                $wishlistCount =
+                    (int) getWishlistCount(
+                        $db,
+                        $userId
+                    );
             }
 
         } catch (Throwable $e) {
@@ -262,7 +267,8 @@ if (
 |--------------------------------------------------------------------------
 */
 
-$pageTitle = $pageTitle ?? 'HochipoHub';
+$pageTitle =
+    $pageTitle ?? 'HochipoHub';
 
 
 /*
@@ -343,15 +349,18 @@ $allJS = array_unique($allJS);
 
     <meta charset="UTF-8">
 
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
 
+
     <meta
         name="description"
         content="HochipoHub - Local Multi-Vendor Marketplace"
     >
+
 
     <meta
         name="theme-color"
@@ -371,18 +380,20 @@ $allJS = array_unique($allJS);
 
     <!-- =====================================================
          GOOGLE FONTS
-         ===================================================== -->
+    ====================================================== -->
 
     <link
         rel="preconnect"
         href="https://fonts.googleapis.com"
     >
 
+
     <link
         rel="preconnect"
         href="https://fonts.gstatic.com"
         crossorigin
     >
+
 
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@500;600;700;800&display=swap"
@@ -392,7 +403,7 @@ $allJS = array_unique($allJS);
 
     <!-- =====================================================
          GLOBAL CSS
-         ===================================================== -->
+    ====================================================== -->
 
     <link
         rel="stylesheet"
@@ -402,15 +413,21 @@ $allJS = array_unique($allJS);
             'UTF-8'
         ) ?>"
     >
+
+
+    <!-- =====================================================
+         BOOTSTRAP ICONS
+    ====================================================== -->
+
     <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
->
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    >
 
 
     <!-- =====================================================
          RESPONSIVE CSS
-         ===================================================== -->
+    ====================================================== -->
 
     <link
         rel="stylesheet"
@@ -423,8 +440,22 @@ $allJS = array_unique($allJS);
 
 
     <!-- =====================================================
+         MODAL CSS
+    ====================================================== -->
+
+    <link
+        rel="stylesheet"
+        href="<?= htmlspecialchars(
+            rtrim(BASE_URL, '/') . '/css/modal.css',
+            ENT_QUOTES,
+            'UTF-8'
+        ) ?>"
+    >
+
+
+    <!-- =====================================================
          PAGE-SPECIFIC CSS
-         ===================================================== -->
+    ====================================================== -->
 
     <?php foreach ($extraCSS as $cssFile): ?>
 
@@ -448,7 +479,7 @@ $allJS = array_unique($allJS);
 
     <!-- =====================================================
          GLOBAL + PAGE JAVASCRIPT
-         ===================================================== -->
+    ====================================================== -->
 
     <?php foreach ($allJS as $jsFile): ?>
 
@@ -469,6 +500,7 @@ $allJS = array_unique($allJS);
 
     <?php endforeach; ?>
 
+
 </head>
 
 
@@ -477,14 +509,16 @@ $allJS = array_unique($allJS);
 
     <!-- =====================================================
          NAVBAR
-         ===================================================== -->
+    ====================================================== -->
 
     <?php
 
     $navbarPath = __DIR__ . '/navbar.php';
 
     if (file_exists($navbarPath)) {
+
         require_once $navbarPath;
+
     }
 
     ?>
@@ -492,7 +526,7 @@ $allJS = array_unique($allJS);
 
     <!-- =====================================================
          MAIN CONTENT
-         ===================================================== -->
+    ====================================================== -->
 
     <main
         id="main-content"
