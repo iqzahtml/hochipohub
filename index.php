@@ -54,7 +54,11 @@ require_once __DIR__ . '/includes/header.php';
 
 $db = null;
 
-if (isset($GLOBALS['db']) && $GLOBALS['db'] instanceof PDO) {
+
+if (
+    isset($GLOBALS['db']) &&
+    $GLOBALS['db'] instanceof PDO
+) {
 
     $db = $GLOBALS['db'];
 
@@ -71,11 +75,13 @@ if (!$db) {
 
     $dbPath = __DIR__ . '/database/db.php';
 
+
     if (file_exists($dbPath)) {
 
         require_once $dbPath;
 
     }
+
 
     if (function_exists('getDB')) {
 
@@ -93,8 +99,11 @@ if (!$db) {
 */
 
 $categories = [];
+
 $products = [];
+
 $vendors = [];
+
 $flash = null;
 
 
@@ -122,16 +131,26 @@ if ($db instanceof PDO) {
     try {
 
         $stmt = $db->query("
+
             SELECT
                 category_id,
                 category_name,
                 category_image
+
             FROM categories
+
             ORDER BY category_name ASC
+
             LIMIT 8
+
         ");
 
-        $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $categories =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            );
+
 
     } catch (Throwable $e) {
 
@@ -153,19 +172,29 @@ if ($db instanceof PDO) {
     try {
 
         $stmt = $db->query("
+
             SELECT
+
                 p.product_id,
+
                 p.product_name,
+
                 p.description,
+
                 p.price,
+
                 p.stock_quantity,
+
                 p.image,
+
                 p.status,
 
                 v.vendor_id,
+
                 v.business_name,
 
                 c.category_id,
+
                 c.category_name
 
             FROM products p
@@ -193,9 +222,15 @@ if ($db instanceof PDO) {
             ORDER BY p.created_at DESC
 
             LIMIT 8
+
         ");
 
-        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $products =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            );
+
 
     } catch (Throwable $e) {
 
@@ -217,25 +252,40 @@ if ($db instanceof PDO) {
     try {
 
         $stmt = $db->query("
+
             SELECT
+
                 v.vendor_id,
+
                 v.business_name,
+
                 v.business_logo,
+
                 v.business_description,
+
                 v.category
 
             FROM vendors v
 
             WHERE
                 v.approval_status = 'Approved'
-                OR v.approval_status = 'approved'
+
+                OR
+
+                v.approval_status = 'approved'
 
             ORDER BY v.created_at DESC
 
             LIMIT 6
+
         ");
 
-        $vendors = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $vendors =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            );
+
 
     } catch (Throwable $e) {
 
@@ -252,9 +302,14 @@ if ($db instanceof PDO) {
 |--------------------------------------------------------------------------
 */
 
-$categoryCount = count($categories);
-$productCount = count($products);
-$vendorCount = count($vendors);
+$categoryCount =
+    count($categories);
+
+$productCount =
+    count($products);
+
+$vendorCount =
+    count($vendors);
 
 ?>
 
@@ -273,16 +328,20 @@ $vendorCount = count($vendors);
 
     <section class="home-hero">
 
-        <div class="home-hero-decoration home-hero-circle-one"></div>
+        <div
+            class="home-hero-decoration home-hero-circle-one"
+        ></div>
 
-        <div class="home-hero-decoration home-hero-circle-two"></div>
+
+        <div
+            class="home-hero-decoration home-hero-circle-two"
+        ></div>
+
 
         <div class="container">
 
             <div class="home-hero-content">
 
-
-                <!-- LABEL -->
 
                 <div class="home-hero-label">
 
@@ -292,8 +351,6 @@ $vendorCount = count($vendors);
 
                 </div>
 
-
-                <!-- TITLE -->
 
                 <h1>
 
@@ -306,8 +363,6 @@ $vendorCount = count($vendors);
                 </h1>
 
 
-                <!-- DESCRIPTION -->
-
                 <p>
 
                     Discover unique products from local
@@ -317,9 +372,8 @@ $vendorCount = count($vendors);
                 </p>
 
 
-                <!-- BUTTONS -->
-
                 <div class="home-hero-actions">
+
 
                     <a
                         href="<?= e(BASE_URL) ?>catalog.php"
@@ -344,10 +398,9 @@ $vendorCount = count($vendors);
 
                     </a>
 
+
                 </div>
 
-
-                <!-- STATS -->
 
                 <div class="home-hero-stats">
 
@@ -399,8 +452,8 @@ $vendorCount = count($vendors);
 
                 </div>
 
-            </div>
 
+            </div>
 
 
             <!-- =================================================
@@ -509,9 +562,9 @@ $vendorCount = count($vendors);
                 </div>
 
 
-                <!-- FLOATING CARD -->
-
-                <div class="home-floating-card home-floating-one">
+                <div
+                    class="home-floating-card home-floating-one"
+                >
 
                     <div class="home-floating-icon">
                         ✨
@@ -532,9 +585,9 @@ $vendorCount = count($vendors);
                 </div>
 
 
-                <!-- FLOATING CARD -->
-
-                <div class="home-floating-card home-floating-two">
+                <div
+                    class="home-floating-card home-floating-two"
+                >
 
                     <div class="home-floating-icon">
                         ❤️
@@ -557,6 +610,7 @@ $vendorCount = count($vendors);
 
             </div>
 
+
         </div>
 
     </section>
@@ -571,9 +625,13 @@ $vendorCount = count($vendors);
 
         <div class="container">
 
-            <div class="alert alert-<?= e($flash['type'] ?? 'info') ?>">
+            <div
+                class="alert alert-<?= e($flash['type'] ?? 'info') ?>"
+            >
 
-                <?= e($flash['message'] ?? '') ?>
+                <?= e(
+                    $flash['message'] ?? ''
+                ) ?>
 
             </div>
 
@@ -661,7 +719,9 @@ $vendorCount = count($vendors);
                                 <?php else: ?>
 
 
-                                    <div class="home-category-placeholder">
+                                    <div
+                                        class="home-category-placeholder"
+                                    >
 
                                         <span>
                                             🛍️
@@ -673,10 +733,14 @@ $vendorCount = count($vendors);
                                 <?php endif; ?>
 
 
-                                <div class="home-category-number">
+                                <div
+                                    class="home-category-number"
+                                >
 
                                     <?= str_pad(
-                                        (string) (($category['category_id'] ?? 0)),
+                                        (string) (
+                                            $category['category_id'] ?? 0
+                                        ),
                                         2,
                                         '0',
                                         STR_PAD_LEFT
@@ -831,7 +895,9 @@ $vendorCount = count($vendors);
                                 <?php else: ?>
 
 
-                                    <div class="home-product-placeholder">
+                                    <div
+                                        class="home-product-placeholder"
+                                    >
 
                                         🛍️
 
@@ -841,7 +907,9 @@ $vendorCount = count($vendors);
                                 <?php endif; ?>
 
 
-                                <span class="home-product-category">
+                                <span
+                                    class="home-product-category"
+                                >
 
                                     <?= e(
                                         $product['category_name']
@@ -872,7 +940,9 @@ $vendorCount = count($vendors);
                                 </h3>
 
 
-                                <p class="home-product-vendor">
+                                <p
+                                    class="home-product-vendor"
+                                >
 
                                     🏪
 
@@ -883,12 +953,15 @@ $vendorCount = count($vendors);
                                 </p>
 
 
-                                <div class="home-product-bottom">
+                                <div
+                                    class="home-product-bottom"
+                                >
 
 
                                     <strong>
 
                                         RM
+
                                         <?= number_format(
                                             (float) $product['price'],
                                             2
@@ -1034,7 +1107,9 @@ $vendorCount = count($vendors);
                                 <?php else: ?>
 
 
-                                    <div class="home-vendor-placeholder">
+                                    <div
+                                        class="home-vendor-placeholder"
+                                    >
 
                                         🏪
 
@@ -1061,7 +1136,6 @@ $vendorCount = count($vendors);
 
                                 <?php if (!empty($vendor['category'])): ?>
 
-
                                     <span>
 
                                         <?= e(
@@ -1070,12 +1144,10 @@ $vendorCount = count($vendors);
 
                                     </span>
 
-
                                 <?php endif; ?>
 
 
                                 <?php if (!empty($vendor['business_description'])): ?>
-
 
                                     <p>
 
@@ -1090,14 +1162,15 @@ $vendorCount = count($vendors);
 
                                     </p>
 
-
                                 <?php endif; ?>
 
 
                             </div>
 
 
-                            <div class="home-vendor-arrow">
+                            <div
+                                class="home-vendor-arrow"
+                            >
 
                                 →
 
@@ -1196,6 +1269,467 @@ $vendorCount = count($vendors);
 
 
 </div>
+
+
+
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| AUTH MODAL AUTO OPEN
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| register_process.php redirects to:
+|
+| index.php?register=1
+|
+| This code automatically opens the register modal.
+|
+| After successful registration:
+|
+| index.php?login=1
+|
+| This code automatically opens the login modal.
+|
+|--------------------------------------------------------------------------
+*/
+
+
+$openRegisterModal =
+    isset($_GET['register']) &&
+    $_GET['register'] === '1';
+
+
+$openLoginModal =
+    isset($_GET['login']) &&
+    $_GET['login'] === '1';
+
+?>
+
+
+<script>
+
+document.addEventListener(
+    'DOMContentLoaded',
+    function () {
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | OPEN REGISTER MODAL AFTER ERROR
+        |--------------------------------------------------------------------------
+        */
+
+        <?php if ($openRegisterModal): ?>
+
+            openRegisterModal();
+
+        <?php endif; ?>
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | OPEN LOGIN MODAL AFTER SUCCESS
+        |--------------------------------------------------------------------------
+        */
+
+        <?php if ($openLoginModal): ?>
+
+            openLoginModal();
+
+        <?php endif; ?>
+
+
+    }
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| FIND REGISTER MODAL
+|--------------------------------------------------------------------------
+*/
+
+function findRegisterModal()
+{
+
+    /*
+    |--------------------------------------------------------------------------
+    | FIRST TRY COMMON IDs
+    |--------------------------------------------------------------------------
+    */
+
+    let modal =
+        document.getElementById('registerModal');
+
+
+    if (!modal) {
+
+        modal =
+            document.getElementById('register-modal');
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TRY DATA ATTRIBUTE
+    |--------------------------------------------------------------------------
+    */
+
+    if (!modal) {
+
+        modal =
+            document.querySelector(
+                '.modal-overlay[data-modal="register"]'
+            );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TRY REGISTER FORM
+    |--------------------------------------------------------------------------
+    |
+    | This allows the system to find the modal even if
+    | the actual modal ID is different.
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    if (!modal) {
+
+        const registerForm =
+            document.querySelector(
+                'form[action*="register_process.php"]'
+            );
+
+
+        if (registerForm) {
+
+            modal =
+                registerForm.closest(
+                    '.modal-overlay'
+                );
+
+        }
+
+    }
+
+
+    return modal;
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| FIND LOGIN MODAL
+|--------------------------------------------------------------------------
+*/
+
+function findLoginModal()
+{
+
+    /*
+    |--------------------------------------------------------------------------
+    | FIRST TRY COMMON IDs
+    |--------------------------------------------------------------------------
+    */
+
+    let modal =
+        document.getElementById('loginModal');
+
+
+    if (!modal) {
+
+        modal =
+            document.getElementById('login-modal');
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TRY DATA ATTRIBUTE
+    |--------------------------------------------------------------------------
+    */
+
+    if (!modal) {
+
+        modal =
+            document.querySelector(
+                '.modal-overlay[data-modal="login"]'
+            );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TRY LOGIN FORM
+    |--------------------------------------------------------------------------
+    */
+
+    if (!modal) {
+
+        const loginForm =
+            document.querySelector(
+                'form[action*="login_process.php"]'
+            );
+
+
+        if (loginForm) {
+
+            modal =
+                loginForm.closest(
+                    '.modal-overlay'
+                );
+
+        }
+
+    }
+
+
+    return modal;
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| OPEN REGISTER MODAL
+|--------------------------------------------------------------------------
+*/
+
+function openRegisterModal()
+{
+
+    const modal =
+        findRegisterModal();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MODAL NOT FOUND
+    |--------------------------------------------------------------------------
+    */
+
+    if (!modal) {
+
+        console.log(
+            'HOCHIPOHUB: Register modal not found.'
+        );
+
+        return;
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADD ACTIVE CLASSES
+    |--------------------------------------------------------------------------
+    */
+
+    modal.classList.add(
+        'active'
+    );
+
+    modal.classList.add(
+        'show'
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FORCE DISPLAY
+    |--------------------------------------------------------------------------
+    */
+
+    modal.style.display =
+        'flex';
+
+    modal.style.opacity =
+        '1';
+
+    modal.style.visibility =
+        'visible';
+
+    modal.style.pointerEvents =
+        'auto';
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | BODY LOCK
+    |--------------------------------------------------------------------------
+    */
+
+    document.body.classList.add(
+        'modal-open'
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MAKE SURE REGISTER MODAL IS ABOVE PAGE
+    |--------------------------------------------------------------------------
+    */
+
+    modal.style.zIndex =
+        '2147483646';
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SCROLL TO TOP OF MODAL
+    |--------------------------------------------------------------------------
+    */
+
+    const authModal =
+        modal.querySelector(
+            '.auth-modal'
+        );
+
+
+    if (authModal) {
+
+        authModal.scrollTop =
+            0;
+
+    }
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| OPEN LOGIN MODAL
+|--------------------------------------------------------------------------
+*/
+
+function openLoginModal()
+{
+
+    const modal =
+        findLoginModal();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MODAL NOT FOUND
+    |--------------------------------------------------------------------------
+    */
+
+    if (!modal) {
+
+        console.log(
+            'HOCHIPOHUB: Login modal not found.'
+        );
+
+        return;
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADD ACTIVE CLASSES
+    |--------------------------------------------------------------------------
+    */
+
+    modal.classList.add(
+        'active'
+    );
+
+    modal.classList.add(
+        'show'
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FORCE DISPLAY
+    |--------------------------------------------------------------------------
+    */
+
+    modal.style.display =
+        'flex';
+
+    modal.style.opacity =
+        '1';
+
+    modal.style.visibility =
+        'visible';
+
+    modal.style.pointerEvents =
+        'auto';
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | BODY LOCK
+    |--------------------------------------------------------------------------
+    */
+
+    document.body.classList.add(
+        'modal-open'
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MAKE SURE LOGIN MODAL IS ABOVE PAGE
+    |--------------------------------------------------------------------------
+    */
+
+    modal.style.zIndex =
+        '2147483646';
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CLEAR REGISTER URL
+|--------------------------------------------------------------------------
+|
+| After the modal has been opened, remove ?register=1 from
+| browser history without reloading the page.
+|
+|--------------------------------------------------------------------------
+*/
+
+if (
+    window.history &&
+    window.history.replaceState
+) {
+
+    <?php if ($openRegisterModal): ?>
+
+        window.history.replaceState(
+            {},
+            document.title,
+            '<?= e(BASE_URL) ?>index.php'
+        );
+
+    <?php elseif ($openLoginModal): ?>
+
+        window.history.replaceState(
+            {},
+            document.title,
+            '<?= e(BASE_URL) ?>index.php'
+        );
+
+    <?php endif; ?>
+
+}
+
+
+</script>
 
 
 
