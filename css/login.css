@@ -1719,3 +1719,16 @@
     }
 
 }
+/* =========================================================
+   HIDE BROWSER NATIVE PASSWORD REVEAL ICON
+   Keep HochipoHub custom eye button only.
+========================================================= */
+
+.login-password-wrapper input::-ms-reveal,
+.login-password-wrapper input::-ms-clear,
+.login-form input[type="password"]::-ms-reveal,
+.login-form input[type="password"]::-ms-clear {
+    display: none;
+    width: 0;
+    height: 0;
+}
