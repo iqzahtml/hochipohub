@@ -4,94 +4,51 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - SELLER COMMISSION
 |--------------------------------------------------------------------------
-| File:
-| commission.php
+| File: commission.php
 |--------------------------------------------------------------------------
-|
-| This file is located in project root but belongs to Seller Center.
-|
+| Seller Center commission & earnings page
 |--------------------------------------------------------------------------
 */
 
 
 /*
 |--------------------------------------------------------------------------
-| CONFIG
+| CONFIG / DATABASE / SESSION / FUNCTIONS
 |--------------------------------------------------------------------------
 */
 
 require_once __DIR__ . '/config.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| DATABASE
-|--------------------------------------------------------------------------
-*/
-
 require_once __DIR__ . '/database/db.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| SESSION
-|--------------------------------------------------------------------------
-*/
-
 require_once __DIR__ . '/includes/session.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| FUNCTIONS
-|--------------------------------------------------------------------------
-*/
-
 require_once __DIR__ . '/includes/functions.php';
 
 
-/*
-|--------------------------------------------------------------------------
-| START SESSION
-|--------------------------------------------------------------------------
-*/
-
 if (session_status() === PHP_SESSION_NONE) {
-
     session_start();
+}
 
+
+requireLogin();
+
+
+$db = getDB();
+
+
+if (!($db instanceof PDO)) {
+    die('Database connection is not available.');
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN CHECK
+| CURRENT USER
 |--------------------------------------------------------------------------
 */
 
-requireLogin();
-
-
-/*
-|--------------------------------------------------------------------------
-| DATABASE
-|--------------------------------------------------------------------------
-*/
-
-$db = getDB();
-
-
-/*
-|--------------------------------------------------------------------------
-| USER ID
-|--------------------------------------------------------------------------
-*/
-
-$userId =
-    (int) (
-        $_SESSION['user_id']
-        ?? 0
-    );
+$userId = (int) (
+    $_SESSION['user_id']
+    ?? 0
+);
 
 
 /*
@@ -100,9 +57,9 @@ $userId =
 |--------------------------------------------------------------------------
 */
 
-if (!function_exists('sellerCommissionEscape')) {
+if (!function_exists('commissionEscape')) {
 
-    function sellerCommissionEscape($value): string
+    function commissionEscape($value): string
     {
         return htmlspecialchars(
             (string) $value,
@@ -110,100 +67,97 @@ if (!function_exists('sellerCommissionEscape')) {
             'UTF-8'
         );
     }
-
 }
 
 
-if (!function_exists('sellerCommissionDate')) {
+if (!function_exists('commissionMoney')) {
 
-    function sellerCommissionDate($value): string
+    function commissionMoney($amount): string
+    {
+        return number_format(
+            (float) $amount,
+            2
+        );
+    }
+}
+
+
+if (!function_exists('commissionDate')) {
+
+    function commissionDate($value): string
     {
         if (empty($value)) {
-
-            return '-';
-
+            return '—';
         }
 
 
-        $timestamp =
-            strtotime(
-                (string) $value
-            );
+        $time = strtotime(
+            (string) $value
+        );
 
 
-        if (!$timestamp) {
-
-            return '-';
-
+        if (!$time) {
+            return '—';
         }
 
 
         return date(
             'd M Y, h:i A',
-            $timestamp
+            $time
         );
     }
-
 }
 
 
-if (!function_exists('sellerCommissionStatusClass')) {
+if (!function_exists('commissionStatusClass')) {
 
-    function sellerCommissionStatusClass($status): string
+    function commissionStatusClass($status): string
     {
-        $status =
-            strtolower(
-                trim(
-                    (string) $status
-                )
-            );
+        $status = strtolower(
+            trim(
+                (string) $status
+            )
+        );
 
 
-        if ($status === 'paid') {
+        switch ($status) {
 
-            return 'paid';
+            case 'paid':
+                return 'paid';
 
+            case 'pending':
+                return 'pending';
+
+            default:
+                return 'default';
         }
-
-
-        if ($status === 'pending') {
-
-            return 'pending';
-
-        }
-
-
-        return 'default';
     }
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CHECK USER
+| GET USER
 |--------------------------------------------------------------------------
 */
 
 try {
 
-    $stmt =
-        $db->prepare("
-            SELECT
+    $stmt = $db->prepare("
+        SELECT
+            user_id,
+            name,
+            email,
+            phone,
+            role,
+            status
 
-                user_id,
-                name,
-                email,
-                phone,
-                role,
-                status
+        FROM users
 
-            FROM users
+        WHERE user_id = ?
 
-            WHERE user_id = ?
-
-            LIMIT 1
-        ");
+        LIMIT 1
+    ");
 
 
     $stmt->execute([
@@ -211,17 +165,13 @@ try {
     ]);
 
 
-    $user =
-        $stmt->fetch(
-            PDO::FETCH_ASSOC
-        );
+    $user = $stmt->fetch(
+        PDO::FETCH_ASSOC
+    );
 
-}
-
-catch (Throwable $e) {
+} catch (Throwable $e) {
 
     $user = false;
-
 }
 
 
@@ -234,11 +184,12 @@ catch (Throwable $e) {
 if (!$user) {
 
     header(
-        'Location: index.php'
+        'Location: ' .
+        BASE_URL .
+        'index.php'
     );
 
     exit;
-
 }
 
 
@@ -251,17 +202,21 @@ if (!$user) {
 if (
     strtolower(
         trim(
-            (string) $user['role']
+            (string) (
+                $user['role']
+                ?? ''
+            )
         )
     ) !== 'vendor'
 ) {
 
     header(
-        'Location: dashboard.php'
+        'Location: ' .
+        BASE_URL .
+        'dashboard.php'
     );
 
     exit;
-
 }
 
 
@@ -269,37 +224,45 @@ if (
 |--------------------------------------------------------------------------
 | GET VENDOR
 |--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| commission_rate now comes directly from vendors table.
+|
+|--------------------------------------------------------------------------
 */
 
 try {
 
-    $stmt =
-        $db->prepare("
-            SELECT
+    $stmt = $db->prepare("
+        SELECT
+            v.vendor_id,
+            v.user_id,
+            v.business_name,
+            v.business_logo,
+            v.business_description,
+            v.business_address,
+            v.category,
+            v.delivery_method,
+            v.allow_vendor_delivery,
+            v.cod_enabled,
+            v.cod_delivery_fee,
+            v.commission_rate,
+            v.approval_status,
+            v.created_at,
 
-                v.vendor_id,
-                v.business_name,
-                v.business_logo,
-                v.business_description,
-                v.business_address,
-                v.category,
-                v.delivery_method,
-                v.approval_status,
-                v.created_at,
+            u.name,
+            u.email,
+            u.phone
 
-                u.name,
-                u.email,
-                u.phone
+        FROM vendors v
 
-            FROM vendors v
+        INNER JOIN users u
+            ON v.user_id = u.user_id
 
-            INNER JOIN users u
-                ON v.user_id = u.user_id
+        WHERE v.user_id = ?
 
-            WHERE v.user_id = ?
-
-            LIMIT 1
-        ");
+        LIMIT 1
+    ");
 
 
     $stmt->execute([
@@ -307,17 +270,13 @@ try {
     ]);
 
 
-    $vendor =
-        $stmt->fetch(
-            PDO::FETCH_ASSOC
-        );
+    $vendor = $stmt->fetch(
+        PDO::FETCH_ASSOC
+    );
 
-}
-
-catch (Throwable $e) {
+} catch (Throwable $e) {
 
     $vendor = false;
-
 }
 
 
@@ -330,22 +289,33 @@ catch (Throwable $e) {
 if (!$vendor) {
 
     header(
-        'Location: dashboard.php'
+        'Location: ' .
+        BASE_URL .
+        'dashboard.php'
     );
 
     exit;
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VENDOR ID
+| VENDOR DATA
 |--------------------------------------------------------------------------
 */
 
-$vendorId =
-    (int) $vendor['vendor_id'];
+$vendorId = (int) $vendor['vendor_id'];
+
+
+$currentCommissionRate = (float) (
+    $vendor['commission_rate']
+    ?? 0
+);
+
+
+$vendorApprovalStatus =
+    $vendor['approval_status']
+    ?? 'Pending';
 
 
 /*
@@ -357,68 +327,137 @@ $vendorId =
 $_SESSION['business_name'] =
     $vendor['business_name'];
 
-
 $_SESSION['vendor_approval_status'] =
-    $vendor['approval_status'];
+    $vendorApprovalStatus;
 
 
 /*
 |--------------------------------------------------------------------------
 | COMMISSION SUMMARY
 |--------------------------------------------------------------------------
+|
+| Gross sales:
+| Sum of vendor order subtotal linked to commission records.
+|
+| Total commission:
+| Sum of commission_amount.
+|
+| Net earnings:
+| Gross sales - commission.
+|
+|--------------------------------------------------------------------------
 */
 
 $summary = [
 
-    'total_records'     => 0,
-    'total_commission'  => 0,
-    'paid_commission'   => 0,
-    'pending_commission'=> 0
+    'total_records' => 0,
+
+    'gross_sales' => 0.00,
+
+    'total_commission' => 0.00,
+
+    'paid_commission' => 0.00,
+
+    'pending_commission' => 0.00,
+
+    'net_earnings' => 0.00,
+
+    'paid_records' => 0,
+
+    'pending_records' => 0
 
 ];
 
 
 try {
 
-    $stmt =
-        $db->prepare("
-            SELECT
+    $stmt = $db->prepare("
+        SELECT
 
-                COUNT(*) AS total_records,
+            COUNT(c.commission_id)
+                AS total_records,
 
-                COALESCE(
-                    SUM(
-                        commission_amount
-                    ),
-                    0
-                ) AS total_commission,
+            COALESCE(
+                SUM(
+                    COALESCE(
+                        vo.subtotal,
+                        0
+                    )
+                ),
+                0
+            ) AS gross_sales,
 
-                COALESCE(
-                    SUM(
-                        CASE
-                            WHEN status = 'Paid'
-                            THEN commission_amount
-                            ELSE 0
-                        END
-                    ),
-                    0
-                ) AS paid_commission,
+            COALESCE(
+                SUM(
+                    c.commission_amount
+                ),
+                0
+            ) AS total_commission,
 
-                COALESCE(
-                    SUM(
-                        CASE
-                            WHEN status = 'Pending'
-                            THEN commission_amount
-                            ELSE 0
-                        END
-                    ),
-                    0
-                ) AS pending_commission
+            COALESCE(
+                SUM(
+                    CASE
 
-            FROM commission
+                        WHEN c.status = 'Paid'
+                        THEN c.commission_amount
 
-            WHERE vendor_id = ?
-        ");
+                        ELSE 0
+
+                    END
+                ),
+                0
+            ) AS paid_commission,
+
+            COALESCE(
+                SUM(
+                    CASE
+
+                        WHEN c.status = 'Pending'
+                        THEN c.commission_amount
+
+                        ELSE 0
+
+                    END
+                ),
+                0
+            ) AS pending_commission,
+
+            COALESCE(
+                SUM(
+                    CASE
+
+                        WHEN c.status = 'Paid'
+                        THEN 1
+
+                        ELSE 0
+
+                    END
+                ),
+                0
+            ) AS paid_records,
+
+            COALESCE(
+                SUM(
+                    CASE
+
+                        WHEN c.status = 'Pending'
+                        THEN 1
+
+                        ELSE 0
+
+                    END
+                ),
+                0
+            ) AS pending_records
+
+        FROM commission c
+
+        LEFT JOIN vendor_orders vo
+            ON c.vendor_order_id =
+               vo.vendor_order_id
+
+        WHERE c.vendor_id = ?
+    ");
 
 
     $stmt->execute([
@@ -426,10 +465,9 @@ try {
     ]);
 
 
-    $row =
-        $stmt->fetch(
-            PDO::FETCH_ASSOC
-        );
+    $row = $stmt->fetch(
+        PDO::FETCH_ASSOC
+    );
 
 
     if ($row) {
@@ -437,6 +475,13 @@ try {
         $summary['total_records'] =
             (int) (
                 $row['total_records']
+                ?? 0
+            );
+
+
+        $summary['gross_sales'] =
+            (float) (
+                $row['gross_sales']
                 ?? 0
             );
 
@@ -461,18 +506,41 @@ try {
                 ?? 0
             );
 
+
+        $summary['paid_records'] =
+            (int) (
+                $row['paid_records']
+                ?? 0
+            );
+
+
+        $summary['pending_records'] =
+            (int) (
+                $row['pending_records']
+                ?? 0
+            );
     }
 
-}
 
-catch (Throwable $e) {
+    $summary['net_earnings'] =
+        max(
+            0,
+            $summary['gross_sales']
+            -
+            $summary['total_commission']
+        );
 
+} catch (Throwable $e) {
+
+    /*
+    | Keep defaults if query fails.
+    */
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| COMMISSION RECORDS
+| COMMISSION HISTORY
 |--------------------------------------------------------------------------
 */
 
@@ -481,38 +549,67 @@ $commissions = [];
 
 try {
 
-    $stmt =
-        $db->prepare("
-            SELECT
+    $stmt = $db->prepare("
+        SELECT
 
-                c.commission_id,
-                c.order_id,
-                c.vendor_order_id,
-                c.commission_rate,
-                c.commission_amount,
-                c.status,
-                c.created_at,
+            c.commission_id,
+            c.vendor_id,
+            c.order_id,
+            c.vendor_order_id,
+            c.commission_rate,
+            c.commission_amount,
+            c.status,
+            c.created_at,
+            c.updated_at,
 
-                vo.subtotal,
-                vo.vendor_status,
+            vo.subtotal
+                AS vendor_subtotal,
 
-                o.order_date,
-                o.order_status
+            vo.delivery_fee,
 
-            FROM commission c
+            vo.vendor_status,
 
-            INNER JOIN orders o
-                ON c.order_id = o.order_id
+            vo.tracking_number,
 
-            LEFT JOIN vendor_orders vo
-                ON c.vendor_order_id =
-                   vo.vendor_order_id
+            o.order_date,
 
-            WHERE c.vendor_id = ?
+            o.order_status,
 
-            ORDER BY
-                c.created_at DESC
-        ");
+            p.payment_method,
+
+            p.payment_status
+
+        FROM commission c
+
+        INNER JOIN orders o
+            ON c.order_id =
+               o.order_id
+
+        LEFT JOIN vendor_orders vo
+            ON c.vendor_order_id =
+               vo.vendor_order_id
+
+        LEFT JOIN payments p
+            ON p.payment_id = (
+                SELECT p2.payment_id
+
+                FROM payments p2
+
+                WHERE p2.order_id =
+                      c.order_id
+
+                ORDER BY
+                    p2.payment_id DESC
+
+                LIMIT 1
+            )
+
+        WHERE c.vendor_id = ?
+
+        ORDER BY
+            c.created_at DESC,
+            c.commission_id DESC
+    ");
 
 
     $stmt->execute([
@@ -525,68 +622,9 @@ try {
             PDO::FETCH_ASSOC
         );
 
-}
-
-catch (Throwable $e) {
+} catch (Throwable $e) {
 
     $commissions = [];
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| DERIVED DATA
-|--------------------------------------------------------------------------
-*/
-
-$effectiveRate = 0;
-
-
-if (!empty($commissions)) {
-
-    $latestCommission =
-        $commissions[0];
-
-
-    $effectiveRate =
-        (float) (
-            $latestCommission[
-                'commission_rate'
-            ]
-            ?? 0
-        );
-
-}
-
-
-$netSalesAfterCommission =
-    0;
-
-
-foreach ($commissions as $commission) {
-
-    $subtotal =
-        (float) (
-            $commission['subtotal']
-            ?? 0
-        );
-
-
-    $commissionAmount =
-        (float) (
-            $commission['commission_amount']
-            ?? 0
-        );
-
-
-    $netSalesAfterCommission +=
-        max(
-            0,
-            $subtotal -
-            $commissionAmount
-        );
-
 }
 
 
@@ -598,43 +636,64 @@ foreach ($commissions as $commission) {
 
 $pageTitle =
     'Commission - ' .
-    $vendor['business_name'];
+    (
+        $vendor['business_name']
+        ?? 'Seller'
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| AVATAR INITIAL
+|--------------------------------------------------------------------------
+*/
+
+$vendorUserName =
+    trim(
+        (string) (
+            $vendor['name']
+            ?? 'Vendor'
+        )
+    );
+
+
+$avatarInitial =
+    strtoupper(
+        substr(
+            $vendorUserName,
+            0,
+            1
+        )
+    );
 
 ?>
-<!DOCTYPE html>
 
+<!DOCTYPE html>
 
 <html lang="en">
 
-
 <head>
 
-
     <meta charset="UTF-8">
-
 
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
 
-
     <title>
-        <?= sellerCommissionEscape(
+        <?= commissionEscape(
             $pageTitle
         ) ?>
     </title>
 
 
-    <!-- ============================================================
-         GOOGLE FONT
-    ============================================================= -->
+    <!-- GOOGLE FONTS -->
 
     <link
         rel="preconnect"
         href="https://fonts.googleapis.com"
     >
-
 
     <link
         rel="preconnect"
@@ -642,16 +701,13 @@ $pageTitle =
         crossorigin
     >
 
-
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@600;700;800&display=swap"
         rel="stylesheet"
     >
 
 
-    <!-- ============================================================
-         FONT AWESOME
-    ============================================================= -->
+    <!-- FONT AWESOME -->
 
     <link
         rel="stylesheet"
@@ -659,38 +715,46 @@ $pageTitle =
     >
 
 
-    <!-- ============================================================
-         PROJECT CSS
-    ============================================================= -->
+    <!-- PROJECT CSS -->
 
     <link
         rel="stylesheet"
-        href="css/style.css"
+        href="<?= commissionEscape(
+            BASE_URL
+        ) ?>css/style.css"
     >
 
-
     <link
         rel="stylesheet"
-        href="css/vendor.css"
+        href="<?= commissionEscape(
+            BASE_URL
+        ) ?>css/vendor.css"
     >
 
-
     <link
         rel="stylesheet"
-        href="css/responsive.css"
+        href="<?= commissionEscape(
+            BASE_URL
+        ) ?>css/responsive.css"
     >
 
 
     <style>
 
+        * {
+            box-sizing: border-box;
+        }
 
-        /* ==========================================================
-           PAGE
-        ========================================================== */
 
-        .seller-commission-page {
+        :root {
+            --commission-sidebar: 260px;
+        }
 
-            margin: 0;
+
+        body.seller-commission-page {
+
+            margin:
+                0;
 
             min-height:
                 100vh;
@@ -699,30 +763,30 @@ $pageTitle =
                 hidden;
 
             color:
-                #14213d;
+                #17233c;
 
             background:
-                #f6f8fc;
+                #f5f7fb;
 
             font-family:
                 Inter,
                 Arial,
                 sans-serif;
-
         }
 
 
-        /* ==========================================================
+        /* ============================================================
            MAIN
-        ========================================================== */
+        ============================================================ */
 
-        .seller-commission-main {
+        .commission-main {
 
             width:
                 calc(
                     100% -
                     var(
-                        --seller-sidebar
+                        --seller-sidebar,
+                        260px
                     )
                 );
 
@@ -731,32 +795,32 @@ $pageTitle =
 
             margin-left:
                 var(
-                    --seller-sidebar
+                    --seller-sidebar,
+                    260px
                 );
 
             background:
 
                 radial-gradient(
-                    circle at 95% 5%,
+                    circle at 96% 4%,
                     rgba(
                         37,
                         99,
                         235,
-                        .065
+                        .07
                     ),
-                    transparent 24%
+                    transparent 23%
                 ),
 
                 #f6f8fc;
-
         }
 
 
-        /* ==========================================================
+        /* ============================================================
            TOPBAR
-        ========================================================== */
+        ============================================================ */
 
-        .seller-commission-topbar {
+        .commission-topbar {
 
             height:
                 72px;
@@ -781,17 +845,15 @@ $pageTitle =
                     255,
                     255,
                     255,
-                    .96
+                    .97
                 );
 
             border-bottom:
-                1px solid
-                #e8edf5;
-
+                1px solid #e7edf5;
         }
 
 
-        .seller-commission-topbar-label {
+        .commission-topbar-label {
 
             color:
                 #94a3b8;
@@ -801,11 +863,10 @@ $pageTitle =
 
             font-weight:
                 700;
-
         }
 
 
-        .seller-commission-user {
+        .commission-user {
 
             display:
                 flex;
@@ -814,12 +875,11 @@ $pageTitle =
                 center;
 
             gap:
-                9px;
-
+                10px;
         }
 
 
-        .seller-commission-avatar {
+        .commission-avatar {
 
             width:
                 38px;
@@ -843,7 +903,7 @@ $pageTitle =
 
                 linear-gradient(
                     135deg,
-                    #3b82f6,
+                    #2563eb,
                     #6366f1
                 );
 
@@ -855,11 +915,10 @@ $pageTitle =
 
             font-weight:
                 900;
-
         }
 
 
-        .seller-commission-user strong {
+        .commission-user strong {
 
             display:
                 block;
@@ -870,10 +929,12 @@ $pageTitle =
             font-size:
                 11px;
 
+            font-weight:
+                800;
         }
 
 
-        .seller-commission-user small {
+        .commission-user small {
 
             display:
                 block;
@@ -886,50 +947,47 @@ $pageTitle =
 
             font-size:
                 8px;
-
         }
 
 
-        /* ==========================================================
+        /* ============================================================
            CONTENT
-        ========================================================== */
+        ============================================================ */
 
-        .seller-commission-content {
+        .commission-content {
 
             width:
                 100%;
 
             max-width:
-                1450px;
+                1480px;
 
             margin:
                 0 auto;
 
             padding:
-                28px 32px 60px;
-
+                30px 32px 65px;
         }
 
 
-        /* ==========================================================
-           PAGE HEADER
-        ========================================================== */
+        /* ============================================================
+           HEADING
+        ============================================================ */
 
-        .seller-commission-heading {
+        .commission-heading {
 
             margin-bottom:
                 22px;
-
         }
 
 
-        .seller-commission-eyebrow {
+        .commission-eyebrow {
 
             display:
                 block;
 
             margin-bottom:
-                5px;
+                6px;
 
             color:
                 #2563eb;
@@ -942,11 +1000,10 @@ $pageTitle =
 
             letter-spacing:
                 1.5px;
-
         }
 
 
-        .seller-commission-heading h1 {
+        .commission-heading h1 {
 
             margin:
                 0;
@@ -954,42 +1011,47 @@ $pageTitle =
             color:
                 #14213d;
 
-            font-size:
+            font-family:
+                Poppins,
+                Inter,
+                sans-serif;
 
+            font-size:
                 clamp(
-                    25px,
+                    26px,
                     3vw,
-                    33px
+                    34px
                 );
 
             font-weight:
-                900;
+                800;
 
             letter-spacing:
                 -.8px;
-
         }
 
 
-        .seller-commission-heading p {
+        .commission-heading p {
 
             margin:
                 7px 0 0;
 
             color:
-                #7b879c;
+                #7d8ba0;
 
             font-size:
                 11px;
 
+            line-height:
+                1.6;
         }
 
 
-        /* ==========================================================
+        /* ============================================================
            HERO
-        ========================================================== */
+        ============================================================ */
 
-        .seller-commission-hero {
+        .commission-hero {
 
             position:
                 relative;
@@ -998,13 +1060,13 @@ $pageTitle =
                 hidden;
 
             min-height:
-                175px;
+                190px;
 
             margin-bottom:
                 22px;
 
             padding:
-                31px;
+                32px;
 
             display:
                 flex;
@@ -1016,7 +1078,7 @@ $pageTitle =
                 space-between;
 
             gap:
-                25px;
+                30px;
 
             color:
                 #ffffff;
@@ -1024,31 +1086,28 @@ $pageTitle =
             background:
 
                 linear-gradient(
-                    110deg,
+                    115deg,
                     #08265a 0%,
-                    #123d8c 48%,
+                    #123d8c 50%,
                     #2783ef 100%
                 );
 
             border-radius:
-                23px;
+                24px;
 
             box-shadow:
 
-                0
-                17px
-                38px
+                0 18px 42px
                 rgba(
                     18,
                     70,
                     150,
-                    .13
+                    .14
                 );
-
         }
 
 
-        .seller-commission-hero::before {
+        .commission-hero::before {
 
             content:
                 "";
@@ -1057,19 +1116,16 @@ $pageTitle =
                 absolute;
 
             width:
-                220px;
+                260px;
 
             height:
-                220px;
+                260px;
 
             top:
-                -130px;
+                -150px;
 
             right:
-                -45px;
-
-            border-radius:
-                50%;
+                -60px;
 
             background:
                 rgba(
@@ -1079,10 +1135,12 @@ $pageTitle =
                     .08
                 );
 
+            border-radius:
+                50%;
         }
 
 
-        .seller-commission-hero::after {
+        .commission-hero::after {
 
             content:
                 "";
@@ -1091,19 +1149,16 @@ $pageTitle =
                 absolute;
 
             width:
-                145px;
+                160px;
 
             height:
-                145px;
+                160px;
 
             right:
-                150px;
+                145px;
 
             bottom:
-                -100px;
-
-            border-radius:
-                50%;
+                -115px;
 
             background:
                 rgba(
@@ -1113,21 +1168,22 @@ $pageTitle =
                     .05
                 );
 
+            border-radius:
+                50%;
         }
 
 
-        .seller-commission-hero-copy {
+        .commission-hero-copy {
 
             position:
                 relative;
 
             z-index:
                 2;
-
         }
 
 
-        .seller-commission-hero-label {
+        .commission-hero-label {
 
             display:
                 block;
@@ -1145,12 +1201,11 @@ $pageTitle =
                 900;
 
             letter-spacing:
-                1.3px;
-
+                1.4px;
         }
 
 
-        .seller-commission-hero h2 {
+        .commission-hero h2 {
 
             margin:
                 0 0 8px;
@@ -1168,14 +1223,13 @@ $pageTitle =
 
             font-weight:
                 800;
-
         }
 
 
-        .seller-commission-hero p {
+        .commission-hero p {
 
             max-width:
-                625px;
+                720px;
 
             margin:
                 0;
@@ -1185,19 +1239,18 @@ $pageTitle =
                     255,
                     255,
                     255,
-                    .77
+                    .78
                 );
 
             font-size:
                 10px;
 
             line-height:
-                1.7;
-
+                1.75;
         }
 
 
-        .seller-commission-hero-icon {
+        .commission-hero-icon {
 
             position:
                 relative;
@@ -1206,10 +1259,10 @@ $pageTitle =
                 2;
 
             width:
-                72px;
+                78px;
 
             height:
-                72px;
+                78px;
 
             flex-shrink:
                 0;
@@ -1244,19 +1297,18 @@ $pageTitle =
                 );
 
             border-radius:
-                20px;
+                21px;
 
             font-size:
-                25px;
-
+                27px;
         }
 
 
-        /* ==========================================================
+        /* ============================================================
            APPROVAL ALERT
-        ========================================================== */
+        ============================================================ */
 
-        .seller-commission-alert {
+        .commission-alert {
 
             margin-bottom:
                 20px;
@@ -1280,8 +1332,7 @@ $pageTitle =
                 #fffbeb;
 
             border:
-                1px solid
-                #fde68a;
+                1px solid #fde68a;
 
             border-radius:
                 12px;
@@ -1291,15 +1342,192 @@ $pageTitle =
 
             font-weight:
                 700;
-
         }
 
 
-        /* ==========================================================
-           STATS
-        ========================================================== */
+        /* ============================================================
+           CURRENT RATE CARD
+        ============================================================ */
 
-        .seller-commission-stats {
+        .commission-rate-panel {
+
+            margin-bottom:
+                22px;
+
+            padding:
+                20px;
+
+            display:
+                grid;
+
+            grid-template-columns:
+                auto
+                minmax(
+                    0,
+                    1fr
+                )
+                auto;
+
+            align-items:
+                center;
+
+            gap:
+                15px;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid #dde7f3;
+
+            border-radius:
+                17px;
+
+            box-shadow:
+
+                0 8px 22px
+                rgba(
+                    40,
+                    65,
+                    120,
+                    .045
+                );
+        }
+
+
+        .commission-rate-icon {
+
+            width:
+                48px;
+
+            height:
+                48px;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            color:
+                #7c3aed;
+
+            background:
+                #f5f3ff;
+
+            border-radius:
+                13px;
+
+            font-size:
+                17px;
+        }
+
+
+        .commission-rate-copy small {
+
+            display:
+                block;
+
+            margin-bottom:
+                4px;
+
+            color:
+                #8b99ad;
+
+            font-size:
+                7px;
+
+            font-weight:
+                900;
+
+            letter-spacing:
+                .7px;
+        }
+
+
+        .commission-rate-copy strong {
+
+            display:
+                block;
+
+            color:
+                #14213d;
+
+            font-size:
+                12px;
+
+            font-weight:
+                900;
+        }
+
+
+        .commission-rate-copy p {
+
+            margin:
+                4px 0 0;
+
+            color:
+                #8190a5;
+
+            font-size:
+                8px;
+
+            line-height:
+                1.6;
+        }
+
+
+        .commission-rate-value {
+
+            min-width:
+                105px;
+
+            min-height:
+                48px;
+
+            padding:
+                0 15px;
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            color:
+                #7c3aed;
+
+            background:
+                #f5f3ff;
+
+            border:
+                1px solid #e5ddff;
+
+            border-radius:
+                13px;
+
+            font-size:
+                19px;
+
+            font-weight:
+                900;
+        }
+
+
+        /* ============================================================
+           STATS
+        ============================================================ */
+
+        .commission-stats {
+
+            margin-bottom:
+                22px;
 
             display:
                 grid;
@@ -1315,15 +1543,11 @@ $pageTitle =
                 );
 
             gap:
-                17px;
-
-            margin-bottom:
-                22px;
-
+                16px;
         }
 
 
-        .seller-commission-stat {
+        .commission-stat {
 
             position:
                 relative;
@@ -1332,7 +1556,7 @@ $pageTitle =
                 hidden;
 
             min-height:
-                140px;
+                145px;
 
             padding:
                 20px;
@@ -1341,28 +1565,24 @@ $pageTitle =
                 #ffffff;
 
             border:
-                1px solid
-                #e5eaf2;
+                1px solid #e4eaf2;
 
             border-radius:
                 18px;
 
             box-shadow:
 
-                0
-                9px
-                25px
+                0 9px 25px
                 rgba(
                     40,
                     65,
                     120,
                     .05
                 );
-
         }
 
 
-        .seller-commission-stat::after {
+        .commission-stat::after {
 
             content:
                 "";
@@ -1371,51 +1591,44 @@ $pageTitle =
                 absolute;
 
             width:
-                90px;
+                95px;
 
             height:
-                90px;
+                95px;
 
             right:
-                -32px;
+                -34px;
 
             bottom:
-                -38px;
-
-            border-radius:
-                50%;
+                -40px;
 
             background:
                 #eef4ff;
 
+            border-radius:
+                50%;
         }
 
 
-        .seller-commission-stat.green::after {
-
+        .commission-stat.green::after {
             background:
                 #ecfdf3;
-
         }
 
 
-        .seller-commission-stat.orange::after {
-
+        .commission-stat.orange::after {
             background:
                 #fff7ed;
-
         }
 
 
-        .seller-commission-stat.purple::after {
-
+        .commission-stat.purple::after {
             background:
                 #f5f3ff;
-
         }
 
 
-        .seller-commission-stat-icon {
+        .commission-stat-icon {
 
             position:
                 relative;
@@ -1424,13 +1637,13 @@ $pageTitle =
                 2;
 
             width:
-                40px;
+                41px;
 
             height:
-                40px;
+                41px;
 
             margin-bottom:
-                12px;
+                13px;
 
             display:
                 flex;
@@ -1451,48 +1664,44 @@ $pageTitle =
                 11px;
 
             font-size:
-                14px;
-
+                15px;
         }
 
 
-        .seller-commission-stat.green
-        .seller-commission-stat-icon {
+        .commission-stat.green
+        .commission-stat-icon {
 
             color:
                 #16a34a;
 
             background:
                 #ecfdf3;
-
         }
 
 
-        .seller-commission-stat.orange
-        .seller-commission-stat-icon {
+        .commission-stat.orange
+        .commission-stat-icon {
 
             color:
                 #ea580c;
 
             background:
                 #fff7ed;
-
         }
 
 
-        .seller-commission-stat.purple
-        .seller-commission-stat-icon {
+        .commission-stat.purple
+        .commission-stat-icon {
 
             color:
                 #7c3aed;
 
             background:
                 #f5f3ff;
-
         }
 
 
-        .seller-commission-stat-label {
+        .commission-stat-label {
 
             position:
                 relative;
@@ -1517,11 +1726,10 @@ $pageTitle =
 
             letter-spacing:
                 .8px;
-
         }
 
 
-        .seller-commission-stat-value {
+        .commission-stat-value {
 
             position:
                 relative;
@@ -1536,43 +1744,65 @@ $pageTitle =
                 #14213d;
 
             font-size:
-                22px;
-
-            line-height:
-                1.2;
+                21px;
 
             font-weight:
                 900;
-
         }
 
 
-        /* ==========================================================
-           INFORMATION ROW
-        ========================================================== */
+        /* ============================================================
+           FINANCE FLOW
+        ============================================================ */
 
-        .seller-commission-insights {
+        .commission-flow {
+
+            margin-bottom:
+                22px;
+
+            padding:
+                20px;
 
             display:
                 grid;
 
             grid-template-columns:
-                1fr
-                1fr;
+                1fr auto 1fr auto 1fr;
+
+            align-items:
+                center;
 
             gap:
-                17px;
+                14px;
 
-            margin-bottom:
-                22px;
+            background:
+                #ffffff;
 
+            border:
+                1px solid #e4eaf2;
+
+            border-radius:
+                18px;
+
+            box-shadow:
+
+                0 8px 23px
+                rgba(
+                    40,
+                    65,
+                    120,
+                    .045
+                );
         }
 
 
-        .seller-commission-insight {
+        .commission-flow-card {
+
+            min-height:
+                95px;
 
             padding:
-                18px;
+                15px;
 
             display:
                 flex;
@@ -1581,40 +1811,26 @@ $pageTitle =
                 center;
 
             gap:
-                13px;
+                12px;
 
             background:
-                #ffffff;
+                #fbfdff;
 
             border:
-                1px solid
-                #e5eaf2;
+                1px solid #e6ecf4;
 
             border-radius:
-                16px;
-
-            box-shadow:
-
-                0
-                8px
-                22px
-                rgba(
-                    40,
-                    65,
-                    120,
-                    .04
-                );
-
+                13px;
         }
 
 
-        .seller-commission-insight-icon {
+        .commission-flow-icon {
 
             width:
-                45px;
+                40px;
 
             height:
-                45px;
+                40px;
 
             flex-shrink:
                 0;
@@ -1635,15 +1851,33 @@ $pageTitle =
                 #eff6ff;
 
             border-radius:
-                12px;
-
-            font-size:
-                15px;
-
+                11px;
         }
 
 
-        .seller-commission-insight small {
+        .commission-flow-card.deduction
+        .commission-flow-icon {
+
+            color:
+                #dc2626;
+
+            background:
+                #fef2f2;
+        }
+
+
+        .commission-flow-card.net
+        .commission-flow-icon {
+
+            color:
+                #15803d;
+
+            background:
+                #ecfdf3;
+        }
+
+
+        .commission-flow-card span {
 
             display:
                 block;
@@ -1652,65 +1886,56 @@ $pageTitle =
                 4px;
 
             color:
-                #8b99ad;
+                #8a98aa;
 
             font-size:
                 7px;
 
             font-weight:
-                800;
+                900;
 
             letter-spacing:
                 .6px;
-
         }
 
 
-        .seller-commission-insight strong {
-
-            display:
-                block;
+        .commission-flow-card strong {
 
             color:
-                #14213d;
+                #17345f;
 
             font-size:
-                12px;
+                14px;
 
             font-weight:
                 900;
-
         }
 
 
-        .seller-commission-insight p {
-
-            margin:
-                3px 0 0;
+        .commission-flow-symbol {
 
             color:
-                #8090a7;
+                #a2afbf;
 
             font-size:
-                8px;
+                17px;
 
-            line-height:
-                1.55;
-
+            font-weight:
+                900;
         }
 
 
-        /* ==========================================================
+        /* ============================================================
            INFO PANEL
-        ========================================================== */
+        ============================================================ */
 
-        .seller-commission-info {
+        .commission-info {
 
             margin-bottom:
                 22px;
 
             padding:
-                19px;
+                18px;
 
             display:
                 grid;
@@ -1726,7 +1951,7 @@ $pageTitle =
                 center;
 
             gap:
-                15px;
+                14px;
 
             background:
 
@@ -1737,16 +1962,14 @@ $pageTitle =
                 );
 
             border:
-                1px solid
-                #dce9f8;
+                1px solid #dce9f8;
 
             border-radius:
                 16px;
-
         }
 
 
-        .seller-commission-info-icon {
+        .commission-info-icon {
 
             width:
                 48px;
@@ -1770,19 +1993,17 @@ $pageTitle =
                 #ffffff;
 
             border:
-                1px solid
-                #dbeafe;
+                1px solid #dbeafe;
 
             border-radius:
                 13px;
 
             font-size:
                 17px;
-
         }
 
 
-        .seller-commission-info strong {
+        .commission-info strong {
 
             display:
                 block;
@@ -1798,11 +2019,10 @@ $pageTitle =
 
             font-weight:
                 900;
-
         }
 
 
-        .seller-commission-info p {
+        .commission-info p {
 
             margin:
                 0;
@@ -1814,16 +2034,15 @@ $pageTitle =
                 8px;
 
             line-height:
-                1.65;
-
+                1.7;
         }
 
 
-        /* ==========================================================
-           TABLE PANEL
-        ========================================================== */
+        /* ============================================================
+           HISTORY PANEL
+        ============================================================ */
 
-        .seller-commission-panel {
+        .commission-panel {
 
             overflow:
                 hidden;
@@ -1832,28 +2051,24 @@ $pageTitle =
                 #ffffff;
 
             border:
-                1px solid
-                #e5eaf2;
+                1px solid #e5eaf2;
 
             border-radius:
                 21px;
 
             box-shadow:
 
-                0
-                11px
-                30px
+                0 11px 30px
                 rgba(
                     40,
                     65,
                     120,
                     .055
                 );
-
         }
 
 
-        .seller-commission-panel-header {
+        .commission-panel-header {
 
             min-height:
                 88px;
@@ -1874,13 +2089,11 @@ $pageTitle =
                 18px;
 
             border-bottom:
-                1px solid
-                #edf1f5;
-
+                1px solid #edf1f5;
         }
 
 
-        .seller-commission-panel-title {
+        .commission-panel-title {
 
             display:
                 flex;
@@ -1890,11 +2103,10 @@ $pageTitle =
 
             gap:
                 12px;
-
         }
 
 
-        .seller-commission-panel-icon {
+        .commission-panel-icon {
 
             width:
                 45px;
@@ -1930,9 +2142,7 @@ $pageTitle =
 
             box-shadow:
 
-                0
-                8px
-                18px
+                0 8px 18px
                 rgba(
                     37,
                     99,
@@ -1942,11 +2152,10 @@ $pageTitle =
 
             font-size:
                 15px;
-
         }
 
 
-        .seller-commission-panel-title h2 {
+        .commission-panel-title h2 {
 
             margin:
                 0 0 4px;
@@ -1959,11 +2168,10 @@ $pageTitle =
 
             font-weight:
                 900;
-
         }
 
 
-        .seller-commission-panel-title p {
+        .commission-panel-title p {
 
             margin:
                 0;
@@ -1973,11 +2181,10 @@ $pageTitle =
 
             font-size:
                 8px;
-
         }
 
 
-        .seller-commission-count {
+        .commission-record-count {
 
             min-height:
                 32px;
@@ -2001,8 +2208,7 @@ $pageTitle =
                 #eff6ff;
 
             border:
-                1px solid
-                #dbeafe;
+                1px solid #dbeafe;
 
             border-radius:
                 999px;
@@ -2011,62 +2217,57 @@ $pageTitle =
                 8px;
 
             font-weight:
-                800;
-
+                900;
         }
 
 
-        /* ==========================================================
+        /* ============================================================
            TABLE
-        ========================================================== */
+        ============================================================ */
 
-        .seller-commission-table-wrap {
+        .commission-table-wrap {
 
             width:
                 100%;
 
             overflow-x:
                 auto;
-
         }
 
 
-        .seller-commission-table {
+        .commission-table {
 
             width:
                 100%;
 
             min-width:
-                1000px;
+                1180px;
 
             border-collapse:
                 collapse;
-
         }
 
 
-        .seller-commission-table thead {
+        .commission-table thead {
 
             background:
                 #f8fafc;
-
         }
 
 
-        .seller-commission-table th {
+        .commission-table th {
 
             height:
-                44px;
+                46px;
 
             padding:
-                0 17px;
+                0 16px;
 
             color:
                 #64748b;
 
             border-bottom:
-                1px solid
-                #e6ebf2;
+                1px solid #e6ebf2;
 
             font-size:
                 7px;
@@ -2083,51 +2284,45 @@ $pageTitle =
             text-transform:
                 uppercase;
 
+            white-space:
+                nowrap;
         }
 
 
-        .seller-commission-table td {
+        .commission-table td {
 
             padding:
-                15px 17px;
+                15px 16px;
 
             color:
                 #52647d;
 
             border-bottom:
-                1px solid
-                #edf1f5;
+                1px solid #edf1f5;
 
             font-size:
                 9px;
 
             vertical-align:
                 middle;
-
         }
 
 
-        .seller-commission-table tbody tr:hover {
+        .commission-table tbody tr:hover {
 
             background:
                 #fbfdff;
-
         }
 
 
-        .seller-commission-table tbody tr:last-child td {
+        .commission-table tbody tr:last-child td {
 
             border-bottom:
                 0;
-
         }
 
 
-        /* ==========================================================
-           ID
-        ========================================================== */
-
-        .seller-commission-id {
+        .commission-id {
 
             color:
                 #2563eb;
@@ -2137,15 +2332,10 @@ $pageTitle =
 
             font-weight:
                 900;
-
         }
 
 
-        /* ==========================================================
-           ORDER
-        ========================================================== */
-
-        .seller-commission-order {
+        .commission-order {
 
             display:
                 flex;
@@ -2155,11 +2345,10 @@ $pageTitle =
 
             gap:
                 9px;
-
         }
 
 
-        .seller-commission-order-icon {
+        .commission-order-icon {
 
             width:
                 34px;
@@ -2187,14 +2376,10 @@ $pageTitle =
 
             border-radius:
                 9px;
-
-            font-size:
-                10px;
-
         }
 
 
-        .seller-commission-order strong {
+        .commission-order strong {
 
             display:
                 block;
@@ -2210,26 +2395,20 @@ $pageTitle =
 
             font-weight:
                 900;
-
         }
 
 
-        .seller-commission-order small {
+        .commission-order small {
 
             color:
                 #94a3b8;
 
             font-size:
                 7px;
-
         }
 
 
-        /* ==========================================================
-           RATE
-        ========================================================== */
-
-        .seller-commission-rate {
+        .commission-rate-badge {
 
             min-height:
                 27px;
@@ -2260,15 +2439,10 @@ $pageTitle =
 
             font-weight:
                 900;
-
         }
 
 
-        /* ==========================================================
-           MONEY
-        ========================================================== */
-
-        .seller-commission-money {
+        .commission-money {
 
             color:
                 #12366a;
@@ -2279,22 +2453,26 @@ $pageTitle =
             font-weight:
                 900;
 
+            white-space:
+                nowrap;
         }
 
 
-        .seller-commission-money.highlight {
+        .commission-money.deduction {
 
             color:
-                #2563eb;
-
+                #dc2626;
         }
 
 
-        /* ==========================================================
-           STATUS
-        ========================================================== */
+        .commission-money.net {
 
-        .seller-commission-status {
+            color:
+                #15803d;
+        }
+
+
+        .commission-status {
 
             min-height:
                 28px;
@@ -2319,11 +2497,10 @@ $pageTitle =
 
             font-weight:
                 900;
-
         }
 
 
-        .seller-commission-status::before {
+        .commission-status::before {
 
             content:
                 "";
@@ -2339,59 +2516,54 @@ $pageTitle =
 
             background:
                 currentColor;
-
         }
 
 
-        .seller-commission-status.paid {
+        .commission-status.paid {
 
             color:
                 #15803d;
 
             background:
                 #ecfdf3;
-
         }
 
 
-        .seller-commission-status.pending {
+        .commission-status.pending {
 
             color:
                 #b45309;
 
             background:
                 #fffbeb;
-
         }
 
 
-        .seller-commission-status.default {
+        .commission-status.default {
 
             color:
                 #64748b;
 
             background:
                 #f1f5f9;
-
         }
 
 
-        /* ==========================================================
+        /* ============================================================
            EMPTY
-        ========================================================== */
+        ============================================================ */
 
-        .seller-commission-empty {
+        .commission-empty {
 
             padding:
-                68px 20px;
+                70px 20px;
 
             text-align:
                 center;
-
         }
 
 
-        .seller-commission-empty-icon {
+        .commission-empty-icon {
 
             width:
                 62px;
@@ -2422,11 +2594,10 @@ $pageTitle =
 
             font-size:
                 24px;
-
         }
 
 
-        .seller-commission-empty h3 {
+        .commission-empty h3 {
 
             margin:
                 0 0 6px;
@@ -2439,11 +2610,10 @@ $pageTitle =
 
             font-weight:
                 900;
-
         }
 
 
-        .seller-commission-empty p {
+        .commission-empty p {
 
             margin:
                 0;
@@ -2453,19 +2623,18 @@ $pageTitle =
 
             font-size:
                 9px;
-
         }
 
 
-        /* ==========================================================
+        /* ============================================================
            RESPONSIVE
-        ========================================================== */
+        ============================================================ */
 
         @media (
-            max-width: 1150px
+            max-width: 1180px
         ) {
 
-            .seller-commission-stats {
+            .commission-stats {
 
                 grid-template-columns:
 
@@ -2476,23 +2645,26 @@ $pageTitle =
                             1fr
                         )
                     );
-
             }
 
-        }
 
-
-        @media (
-            max-width: 850px
-        ) {
-
-            .seller-commission-insights {
+            .commission-flow {
 
                 grid-template-columns:
                     1fr;
-
             }
 
+
+            .commission-flow-symbol {
+
+                text-align:
+                    center;
+
+                transform:
+                    rotate(
+                        90deg
+                    );
+            }
         }
 
 
@@ -2500,32 +2672,49 @@ $pageTitle =
             max-width: 768px
         ) {
 
-            .seller-commission-main {
+            .commission-main {
 
                 width:
                     100%;
 
                 margin-left:
                     0;
-
             }
 
 
-            .seller-commission-topbar {
+            .commission-topbar {
 
                 padding:
                     0 20px;
-
             }
 
 
-            .seller-commission-content {
+            .commission-content {
 
                 padding:
                     24px 20px 50px;
-
             }
 
+
+            .commission-rate-panel {
+
+                grid-template-columns:
+                    auto
+                    minmax(
+                        0,
+                        1fr
+                    );
+            }
+
+
+            .commission-rate-value {
+
+                grid-column:
+                    1 / -1;
+
+                width:
+                    100%;
+            }
         }
 
 
@@ -2533,102 +2722,95 @@ $pageTitle =
             max-width: 600px
         ) {
 
-            .seller-commission-user
-            > div:last-child {
-
-                display:
-                    none;
-
-            }
-
-
-            .seller-commission-content {
+            .commission-content {
 
                 padding:
                     20px 14px 45px;
-
             }
 
 
-            .seller-commission-hero {
+            .commission-user > div:last-child {
+
+                display:
+                    none;
+            }
+
+
+            .commission-hero {
 
                 min-height:
                     auto;
 
                 padding:
-                    23px;
+                    24px;
 
                 align-items:
                     flex-start;
-
             }
 
 
-            .seller-commission-hero h2 {
+            .commission-hero h2 {
 
                 font-size:
                     20px;
-
             }
 
 
-            .seller-commission-hero-icon {
+            .commission-hero-icon {
 
                 width:
-                    53px;
+                    54px;
 
                 height:
-                    53px;
+                    54px;
 
                 font-size:
                     19px;
-
             }
 
 
-            .seller-commission-stats {
+            .commission-stats {
 
                 grid-template-columns:
                     1fr;
-
             }
 
 
-            .seller-commission-panel-header {
+            .commission-panel-header {
 
                 align-items:
                     flex-start;
 
                 flex-direction:
                     column;
-
             }
 
 
-            .seller-commission-info {
+            .commission-info {
 
                 grid-template-columns:
                     1fr;
-
             }
-
         }
 
-
     </style>
-
 
 </head>
 
 
-<body class="seller-dashboard-page seller-commission-page">
+<body
+    class="
+        seller-dashboard-page
+        seller-commission-page
+    "
+>
 
 
 <?php
 
 /*
 |--------------------------------------------------------------------------
-| SHARED SELLER SIDEBAR
+| SELLER SIDEBAR
 |--------------------------------------------------------------------------
 */
 
@@ -2638,41 +2820,30 @@ require_once __DIR__ .
 ?>
 
 
-<!-- ===============================================================
-     MAIN
-================================================================ -->
-
-<main class="seller-commission-main">
+<main class="commission-main">
 
 
-    <!-- ===========================================================
+    <!-- ============================================================
          TOPBAR
-    ============================================================ -->
+    ============================================================= -->
 
-    <header class="seller-commission-topbar">
+    <header class="commission-topbar">
 
 
-        <span class="seller-commission-topbar-label">
+        <span class="commission-topbar-label">
 
             Seller Center
 
         </span>
 
 
-        <div class="seller-commission-user">
+        <div class="commission-user">
 
 
-            <div class="seller-commission-avatar">
+            <div class="commission-avatar">
 
-                <?= sellerCommissionEscape(
-                    strtoupper(
-                        substr(
-                            $vendor['name']
-                            ?? 'V',
-                            0,
-                            1
-                        )
-                    )
+                <?= commissionEscape(
+                    $avatarInitial
                 ) ?>
 
             </div>
@@ -2680,23 +2851,24 @@ require_once __DIR__ .
 
             <div>
 
-
                 <strong>
 
-                    <?= sellerCommissionEscape(
-                        $vendor['name']
-                        ?? 'Vendor'
+                    <?= commissionEscape(
+                        $vendorUserName
                     ) ?>
 
                 </strong>
 
-
                 <small>
 
-                    Vendor
+                    <?= commissionEscape(
+                        $vendor[
+                            'business_name'
+                        ]
+                        ?? 'Vendor'
+                    ) ?>
 
                 </small>
-
 
             </div>
 
@@ -2707,22 +2879,21 @@ require_once __DIR__ .
     </header>
 
 
-
-    <!-- ===========================================================
+    <!-- ============================================================
          CONTENT
-    ============================================================ -->
+    ============================================================= -->
 
-    <div class="seller-commission-content">
+    <div class="commission-content">
 
 
-        <!-- =======================================================
+        <!-- ========================================================
              PAGE HEADING
-        ======================================================== -->
+        ========================================================= -->
 
-        <section class="seller-commission-heading">
+        <section class="commission-heading">
 
 
-            <span class="seller-commission-eyebrow">
+            <span class="commission-eyebrow">
 
                 FINANCE & COMMISSION
 
@@ -2731,19 +2902,23 @@ require_once __DIR__ .
 
             <h1>
 
-                Commission
+                Commission & Earnings
 
             </h1>
 
 
             <p>
 
-                Track platform commission generated from
-                orders under
+                Track sales, commission deduction and
+                estimated earnings for
 
-                <?= sellerCommissionEscape(
-                    $vendor['business_name']
-                ) ?>.
+                <strong>
+                    <?= commissionEscape(
+                        $vendor[
+                            'business_name'
+                        ]
+                    ) ?>
+                </strong>.
 
             </p>
 
@@ -2751,18 +2926,17 @@ require_once __DIR__ .
         </section>
 
 
-
-        <!-- =======================================================
+        <!-- ========================================================
              HERO
-        ======================================================== -->
+        ========================================================= -->
 
-        <section class="seller-commission-hero">
-
-
-            <div class="seller-commission-hero-copy">
+        <section class="commission-hero">
 
 
-                <span class="seller-commission-hero-label">
+            <div class="commission-hero-copy">
+
+
+                <span class="commission-hero-label">
 
                     SELLER FINANCE
 
@@ -2771,17 +2945,18 @@ require_once __DIR__ .
 
                 <h2>
 
-                    See exactly where your commission goes.
+                    Know exactly how much you earn.
 
                 </h2>
 
 
                 <p>
 
-                    Review commission charged on vendor orders,
-                    track pending and paid amounts, and understand
-                    how each transaction contributes to your
-                    overall store finances.
+                    Every vendor order stores the commission rate
+                    used for that transaction. Your store's current
+                    commission setting is shown separately, while
+                    historical records continue using the rate that
+                    was saved when each order was created.
 
                 </p>
 
@@ -2789,9 +2964,9 @@ require_once __DIR__ .
             </div>
 
 
-            <div class="seller-commission-hero-icon">
+            <div class="commission-hero-icon">
 
-                <i class="fa-solid fa-circle-dollar-to-slot"></i>
+                <i class="fa-solid fa-wallet"></i>
 
             </div>
 
@@ -2799,38 +2974,40 @@ require_once __DIR__ .
         </section>
 
 
-
-        <!-- =======================================================
+        <!-- ========================================================
              APPROVAL ALERT
-        ======================================================== -->
+        ========================================================= -->
 
         <?php if (
             strtolower(
                 trim(
                     (string)
-                    $vendor['approval_status']
+                    $vendorApprovalStatus
                 )
             ) !== 'approved'
         ): ?>
 
 
-            <div class="seller-commission-alert">
+            <div class="commission-alert">
 
                 <i class="fa-solid fa-triangle-exclamation"></i>
 
+                <span>
 
-                Your vendor account is currently
+                    Your vendor account is currently
 
-                <strong>
+                    <strong>
 
-                    <?= sellerCommissionEscape(
-                        $vendor['approval_status']
-                    ) ?>
+                        <?= commissionEscape(
+                            $vendorApprovalStatus
+                        ) ?>
 
-                </strong>.
+                    </strong>.
 
-                Commission information may be limited until
-                your store is approved.
+                    Commission information may be limited
+                    until the store is approved.
+
+                </span>
 
             </div>
 
@@ -2838,41 +3015,130 @@ require_once __DIR__ .
         <?php endif; ?>
 
 
+        <!-- ========================================================
+             CURRENT COMMISSION RATE
+        ========================================================= -->
 
-        <!-- =======================================================
+        <section class="commission-rate-panel">
+
+
+            <div class="commission-rate-icon">
+
+                <i class="fa-solid fa-percent"></i>
+
+            </div>
+
+
+            <div class="commission-rate-copy">
+
+                <small>
+
+                    CURRENT STORE COMMISSION RATE
+
+                </small>
+
+                <strong>
+
+                    Your configured commission rate
+
+                </strong>
+
+                <p>
+
+                    This value comes directly from your vendor
+                    profile. New eligible orders use this rate
+                    when their commission record is created.
+
+                </p>
+
+            </div>
+
+
+            <div class="commission-rate-value">
+
+                <?= number_format(
+                    $currentCommissionRate,
+                    2
+                ) ?>%
+
+            </div>
+
+
+        </section>
+
+
+        <!-- ========================================================
              STATS
-        ======================================================== -->
+        ========================================================= -->
 
-        <section class="seller-commission-stats">
-
-
-            <!-- TOTAL -->
-
-            <article class="seller-commission-stat">
+        <section class="commission-stats">
 
 
-                <div class="seller-commission-stat-icon">
+            <!-- GROSS SALES -->
 
-                    <i class="fa-solid fa-coins"></i>
+            <article class="commission-stat">
+
+
+                <div class="commission-stat-icon">
+
+                    <i class="fa-solid fa-chart-line"></i>
 
                 </div>
 
 
-                <span class="seller-commission-stat-label">
+                <span class="commission-stat-label">
+
+                    GROSS SALES
+
+                </span>
+
+
+                <strong class="commission-stat-value">
+
+                    RM
+                    <?= commissionMoney(
+                        $summary[
+                            'gross_sales'
+                        ]
+                    ) ?>
+
+                </strong>
+
+
+            </article>
+
+
+            <!-- COMMISSION -->
+
+            <article
+                class="
+                    commission-stat
+                    orange
+                "
+            >
+
+
+                <div class="commission-stat-icon">
+
+                    <i class="fa-solid fa-circle-minus"></i>
+
+                </div>
+
+
+                <span class="commission-stat-label">
 
                     TOTAL COMMISSION
 
                 </span>
 
 
-                <strong class="seller-commission-stat-value">
+                <strong class="commission-stat-value">
 
                     RM
-                    <?= number_format(
+                    <?= commissionMoney(
                         $summary[
                             'total_commission'
-                        ],
-                        2
+                        ]
                     ) ?>
 
                 </strong>
@@ -2881,114 +3147,70 @@ require_once __DIR__ .
             </article>
 
 
-
-            <!-- PAID -->
+            <!-- NET -->
 
             <article
                 class="
-                    seller-commission-stat
+                    commission-stat
                     green
                 "
             >
 
 
-                <div class="seller-commission-stat-icon">
+                <div class="commission-stat-icon">
 
-                    <i class="fa-solid fa-circle-check"></i>
+                    <i class="fa-solid fa-wallet"></i>
 
                 </div>
 
 
-                <span class="seller-commission-stat-label">
+                <span class="commission-stat-label">
 
-                    PAID COMMISSION
+                    NET EARNINGS
 
                 </span>
 
 
-                <strong class="seller-commission-stat-value">
+                <strong class="commission-stat-value">
 
                     RM
-                    <?= number_format(
+                    <?= commissionMoney(
                         $summary[
-                            'paid_commission'
-                        ],
-                        2
+                            'net_earnings'
+                        ]
                     ) ?>
 
                 </strong>
 
 
             </article>
-
-
-
-            <!-- PENDING -->
-
-            <article
-                class="
-                    seller-commission-stat
-                    orange
-                "
-            >
-
-
-                <div class="seller-commission-stat-icon">
-
-                    <i class="fa-solid fa-clock"></i>
-
-                </div>
-
-
-                <span class="seller-commission-stat-label">
-
-                    PENDING COMMISSION
-
-                </span>
-
-
-                <strong class="seller-commission-stat-value">
-
-                    RM
-                    <?= number_format(
-                        $summary[
-                            'pending_commission'
-                        ],
-                        2
-                    ) ?>
-
-                </strong>
-
-
-            </article>
-
 
 
             <!-- RECORDS -->
 
             <article
                 class="
-                    seller-commission-stat
+                    commission-stat
                     purple
                 "
             >
 
 
-                <div class="seller-commission-stat-icon">
+                <div class="commission-stat-icon">
 
                     <i class="fa-solid fa-receipt"></i>
 
                 </div>
 
 
-                <span class="seller-commission-stat-label">
+                <span class="commission-stat-label">
 
                     COMMISSION RECORDS
 
                 </span>
 
 
-                <strong class="seller-commission-stat-value">
+                <strong class="commission-stat-value">
 
                     <?= number_format(
                         $summary[
@@ -3005,20 +3227,64 @@ require_once __DIR__ .
         </section>
 
 
+        <!-- ========================================================
+             FINANCE FLOW
+        ========================================================= -->
 
-        <!-- =======================================================
-             INSIGHTS
-        ======================================================== -->
-
-        <section class="seller-commission-insights">
-
-
-            <!-- RATE -->
-
-            <article class="seller-commission-insight">
+        <section class="commission-flow">
 
 
-                <div class="seller-commission-insight-icon">
+            <article class="commission-flow-card">
+
+
+                <div class="commission-flow-icon">
+
+                    <i class="fa-solid fa-bag-shopping"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+
+                        SALES SUBTOTAL
+
+                    </span>
+
+                    <strong>
+
+                        RM
+                        <?= commissionMoney(
+                            $summary[
+                                'gross_sales'
+                            ]
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+            <div class="commission-flow-symbol">
+
+                −
+
+            </div>
+
+
+            <article
+                class="
+                    commission-flow-card
+                    deduction
+                "
+            >
+
+
+                <div class="commission-flow-icon">
 
                     <i class="fa-solid fa-percent"></i>
 
@@ -3027,30 +3293,22 @@ require_once __DIR__ .
 
                 <div>
 
+                    <span>
 
-                    <small>
+                        COMMISSION DEDUCTION
 
-                        LATEST COMMISSION RATE
-
-                    </small>
-
+                    </span>
 
                     <strong>
 
-                        <?= number_format(
-                            $effectiveRate,
-                            2
-                        ) ?>%
+                        RM
+                        <?= commissionMoney(
+                            $summary[
+                                'total_commission'
+                            ]
+                        ) ?>
 
                     </strong>
-
-
-                    <p>
-
-                        Based on your most recent commission record.
-
-                    </p>
-
 
                 </div>
 
@@ -3058,47 +3316,46 @@ require_once __DIR__ .
             </article>
 
 
+            <div class="commission-flow-symbol">
 
-            <!-- NET -->
+                =
 
-            <article class="seller-commission-insight">
+            </div>
 
 
-                <div class="seller-commission-insight-icon">
+            <article
+                class="
+                    commission-flow-card
+                    net
+                "
+            >
 
-                    <i class="fa-solid fa-wallet"></i>
+
+                <div class="commission-flow-icon">
+
+                    <i class="fa-solid fa-sack-dollar"></i>
 
                 </div>
 
 
                 <div>
 
+                    <span>
 
-                    <small>
+                        ESTIMATED NET EARNINGS
 
-                        ESTIMATED NET SALES
-
-                    </small>
-
+                    </span>
 
                     <strong>
 
                         RM
-                        <?= number_format(
-                            $netSalesAfterCommission,
-                            2
+                        <?= commissionMoney(
+                            $summary[
+                                'net_earnings'
+                            ]
                         ) ?>
 
                     </strong>
-
-
-                    <p>
-
-                        Order subtotal minus commission shown
-                        in available records.
-
-                    </p>
-
 
                 </div>
 
@@ -3109,15 +3366,165 @@ require_once __DIR__ .
         </section>
 
 
+        <!-- ========================================================
+             COMMISSION STATUS SUMMARY
+        ========================================================= -->
 
-        <!-- =======================================================
-             EXPLANATION
-        ======================================================== -->
-
-        <section class="seller-commission-info">
+        <section class="commission-stats">
 
 
-            <div class="seller-commission-info-icon">
+            <article
+                class="
+                    commission-stat
+                    green
+                "
+            >
+
+
+                <div class="commission-stat-icon">
+
+                    <i class="fa-solid fa-circle-check"></i>
+
+                </div>
+
+
+                <span class="commission-stat-label">
+
+                    PAID COMMISSION
+
+                </span>
+
+
+                <strong class="commission-stat-value">
+
+                    RM
+                    <?= commissionMoney(
+                        $summary[
+                            'paid_commission'
+                        ]
+                    ) ?>
+
+                </strong>
+
+
+            </article>
+
+
+            <article
+                class="
+                    commission-stat
+                    orange
+                "
+            >
+
+
+                <div class="commission-stat-icon">
+
+                    <i class="fa-solid fa-clock"></i>
+
+                </div>
+
+
+                <span class="commission-stat-label">
+
+                    PENDING COMMISSION
+
+                </span>
+
+
+                <strong class="commission-stat-value">
+
+                    RM
+                    <?= commissionMoney(
+                        $summary[
+                            'pending_commission'
+                        ]
+                    ) ?>
+
+                </strong>
+
+
+            </article>
+
+
+            <article class="commission-stat">
+
+
+                <div class="commission-stat-icon">
+
+                    <i class="fa-solid fa-check-double"></i>
+
+                </div>
+
+
+                <span class="commission-stat-label">
+
+                    PAID RECORDS
+
+                </span>
+
+
+                <strong class="commission-stat-value">
+
+                    <?= number_format(
+                        $summary[
+                            'paid_records'
+                        ]
+                    ) ?>
+
+                </strong>
+
+
+            </article>
+
+
+            <article
+                class="
+                    commission-stat
+                    purple
+                "
+            >
+
+
+                <div class="commission-stat-icon">
+
+                    <i class="fa-solid fa-hourglass-half"></i>
+
+                </div>
+
+
+                <span class="commission-stat-label">
+
+                    PENDING RECORDS
+
+                </span>
+
+
+                <strong class="commission-stat-value">
+
+                    <?= number_format(
+                        $summary[
+                            'pending_records'
+                        ]
+                    ) ?>
+
+                </strong>
+
+
+            </article>
+
+
+        </section>
+
+
+        <!-- ========================================================
+             INFORMATION
+        ========================================================= -->
+
+        <section class="commission-info">
+
+
+            <div class="commission-info-icon">
 
                 <i class="fa-solid fa-circle-info"></i>
 
@@ -3125,7 +3532,6 @@ require_once __DIR__ .
 
 
             <div>
-
 
                 <strong>
 
@@ -3136,15 +3542,27 @@ require_once __DIR__ .
 
                 <p>
 
-                    Each eligible vendor order can generate a
-                    commission record. The commission amount shown
-                    below is calculated using the rate stored for
-                    that transaction. Pending records have not yet
-                    been marked as paid, while Paid records represent
-                    completed commission processing.
+                    Your store has a current commission rate of
+
+                    <strong>
+
+                        <?= number_format(
+                            $currentCommissionRate,
+                            2
+                        ) ?>%
+
+                    </strong>.
+
+                    When an eligible order is created, that rate is
+                    stored inside the commission record. Therefore,
+                    changing your commission rate later does not change
+                    the historical rate for previous transactions.
+                    Net earnings shown here are calculated from the
+                    vendor product subtotal minus platform commission.
+                    Delivery fees are not included in the product sales
+                    subtotal calculation on this page.
 
                 </p>
-
 
             </div>
 
@@ -3152,25 +3570,20 @@ require_once __DIR__ .
         </section>
 
 
-
-        <!-- =======================================================
+        <!-- ========================================================
              HISTORY
-        ======================================================== -->
+        ========================================================= -->
 
-        <section class="seller-commission-panel">
-
-
-            <!-- ===================================================
-                 HEADER
-            ==================================================== -->
-
-            <div class="seller-commission-panel-header">
+        <section class="commission-panel">
 
 
-                <div class="seller-commission-panel-title">
+            <div class="commission-panel-header">
 
 
-                    <div class="seller-commission-panel-icon">
+                <div class="commission-panel-title">
+
+
+                    <div class="commission-panel-icon">
 
                         <i class="fa-solid fa-money-bill-transfer"></i>
 
@@ -3179,21 +3592,18 @@ require_once __DIR__ .
 
                     <div>
 
-
                         <h2>
 
                             Commission History
 
                         </h2>
 
-
                         <p>
 
-                            Review commission generated from
-                            your vendor transactions.
+                            Detailed commission and earnings for
+                            each vendor order.
 
                         </p>
-
 
                     </div>
 
@@ -3201,7 +3611,7 @@ require_once __DIR__ .
                 </div>
 
 
-                <span class="seller-commission-count">
+                <span class="commission-record-count">
 
                     <?= number_format(
                         count(
@@ -3219,11 +3629,6 @@ require_once __DIR__ .
             </div>
 
 
-
-            <!-- ===================================================
-                 EMPTY
-            ==================================================== -->
-
             <?php if (
                 empty(
                     $commissions
@@ -3231,10 +3636,10 @@ require_once __DIR__ .
             ): ?>
 
 
-                <div class="seller-commission-empty">
+                <div class="commission-empty">
 
 
-                    <div class="seller-commission-empty-icon">
+                    <div class="commission-empty-icon">
 
                         <i class="fa-solid fa-coins"></i>
 
@@ -3243,7 +3648,7 @@ require_once __DIR__ .
 
                     <h3>
 
-                        No commission yet
+                        No commission records yet
 
                     </h3>
 
@@ -3251,7 +3656,7 @@ require_once __DIR__ .
                     <p>
 
                         Commission records will appear here
-                        when your products generate eligible orders.
+                        when eligible customer orders are created.
 
                     </p>
 
@@ -3262,80 +3667,57 @@ require_once __DIR__ .
             <?php else: ?>
 
 
-                <!-- =================================================
-                     TABLE
-                ================================================== -->
-
-                <div class="seller-commission-table-wrap">
+                <div class="commission-table-wrap">
 
 
-                    <table class="seller-commission-table">
+                    <table class="commission-table">
 
 
                         <thead>
 
-
                             <tr>
 
-
                                 <th>
-
-                                    Commission
-
+                                    ID
                                 </th>
 
-
                                 <th>
-
                                     Order
-
                                 </th>
 
-
                                 <th>
-
                                     Vendor Order
-
                                 </th>
 
-
                                 <th>
-
-                                    Order Amount
-
+                                    Sales Subtotal
                                 </th>
 
-
                                 <th>
-
                                     Rate
-
                                 </th>
 
-
                                 <th>
-
-                                    Commission Amount
-
+                                    Commission
                                 </th>
 
+                                <th>
+                                    Net Earnings
+                                </th>
 
                                 <th>
+                                    Payment
+                                </th>
 
+                                <th>
                                     Status
-
                                 </th>
-
 
                                 <th>
-
-                                    Date
-
+                                    Created
                                 </th>
-
 
                             </tr>
-
 
                         </thead>
 
@@ -3351,21 +3733,67 @@ require_once __DIR__ .
 
                                 <?php
 
+                                $commissionStatus =
+                                    $commission[
+                                        'status'
+                                    ]
+                                    ?? 'Pending';
+
+
                                 $statusClass =
-                                    sellerCommissionStatusClass(
-                                        $commission[
-                                            'status'
-                                        ]
+                                    commissionStatusClass(
+                                        $commissionStatus
                                     );
 
 
-                                $orderAmount =
+                                $salesSubtotal =
                                     (float) (
                                         $commission[
-                                            'subtotal'
+                                            'vendor_subtotal'
                                         ]
                                         ?? 0
                                     );
+
+
+                                $commissionAmount =
+                                    (float) (
+                                        $commission[
+                                            'commission_amount'
+                                        ]
+                                        ?? 0
+                                    );
+
+
+                                $netEarning =
+                                    max(
+                                        0,
+                                        $salesSubtotal
+                                        -
+                                        $commissionAmount
+                                    );
+
+
+                                $recordRate =
+                                    (float) (
+                                        $commission[
+                                            'commission_rate'
+                                        ]
+                                        ?? 0
+                                    );
+
+
+                                $paymentMethod =
+                                    $commission[
+                                        'payment_method'
+                                    ]
+                                    ?? '—';
+
+
+                                $paymentStatus =
+                                    $commission[
+                                        'payment_status'
+                                    ]
+                                    ?? 'Pending';
 
                                 ?>
 
@@ -3373,14 +3801,11 @@ require_once __DIR__ .
                                 <tr>
 
 
-                                    <!-- ===========================
-                                         COMMISSION ID
-                                    ============================ -->
+                                    <!-- ID -->
 
                                     <td>
 
-
-                                        <span class="seller-commission-id">
+                                        <span class="commission-id">
 
                                             #<?= (int)
                                                 $commission[
@@ -3389,22 +3814,17 @@ require_once __DIR__ .
 
                                         </span>
 
-
                                     </td>
 
 
-
-                                    <!-- ===========================
-                                         ORDER
-                                    ============================ -->
+                                    <!-- ORDER -->
 
                                     <td>
 
+                                        <div class="commission-order">
 
-                                        <div class="seller-commission-order">
 
-
-                                            <div class="seller-commission-order-icon">
+                                            <div class="commission-order-icon">
 
                                                 <i class="fa-solid fa-receipt"></i>
 
@@ -3412,7 +3832,6 @@ require_once __DIR__ .
 
 
                                             <div>
-
 
                                                 <strong>
 
@@ -3424,11 +3843,10 @@ require_once __DIR__ .
 
                                                 </strong>
 
-
                                                 <small>
 
-                                                    <?= sellerCommissionEscape(
-                                                        sellerCommissionDate(
+                                                    <?= commissionEscape(
+                                                        commissionDate(
                                                             $commission[
                                                                 'order_date'
                                                             ]
@@ -3437,23 +3855,17 @@ require_once __DIR__ .
 
                                                 </small>
 
-
                                             </div>
 
 
                                         </div>
 
-
                                     </td>
 
 
-
-                                    <!-- ===========================
-                                         VENDOR ORDER
-                                    ============================ -->
+                                    <!-- VENDOR ORDER -->
 
                                     <td>
-
 
                                         <?php if (
                                             !empty(
@@ -3463,8 +3875,7 @@ require_once __DIR__ .
                                             )
                                         ): ?>
 
-
-                                            <span class="seller-commission-id">
+                                            <span class="commission-id">
 
                                                 #<?= (int)
                                                     $commission[
@@ -3473,133 +3884,153 @@ require_once __DIR__ .
 
                                             </span>
 
-
                                         <?php else: ?>
-
 
                                             —
 
-
                                         <?php endif; ?>
-
 
                                     </td>
 
 
-
-                                    <!-- ===========================
-                                         ORDER AMOUNT
-                                    ============================ -->
+                                    <!-- SALES -->
 
                                     <td>
 
-
-                                        <span class="seller-commission-money">
+                                        <span class="commission-money">
 
                                             RM
-                                            <?= number_format(
-                                                $orderAmount,
-                                                2
+                                            <?= commissionMoney(
+                                                $salesSubtotal
                                             ) ?>
 
                                         </span>
 
-
                                     </td>
 
 
-
-                                    <!-- ===========================
-                                         RATE
-                                    ============================ -->
+                                    <!-- RATE -->
 
                                     <td>
 
-
-                                        <span class="seller-commission-rate">
+                                        <span class="commission-rate-badge">
 
                                             <?= number_format(
-                                                (float)
-                                                $commission[
-                                                    'commission_rate'
-                                                ],
+                                                $recordRate,
                                                 2
                                             ) ?>%
 
                                         </span>
 
-
                                     </td>
 
 
-
-                                    <!-- ===========================
-                                         COMMISSION
-                                    ============================ -->
+                                    <!-- COMMISSION -->
 
                                     <td>
 
-
                                         <span
                                             class="
-                                                seller-commission-money
-                                                highlight
+                                                commission-money
+                                                deduction
                                             "
                                         >
 
-                                            RM
-                                            <?= number_format(
-                                                (float)
-                                                $commission[
-                                                    'commission_amount'
-                                                ],
-                                                2
+                                            − RM
+                                            <?= commissionMoney(
+                                                $commissionAmount
                                             ) ?>
 
                                         </span>
 
+                                    </td>
+
+
+                                    <!-- NET -->
+
+                                    <td>
+
+                                        <span
+                                            class="
+                                                commission-money
+                                                net
+                                            "
+                                        >
+
+                                            RM
+                                            <?= commissionMoney(
+                                                $netEarning
+                                            ) ?>
+
+                                        </span>
 
                                     </td>
 
 
-
-                                    <!-- ===========================
-                                         STATUS
-                                    ============================ -->
+                                    <!-- PAYMENT -->
 
                                     <td>
 
+                                        <strong
+                                            style="
+                                                display:block;
+                                                color:#334155;
+                                                font-size:9px;
+                                            "
+                                        >
+
+                                            <?= commissionEscape(
+                                                $paymentMethod
+                                            ) ?>
+
+                                        </strong>
+
+                                        <small
+                                            style="
+                                                display:block;
+                                                margin-top:3px;
+                                                color:#94a3b8;
+                                                font-size:7px;
+                                            "
+                                        >
+
+                                            <?= commissionEscape(
+                                                $paymentStatus
+                                            ) ?>
+
+                                        </small>
+
+                                    </td>
+
+
+                                    <!-- STATUS -->
+
+                                    <td>
 
                                         <span
                                             class="
-                                                seller-commission-status
-                                                <?= sellerCommissionEscape(
+                                                commission-status
+                                                <?= commissionEscape(
                                                     $statusClass
                                                 ) ?>
                                             "
                                         >
 
-                                            <?= sellerCommissionEscape(
-                                                $commission[
-                                                    'status'
-                                                ]
+                                            <?= commissionEscape(
+                                                $commissionStatus
                                             ) ?>
 
                                         </span>
 
-
                                     </td>
 
 
-
-                                    <!-- ===========================
-                                         DATE
-                                    ============================ -->
+                                    <!-- DATE -->
 
                                     <td>
 
-                                        <?= sellerCommissionEscape(
-                                            sellerCommissionDate(
+                                        <?= commissionEscape(
+                                            commissionDate(
                                                 $commission[
                                                     'created_at'
                                                 ]
@@ -3637,6 +4068,5 @@ require_once __DIR__ .
 
 
 </body>
-
 
 </html>
