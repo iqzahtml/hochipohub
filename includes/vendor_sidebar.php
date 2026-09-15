@@ -6,24 +6,17 @@
 |--------------------------------------------------------------------------
 | File:
 | includes/vendor_sidebar.php
-|--------------------------------------------------------------------------
 |
-| IMPORTANT:
-| All sidebar URLs use BASE_URL.
-|
-| This means the same sidebar can safely be used from:
-|
+| Shared seller sidebar for:
 | - seller/dashboard.php
 | - seller/products.php
 | - seller/add_product.php
 | - seller/orders.php
 | - seller/sales.php
+| - seller/messages.php
 | - seller/setup_profile.php
 | - inventory.php
 | - commission.php
-|
-| without ../ path problems.
-|
 |--------------------------------------------------------------------------
 */
 
@@ -35,19 +28,13 @@
 */
 
 if (session_status() === PHP_SESSION_NONE) {
-
     session_start();
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| FALLBACK BASE URL
-|--------------------------------------------------------------------------
-|
-| Normally config.php already defines BASE_URL.
-|
+| BASE URL
 |--------------------------------------------------------------------------
 */
 
@@ -62,7 +49,7 @@ $vendorSidebarBaseUrl =
 
 /*
 |--------------------------------------------------------------------------
-| ESCAPE HELPER
+| ESCAPE
 |--------------------------------------------------------------------------
 */
 
@@ -76,30 +63,12 @@ if (!function_exists('vendorSidebarEscape')) {
             'UTF-8'
         );
     }
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CURRENT PAGE
-|--------------------------------------------------------------------------
-*/
-
-$currentPage =
-    basename(
-        $_SERVER['PHP_SELF']
-        ?? ''
-    );
-
-
-/*
-|--------------------------------------------------------------------------
-| CURRENT DIRECTORY
-|--------------------------------------------------------------------------
-|
-| This is useful because dashboard.php also exists at project root.
-|
+| CURRENT SCRIPT
 |--------------------------------------------------------------------------
 */
 
@@ -112,6 +81,12 @@ $currentScript =
     );
 
 
+$currentPage =
+    basename(
+        $currentScript
+    );
+
+
 $isSellerDirectory =
     strpos(
         $currentScript,
@@ -121,7 +96,7 @@ $isSellerDirectory =
 
 /*
 |--------------------------------------------------------------------------
-| ACTIVE MENU HELPER
+| ACTIVE HELPERS
 |--------------------------------------------------------------------------
 */
 
@@ -133,13 +108,11 @@ if (!function_exists('vendorSidebarActive')) {
 
         global $currentPage;
 
-
         if (!is_array($pages)) {
 
             $pages = [
                 $pages
             ];
-
         }
 
 
@@ -150,22 +123,9 @@ if (!function_exists('vendorSidebarActive')) {
         )
             ? 'active'
             : '';
-
     }
-
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| DASHBOARD ACTIVE HELPER
-|--------------------------------------------------------------------------
-|
-| We only highlight Seller Dashboard when the current dashboard.php
-| is actually inside /seller/.
-|
-|--------------------------------------------------------------------------
-*/
 
 if (!function_exists('vendorSidebarDashboardActive')) {
 
@@ -174,26 +134,122 @@ if (!function_exists('vendorSidebarDashboardActive')) {
         global $currentPage;
         global $isSellerDirectory;
 
-
         return (
             $currentPage === 'dashboard.php' &&
             $isSellerDirectory
         )
             ? 'active'
             : '';
+    }
+}
 
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE
+|--------------------------------------------------------------------------
+|
+| Sidebar boleh load sendiri vendor information jika page
+| tak provide $vendor.
+|--------------------------------------------------------------------------
+*/
+
+$sidebarDb = null;
+
+
+try {
+
+    if (
+        function_exists('getDB')
+    ) {
+
+        $sidebarDb =
+            getDB();
     }
 
+} catch (Throwable $e) {
+
+    $sidebarDb = null;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| USER ID
+|--------------------------------------------------------------------------
+*/
+
+$sidebarUserId =
+    (int) (
+        $_SESSION['user_id']
+        ?? 0
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| LOAD VENDOR IF PAGE DOES NOT HAVE IT
+|--------------------------------------------------------------------------
+*/
+
+if (
+    (
+        !isset($vendor) ||
+        !is_array($vendor) ||
+        empty($vendor)
+    ) &&
+    $sidebarUserId > 0 &&
+    $sidebarDb instanceof PDO
+) {
+
+    try {
+
+        $sidebarVendorStmt =
+            $sidebarDb->prepare("
+                SELECT
+                    v.*,
+                    u.name,
+                    u.email,
+                    u.phone
+
+                FROM vendors v
+
+                INNER JOIN users u
+                    ON v.user_id = u.user_id
+
+                WHERE v.user_id = ?
+
+                LIMIT 1
+            ");
+
+
+        $sidebarVendorStmt->execute([
+            $sidebarUserId
+        ]);
+
+
+        $sidebarLoadedVendor =
+            $sidebarVendorStmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        if ($sidebarLoadedVendor) {
+
+            $vendor =
+                $sidebarLoadedVendor;
+        }
+
+    } catch (Throwable $e) {
+
+        // Sidebar still works using session fallback.
+    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
 | VENDOR INFORMATION
-|--------------------------------------------------------------------------
-|
-| If current page already has $vendor, use it.
-|
 |--------------------------------------------------------------------------
 */
 
@@ -216,6 +272,14 @@ $sidebarStatus =
     ?? 'Pending';
 
 
+$sidebarVendorId =
+    (int) (
+        $vendor['vendor_id']
+        ?? $_SESSION['vendor_id']
+        ?? 0
+    );
+
+
 /*
 |--------------------------------------------------------------------------
 | BUSINESS LOGO
@@ -229,9 +293,10 @@ if (
     isset(
         $vendor['business_logo']
     ) &&
-    !empty(
+    trim(
+        (string)
         $vendor['business_logo']
-    )
+    ) !== ''
 ) {
 
     $sidebarLogo =
@@ -242,18 +307,56 @@ if (
                 $vendor['business_logo']
             )
         );
+}
 
+
+/*
+|--------------------------------------------------------------------------
+| PENDING ORDERS NOTIFICATION
+|--------------------------------------------------------------------------
+*/
+
+$sidebarPendingOrders = 0;
+
+
+if (
+    $sidebarVendorId > 0 &&
+    $sidebarDb instanceof PDO
+) {
+
+    try {
+
+        $sidebarOrderStmt =
+            $sidebarDb->prepare("
+                SELECT
+                    COUNT(*)
+
+                FROM vendor_orders
+
+                WHERE vendor_id = ?
+                  AND vendor_status = 'Pending'
+            ");
+
+
+        $sidebarOrderStmt->execute([
+            $sidebarVendorId
+        ]);
+
+
+        $sidebarPendingOrders =
+            (int)
+            $sidebarOrderStmt->fetchColumn();
+
+    } catch (Throwable $e) {
+
+        $sidebarPendingOrders = 0;
+    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
 | URLS
-|--------------------------------------------------------------------------
-|
-| IMPORTANT:
-| Every URL below is absolute relative to HOCHIPOHUB BASE_URL.
-|
 |--------------------------------------------------------------------------
 */
 
@@ -277,9 +380,19 @@ $sidebarOrdersUrl =
     'seller/orders.php';
 
 
+$sidebarPendingOrdersUrl =
+    $vendorSidebarBaseUrl .
+    'seller/orders.php?status=Pending';
+
+
 $sidebarSalesUrl =
     $vendorSidebarBaseUrl .
     'seller/sales.php';
+
+
+$sidebarMessagesUrl =
+    $vendorSidebarBaseUrl .
+    'seller/messages.php';
 
 
 $sidebarInventoryUrl =
@@ -319,6 +432,307 @@ $sidebarLogoutUrl =
 ?>
 
 
+<style>
+
+/*
+|--------------------------------------------------------------------------
+| SIDEBAR SAFETY FIX
+|--------------------------------------------------------------------------
+| Prevent seller page content from sitting above sidebar links.
+|--------------------------------------------------------------------------
+*/
+
+.vendor-sidebar {
+
+    position:
+        fixed !important;
+
+    top:
+        0 !important;
+
+    left:
+        0 !important;
+
+    bottom:
+        0 !important;
+
+    z-index:
+        10000 !important;
+
+    pointer-events:
+        auto !important;
+
+    isolation:
+        isolate;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| LINKS
+|--------------------------------------------------------------------------
+*/
+
+.vendor-sidebar-nav {
+
+    position:
+        relative;
+
+    z-index:
+        2;
+
+    pointer-events:
+        auto !important;
+}
+
+
+.vendor-sidebar-link {
+
+    position:
+        relative !important;
+
+    z-index:
+        3 !important;
+
+    width:
+        100%;
+
+    pointer-events:
+        auto !important;
+
+    cursor:
+        pointer !important;
+
+    overflow:
+        hidden;
+}
+
+
+.vendor-sidebar-link > * {
+
+    position:
+        relative;
+
+    z-index:
+        1;
+
+    pointer-events:
+        none;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ORDER NOTIFICATION BADGE
+|--------------------------------------------------------------------------
+*/
+
+.vendor-order-notification {
+
+    min-width:
+        20px;
+
+    height:
+        20px;
+
+    padding:
+        0 6px;
+
+    margin-left:
+        auto;
+
+    display:
+        inline-flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    color:
+        #ffffff;
+
+    background:
+        #ef4444;
+
+    border:
+        2px solid
+        rgba(
+            255,
+            255,
+            255,
+            .15
+        );
+
+    border-radius:
+        999px;
+
+    box-shadow:
+        0 5px 12px
+        rgba(
+            239,
+            68,
+            68,
+            .25
+        );
+
+    font-size:
+        9px;
+
+    font-weight:
+        900;
+
+    line-height:
+        1;
+
+    pointer-events:
+        none;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ACTIVE LINK SAFETY
+|--------------------------------------------------------------------------
+*/
+
+.vendor-sidebar-link.active {
+
+    z-index:
+        4 !important;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| FOOTER
+|--------------------------------------------------------------------------
+*/
+
+.vendor-sidebar-footer {
+
+    position:
+        relative;
+
+    z-index:
+        3;
+
+    pointer-events:
+        auto;
+}
+
+
+.vendor-footer-link {
+
+    position:
+        relative;
+
+    z-index:
+        4;
+
+    pointer-events:
+        auto !important;
+}
+
+
+.vendor-footer-link > * {
+
+    pointer-events:
+        none;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| MOBILE BUTTON
+|--------------------------------------------------------------------------
+*/
+
+.seller-mobile-menu {
+
+    position:
+        fixed;
+
+    z-index:
+        10020;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| OVERLAY
+|--------------------------------------------------------------------------
+*/
+
+.vendor-sidebar-overlay {
+
+    position:
+        fixed;
+
+    inset:
+        0;
+
+    z-index:
+        9990;
+
+    pointer-events:
+        none;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DESKTOP
+|--------------------------------------------------------------------------
+*/
+
+@media (
+    min-width: 769px
+) {
+
+    .vendor-sidebar-overlay {
+
+        display:
+            none !important;
+
+        pointer-events:
+            none !important;
+    }
+
+
+    .seller-mobile-menu {
+
+        display:
+            none !important;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| MOBILE
+|--------------------------------------------------------------------------
+*/
+
+@media (
+    max-width: 768px
+) {
+
+    .vendor-sidebar-overlay.show {
+
+        display:
+            block;
+
+        pointer-events:
+            auto;
+    }
+
+}
+
+</style>
+
+
 <!-- ===============================================================
      VENDOR SIDEBAR
 ================================================================ -->
@@ -335,14 +749,12 @@ $sidebarLogoutUrl =
 
     <div class="vendor-sidebar-brand">
 
-
         <a
             href="<?= vendorSidebarEscape(
                 $sidebarDashboardUrl
             ) ?>"
             class="vendor-brand"
         >
-
 
             <div class="vendor-brand-logo">
 
@@ -352,7 +764,6 @@ $sidebarLogoutUrl =
 
 
             <div class="vendor-brand-copy">
-
 
                 <strong>
 
@@ -367,17 +778,10 @@ $sidebarLogoutUrl =
 
                 </small>
 
-
             </div>
-
 
         </a>
 
-
-
-        <!-- =======================================================
-             MOBILE CLOSE
-        ======================================================== -->
 
         <button
             type="button"
@@ -390,9 +794,7 @@ $sidebarLogoutUrl =
 
         </button>
 
-
     </div>
-
 
 
     <!-- ===========================================================
@@ -402,17 +804,11 @@ $sidebarLogoutUrl =
     <div class="vendor-sidebar-profile">
 
 
-        <!-- =======================================================
-             AVATAR
-        ======================================================== -->
-
         <div class="vendor-sidebar-avatar">
-
 
             <?php if (
                 $sidebarLogo !== ''
             ): ?>
-
 
                 <img
                     src="<?= vendorSidebarEscape(
@@ -437,9 +833,7 @@ $sidebarLogoutUrl =
 
                 </div>
 
-
             <?php else: ?>
-
 
                 <div class="vendor-avatar-fallback">
 
@@ -447,20 +841,12 @@ $sidebarLogoutUrl =
 
                 </div>
 
-
             <?php endif; ?>
-
 
         </div>
 
 
-
-        <!-- =======================================================
-             PROFILE TEXT
-        ======================================================== -->
-
         <div class="vendor-sidebar-profile-copy">
-
 
             <strong>
 
@@ -500,12 +886,9 @@ $sidebarLogoutUrl =
 
             </small>
 
-
         </div>
 
-
     </div>
-
 
 
     <!-- ===========================================================
@@ -515,16 +898,13 @@ $sidebarLogoutUrl =
     <nav class="vendor-sidebar-nav">
 
 
-        <!-- =======================================================
-             MAIN MENU LABEL
-        ======================================================== -->
+        <!-- MAIN MENU -->
 
         <div class="vendor-sidebar-label">
 
             MAIN MENU
 
         </div>
-
 
 
         <!-- =======================================================
@@ -541,7 +921,6 @@ $sidebarLogoutUrl =
             "
         >
 
-
             <span class="vendor-link-icon">
 
                 <i class="fa-solid fa-table-columns"></i>
@@ -555,13 +934,11 @@ $sidebarLogoutUrl =
 
             </span>
 
-
         </a>
 
 
-
         <!-- =======================================================
-             PRODUCTS
+             MY PRODUCTS
         ======================================================== -->
 
         <a
@@ -577,7 +954,6 @@ $sidebarLogoutUrl =
             "
         >
 
-
             <span class="vendor-link-icon">
 
                 <i class="fa-solid fa-cube"></i>
@@ -591,9 +967,7 @@ $sidebarLogoutUrl =
 
             </span>
 
-
         </a>
-
 
 
         <!-- =======================================================
@@ -612,7 +986,6 @@ $sidebarLogoutUrl =
             "
         >
 
-
             <span class="vendor-link-icon">
 
                 <i class="fa-solid fa-circle-plus"></i>
@@ -626,9 +999,7 @@ $sidebarLogoutUrl =
 
             </span>
 
-
         </a>
-
 
 
         <!-- =======================================================
@@ -647,7 +1018,6 @@ $sidebarLogoutUrl =
             "
         >
 
-
             <span class="vendor-link-icon">
 
                 <i class="fa-solid fa-bag-shopping"></i>
@@ -662,8 +1032,28 @@ $sidebarLogoutUrl =
             </span>
 
 
-        </a>
+            <?php if (
+                $sidebarPendingOrders > 0
+            ): ?>
 
+                <span
+                    class="vendor-order-notification"
+                    title="<?= vendorSidebarEscape(
+                        $sidebarPendingOrders .
+                        ' pending order(s)'
+                    ) ?>"
+                >
+
+                    <?= $sidebarPendingOrders > 99
+                        ? '99+'
+                        : (int)
+                            $sidebarPendingOrders ?>
+
+                </span>
+
+            <?php endif; ?>
+
+        </a>
 
 
         <!-- =======================================================
@@ -682,7 +1072,6 @@ $sidebarLogoutUrl =
             "
         >
 
-
             <span class="vendor-link-icon">
 
                 <i class="fa-solid fa-chart-column"></i>
@@ -696,13 +1085,43 @@ $sidebarLogoutUrl =
 
             </span>
 
+        </a>
+
+
+        <!-- =======================================================
+             MESSAGES
+        ======================================================== -->
+
+        <a
+            href="<?= vendorSidebarEscape(
+                $sidebarMessagesUrl
+            ) ?>"
+            class="
+                vendor-sidebar-link
+                <?= vendorSidebarActive(
+                    'messages.php'
+                ) ?>
+            "
+        >
+
+            <span class="vendor-link-icon">
+
+                <i class="fa-solid fa-message"></i>
+
+            </span>
+
+
+            <span class="vendor-link-text">
+
+                Messages
+
+            </span>
 
         </a>
 
 
-
         <!-- =======================================================
-             MANAGEMENT LABEL
+             MANAGEMENT
         ======================================================== -->
 
         <div
@@ -715,7 +1134,6 @@ $sidebarLogoutUrl =
             MANAGEMENT
 
         </div>
-
 
 
         <!-- =======================================================
@@ -734,7 +1152,6 @@ $sidebarLogoutUrl =
             "
         >
 
-
             <span class="vendor-link-icon">
 
                 <i class="fa-solid fa-warehouse"></i>
@@ -748,9 +1165,7 @@ $sidebarLogoutUrl =
 
             </span>
 
-
         </a>
-
 
 
         <!-- =======================================================
@@ -769,7 +1184,6 @@ $sidebarLogoutUrl =
             "
         >
 
-
             <span class="vendor-link-icon">
 
                 <i class="fa-solid fa-circle-dollar-to-slot"></i>
@@ -783,9 +1197,7 @@ $sidebarLogoutUrl =
 
             </span>
 
-
         </a>
-
 
 
         <!-- =======================================================
@@ -804,7 +1216,6 @@ $sidebarLogoutUrl =
             "
         >
 
-
             <span class="vendor-link-icon">
 
                 <i class="fa-solid fa-store"></i>
@@ -818,9 +1229,7 @@ $sidebarLogoutUrl =
 
             </span>
 
-
         </a>
-
 
 
         <!-- =======================================================
@@ -828,7 +1237,6 @@ $sidebarLogoutUrl =
         ======================================================== -->
 
         <div class="vendor-sidebar-divider"></div>
-
 
 
         <!-- =======================================================
@@ -841,7 +1249,6 @@ $sidebarLogoutUrl =
             ) ?>"
             class="vendor-sidebar-link"
         >
-
 
             <span class="vendor-link-icon">
 
@@ -856,9 +1263,7 @@ $sidebarLogoutUrl =
 
             </span>
 
-
         </a>
-
 
 
         <!-- =======================================================
@@ -871,7 +1276,6 @@ $sidebarLogoutUrl =
             ) ?>"
             class="vendor-sidebar-link"
         >
-
 
             <span class="vendor-link-icon">
 
@@ -886,12 +1290,9 @@ $sidebarLogoutUrl =
 
             </span>
 
-
         </a>
 
-
     </nav>
-
 
 
     <!-- ===========================================================
@@ -901,9 +1302,7 @@ $sidebarLogoutUrl =
     <div class="vendor-sidebar-footer">
 
 
-        <!-- =======================================================
-             PROFILE
-        ======================================================== -->
+        <!-- PROFILE -->
 
         <a
             href="<?= vendorSidebarEscape(
@@ -911,7 +1310,6 @@ $sidebarLogoutUrl =
             ) ?>"
             class="vendor-footer-link"
         >
-
 
             <span>
 
@@ -926,14 +1324,10 @@ $sidebarLogoutUrl =
 
             </span>
 
-
         </a>
 
 
-
-        <!-- =======================================================
-             LOGOUT
-        ======================================================== -->
+        <!-- LOGOUT -->
 
         <a
             href="<?= vendorSidebarEscape(
@@ -944,7 +1338,6 @@ $sidebarLogoutUrl =
                 logout
             "
         >
-
 
             <span>
 
@@ -959,19 +1352,15 @@ $sidebarLogoutUrl =
 
             </span>
 
-
         </a>
 
-
     </div>
-
 
 </aside>
 
 
-
 <!-- ===============================================================
-     MOBILE SIDEBAR BUTTON
+     MOBILE OPEN BUTTON
 ================================================================ -->
 
 <button
@@ -986,7 +1375,6 @@ $sidebarLogoutUrl =
 </button>
 
 
-
 <!-- ===============================================================
      MOBILE OVERLAY
 ================================================================ -->
@@ -997,12 +1385,11 @@ $sidebarLogoutUrl =
 ></div>
 
 
-
 <script>
 
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB VENDOR SIDEBAR
+| HOCHIPOHUB - VENDOR SIDEBAR
 |--------------------------------------------------------------------------
 */
 
@@ -1043,7 +1430,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | OPEN SIDEBAR
+        | OPEN
         |--------------------------------------------------------------------------
         */
 
@@ -1054,7 +1441,6 @@ document.addEventListener(
                 sidebar.classList.add(
                     'open'
                 );
-
             }
 
 
@@ -1063,20 +1449,18 @@ document.addEventListener(
                 overlay.classList.add(
                     'show'
                 );
-
             }
 
 
             document.body.classList.add(
                 'vendor-sidebar-open'
             );
-
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | CLOSE SIDEBAR
+        | CLOSE
         |--------------------------------------------------------------------------
         */
 
@@ -1087,7 +1471,6 @@ document.addEventListener(
                 sidebar.classList.remove(
                     'open'
                 );
-
             }
 
 
@@ -1096,20 +1479,18 @@ document.addEventListener(
                 overlay.classList.remove(
                     'show'
                 );
-
             }
 
 
             document.body.classList.remove(
                 'vendor-sidebar-open'
             );
-
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | TOGGLE BUTTONS
+        | TOGGLE
         |--------------------------------------------------------------------------
         */
 
@@ -1118,7 +1499,12 @@ document.addEventListener(
 
                 button.addEventListener(
                     'click',
-                    function () {
+                    function (event) {
+
+                        event.preventDefault();
+
+                        event.stopPropagation();
+
 
                         if (
                             sidebar &&
@@ -1129,17 +1515,12 @@ document.addEventListener(
 
                             closeVendorSidebar();
 
-                        }
-
-                        else {
+                        } else {
 
                             openVendorSidebar();
-
                         }
-
                     }
                 );
-
             }
         );
 
@@ -1154,9 +1535,15 @@ document.addEventListener(
 
             closeButton.addEventListener(
                 'click',
-                closeVendorSidebar
-            );
+                function (event) {
 
+                    event.preventDefault();
+
+                    event.stopPropagation();
+
+                    closeVendorSidebar();
+                }
+            );
         }
 
 
@@ -1170,15 +1557,19 @@ document.addEventListener(
 
             overlay.addEventListener(
                 'click',
-                closeVendorSidebar
-            );
+                function (event) {
 
+                    event.preventDefault();
+
+                    closeVendorSidebar();
+                }
+            );
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | ESC KEY
+        | ESC
         |--------------------------------------------------------------------------
         */
 
@@ -1187,20 +1578,19 @@ document.addEventListener(
             function (event) {
 
                 if (
-                    event.key === 'Escape'
+                    event.key ===
+                    'Escape'
                 ) {
 
                     closeVendorSidebar();
-
                 }
-
             }
         );
 
 
         /*
         |--------------------------------------------------------------------------
-        | MOBILE LINK CLICK
+        | MOBILE LINK
         |--------------------------------------------------------------------------
         */
 
@@ -1216,23 +1606,21 @@ document.addEventListener(
                         function () {
 
                             if (
-                                window.innerWidth <= 768
+                                window.innerWidth <=
+                                768
                             ) {
 
                                 closeVendorSidebar();
-
                             }
-
                         }
                     );
-
                 }
             );
 
 
         /*
         |--------------------------------------------------------------------------
-        | WINDOW RESIZE
+        | DESKTOP RESIZE
         |--------------------------------------------------------------------------
         */
 
@@ -1241,13 +1629,12 @@ document.addEventListener(
             function () {
 
                 if (
-                    window.innerWidth > 768
+                    window.innerWidth >
+                    768
                 ) {
 
                     closeVendorSidebar();
-
                 }
-
             }
         );
 
