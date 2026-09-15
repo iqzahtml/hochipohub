@@ -33,7 +33,11 @@ if (!function_exists('customerSidebarActive')) {
             $pages = [$pages];
         }
 
-        return in_array($currentPage, $pages, true)
+        return in_array(
+            $currentPage,
+            $pages,
+            true
+        )
             ? 'active'
             : '';
     }
@@ -41,7 +45,12 @@ if (!function_exists('customerSidebarActive')) {
 }
 
 
-/* Keep logout available throughout the customer area. */
+/*
+|--------------------------------------------------------------------------
+| LOGOUT
+|--------------------------------------------------------------------------
+*/
+
 $showCustomerLogout =
     strtolower($userRole) === 'customer';
 
@@ -58,7 +67,12 @@ $showCustomerLogout =
 
         <a
             href="dashboard.php"
-            class="customer-sidebar-item <?= customerSidebarActive('dashboard.php') ?>"
+            class="
+                customer-sidebar-item
+                <?= customerSidebarActive(
+                    'dashboard.php'
+                ) ?>
+            "
         >
 
             <span class="sidebar-icon">
@@ -78,11 +92,14 @@ $showCustomerLogout =
 
         <a
             href="catalog.php"
-            class="customer-sidebar-item <?= customerSidebarActive([
-                'catalog.php',
-                'product.php',
-                'product_details.php'
-            ]) ?>"
+            class="
+                customer-sidebar-item
+                <?= customerSidebarActive([
+                    'catalog.php',
+                    'product.php',
+                    'product_details.php'
+                ]) ?>
+            "
         >
 
             <span class="sidebar-icon">
@@ -102,7 +119,12 @@ $showCustomerLogout =
 
         <a
             href="cart.php"
-            class="customer-sidebar-item <?= customerSidebarActive('cart.php') ?>"
+            class="
+                customer-sidebar-item
+                <?= customerSidebarActive(
+                    'cart.php'
+                ) ?>
+            "
         >
 
             <span class="sidebar-icon">
@@ -113,10 +135,17 @@ $showCustomerLogout =
                 Cart
             </span>
 
-            <?php if (!empty($cartCount) && $cartCount > 0): ?>
+            <?php if (
+                !empty($cartCount) &&
+                $cartCount > 0
+            ): ?>
 
                 <span class="sidebar-badge">
-                    <?= $cartCount > 99 ? '99+' : $cartCount ?>
+
+                    <?= $cartCount > 99
+                        ? '99+'
+                        : (int) $cartCount ?>
+
                 </span>
 
             <?php endif; ?>
@@ -130,7 +159,12 @@ $showCustomerLogout =
 
         <a
             href="wishlist.php"
-            class="customer-sidebar-item <?= customerSidebarActive('wishlist.php') ?>"
+            class="
+                customer-sidebar-item
+                <?= customerSidebarActive(
+                    'wishlist.php'
+                ) ?>
+            "
         >
 
             <span class="sidebar-icon">
@@ -141,10 +175,17 @@ $showCustomerLogout =
                 Wishlist
             </span>
 
-            <?php if (!empty($wishlistCount) && $wishlistCount > 0): ?>
+            <?php if (
+                !empty($wishlistCount) &&
+                $wishlistCount > 0
+            ): ?>
 
                 <span class="sidebar-badge">
-                    <?= $wishlistCount > 99 ? '99+' : $wishlistCount ?>
+
+                    <?= $wishlistCount > 99
+                        ? '99+'
+                        : (int) $wishlistCount ?>
+
                 </span>
 
             <?php endif; ?>
@@ -158,10 +199,13 @@ $showCustomerLogout =
 
         <a
             href="order.php"
-            class="customer-sidebar-item <?= customerSidebarActive([
-                'order.php',
-                'order_details.php'
-            ]) ?>"
+            class="
+                customer-sidebar-item
+                <?= customerSidebarActive([
+                    'order.php',
+                    'order_details.php'
+                ]) ?>
+            "
         >
 
             <span class="sidebar-icon">
@@ -176,12 +220,42 @@ $showCustomerLogout =
 
 
         <!-- =====================================================
+             MESSAGES
+        ====================================================== -->
+
+        <a
+            href="messages.php"
+            class="
+                customer-sidebar-item
+                <?= customerSidebarActive(
+                    'messages.php'
+                ) ?>
+            "
+        >
+
+            <span class="sidebar-icon">
+                <i class="bi bi-chat-dots"></i>
+            </span>
+
+            <span class="sidebar-text">
+                Messages
+            </span>
+
+        </a>
+
+
+        <!-- =====================================================
              PROFILE
         ====================================================== -->
 
         <a
             href="profile.php"
-            class="customer-sidebar-item <?= customerSidebarActive('profile.php') ?>"
+            class="
+                customer-sidebar-item
+                <?= customerSidebarActive(
+                    'profile.php'
+                ) ?>
+            "
         >
 
             <span class="sidebar-icon">
@@ -217,14 +291,16 @@ $showCustomerLogout =
 
         <!-- =====================================================
              LOGOUT
-             ONLY CUSTOMER DASHBOARD
         ====================================================== -->
 
         <?php if ($showCustomerLogout): ?>
 
             <a
                 href="auth/logout.php"
-                class="customer-sidebar-item sidebar-logout"
+                class="
+                    customer-sidebar-item
+                    sidebar-logout
+                "
             >
 
                 <span class="sidebar-icon">
