@@ -72,7 +72,7 @@ $loginError =
 
 
         <!-- =====================================================
-             SUCCESS MESSAGE
+             SUCCESS
         ====================================================== -->
 
         <?php if (!empty($loginSuccess)): ?>
@@ -95,7 +95,7 @@ $loginError =
 
 
         <!-- =====================================================
-             ERROR MESSAGE
+             ERROR
         ====================================================== -->
 
         <?php if (!empty($loginError)): ?>
@@ -218,9 +218,10 @@ $loginError =
                 </div>
 
 
-                <!-- PASSWORD CONTAINER -->
-
-                <div class="password-input">
+                <div
+                    class="password-input"
+                    id="loginPasswordWrapper"
+                >
 
                     <input
                         type="password"
@@ -232,17 +233,22 @@ $loginError =
                     >
 
 
-                    <!-- PASSWORD TOGGLE -->
-
                     <button
                         type="button"
                         id="loginPasswordToggle"
                         class="password-toggle"
-                        data-password-target="loginPassword"
                         aria-label="Show password"
                         aria-pressed="false"
+                        title="Show password"
                     >
-                        👁
+
+                        <span
+                            id="loginPasswordEye"
+                            aria-hidden="true"
+                        >
+                            👁
+                        </span>
+
                     </button>
 
                 </div>
@@ -270,7 +276,7 @@ $loginError =
 
 
             <!-- =================================================
-                 LOGIN BUTTON
+                 LOGIN
             ================================================== -->
 
             <button
@@ -327,3 +333,318 @@ $loginError =
     </div>
 
 </div>
+
+
+<!-- ===============================================================
+     PASSWORD TOGGLE FIX
+================================================================ -->
+
+<style>
+
+#loginPasswordWrapper {
+    position: relative !important;
+    width: 100% !important;
+}
+
+
+#loginPassword {
+    position: relative !important;
+
+    z-index: 1 !important;
+
+    padding-right: 58px !important;
+}
+
+
+#loginPasswordToggle {
+    position: absolute !important;
+
+    top: 50% !important;
+    right: 8px !important;
+
+    width: 40px !important;
+    height: 40px !important;
+
+    min-width: 40px !important;
+    min-height: 40px !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    transform:
+        translateY(-50%) !important;
+
+    border: 0 !important;
+
+    outline: 0 !important;
+
+    background:
+        transparent !important;
+
+    color: #ffffff !important;
+
+    border-radius: 9px !important;
+
+    cursor: pointer !important;
+
+    pointer-events: auto !important;
+
+    z-index: 99999999 !important;
+
+    user-select: none !important;
+
+    touch-action: manipulation !important;
+}
+
+
+#loginPasswordToggle:hover {
+    background:
+        rgba(255,255,255,.12) !important;
+}
+
+
+#loginPasswordToggle:active {
+    transform:
+        translateY(-50%)
+        scale(.92) !important;
+}
+
+
+#loginPasswordEye {
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    pointer-events: none !important;
+
+    font-size: 16px !important;
+
+    line-height: 1 !important;
+}
+
+</style>
+
+
+<script>
+
+(function () {
+
+    'use strict';
+
+
+    function initializeLoginPasswordToggle() {
+
+        const passwordInput =
+            document.getElementById(
+                'loginPassword'
+            );
+
+
+        const toggleButton =
+            document.getElementById(
+                'loginPasswordToggle'
+            );
+
+
+        const eyeIcon =
+            document.getElementById(
+                'loginPasswordEye'
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SAFETY
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            !passwordInput ||
+            !toggleButton
+        ) {
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PREVENT DUPLICATE INITIALIZATION
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            toggleButton.dataset.initialized ===
+            'true'
+        ) {
+
+            return;
+        }
+
+
+        toggleButton.dataset.initialized =
+            'true';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CLICK
+        |--------------------------------------------------------------------------
+        */
+
+        toggleButton.addEventListener(
+            'click',
+            function (event) {
+
+                event.preventDefault();
+                event.stopPropagation();
+
+
+                const currentlyHidden =
+                    passwordInput.type ===
+                    'password';
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | SHOW
+                |--------------------------------------------------------------------------
+                */
+
+                if (currentlyHidden) {
+
+                    passwordInput.type =
+                        'text';
+
+
+                    toggleButton.setAttribute(
+                        'aria-label',
+                        'Hide password'
+                    );
+
+
+                    toggleButton.setAttribute(
+                        'aria-pressed',
+                        'true'
+                    );
+
+
+                    toggleButton.setAttribute(
+                        'title',
+                        'Hide password'
+                    );
+
+
+                    if (eyeIcon) {
+
+                        eyeIcon.textContent =
+                            '🙈';
+                    }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | HIDE
+                |--------------------------------------------------------------------------
+                */
+
+                } else {
+
+                    passwordInput.type =
+                        'password';
+
+
+                    toggleButton.setAttribute(
+                        'aria-label',
+                        'Show password'
+                    );
+
+
+                    toggleButton.setAttribute(
+                        'aria-pressed',
+                        'false'
+                    );
+
+
+                    toggleButton.setAttribute(
+                        'title',
+                        'Show password'
+                    );
+
+
+                    if (eyeIcon) {
+
+                        eyeIcon.textContent =
+                            '👁';
+                    }
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | RETURN FOCUS
+                |--------------------------------------------------------------------------
+                */
+
+                passwordInput.focus();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CURSOR AT END
+                |--------------------------------------------------------------------------
+                */
+
+                try {
+
+                    const length =
+                        passwordInput.value.length;
+
+
+                    passwordInput.setSelectionRange(
+                        length,
+                        length
+                    );
+
+                } catch (error) {
+
+                    // Ignore browser selection errors.
+                }
+
+            },
+            false
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | INITIALIZE
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        document.readyState ===
+        'loading'
+    ) {
+
+        document.addEventListener(
+            'DOMContentLoaded',
+            initializeLoginPasswordToggle
+        );
+
+    } else {
+
+        initializeLoginPasswordToggle();
+    }
+
+})();
+
+</script>
