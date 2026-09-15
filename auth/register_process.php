@@ -7,21 +7,13 @@
 | File:
 | auth/register_process.php
 |
-| Purpose:
-| - Process registration
-| - Validate customer/vendor registration
-| - Check duplicate email
-| - Check duplicate phone
-| - Keep registration modal OPEN when error occurs
-| - Preserve entered information
-| - Redirect to login modal after successful registration
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| LOAD CONFIG
+| Handles:
+| - Customer registration
+| - Vendor registration
+| - Vendor pending approval
+| - Vendor application creation
+| - Duplicate email / phone
+| - Registration validation
 |--------------------------------------------------------------------------
 */
 
@@ -35,26 +27,25 @@ require_once dirname(__DIR__) . '/config.php';
 */
 
 if (session_status() === PHP_SESSION_NONE) {
-
     session_start();
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| ONLY ALLOW POST REQUEST
+| ONLY POST
 |--------------------------------------------------------------------------
 */
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
     header(
-        'Location: ' . BASE_URL . 'index.php'
+        'Location: ' .
+        BASE_URL .
+        'index.php'
     );
 
     exit;
-
 }
 
 
@@ -82,13 +73,14 @@ $role = strtolower(
     )
 );
 
-$password = $_POST['password'] ?? '';
+$password =
+    $_POST['password'] ?? '';
 
-$confirmPassword = $_POST['confirm_password'] ?? '';
+$confirmPassword =
+    $_POST['confirm_password'] ?? '';
 
-$terms = isset(
-    $_POST['terms']
-);
+$terms =
+    isset($_POST['terms']);
 
 
 /*
@@ -106,46 +98,40 @@ $cleanPhone = preg_replace(
 
 /*
 |--------------------------------------------------------------------------
-| SAVE OLD FORM DATA
+| OLD FORM DATA
 |--------------------------------------------------------------------------
-|
-| Password is intentionally NOT saved.
-|
 */
 
 $_SESSION['register_old'] = [
 
-    'name' => $name,
+    'name' =>
+        $name,
 
-    'email' => $email,
+    'email' =>
+        $email,
 
-    'phone' => $phone,
+    'phone' =>
+        $phone,
 
-    'role' => $role
+    'role' =>
+        $role
 
 ];
 
 
 /*
 |--------------------------------------------------------------------------
-| REGISTER ERROR FUNCTION
-|--------------------------------------------------------------------------
-|
-| This function:
-| 1. Saves error message
-| 2. Saves old form information
-| 3. Tells homepage to open register modal
-| 4. Redirects back to register modal
-|
+| REGISTER ERROR
 |--------------------------------------------------------------------------
 */
 
 function registerError($message)
 {
+    $_SESSION['register_error'] =
+        $message;
 
-    $_SESSION['register_error'] = $message;
-
-    $_SESSION['open_register_modal'] = true;
+    $_SESSION['open_register_modal'] =
+        true;
 
     header(
         'Location: ' .
@@ -154,13 +140,12 @@ function registerError($message)
     );
 
     exit;
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE NAME
+| NAME
 |--------------------------------------------------------------------------
 */
 
@@ -169,13 +154,12 @@ if ($name === '') {
     registerError(
         'Name is required.'
     );
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE EMAIL
+| EMAIL
 |--------------------------------------------------------------------------
 */
 
@@ -190,13 +174,12 @@ if (
     registerError(
         'Please enter a valid email address.'
     );
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE PHONE
+| PHONE
 |--------------------------------------------------------------------------
 */
 
@@ -205,18 +188,12 @@ if ($cleanPhone === '') {
     registerError(
         'Phone number is required.'
     );
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE PHONE FORMAT
-|--------------------------------------------------------------------------
-|
-| Malaysian mobile number:
-| 01XXXXXXXX
-|
+| MALAYSIAN PHONE FORMAT
 |--------------------------------------------------------------------------
 */
 
@@ -230,24 +207,19 @@ if (
     registerError(
         'Please enter a valid Malaysian phone number.'
     );
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE ROLE
+| ROLE
 |--------------------------------------------------------------------------
 */
 
 $allowedRoles = [
-
     'customer',
-
     'vendor'
-
 ];
-
 
 if (
     !in_array(
@@ -260,47 +232,47 @@ if (
     registerError(
         'Invalid account type.'
     );
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE PASSWORD
+| PASSWORD
 |--------------------------------------------------------------------------
 */
 
 if (
-    strlen($password) < 6
+    strlen(
+        $password
+    ) < 6
 ) {
 
     registerError(
         'Password must contain at least 6 characters.'
     );
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE CONFIRM PASSWORD
+| CONFIRM PASSWORD
 |--------------------------------------------------------------------------
 */
 
 if (
-    $password !== $confirmPassword
+    $password !==
+    $confirmPassword
 ) {
 
     registerError(
         'Passwords do not match.'
     );
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VALIDATE TERMS
+| TERMS
 |--------------------------------------------------------------------------
 */
 
@@ -309,7 +281,6 @@ if (!$terms) {
     registerError(
         'You must agree to the Terms & Conditions.'
     );
-
 }
 
 
@@ -324,14 +295,21 @@ $db = null;
 
 try {
 
-
     /*
     |--------------------------------------------------------------------------
-    | GET DATABASE CONNECTION
+    | CONNECTION
     |--------------------------------------------------------------------------
     */
 
     $db = getDB();
+
+
+    if (!($db instanceof PDO)) {
+
+        throw new Exception(
+            'Database connection failed.'
+        );
+    }
 
 
     /*
@@ -341,17 +319,19 @@ try {
     */
 
     $stmt = $db->prepare("
-        SELECT user_id
+        SELECT
+            user_id
+
         FROM users
+
         WHERE email = ?
+
         LIMIT 1
     ");
 
 
     $stmt->execute([
-
         $email
-
     ]);
 
 
@@ -360,7 +340,6 @@ try {
         registerError(
             'This email is already registered. Please use another email.'
         );
-
     }
 
 
@@ -371,17 +350,19 @@ try {
     */
 
     $stmt = $db->prepare("
-        SELECT user_id
+        SELECT
+            user_id
+
         FROM users
+
         WHERE phone = ?
+
         LIMIT 1
     ");
 
 
     $stmt->execute([
-
         $cleanPhone
-
     ]);
 
 
@@ -390,7 +371,6 @@ try {
         registerError(
             'This phone number is already registered. Please use another phone number.'
         );
-
     }
 
 
@@ -400,10 +380,11 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    $passwordHash = password_hash(
-        $password,
-        PASSWORD_DEFAULT
-    );
+    $passwordHash =
+        password_hash(
+            $password,
+            PASSWORD_DEFAULT
+        );
 
 
     /*
@@ -417,12 +398,27 @@ try {
 
     /*
     |--------------------------------------------------------------------------
+    | USER STATUS
+    |--------------------------------------------------------------------------
+    |
+    | Customer = active
+    | Vendor   = pending until admin approves application
+    |
+    */
+
+    $userStatus =
+        ($role === 'vendor')
+            ? 'pending'
+            : 'active';
+
+
+    /*
+    |--------------------------------------------------------------------------
     | INSERT USER
     |--------------------------------------------------------------------------
     */
 
     $stmt = $db->prepare("
-
         INSERT INTO users
         (
             name,
@@ -440,34 +436,41 @@ try {
             :phone,
             :password,
             :role,
-            'active'
+            :status
         )
-
     ");
 
 
     $stmt->execute([
 
-        ':name' => $name,
+        ':name' =>
+            $name,
 
-        ':email' => $email,
+        ':email' =>
+            $email,
 
-        ':phone' => $cleanPhone,
+        ':phone' =>
+            $cleanPhone,
 
-        ':password' => $passwordHash,
+        ':password' =>
+            $passwordHash,
 
-        ':role' => $role
+        ':role' =>
+            $role,
 
+        ':status' =>
+            $userStatus
     ]);
 
 
     /*
     |--------------------------------------------------------------------------
-    | GET USER ID
+    | USER ID
     |--------------------------------------------------------------------------
     */
 
-    $userId = (int) $db->lastInsertId();
+    $userId =
+        (int) $db->lastInsertId();
 
 
     if ($userId <= 0) {
@@ -475,48 +478,137 @@ try {
         throw new Exception(
             'Failed to create user.'
         );
-
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | CREATE VENDOR PROFILE
+    | VENDOR REGISTRATION
     |--------------------------------------------------------------------------
     */
 
     if ($role === 'vendor') {
 
 
-        $vendorStmt = $db->prepare("
+        /*
+        |--------------------------------------------------------------------------
+        | CREATE VENDOR PROFILE
+        |--------------------------------------------------------------------------
+        */
 
-            INSERT INTO vendors
-            (
-                user_id,
-                business_name,
-                approval_status
-            )
+        $vendorStmt =
+            $db->prepare("
+                INSERT INTO vendors
+                (
+                    user_id,
+                    business_name,
+                    delivery_method,
+                    postage_fee,
+                    allow_vendor_delivery,
+                    cod_enabled,
+                    vendor_delivery_fee,
+                    commission_rate,
+                    approval_status
+                )
 
-            VALUES
-            (
-                ?,
-                ?,
-                ?
-            )
-
-        ");
+                VALUES
+                (
+                    :user_id,
+                    :business_name,
+                    'Both',
+                    0.00,
+                    0,
+                    0,
+                    0.00,
+                    5.00,
+                    'Pending'
+                )
+            ");
 
 
         $vendorStmt->execute([
 
-            $userId,
+            ':user_id' =>
+                $userId,
 
-            $name,
-
-            'Pending'
-
+            ':business_name' =>
+                $name
         ]);
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK VENDOR ID
+        |--------------------------------------------------------------------------
+        */
+
+        $vendorId =
+            (int) $db->lastInsertId();
+
+
+        if ($vendorId <= 0) {
+
+            throw new Exception(
+                'Failed to create vendor profile.'
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CREATE VENDOR APPLICATION
+        |--------------------------------------------------------------------------
+        */
+
+        $applicationStmt =
+            $db->prepare("
+                INSERT INTO vendor_applications
+                (
+                    user_id,
+                    business_name,
+                    reason,
+                    status
+                )
+
+                VALUES
+                (
+                    :user_id,
+                    :business_name,
+                    :reason,
+                    'Pending'
+                )
+            ");
+
+
+        $applicationStmt->execute([
+
+            ':user_id' =>
+                $userId,
+
+            ':business_name' =>
+                $name,
+
+            ':reason' =>
+                'New vendor registration application.'
+        ]);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK APPLICATION
+        |--------------------------------------------------------------------------
+        */
+
+        $applicationId =
+            (int) $db->lastInsertId();
+
+
+        if ($applicationId <= 0) {
+
+            throw new Exception(
+                'Failed to create vendor application.'
+            );
+        }
     }
 
 
@@ -531,7 +623,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | CLEAR OLD REGISTER DATA
+    | CLEAR REGISTER SESSION
     |--------------------------------------------------------------------------
     */
 
@@ -548,13 +640,21 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    $_SESSION['login_success'] =
-        'Account created successfully. Please login.';
+    if ($role === 'vendor') {
+
+        $_SESSION['login_success'] =
+            'Vendor account created successfully. Your application is waiting for admin approval.';
+
+    } else {
+
+        $_SESSION['login_success'] =
+            'Account created successfully. Please login.';
+    }
 
 
     /*
     |--------------------------------------------------------------------------
-    | REMEMBER LOGIN EMAIL
+    | REMEMBER EMAIL
     |--------------------------------------------------------------------------
     */
 
@@ -575,14 +675,12 @@ try {
     );
 
     exit;
-
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| DATABASE / SYSTEM ERROR
+| ERROR
 |--------------------------------------------------------------------------
 */
 
@@ -602,37 +700,34 @@ catch (Throwable $e) {
     ) {
 
         $db->rollBack();
-
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | SAVE USER DATA AGAIN
+    | RESTORE FORM
     |--------------------------------------------------------------------------
     */
 
     $_SESSION['register_old'] = [
 
-        'name' => $name,
+        'name' =>
+            $name,
 
-        'email' => $email,
+        'email' =>
+            $email,
 
-        'phone' => $phone,
+        'phone' =>
+            $phone,
 
-        'role' => $role
-
+        'role' =>
+            $role
     ];
 
 
     /*
     |--------------------------------------------------------------------------
-    | SAVE ERROR
-    |--------------------------------------------------------------------------
-    |
-    | Development error is shown here so you can identify
-    | database problems.
-    |
+    | ERROR MESSAGE
     |--------------------------------------------------------------------------
     */
 
@@ -643,16 +738,17 @@ catch (Throwable $e) {
 
     /*
     |--------------------------------------------------------------------------
-    | KEEP REGISTER MODAL OPEN
+    | OPEN REGISTER MODAL
     |--------------------------------------------------------------------------
     */
 
-    $_SESSION['open_register_modal'] = true;
+    $_SESSION['open_register_modal'] =
+        true;
 
 
     /*
     |--------------------------------------------------------------------------
-    | RETURN TO REGISTER MODAL
+    | RETURN
     |--------------------------------------------------------------------------
     */
 
@@ -663,7 +759,6 @@ catch (Throwable $e) {
     );
 
     exit;
-
 }
 
 ?>
