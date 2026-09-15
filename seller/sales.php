@@ -7,110 +7,75 @@
 | File:
 | seller/sales.php
 |--------------------------------------------------------------------------
-|
-| Purpose:
-| - Display vendor sales
-| - Filter sales by date
-| - Show sales summary
-| - Show product performance
-| - Show daily sales
+| Seller sales, revenue, commission and earnings dashboard.
 |--------------------------------------------------------------------------
 */
 
 
 /*
 |--------------------------------------------------------------------------
-| CONFIG
+| CONFIG / DATABASE / SESSION / FUNCTIONS
 |--------------------------------------------------------------------------
 */
 
 require_once __DIR__ . '/../config.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| DATABASE
-|--------------------------------------------------------------------------
-*/
-
 require_once __DIR__ . '/../database/db.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| SESSION
-|--------------------------------------------------------------------------
-*/
-
 require_once __DIR__ . '/../includes/session.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| FUNCTIONS
-|--------------------------------------------------------------------------
-*/
-
 require_once __DIR__ . '/../includes/functions.php';
 
 
-/*
-|--------------------------------------------------------------------------
-| START SESSION
-|--------------------------------------------------------------------------
-*/
-
 if (session_status() === PHP_SESSION_NONE) {
-
     session_start();
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN CHECK
+| LOGIN
 |--------------------------------------------------------------------------
 */
 
 if (!isset($_SESSION['user_id'])) {
 
     header(
-        'Location: ../index.php'
+        'Location: ' .
+        BASE_URL .
+        'index.php'
     );
 
     exit;
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VENDOR ROLE CHECK
+| ROLE
 |--------------------------------------------------------------------------
 */
 
-if (
-    !isset($_SESSION['role']) ||
+$currentRole =
     strtolower(
-        (string) $_SESSION['role']
-    ) !== 'vendor'
-) {
+        trim(
+            (string) (
+                $_SESSION['role']
+                ?? $_SESSION['user_role']
+                ?? ''
+            )
+        )
+    );
+
+
+if ($currentRole !== 'vendor') {
 
     header(
-        'Location: ../dashboard.php'
+        'Location: ' .
+        BASE_URL .
+        'dashboard.php'
     );
 
     exit;
-
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| USER ID
-|--------------------------------------------------------------------------
-*/
 
 $userId =
     (int) $_SESSION['user_id'];
@@ -122,15 +87,7 @@ $userId =
 |--------------------------------------------------------------------------
 */
 
-if (
-    !isset($db) ||
-    !($db instanceof PDO)
-) {
-
-    $db =
-        getDB();
-
-}
+$db = getDB();
 
 
 if (!($db instanceof PDO)) {
@@ -138,7 +95,6 @@ if (!($db instanceof PDO)) {
     die(
         'Database connection is not available.'
     );
-
 }
 
 
@@ -148,9 +104,9 @@ if (!($db instanceof PDO)) {
 |--------------------------------------------------------------------------
 */
 
-if (!function_exists('sellerSalesEscape')) {
+if (!function_exists('salesEscape')) {
 
-    function sellerSalesEscape($value): string
+    function salesEscape($value): string
     {
         return htmlspecialchars(
             (string) $value,
@@ -158,78 +114,195 @@ if (!function_exists('sellerSalesEscape')) {
             'UTF-8'
         );
     }
-
 }
 
 
-if (!function_exists('sellerSalesDate')) {
+if (!function_exists('salesMoney')) {
 
-    function sellerSalesDate($date): string
+    function salesMoney($value): string
     {
-        $timestamp =
+        return number_format(
+            (float) $value,
+            2
+        );
+    }
+}
+
+
+if (!function_exists('salesDate')) {
+
+    function salesDate($value): string
+    {
+        if (empty($value)) {
+            return '—';
+        }
+
+
+        $time =
             strtotime(
-                (string) $date
+                (string) $value
             );
 
 
-        if (!$timestamp) {
-            return '-';
+        if (!$time) {
+            return '—';
         }
 
 
         return date(
             'd M Y',
-            $timestamp
+            $time
         );
     }
+}
 
+
+if (!function_exists('salesDateTime')) {
+
+    function salesDateTime($value): string
+    {
+        if (empty($value)) {
+            return '—';
+        }
+
+
+        $time =
+            strtotime(
+                (string) $value
+            );
+
+
+        if (!$time) {
+            return '—';
+        }
+
+
+        return date(
+            'd M Y, h:i A',
+            $time
+        );
+    }
+}
+
+
+if (!function_exists('salesImage')) {
+
+    function salesImage($image): string
+    {
+        $image =
+            trim(
+                (string) $image
+            );
+
+
+        if ($image === '') {
+            return '';
+        }
+
+
+        if (
+            preg_match(
+                '/^https?:\/\//i',
+                $image
+            )
+        ) {
+
+            return $image;
+        }
+
+
+        if (
+            str_starts_with(
+                $image,
+                'uploads/'
+            )
+        ) {
+
+            return
+                BASE_URL .
+                $image;
+        }
+
+
+        return
+            BASE_URL .
+            'uploads/products/' .
+            rawurlencode(
+                basename(
+                    $image
+                )
+            );
+    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| VENDOR INFORMATION
+| GET VENDOR
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| Old field:
+|     cod_delivery_fee
+|
+| Current database field:
+|     vendor_delivery_fee
 |--------------------------------------------------------------------------
 */
 
-$stmt =
-    $db->prepare("
-        SELECT
+try {
 
-            v.vendor_id,
-            v.business_name,
-            v.business_logo,
-            v.business_description,
-            v.business_address,
-            v.category,
-            v.delivery_method,
-            v.approval_status,
-            v.created_at,
+    $stmt =
+        $db->prepare("
+            SELECT
 
-            u.name,
-            u.email,
-            u.phone
+                v.vendor_id,
+                v.user_id,
+                v.business_name,
+                v.business_logo,
+                v.business_description,
+                v.business_address,
+                v.category,
+                v.delivery_method,
+                v.postage_fee,
+                v.allow_vendor_delivery,
+                v.cod_enabled,
+                v.vendor_delivery_fee,
+                v.commission_rate,
+                v.approval_status,
+                v.created_at,
 
-        FROM vendors v
+                u.name,
+                u.email,
+                u.phone
 
-        INNER JOIN users u
-            ON v.user_id = u.user_id
+            FROM vendors v
 
-        WHERE v.user_id = ?
+            INNER JOIN users u
+                ON u.user_id =
+                   v.user_id
 
-        LIMIT 1
-    ");
+            WHERE v.user_id = ?
 
-
-$stmt->execute([
-    $userId
-]);
+            LIMIT 1
+        ");
 
 
-$vendor =
-    $stmt->fetch(
-        PDO::FETCH_ASSOC
-    );
+    $stmt->execute([
+        $userId
+    ]);
+
+
+    $vendor =
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+
+} catch (Throwable $e) {
+
+    $vendor = false;
+}
 
 
 /*
@@ -245,25 +318,19 @@ if (!$vendor) {
     );
 
     exit;
-
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| VENDOR ID
-|--------------------------------------------------------------------------
-*/
 
 $vendorId =
     (int) $vendor['vendor_id'];
 
 
-/*
-|--------------------------------------------------------------------------
-| SYNC SIDEBAR SESSION
-|--------------------------------------------------------------------------
-*/
+$currentCommissionRate =
+    (float) (
+        $vendor['commission_rate']
+        ?? 0
+    );
+
 
 $_SESSION['business_name'] =
     $vendor['business_name'];
@@ -281,37 +348,37 @@ $_SESSION['vendor_approval_status'] =
 
 $startDate =
     trim(
-        $_GET['start_date']
-        ?? ''
+        (string) (
+            $_GET['start_date']
+            ?? ''
+        )
     );
 
 
 $endDate =
     trim(
-        $_GET['end_date']
-        ?? ''
+        (string) (
+            $_GET['end_date']
+            ?? ''
+        )
     );
 
-
-/*
-|--------------------------------------------------------------------------
-| DEFAULT DATE RANGE
-|--------------------------------------------------------------------------
-*/
 
 if ($startDate === '') {
 
     $startDate =
-        date('Y-m-01');
-
+        date(
+            'Y-m-01'
+        );
 }
 
 
 if ($endDate === '') {
 
     $endDate =
-        date('Y-m-d');
-
+        date(
+            'Y-m-d'
+        );
 }
 
 
@@ -321,43 +388,50 @@ if ($endDate === '') {
 |--------------------------------------------------------------------------
 */
 
-$startTimestamp =
-    strtotime(
+$startObject =
+    DateTime::createFromFormat(
+        'Y-m-d',
         $startDate
     );
 
 
-$endTimestamp =
-    strtotime(
+$endObject =
+    DateTime::createFromFormat(
+        'Y-m-d',
         $endDate
     );
 
 
+$validStart =
+    $startObject &&
+    $startObject->format(
+        'Y-m-d'
+    ) === $startDate;
+
+
+$validEnd =
+    $endObject &&
+    $endObject->format(
+        'Y-m-d'
+    ) === $endDate;
+
+
 if (
-    !$startTimestamp ||
-    !$endTimestamp ||
-    $startTimestamp > $endTimestamp
+    !$validStart ||
+    !$validEnd ||
+    $startDate > $endDate
 ) {
 
     $startDate =
-        date('Y-m-01');
+        date(
+            'Y-m-01'
+        );
 
 
     $endDate =
-        date('Y-m-d');
-
-
-    $startTimestamp =
-        strtotime(
-            $startDate
+        date(
+            'Y-m-d'
         );
-
-
-    $endTimestamp =
-        strtotime(
-            $endDate
-        );
-
 }
 
 
@@ -369,17 +443,49 @@ if (
 
 $summary = [
 
-    'total_orders'    => 0,
-    'total_sales'     => 0,
-    'completed_sales' => 0,
-    'pending_sales'   => 0
+    'total_orders' => 0,
 
+    'product_sales' => 0.00,
+
+    'delivery_fees' => 0.00,
+
+    'gross_collected' => 0.00,
+
+    'commission' => 0.00,
+
+    'net_earnings' => 0.00,
+
+    'completed_sales' => 0.00,
+
+    'processing_sales' => 0.00,
+
+    'cancelled_sales' => 0.00,
+
+    'paid_orders' => 0,
+
+    'pending_payments' => 0
 ];
 
 
 /*
 |--------------------------------------------------------------------------
-| SUMMARY
+| SALES SUMMARY
+|--------------------------------------------------------------------------
+|
+| Product Sales
+| = vendor_orders.subtotal
+|
+| Delivery Fees
+| = vendor_orders.delivery_fee
+|
+| Gross
+| = Product Sales + Delivery Fees
+|
+| Commission
+| = commission.commission_amount
+|
+| Net
+| = Product Sales - Commission + Delivery Fees
 |--------------------------------------------------------------------------
 */
 
@@ -390,19 +496,31 @@ try {
             SELECT
 
                 COUNT(
-                    DISTINCT vo.vendor_order_id
+                    DISTINCT
+                    vo.vendor_order_id
                 ) AS total_orders,
 
                 COALESCE(
                     SUM(
                         CASE
-                            WHEN vo.vendor_status != 'Cancelled'
+                            WHEN vo.vendor_status <> 'Cancelled'
                             THEN vo.subtotal
                             ELSE 0
                         END
                     ),
                     0
-                ) AS total_sales,
+                ) AS product_sales,
+
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN vo.vendor_status <> 'Cancelled'
+                            THEN vo.delivery_fee
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS delivery_fees,
 
                 COALESCE(
                     SUM(
@@ -418,13 +536,34 @@ try {
                 COALESCE(
                     SUM(
                         CASE
-                            WHEN vo.vendor_status = 'Pending'
+
+                            WHEN vo.vendor_status IN
+                            (
+                                'Pending',
+                                'Processing',
+                                'Ready',
+                                'Shipped'
+                            )
+
+                            THEN vo.subtotal
+
+                            ELSE 0
+
+                        END
+                    ),
+                    0
+                ) AS processing_sales,
+
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN vo.vendor_status = 'Cancelled'
                             THEN vo.subtotal
                             ELSE 0
                         END
                     ),
                     0
-                ) AS pending_sales
+                ) AS cancelled_sales
 
             FROM vendor_orders vo
 
@@ -436,13 +575,9 @@ try {
 
 
     $stmt->execute([
-
         $vendorId,
-
         $startDate,
-
         $endDate
-
     ]);
 
 
@@ -454,46 +589,262 @@ try {
 
     if ($data) {
 
-        $summary = [
+        $summary['total_orders'] =
+            (int) (
+                $data['total_orders']
+                ?? 0
+            );
 
-            'total_orders' =>
-                (int) (
-                    $data['total_orders']
-                    ?? 0
-                ),
 
-            'total_sales' =>
-                (float) (
-                    $data['total_sales']
-                    ?? 0
-                ),
+        $summary['product_sales'] =
+            (float) (
+                $data['product_sales']
+                ?? 0
+            );
 
-            'completed_sales' =>
-                (float) (
-                    $data['completed_sales']
-                    ?? 0
-                ),
 
-            'pending_sales' =>
-                (float) (
-                    $data['pending_sales']
-                    ?? 0
-                )
+        $summary['delivery_fees'] =
+            (float) (
+                $data['delivery_fees']
+                ?? 0
+            );
 
-        ];
 
+        $summary['completed_sales'] =
+            (float) (
+                $data['completed_sales']
+                ?? 0
+            );
+
+
+        $summary['processing_sales'] =
+            (float) (
+                $data['processing_sales']
+                ?? 0
+            );
+
+
+        $summary['cancelled_sales'] =
+            (float) (
+                $data['cancelled_sales']
+                ?? 0
+            );
     }
 
-}
 
-catch (Throwable $e) {
+} catch (Throwable $e) {
 
+    // Keep zero values.
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| PRODUCT SALES
+| COMMISSION SUMMARY
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    $stmt =
+        $db->prepare("
+            SELECT
+
+                COALESCE(
+                    SUM(
+                        c.commission_amount
+                    ),
+                    0
+                ) AS commission_total
+
+            FROM commission c
+
+            INNER JOIN vendor_orders vo
+                ON vo.vendor_order_id =
+                   c.vendor_order_id
+
+            WHERE c.vendor_id = ?
+
+            AND vo.vendor_status <> 'Cancelled'
+
+            AND DATE(vo.created_at)
+                BETWEEN ? AND ?
+        ");
+
+
+    $stmt->execute([
+        $vendorId,
+        $startDate,
+        $endDate
+    ]);
+
+
+    $commissionData =
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+
+    if ($commissionData) {
+
+        $summary['commission'] =
+            (float) (
+                $commissionData[
+                    'commission_total'
+                ]
+                ?? 0
+            );
+    }
+
+
+} catch (Throwable $e) {
+
+    // Keep zero value.
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PAYMENT SUMMARY
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    $stmt =
+        $db->prepare("
+            SELECT
+
+                COUNT(
+                    DISTINCT
+                    CASE
+
+                        WHEN LOWER(
+                            COALESCE(
+                                p.payment_status,
+                                ''
+                            )
+                        ) = 'paid'
+
+                        THEN vo.vendor_order_id
+
+                    END
+                ) AS paid_orders,
+
+                COUNT(
+                    DISTINCT
+                    CASE
+
+                        WHEN LOWER(
+                            COALESCE(
+                                p.payment_status,
+                                'pending'
+                            )
+                        ) = 'pending'
+
+                        THEN vo.vendor_order_id
+
+                    END
+                ) AS pending_payments
+
+            FROM vendor_orders vo
+
+            INNER JOIN orders o
+                ON o.order_id =
+                   vo.order_id
+
+            LEFT JOIN payments p
+                ON p.payment_id = (
+
+                    SELECT
+                        p2.payment_id
+
+                    FROM payments p2
+
+                    WHERE p2.order_id =
+                          o.order_id
+
+                    ORDER BY
+                        p2.payment_id DESC
+
+                    LIMIT 1
+                )
+
+            WHERE vo.vendor_id = ?
+
+            AND vo.vendor_status <> 'Cancelled'
+
+            AND DATE(vo.created_at)
+                BETWEEN ? AND ?
+        ");
+
+
+    $stmt->execute([
+        $vendorId,
+        $startDate,
+        $endDate
+    ]);
+
+
+    $paymentData =
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+
+    if ($paymentData) {
+
+        $summary['paid_orders'] =
+            (int) (
+                $paymentData[
+                    'paid_orders'
+                ]
+                ?? 0
+            );
+
+
+        $summary['pending_payments'] =
+            (int) (
+                $paymentData[
+                    'pending_payments'
+                ]
+                ?? 0
+            );
+    }
+
+
+} catch (Throwable $e) {
+
+    // Keep defaults.
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| FINAL CALCULATIONS
+|--------------------------------------------------------------------------
+*/
+
+$summary['gross_collected'] =
+    $summary['product_sales']
+    +
+    $summary['delivery_fees'];
+
+
+$summary['net_earnings'] =
+    max(
+        0,
+        $summary['product_sales']
+        -
+        $summary['commission']
+        +
+        $summary['delivery_fees']
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| PRODUCT PERFORMANCE
 |--------------------------------------------------------------------------
 */
 
@@ -513,9 +864,13 @@ try {
                 COALESCE(
                     SUM(
                         CASE
-                            WHEN vo.vendor_status != 'Cancelled'
+
+                            WHEN vo.vendor_status <> 'Cancelled'
+
                             THEN od.quantity
+
                             ELSE 0
+
                         END
                     ),
                     0
@@ -524,9 +879,13 @@ try {
                 COALESCE(
                     SUM(
                         CASE
-                            WHEN vo.vendor_status != 'Cancelled'
+
+                            WHEN vo.vendor_status <> 'Cancelled'
+
                             THEN od.subtotal
+
                             ELSE 0
+
                         END
                     ),
                     0
@@ -535,11 +894,15 @@ try {
             FROM order_details od
 
             INNER JOIN products p
-                ON od.product_id = p.product_id
+                ON p.product_id =
+                   od.product_id
 
             INNER JOIN vendor_orders vo
-                ON vo.order_id = od.order_id
-                AND vo.vendor_id = p.vendor_id
+                ON vo.order_id =
+                   od.order_id
+
+                AND vo.vendor_id =
+                    p.vendor_id
 
             WHERE p.vendor_id = ?
 
@@ -547,23 +910,24 @@ try {
                 BETWEEN ? AND ?
 
             GROUP BY
+
                 p.product_id,
                 p.product_name,
                 p.image
 
+            HAVING total_quantity > 0
+
             ORDER BY
-                total_revenue DESC
+
+                total_revenue DESC,
+                total_quantity DESC
         ");
 
 
     $stmt->execute([
-
         $vendorId,
-
         $startDate,
-
         $endDate
-
     ]);
 
 
@@ -572,12 +936,10 @@ try {
             PDO::FETCH_ASSOC
         );
 
-}
 
-catch (Throwable $e) {
+} catch (Throwable $e) {
 
     $productSales = [];
-
 }
 
 
@@ -596,24 +958,70 @@ try {
         $db->prepare("
             SELECT
 
-                DATE(vo.created_at) AS sale_date,
+                DATE(vo.created_at)
+                    AS sale_date,
+
+                COUNT(
+                    DISTINCT
+                    CASE
+
+                        WHEN vo.vendor_status <> 'Cancelled'
+
+                        THEN vo.vendor_order_id
+
+                    END
+                ) AS total_orders,
 
                 COALESCE(
                     SUM(
                         CASE
-                            WHEN vo.vendor_status != 'Cancelled'
+
+                            WHEN vo.vendor_status <> 'Cancelled'
+
                             THEN vo.subtotal
+
                             ELSE 0
+
                         END
                     ),
                     0
-                ) AS total_sales,
+                ) AS product_sales,
 
-                COUNT(
-                    DISTINCT vo.vendor_order_id
-                ) AS total_orders
+                COALESCE(
+                    SUM(
+                        CASE
+
+                            WHEN vo.vendor_status <> 'Cancelled'
+
+                            THEN vo.delivery_fee
+
+                            ELSE 0
+
+                        END
+                    ),
+                    0
+                ) AS delivery_fees,
+
+                COALESCE(
+                    SUM(
+                        CASE
+
+                            WHEN vo.vendor_status <> 'Cancelled'
+
+                            THEN c.commission_amount
+
+                            ELSE 0
+
+                        END
+                    ),
+                    0
+                ) AS commission_amount
 
             FROM vendor_orders vo
+
+            LEFT JOIN commission c
+                ON c.vendor_order_id =
+                   vo.vendor_order_id
 
             WHERE vo.vendor_id = ?
 
@@ -629,13 +1037,9 @@ try {
 
 
     $stmt->execute([
-
         $vendorId,
-
         $startDate,
-
         $endDate
-
     ]);
 
 
@@ -644,18 +1048,122 @@ try {
             PDO::FETCH_ASSOC
         );
 
-}
 
-catch (Throwable $e) {
+} catch (Throwable $e) {
 
     $dailySales = [];
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| EXTRA DATA
+| ORDER SALES HISTORY
+|--------------------------------------------------------------------------
+*/
+
+$orderSales = [];
+
+
+try {
+
+    $stmt =
+        $db->prepare("
+            SELECT
+
+                vo.vendor_order_id,
+                vo.order_id,
+                vo.subtotal,
+                vo.delivery_fee,
+                vo.vendor_status,
+                vo.tracking_number,
+                vo.created_at,
+                vo.completed_at,
+
+                o.delivery_method,
+                o.order_status,
+                o.order_date,
+
+                u.name
+                    AS customer_name,
+
+                COALESCE(
+                    c.commission_rate,
+                    0
+                ) AS commission_rate,
+
+                COALESCE(
+                    c.commission_amount,
+                    0
+                ) AS commission_amount,
+
+                p.payment_method,
+                p.payment_status
+
+            FROM vendor_orders vo
+
+            INNER JOIN orders o
+                ON o.order_id =
+                   vo.order_id
+
+            INNER JOIN users u
+                ON u.user_id =
+                   o.customer_id
+
+            LEFT JOIN commission c
+                ON c.vendor_order_id =
+                   vo.vendor_order_id
+
+            LEFT JOIN payments p
+                ON p.payment_id = (
+
+                    SELECT
+                        p2.payment_id
+
+                    FROM payments p2
+
+                    WHERE p2.order_id =
+                          o.order_id
+
+                    ORDER BY
+                        p2.payment_id DESC
+
+                    LIMIT 1
+                )
+
+            WHERE vo.vendor_id = ?
+
+            AND DATE(vo.created_at)
+                BETWEEN ? AND ?
+
+            ORDER BY
+
+                vo.created_at DESC,
+                vo.vendor_order_id DESC
+        ");
+
+
+    $stmt->execute([
+        $vendorId,
+        $startDate,
+        $endDate
+    ]);
+
+
+    $orderSales =
+        $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        );
+
+
+} catch (Throwable $e) {
+
+    $orderSales = [];
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| EXTRA INSIGHTS
 |--------------------------------------------------------------------------
 */
 
@@ -668,61 +1176,90 @@ $bestSellingProduct =
 $totalUnitsSold = 0;
 
 
-foreach ($productSales as $sale) {
+foreach (
+    $productSales
+    as $sale
+) {
 
     $totalUnitsSold +=
         (int) (
-            $sale['total_quantity']
+            $sale[
+                'total_quantity'
+            ]
             ?? 0
         );
+}
 
+
+$averageOrderValue = 0;
+
+
+if (
+    $summary['total_orders'] > 0
+) {
+
+    $averageOrderValue =
+        $summary['product_sales']
+        /
+        $summary['total_orders'];
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| PAGE TITLE
+| PAGE INFORMATION
 |--------------------------------------------------------------------------
 */
 
 $pageTitle =
     'Sales | Seller | HochipoHub';
 
+
+$vendorName =
+    trim(
+        (string) (
+            $vendor['name']
+            ?? 'Vendor'
+        )
+    );
+
+
+$avatarInitial =
+    strtoupper(
+        substr(
+            $vendorName,
+            0,
+            1
+        )
+    );
+
 ?>
 <!DOCTYPE html>
 
-
 <html lang="en">
-
 
 <head>
 
-
     <meta charset="UTF-8">
-
 
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
 
-
     <title>
-        <?= sellerSalesEscape(
+        <?= salesEscape(
             $pageTitle
         ) ?>
     </title>
 
 
-    <!-- ============================================================
-         GOOGLE FONT
-    ============================================================= -->
+    <!-- GOOGLE FONT -->
 
     <link
         rel="preconnect"
         href="https://fonts.googleapis.com"
     >
-
 
     <link
         rel="preconnect"
@@ -730,16 +1267,13 @@ $pageTitle =
         crossorigin
     >
 
-
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@600;700;800&display=swap"
         rel="stylesheet"
     >
 
 
-    <!-- ============================================================
-         FONT AWESOME
-    ============================================================= -->
+    <!-- FONT AWESOME -->
 
     <link
         rel="stylesheet"
@@ -747,2048 +1281,1887 @@ $pageTitle =
     >
 
 
-    <!-- ============================================================
-         PROJECT CSS
-    ============================================================= -->
+    <!-- PROJECT CSS -->
 
     <link
         rel="stylesheet"
-        href="../css/style.css"
+        href="<?= salesEscape(
+            BASE_URL
+        ) ?>css/style.css"
     >
-
 
     <link
         rel="stylesheet"
-        href="../css/vendor.css"
+        href="<?= salesEscape(
+            BASE_URL
+        ) ?>css/vendor.css"
     >
-
 
     <link
         rel="stylesheet"
-        href="../css/responsive.css"
+        href="<?= salesEscape(
+            BASE_URL
+        ) ?>css/responsive.css"
     >
 
 
-    <style>
+<style>
 
+/* =========================================================
+   BASE
+========================================================= */
 
-        /* ==========================================================
-           PAGE
-        ========================================================== */
+* {
+    box-sizing: border-box;
+}
 
-        .seller-sales-page {
 
-            margin: 0;
+body.seller-sales-page {
 
-            min-height:
-                100vh;
+    margin: 0;
 
-            overflow-x:
-                hidden;
+    min-height: 100vh;
 
-            color:
-                #14213d;
+    overflow-x: hidden;
 
-            background:
-                #f6f8fc;
+    color: #14213d;
 
-            font-family:
-                Inter,
-                Arial,
-                sans-serif;
+    background: #f6f8fc;
 
-        }
+    font-family:
+        Inter,
+        Arial,
+        sans-serif;
+}
 
 
-        /* ==========================================================
-           MAIN
-        ========================================================== */
+/* =========================================================
+   SELLER MAIN
+========================================================= */
 
-        .seller-sales-main {
+.seller-sales-main {
 
-            width:
-                calc(
-                    100% -
-                    var(
-                        --seller-sidebar
-                    )
-                );
+    width:
+        calc(
+            100% -
+            var(
+                --seller-sidebar
+            )
+        );
 
-            min-height:
-                100vh;
+    min-height: 100vh;
 
-            margin-left:
-                var(
-                    --seller-sidebar
-                );
+    margin-left:
+        var(
+            --seller-sidebar
+        );
 
-            background:
+    background:
 
-                radial-gradient(
-                    circle at 95% 5%,
-                    rgba(
-                        37,
-                        99,
-                        235,
-                        .065
-                    ),
-                    transparent 24%
-                ),
+        radial-gradient(
+            circle at 95% 5%,
+            rgba(
+                37,
+                99,
+                235,
+                .065
+            ),
+            transparent 24%
+        ),
 
-                #f6f8fc;
+        #f6f8fc;
+}
 
-        }
 
+/* =========================================================
+   TOPBAR
+========================================================= */
 
-        /* ==========================================================
-           TOPBAR
-        ========================================================== */
+.sales-topbar {
 
-        .seller-sales-topbar {
+    height: 72px;
 
-            height:
-                72px;
+    padding:
+        0 32px;
 
-            padding:
-                0 32px;
+    display: flex;
 
-            display:
-                flex;
+    align-items: center;
 
-            align-items:
-                center;
+    justify-content: space-between;
 
-            justify-content:
-                space-between;
+    gap: 20px;
 
-            gap:
-                20px;
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .97
+        );
 
-            background:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .96
-                );
+    border-bottom:
+        1px solid
+        #e8edf5;
+}
 
-            border-bottom:
-                1px solid
-                #e8edf5;
 
-        }
+.sales-topbar-label {
 
+    color: #94a3b8;
 
-        .seller-sales-topbar-label {
+    font-size: 11px;
 
-            color:
-                #94a3b8;
+    font-weight: 700;
+}
 
-            font-size:
-                11px;
 
-            font-weight:
-                700;
+.sales-user {
 
-        }
+    display: flex;
 
+    align-items: center;
 
-        .seller-sales-user {
+    gap: 10px;
+}
 
-            display:
-                flex;
 
-            align-items:
-                center;
+.sales-avatar {
 
-            gap:
-                9px;
+    width: 38px;
 
-        }
+    height: 38px;
 
+    flex-shrink: 0;
 
-        .seller-sales-avatar {
+    display: flex;
 
-            width:
-                38px;
+    align-items: center;
 
-            height:
-                38px;
+    justify-content: center;
 
-            display:
-                flex;
+    color: #ffffff;
 
-            align-items:
-                center;
+    background:
 
-            justify-content:
-                center;
+        linear-gradient(
+            135deg,
+            #3b82f6,
+            #6366f1
+        );
 
-            color:
-                #ffffff;
+    border-radius: 50%;
 
-            background:
+    font-size: 12px;
 
-                linear-gradient(
-                    135deg,
-                    #3b82f6,
-                    #6366f1
-                );
+    font-weight: 900;
+}
 
-            border-radius:
-                50%;
 
-            font-size:
-                12px;
+.sales-user strong {
 
-            font-weight:
-                900;
+    display: block;
 
-        }
+    color: #14213d;
 
+    font-size: 11px;
+}
 
-        .seller-sales-user strong {
 
-            display:
-                block;
+.sales-user small {
 
-            color:
-                #14213d;
+    display: block;
 
-            font-size:
-                11px;
+    margin-top: 2px;
 
-        }
+    color: #94a3b8;
 
+    font-size: 8px;
+}
 
-        .seller-sales-user small {
 
-            display:
-                block;
+/* =========================================================
+   CONTENT
+========================================================= */
 
-            margin-top:
-                2px;
+.sales-content {
 
-            color:
-                #94a3b8;
+    width: 100%;
 
-            font-size:
-                8px;
+    max-width: 1480px;
 
-        }
+    margin:
+        0 auto;
 
+    padding:
+        30px 32px
+        65px;
+}
 
-        /* ==========================================================
-           CONTENT
-        ========================================================== */
 
-        .seller-sales-content {
+/* =========================================================
+   HEADING
+========================================================= */
 
-            width:
-                100%;
+.sales-heading {
 
-            max-width:
-                1450px;
+    margin-bottom: 22px;
+}
 
-            margin:
-                0 auto;
 
-            padding:
-                28px 32px 60px;
+.sales-eyebrow {
 
-        }
+    display: block;
 
+    margin-bottom: 6px;
 
-        /* ==========================================================
-           PAGE HEADER
-        ========================================================== */
+    color: #2563eb;
 
-        .seller-sales-header {
+    font-size: 8px;
 
-            margin-bottom:
-                22px;
+    font-weight: 900;
 
-        }
+    letter-spacing: 1.5px;
+}
 
 
-        .seller-sales-eyebrow {
+.sales-heading h1 {
 
-            display:
-                block;
+    margin: 0;
 
-            margin-bottom:
-                5px;
+    color: #14213d;
 
-            color:
-                #2563eb;
+    font-family:
+        Poppins,
+        Inter,
+        sans-serif;
 
-            font-size:
-                8px;
+    font-size:
 
-            font-weight:
-                900;
+        clamp(
+            26px,
+            3vw,
+            34px
+        );
 
-            letter-spacing:
-                1.5px;
+    font-weight: 800;
 
-        }
+    letter-spacing: -.8px;
+}
 
 
-        .seller-sales-header h1 {
+.sales-heading p {
 
-            margin:
-                0;
+    margin:
+        7px 0 0;
 
-            color:
-                #14213d;
+    color: #7d8ba0;
 
-            font-size:
+    font-size: 11px;
+}
 
-                clamp(
-                    25px,
-                    3vw,
-                    33px
-                );
 
-            font-weight:
-                900;
+/* =========================================================
+   HERO
+========================================================= */
 
-            letter-spacing:
-                -.8px;
+.sales-hero {
 
-        }
+    position: relative;
 
+    overflow: hidden;
 
-        .seller-sales-header p {
+    min-height: 185px;
 
-            margin:
-                7px 0 0;
+    margin-bottom: 22px;
 
-            color:
-                #7b879c;
+    padding: 32px;
 
-            font-size:
-                11px;
+    display: flex;
 
-        }
+    align-items: center;
 
+    justify-content: space-between;
 
-        /* ==========================================================
-           HERO
-        ========================================================== */
+    gap: 30px;
 
-        .seller-sales-hero {
+    color: #ffffff;
 
-            position:
-                relative;
+    background:
 
-            overflow:
-                hidden;
+        linear-gradient(
+            115deg,
+            #08265a 0%,
+            #123d8c 50%,
+            #2783ef 100%
+        );
 
-            min-height:
-                175px;
+    border-radius: 24px;
 
-            margin-bottom:
-                22px;
+    box-shadow:
 
-            padding:
-                31px;
+        0
+        18px
+        42px
+        rgba(
+            18,
+            70,
+            150,
+            .14
+        );
+}
 
-            display:
-                flex;
 
-            align-items:
-                center;
+.sales-hero::before {
 
-            justify-content:
-                space-between;
+    content: "";
 
-            gap:
-                25px;
+    position: absolute;
 
-            color:
-                #ffffff;
+    width: 260px;
 
-            background:
+    height: 260px;
 
-                linear-gradient(
-                    110deg,
-                    #08265a 0%,
-                    #123d8c 48%,
-                    #2783ef 100%
-                );
+    top: -150px;
 
-            border-radius:
-                23px;
+    right: -60px;
 
-            box-shadow:
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .08
+        );
 
-                0
-                17px
-                38px
-                rgba(
-                    18,
-                    70,
-                    150,
-                    .13
-                );
+    border-radius: 50%;
+}
 
-        }
 
+.sales-hero::after {
 
-        .seller-sales-hero::before {
+    content: "";
 
-            content:
-                "";
+    position: absolute;
 
-            position:
-                absolute;
+    width: 140px;
 
-            width:
-                220px;
+    height: 140px;
 
-            height:
-                220px;
+    right: 180px;
 
-            top:
-                -130px;
+    bottom: -95px;
 
-            right:
-                -45px;
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .05
+        );
 
-            border-radius:
-                50%;
+    border-radius: 50%;
+}
 
-            background:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .08
-                );
 
-        }
+.sales-hero-copy {
 
+    position: relative;
 
-        .seller-sales-hero::after {
+    z-index: 2;
 
-            content:
-                "";
+    max-width: 700px;
+}
 
-            position:
-                absolute;
 
-            width:
-                145px;
+.sales-hero-label {
 
-            height:
-                145px;
+    display: block;
 
-            right:
-                150px;
+    margin-bottom: 8px;
 
-            bottom:
-                -100px;
+    color: #a8d4ff;
 
-            border-radius:
-                50%;
+    font-size: 8px;
 
-            background:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .05
-                );
+    font-weight: 900;
 
-        }
+    letter-spacing: 1.4px;
+}
 
 
-        .seller-sales-hero-copy {
+.sales-hero h2 {
 
-            position:
-                relative;
+    margin:
+        0 0 8px;
 
-            z-index:
-                2;
+    font-family:
+        Poppins,
+        Inter,
+        sans-serif;
 
-        }
+    font-size: 25px;
 
+    font-weight: 800;
+}
 
-        .seller-sales-hero-label {
 
-            display:
-                block;
+.sales-hero p {
 
-            margin-bottom:
-                8px;
+    max-width: 700px;
 
-            color:
-                #a8d4ff;
+    margin: 0;
 
-            font-size:
-                8px;
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .78
+        );
 
-            font-weight:
-                900;
+    font-size: 10px;
 
-            letter-spacing:
-                1.3px;
+    line-height: 1.75;
+}
 
-        }
 
+.sales-hero-icon {
 
-        .seller-sales-hero h2 {
+    position: relative;
 
-            margin:
-                0 0 8px;
+    z-index: 2;
 
-            color:
-                #ffffff;
+    width: 78px;
 
-            font-family:
-                Poppins,
-                Inter,
-                sans-serif;
+    height: 78px;
 
-            font-size:
-                25px;
+    flex-shrink: 0;
 
-            font-weight:
-                800;
+    display: flex;
 
-        }
+    align-items: center;
 
+    justify-content: center;
 
-        .seller-sales-hero p {
+    color: #ffffff;
 
-            max-width:
-                620px;
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .13
+        );
 
-            margin:
-                0;
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            .22
+        );
 
-            color:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .77
-                );
+    border-radius: 21px;
 
-            font-size:
-                10px;
+    font-size: 27px;
+}
 
-            line-height:
-                1.7;
 
-        }
+/* =========================================================
+   FILTER
+========================================================= */
 
+.sales-filter {
 
-        .seller-sales-hero-icon {
+    margin-bottom: 22px;
 
-            position:
-                relative;
+    padding:
+        19px 20px;
 
-            z-index:
-                2;
+    display: grid;
 
-            width:
-                72px;
+    grid-template-columns:
+        minmax(
+            180px,
+            .7fr
+        )
+        minmax(
+            0,
+            2fr
+        );
 
-            height:
-                72px;
+    align-items: end;
 
-            flex-shrink:
-                0;
+    gap: 20px;
 
-            display:
-                flex;
+    background: #ffffff;
 
-            align-items:
-                center;
+    border:
+        1px solid
+        #e5eaf2;
 
-            justify-content:
-                center;
+    border-radius: 17px;
 
-            color:
-                #ffffff;
+    box-shadow:
 
-            background:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .13
-                );
+        0
+        8px
+        22px
+        rgba(
+            40,
+            65,
+            120,
+            .045
+        );
+}
 
-            border:
-                1px solid
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .22
-                );
 
-            border-radius:
-                20px;
+.sales-filter-title strong {
 
-            font-size:
-                25px;
+    display: block;
 
-        }
+    margin-bottom: 4px;
 
+    font-size: 11px;
 
-        /* ==========================================================
-           DATE FILTER
-        ========================================================== */
+    font-weight: 900;
+}
 
-        .seller-sales-filter-card {
 
-            margin-bottom:
-                22px;
+.sales-filter-title span {
 
-            padding:
-                18px 20px;
+    color: #8b99ad;
 
-            display:
-                flex;
+    font-size: 8px;
+}
 
-            align-items:
-                flex-end;
 
-            justify-content:
-                space-between;
+.sales-filter-form {
 
-            gap:
-                20px;
+    display: grid;
 
-            background:
-                #ffffff;
+    grid-template-columns:
+        1fr
+        1fr
+        auto
+        auto;
 
-            border:
-                1px solid
-                #e5eaf2;
+    align-items: end;
 
-            border-radius:
-                17px;
+    gap: 9px;
+}
 
-            box-shadow:
 
-                0
-                8px
-                22px
-                rgba(
-                    40,
-                    65,
-                    120,
-                    .045
-                );
+.sales-field label {
 
-        }
+    display: block;
 
+    margin-bottom: 6px;
 
-        .seller-sales-filter-title {
+    color: #475569;
 
-            min-width:
-                190px;
+    font-size: 8px;
 
-        }
+    font-weight: 800;
+}
 
 
-        .seller-sales-filter-title strong {
+.sales-field input {
 
-            display:
-                block;
+    width: 100%;
 
-            margin-bottom:
-                4px;
+    height: 40px;
 
-            color:
-                #14213d;
+    padding:
+        0 11px;
 
-            font-size:
-                11px;
+    outline: none;
 
-            font-weight:
-                900;
+    color: #334155;
 
-        }
+    background: #fbfdff;
 
+    border:
+        1px solid
+        #dce5ef;
 
-        .seller-sales-filter-title span {
+    border-radius: 9px;
 
-            color:
-                #8b99ad;
+    font-family: inherit;
 
-            font-size:
-                8px;
+    font-size: 9px;
+}
 
-        }
 
+.sales-field input:focus {
 
-        .seller-sales-filter-form {
+    border-color:
+        #3b82f6;
 
-            flex:
-                1;
+    box-shadow:
 
-            display:
-                grid;
+        0
+        0
+        0
+        3px
+        rgba(
+            59,
+            130,
+            246,
+            .07
+        );
+}
 
-            grid-template-columns:
+
+.sales-filter-btn {
+
+    min-height: 40px;
+
+    padding:
+        0 15px;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 6px;
+
+    border-radius: 9px;
+
+    font-family: inherit;
+
+    font-size: 8px;
+
+    font-weight: 800;
+
+    text-decoration: none;
+
+    cursor: pointer;
+}
+
+
+.sales-filter-btn.apply {
+
+    color: #ffffff;
+
+    background: #2563eb;
+
+    border: 0;
+}
+
+
+.sales-filter-btn.reset {
+
+    color: #64748b;
+
+    background: #ffffff;
+
+    border:
+        1px solid
+        #dce5ef;
+}
+
+
+/* =========================================================
+   STAT CARDS
+========================================================= */
+
+.sales-stats {
+
+    margin-bottom: 22px;
+
+    display: grid;
+
+    grid-template-columns:
+
+        repeat(
+            4,
+            minmax(
+                0,
                 1fr
+            )
+        );
+
+    gap: 16px;
+}
+
+
+.sales-stat {
+
+    position: relative;
+
+    overflow: hidden;
+
+    min-height: 142px;
+
+    padding: 20px;
+
+    background: #ffffff;
+
+    border:
+        1px solid
+        #e4eaf2;
+
+    border-radius: 18px;
+
+    box-shadow:
+
+        0
+        9px
+        25px
+        rgba(
+            40,
+            65,
+            120,
+            .05
+        );
+}
+
+
+.sales-stat::after {
+
+    content: "";
+
+    position: absolute;
+
+    width: 95px;
+
+    height: 95px;
+
+    right: -34px;
+
+    bottom: -40px;
+
+    background: #eef4ff;
+
+    border-radius: 50%;
+}
+
+
+.sales-stat.green::after {
+
+    background: #ecfdf3;
+}
+
+
+.sales-stat.orange::after {
+
+    background: #fff7ed;
+}
+
+
+.sales-stat.purple::after {
+
+    background: #f5f3ff;
+}
+
+
+.sales-stat.red::after {
+
+    background: #fef2f2;
+}
+
+
+.sales-stat-icon {
+
+    position: relative;
+
+    z-index: 2;
+
+    width: 41px;
+
+    height: 41px;
+
+    margin-bottom: 13px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    color: #2563eb;
+
+    background: #eff6ff;
+
+    border-radius: 11px;
+
+    font-size: 15px;
+}
+
+
+.sales-stat.green
+.sales-stat-icon {
+
+    color: #16a34a;
+
+    background: #ecfdf3;
+}
+
+
+.sales-stat.orange
+.sales-stat-icon {
+
+    color: #ea580c;
+
+    background: #fff7ed;
+}
+
+
+.sales-stat.purple
+.sales-stat-icon {
+
+    color: #7c3aed;
+
+    background: #f5f3ff;
+}
+
+
+.sales-stat.red
+.sales-stat-icon {
+
+    color: #dc2626;
+
+    background: #fef2f2;
+}
+
+
+.sales-stat-label {
+
+    position: relative;
+
+    z-index: 2;
+
+    display: block;
+
+    margin-bottom: 5px;
+
+    color: #7d899d;
+
+    font-size: 7px;
+
+    font-weight: 900;
+
+    letter-spacing: .8px;
+}
+
+
+.sales-stat-value {
+
+    position: relative;
+
+    z-index: 2;
+
+    display: block;
+
+    color: #14213d;
+
+    font-size: 21px;
+
+    font-weight: 900;
+}
+
+
+/* =========================================================
+   MONEY FLOW
+========================================================= */
+
+.sales-flow {
+
+    margin-bottom: 22px;
+
+    padding: 20px;
+
+    display: grid;
+
+    grid-template-columns:
+
+        1fr
+        auto
+        1fr
+        auto
+        1fr
+        auto
+        1fr;
+
+    align-items: center;
+
+    gap: 12px;
+
+    background: #ffffff;
+
+    border:
+        1px solid
+        #e4eaf2;
+
+    border-radius: 18px;
+}
+
+
+.sales-flow-card {
+
+    min-height: 95px;
+
+    padding: 15px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    background: #fbfdff;
+
+    border:
+        1px solid
+        #e6ecf4;
+
+    border-radius: 13px;
+}
+
+
+.sales-flow-icon {
+
+    width: 40px;
+
+    height: 40px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    color: #2563eb;
+
+    background: #eff6ff;
+
+    border-radius: 11px;
+}
+
+
+.sales-flow-card.delivery
+.sales-flow-icon {
+
+    color: #7c3aed;
+
+    background: #f5f3ff;
+}
+
+
+.sales-flow-card.commission
+.sales-flow-icon {
+
+    color: #dc2626;
+
+    background: #fef2f2;
+}
+
+
+.sales-flow-card.net
+.sales-flow-icon {
+
+    color: #15803d;
+
+    background: #ecfdf3;
+}
+
+
+.sales-flow-card span {
+
+    display: block;
+
+    margin-bottom: 4px;
+
+    color: #8a98aa;
+
+    font-size: 7px;
+
+    font-weight: 900;
+
+    letter-spacing: .6px;
+}
+
+
+.sales-flow-card strong {
+
+    color: #17345f;
+
+    font-size: 13px;
+
+    font-weight: 900;
+}
+
+
+.sales-flow-symbol {
+
+    color: #a2afbf;
+
+    font-size: 17px;
+
+    font-weight: 900;
+}
+
+
+/* =========================================================
+   INSIGHTS
+========================================================= */
+
+.sales-insights {
+
+    margin-bottom: 22px;
+
+    display: grid;
+
+    grid-template-columns:
+
+        repeat(
+            3,
+            minmax(
+                0,
                 1fr
-                auto
-                auto;
+            )
+        );
 
-            align-items:
-                end;
+    gap: 16px;
+}
 
-            gap:
-                9px;
 
-        }
+.sales-insight {
 
+    padding: 18px;
 
-        .seller-sales-filter-field label {
+    display: flex;
 
-            display:
-                block;
+    align-items: center;
 
-            margin-bottom:
-                6px;
+    gap: 13px;
 
-            color:
-                #475569;
+    background: #ffffff;
 
-            font-size:
-                8px;
+    border:
+        1px solid
+        #e5eaf2;
 
-            font-weight:
-                800;
+    border-radius: 16px;
+}
 
-        }
 
+.sales-insight-icon {
 
-        .seller-sales-filter-field input {
+    width: 45px;
 
-            width:
-                100%;
+    height: 45px;
 
-            height:
-                40px;
+    flex-shrink: 0;
 
-            padding:
-                0 11px;
+    display: flex;
 
-            outline:
-                none;
+    align-items: center;
 
-            color:
-                #334155;
+    justify-content: center;
 
-            background:
-                #fbfdff;
+    color: #2563eb;
 
-            border:
-                1px solid
-                #dce5ef;
+    background: #eff6ff;
 
-            border-radius:
-                9px;
+    border-radius: 12px;
 
-            font-family:
-                inherit;
+    font-size: 15px;
+}
 
-            font-size:
-                8px;
 
-        }
+.sales-insight small {
 
+    display: block;
 
-        .seller-sales-filter-field input:focus {
+    margin-bottom: 4px;
 
-            border-color:
-                #3b82f6;
+    color: #8b99ad;
 
-            box-shadow:
+    font-size: 7px;
 
-                0
-                0
-                0
-                3px
-                rgba(
-                    59,
-                    130,
-                    246,
-                    .07
-                );
+    font-weight: 800;
 
-        }
+    letter-spacing: .6px;
+}
 
 
-        .seller-sales-filter-button {
+.sales-insight strong {
 
-            min-height:
-                40px;
+    display: block;
 
-            padding:
-                0 14px;
+    font-size: 12px;
 
-            display:
-                inline-flex;
+    font-weight: 900;
+}
 
-            align-items:
-                center;
 
-            justify-content:
-                center;
+.sales-insight p {
 
-            gap:
-                6px;
+    margin:
+        3px 0 0;
 
-            border-radius:
-                9px;
+    color: #8090a7;
 
-            font-family:
-                inherit;
+    font-size: 8px;
+}
 
-            font-size:
-                8px;
 
-            font-weight:
-                800;
+/* =========================================================
+   SECTION
+========================================================= */
 
-            text-decoration:
-                none;
+.sales-section {
 
-            cursor:
-                pointer;
+    overflow: hidden;
 
-        }
+    margin-bottom: 22px;
 
+    background: #ffffff;
 
-        .seller-sales-filter-button.apply {
+    border:
+        1px solid
+        #e5eaf2;
 
-            color:
-                #ffffff;
+    border-radius: 21px;
 
-            background:
-                #2563eb;
+    box-shadow:
 
-            border:
-                0;
+        0
+        11px
+        30px
+        rgba(
+            40,
+            65,
+            120,
+            .055
+        );
+}
 
-        }
 
+.sales-section-header {
 
-        .seller-sales-filter-button.reset {
+    min-height: 83px;
 
-            color:
-                #64748b;
+    padding:
+        19px 22px;
 
-            background:
-                #ffffff;
+    display: flex;
 
-            border:
-                1px solid
-                #dce5ef;
+    align-items: center;
 
-        }
+    justify-content: space-between;
 
+    gap: 18px;
 
-        /* ==========================================================
-           STATS
-        ========================================================== */
+    border-bottom:
+        1px solid
+        #edf1f5;
+}
 
-        .seller-sales-stats {
 
-            display:
-                grid;
+.sales-section-title {
 
-            grid-template-columns:
+    display: flex;
 
-                repeat(
-                    4,
-                    minmax(
-                        0,
-                        1fr
-                    )
-                );
+    align-items: center;
 
-            gap:
-                17px;
+    gap: 12px;
+}
 
-            margin-bottom:
-                22px;
 
-        }
+.sales-section-icon {
 
+    width: 44px;
 
-        .seller-sales-stat {
+    height: 44px;
 
-            position:
-                relative;
+    flex-shrink: 0;
 
-            overflow:
-                hidden;
+    display: flex;
 
-            min-height:
-                142px;
+    align-items: center;
 
-            padding:
-                20px;
+    justify-content: center;
 
-            background:
-                #ffffff;
+    color: #ffffff;
 
-            border:
-                1px solid
-                #e5eaf2;
+    background:
 
-            border-radius:
-                18px;
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #3b82f6
+        );
 
-            box-shadow:
+    border-radius: 12px;
 
-                0
-                9px
-                25px
-                rgba(
-                    40,
-                    65,
-                    120,
-                    .05
-                );
+    font-size: 15px;
+}
 
-        }
 
+.sales-section-title h2 {
 
-        .seller-sales-stat::after {
+    margin:
+        0 0 4px;
 
-            content:
-                "";
+    color: #14213d;
 
-            position:
-                absolute;
+    font-size: 15px;
 
-            width:
-                90px;
+    font-weight: 900;
+}
 
-            height:
-                90px;
 
-            right:
-                -32px;
+.sales-section-title p {
 
-            bottom:
-                -38px;
+    margin: 0;
 
-            border-radius:
-                50%;
+    color: #8b99ad;
 
-            background:
-                #eef4ff;
+    font-size: 8px;
+}
 
-        }
 
+.sales-range-pill {
 
-        .seller-sales-stat.green::after {
+    min-height: 32px;
 
-            background:
-                #ecfdf3;
+    padding:
+        0 11px;
 
-        }
+    display: inline-flex;
 
+    align-items: center;
 
-        .seller-sales-stat.orange::after {
+    justify-content: center;
 
-            background:
-                #fff7ed;
+    color: #2563eb;
 
-        }
+    background: #eff6ff;
 
+    border:
+        1px solid
+        #dbeafe;
 
-        .seller-sales-stat.purple::after {
+    border-radius: 999px;
 
-            background:
-                #f5f3ff;
+    font-size: 8px;
 
-        }
+    font-weight: 800;
 
+    white-space: nowrap;
+}
 
-        .seller-sales-stat-icon {
 
-            position:
-                relative;
+/* =========================================================
+   TABLE
+========================================================= */
 
-            z-index:
-                2;
+.sales-table-wrap {
 
-            width:
-                40px;
+    width: 100%;
 
-            height:
-                40px;
+    overflow-x: auto;
+}
 
-            margin-bottom:
-                12px;
 
-            display:
-                flex;
+.sales-table {
 
-            align-items:
-                center;
+    width: 100%;
 
-            justify-content:
-                center;
+    min-width: 850px;
 
-            color:
-                #2563eb;
+    border-collapse: collapse;
+}
 
-            background:
-                #eff6ff;
 
-            border-radius:
-                11px;
+.sales-table.wide {
 
-            font-size:
-                14px;
+    min-width: 1250px;
+}
 
-        }
 
+.sales-table thead {
 
-        .seller-sales-stat.green
-        .seller-sales-stat-icon {
+    background: #f8fafc;
+}
 
-            color:
-                #16a34a;
 
-            background:
-                #ecfdf3;
+.sales-table th {
 
-        }
+    height: 44px;
 
+    padding:
+        0 17px;
 
-        .seller-sales-stat.orange
-        .seller-sales-stat-icon {
+    color: #64748b;
 
-            color:
-                #ea580c;
+    border-bottom:
+        1px solid
+        #e6ebf2;
 
-            background:
-                #fff7ed;
+    font-size: 7px;
 
-        }
+    font-weight: 900;
 
+    letter-spacing: .55px;
 
-        .seller-sales-stat.purple
-        .seller-sales-stat-icon {
+    text-align: left;
 
-            color:
-                #7c3aed;
+    text-transform: uppercase;
 
-            background:
-                #f5f3ff;
+    white-space: nowrap;
+}
 
-        }
 
+.sales-table td {
 
-        .seller-sales-stat-label {
+    padding:
+        14px 17px;
 
-            position:
-                relative;
+    color: #4d607a;
 
-            z-index:
-                2;
+    border-bottom:
+        1px solid
+        #edf1f5;
 
-            display:
-                block;
+    font-size: 9px;
 
-            margin-bottom:
-                5px;
+    vertical-align: middle;
+}
 
-            color:
-                #7d899d;
 
-            font-size:
-                7px;
+.sales-table tbody tr:hover {
 
-            font-weight:
-                900;
+    background: #fbfdff;
+}
 
-            letter-spacing:
-                .8px;
 
-        }
+.sales-table tbody tr:last-child td {
 
+    border-bottom: 0;
+}
 
-        .seller-sales-stat-value {
 
-            position:
-                relative;
+/* =========================================================
+   PRODUCT
+========================================================= */
 
-            z-index:
-                2;
+.sales-product {
 
-            display:
-                block;
+    display: flex;
 
-            color:
-                #14213d;
+    align-items: center;
 
-            font-size:
-                22px;
+    gap: 11px;
+}
 
-            line-height:
-                1.15;
 
-            font-weight:
-                900;
+.sales-product-image {
 
-        }
+    width: 52px;
 
+    height: 52px;
 
-        /* ==========================================================
-           INSIGHTS ROW
-        ========================================================== */
+    flex-shrink: 0;
 
-        .seller-sales-insights {
+    overflow: hidden;
 
-            display:
-                grid;
+    display: flex;
 
-            grid-template-columns:
-                1fr
-                1fr;
+    align-items: center;
 
-            gap:
-                17px;
+    justify-content: center;
 
-            margin-bottom:
-                22px;
+    color: #2563eb;
 
-        }
+    background: #eff6ff;
 
+    border:
+        1px solid
+        #dbeafe;
 
-        .seller-sales-insight {
+    border-radius: 11px;
 
-            padding:
-                18px;
+    font-size: 18px;
+}
 
-            display:
-                flex;
 
-            align-items:
-                center;
+.sales-product-image img {
 
-            gap:
-                13px;
+    width: 100%;
 
-            background:
-                #ffffff;
+    height: 100%;
 
-            border:
-                1px solid
-                #e5eaf2;
+    object-fit: contain;
+}
 
-            border-radius:
-                16px;
 
-            box-shadow:
+.sales-product-name {
 
-                0
-                8px
-                22px
-                rgba(
-                    40,
-                    65,
-                    120,
-                    .04
-                );
+    color: #14213d;
 
-        }
+    font-size: 9px;
 
+    font-weight: 900;
+}
 
-        .seller-sales-insight-icon {
 
-            width:
-                45px;
+/* =========================================================
+   MONEY
+========================================================= */
 
-            height:
-                45px;
+.sales-money {
 
-            flex-shrink:
-                0;
+    color: #12366a;
 
-            display:
-                flex;
+    font-size: 10px;
 
-            align-items:
-                center;
+    font-weight: 900;
 
-            justify-content:
-                center;
+    white-space: nowrap;
+}
 
-            color:
-                #2563eb;
 
-            background:
-                #eff6ff;
+.sales-money.green {
 
-            border-radius:
-                12px;
+    color: #15803d;
+}
 
-            font-size:
-                15px;
 
-        }
+.sales-money.red {
 
+    color: #dc2626;
+}
 
-        .seller-sales-insight small {
 
-            display:
-                block;
+/* =========================================================
+   BADGES
+========================================================= */
 
-            margin-bottom:
-                4px;
+.sales-badge {
 
-            color:
-                #8b99ad;
+    min-height: 27px;
 
-            font-size:
-                7px;
+    padding:
+        0 9px;
 
-            font-weight:
-                800;
+    display: inline-flex;
 
-            letter-spacing:
-                .6px;
+    align-items: center;
 
-        }
+    justify-content: center;
 
+    border-radius: 999px;
 
-        .seller-sales-insight strong {
+    font-size: 8px;
 
-            display:
-                block;
+    font-weight: 800;
 
-            color:
-                #14213d;
+    white-space: nowrap;
+}
 
-            font-size:
-                12px;
 
-            font-weight:
-                900;
+.sales-badge.blue {
 
-        }
+    color: #2563eb;
 
+    background: #eff6ff;
+}
 
-        .seller-sales-insight p {
 
-            margin:
-                3px 0 0;
+.sales-badge.green {
 
-            color:
-                #8090a7;
+    color: #15803d;
 
-            font-size:
-                8px;
+    background: #ecfdf3;
+}
 
-        }
 
+.sales-badge.orange {
 
-        /* ==========================================================
-           SECTION CARD
-        ========================================================== */
+    color: #b45309;
 
-        .seller-sales-section {
+    background: #fffbeb;
+}
 
-            overflow:
-                hidden;
 
-            margin-bottom:
-                22px;
+.sales-badge.red {
 
-            background:
-                #ffffff;
+    color: #b91c1c;
 
-            border:
-                1px solid
-                #e5eaf2;
+    background: #fef2f2;
+}
 
-            border-radius:
-                21px;
 
-            box-shadow:
+.sales-badge.gray {
 
-                0
-                11px
-                30px
-                rgba(
-                    40,
-                    65,
-                    120,
-                    .055
-                );
+    color: #64748b;
 
-        }
+    background: #f1f5f9;
+}
 
 
-        .seller-sales-section-header {
+/* =========================================================
+   ORDER CELL
+========================================================= */
 
-            min-height:
-                83px;
+.sales-order strong {
 
-            padding:
-                19px 22px;
+    display: block;
 
-            display:
-                flex;
+    margin-bottom: 3px;
 
-            align-items:
-                center;
+    color: #14213d;
 
-            justify-content:
-                space-between;
+    font-size: 9px;
 
-            gap:
-                18px;
+    font-weight: 900;
+}
 
-            border-bottom:
-                1px solid
-                #edf1f5;
 
-        }
+.sales-order small {
 
+    color: #94a3b8;
 
-        .seller-sales-section-title {
+    font-size: 7px;
+}
 
-            display:
-                flex;
 
-            align-items:
-                center;
+/* =========================================================
+   EMPTY STATE
+========================================================= */
 
-            gap:
-                12px;
+.sales-empty {
 
-        }
+    padding:
+        65px 20px;
 
+    text-align: center;
+}
 
-        .seller-sales-section-icon {
 
-            width:
-                44px;
+.sales-empty-icon {
 
-            height:
-                44px;
+    width: 60px;
 
-            flex-shrink:
-                0;
+    height: 60px;
 
-            display:
-                flex;
+    margin:
+        0 auto 13px;
 
-            align-items:
-                center;
+    display: flex;
 
-            justify-content:
-                center;
+    align-items: center;
 
-            color:
-                #ffffff;
+    justify-content: center;
 
-            background:
+    color: #2563eb;
 
-                linear-gradient(
-                    135deg,
-                    #2563eb,
-                    #3b82f6
-                );
+    background: #eff6ff;
 
-            border-radius:
-                12px;
+    border-radius: 17px;
 
-            box-shadow:
+    font-size: 23px;
+}
 
-                0
-                8px
-                18px
-                rgba(
-                    37,
-                    99,
-                    235,
-                    .20
-                );
 
-            font-size:
-                15px;
+.sales-empty h3 {
 
-        }
+    margin:
+        0 0 6px;
 
+    font-size: 14px;
 
-        .seller-sales-section-title h2 {
+    font-weight: 900;
+}
 
-            margin:
-                0 0 4px;
 
-            color:
-                #14213d;
+.sales-empty p {
 
-            font-size:
-                15px;
+    margin: 0;
 
-            font-weight:
-                900;
+    color: #8492a6;
 
-        }
+    font-size: 9px;
+}
 
 
-        .seller-sales-section-title p {
+/* =========================================================
+   COMMISSION INFO
+========================================================= */
 
-            margin:
-                0;
+.sales-commission-info {
 
-            color:
-                #8b99ad;
+    margin-bottom: 22px;
 
-            font-size:
-                8px;
+    padding:
+        14px 17px;
 
-        }
+    display: flex;
 
+    align-items: center;
 
-        .seller-sales-range-pill {
+    justify-content: space-between;
 
-            min-height:
-                32px;
+    gap: 20px;
 
-            padding:
-                0 11px;
+    background: #ffffff;
 
-            display:
-                inline-flex;
+    border:
+        1px solid
+        #e5eaf2;
 
-            align-items:
-                center;
+    border-radius: 14px;
+}
 
-            justify-content:
-                center;
 
-            color:
-                #2563eb;
+.sales-commission-info-left {
 
-            background:
-                #eff6ff;
+    display: flex;
 
-            border:
-                1px solid
-                #dbeafe;
+    align-items: center;
 
-            border-radius:
-                999px;
+    gap: 11px;
+}
 
-            font-size:
-                8px;
 
-            font-weight:
-                800;
+.sales-commission-info-icon {
 
-            white-space:
-                nowrap;
+    width: 39px;
 
-        }
+    height: 39px;
 
+    display: flex;
 
-        /* ==========================================================
-           TABLE
-        ========================================================== */
+    align-items: center;
 
-        .seller-sales-table-wrap {
+    justify-content: center;
 
-            width:
-                100%;
+    color: #7c3aed;
 
-            overflow-x:
-                auto;
+    background: #f5f3ff;
 
-        }
+    border-radius: 10px;
+}
 
 
-        .seller-sales-table {
+.sales-commission-info span {
 
-            width:
-                100%;
+    display: block;
 
-            min-width:
-                720px;
+    margin-bottom: 2px;
 
-            border-collapse:
-                collapse;
+    color: #8492a6;
 
-        }
+    font-size: 8px;
+}
 
 
-        .seller-sales-table thead {
+.sales-commission-info strong {
 
-            background:
-                #f8fafc;
+    color: #14213d;
 
-        }
+    font-size: 11px;
+}
 
 
-        .seller-sales-table th {
+/* =========================================================
+   RESPONSIVE
+========================================================= */
 
-            height:
-                42px;
+@media (
+    max-width: 1180px
+) {
 
-            padding:
-                0 18px;
+    .sales-stats {
 
-            color:
-                #64748b;
+        grid-template-columns:
 
-            border-bottom:
-                1px solid
-                #e6ebf2;
-
-            font-size:
-                7px;
-
-            font-weight:
-                900;
-
-            letter-spacing:
-                .6px;
-
-            text-align:
-                left;
-
-            text-transform:
-                uppercase;
-
-        }
-
-
-        .seller-sales-table td {
-
-            padding:
-                14px 18px;
-
-            color:
-                #4d607a;
-
-            border-bottom:
-                1px solid
-                #edf1f5;
-
-            font-size:
-                9px;
-
-            vertical-align:
-                middle;
-
-        }
-
-
-        .seller-sales-table tbody tr:hover {
-
-            background:
-                #fbfdff;
-
-        }
-
-
-        .seller-sales-table tbody tr:last-child td {
-
-            border-bottom:
-                0;
-
-        }
-
-
-        /* ==========================================================
-           PRODUCT TABLE
-        ========================================================== */
-
-        .seller-sales-product {
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            gap:
-                11px;
-
-        }
-
-
-        .seller-sales-product-image {
-
-            width:
-                52px;
-
-            height:
-                52px;
-
-            flex-shrink:
-                0;
-
-            overflow:
-                hidden;
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            justify-content:
-                center;
-
-            color:
-                #2563eb;
-
-            background:
-                #eff6ff;
-
-            border:
-                1px solid
-                #dbeafe;
-
-            border-radius:
-                11px;
-
-            font-size:
-                18px;
-
-        }
-
-
-        .seller-sales-product-image img {
-
-            width:
-                100%;
-
-            height:
-                100%;
-
-            object-fit:
-                contain;
-
-            object-position:
-                center;
-
-        }
-
-
-        .seller-sales-product-name {
-
-            color:
-                #14213d;
-
-            font-size:
-                9px;
-
-            font-weight:
-                900;
-
-        }
-
-
-        .seller-sales-unit-badge {
-
-            min-height:
-                27px;
-
-            padding:
-                0 9px;
-
-            display:
-                inline-flex;
-
-            align-items:
-                center;
-
-            justify-content:
-                center;
-
-            color:
-                #2563eb;
-
-            background:
-                #eff6ff;
-
-            border-radius:
-                999px;
-
-            font-size:
-                8px;
-
-            font-weight:
-                800;
-
-        }
-
-
-        .seller-sales-money {
-
-            color:
-                #12366a;
-
-            font-size:
-                10px;
-
-            font-weight:
-                900;
-
-        }
-
-
-        /* ==========================================================
-           DAILY SALES
-        ========================================================== */
-
-        .seller-daily-date {
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            gap:
-                8px;
-
-        }
-
-
-        .seller-daily-date-icon {
-
-            width:
-                31px;
-
-            height:
-                31px;
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            justify-content:
-                center;
-
-            color:
-                #2563eb;
-
-            background:
-                #eff6ff;
-
-            border-radius:
-                9px;
-
-            font-size:
-                10px;
-
-        }
-
-
-        .seller-daily-date strong {
-
-            color:
-                #14213d;
-
-            font-size:
-                9px;
-
-            font-weight:
-                900;
-
-        }
-
-
-        /* ==========================================================
-           EMPTY
-        ========================================================== */
-
-        .seller-sales-empty {
-
-            padding:
-                62px 20px;
-
-            text-align:
-                center;
-
-        }
-
-
-        .seller-sales-empty-icon {
-
-            width:
-                60px;
-
-            height:
-                60px;
-
-            margin:
-                0 auto 13px;
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            justify-content:
-                center;
-
-            color:
-                #2563eb;
-
-            background:
-                #eff6ff;
-
-            border-radius:
-                17px;
-
-            font-size:
-                23px;
-
-        }
-
-
-        .seller-sales-empty h3 {
-
-            margin:
-                0 0 6px;
-
-            color:
-                #14213d;
-
-            font-size:
-                14px;
-
-            font-weight:
-                900;
-
-        }
-
-
-        .seller-sales-empty p {
-
-            margin:
-                0;
-
-            color:
-                #8492a6;
-
-            font-size:
-                9px;
-
-        }
-
-
-        /* ==========================================================
-           RESPONSIVE
-        ========================================================== */
-
-        @media (
-            max-width: 1150px
-        ) {
-
-            .seller-sales-stats {
-
-                grid-template-columns:
-
-                    repeat(
-                        2,
-                        minmax(
-                            0,
-                            1fr
-                        )
-                    );
-
-            }
-
-        }
-
-
-        @media (
-            max-width: 950px
-        ) {
-
-            .seller-sales-filter-card {
-
-                align-items:
-                    flex-start;
-
-                flex-direction:
-                    column;
-
-            }
-
-
-            .seller-sales-filter-form {
-
-                width:
-                    100%;
-
-            }
-
-        }
-
-
-        @media (
-            max-width: 768px
-        ) {
-
-            .seller-sales-main {
-
-                width:
-                    100%;
-
-                margin-left:
-                    0;
-
-            }
-
-
-            .seller-sales-topbar {
-
-                padding:
-                    0 20px;
-
-            }
-
-
-            .seller-sales-content {
-
-                padding:
-                    24px 20px 50px;
-
-            }
-
-
-            .seller-sales-filter-form {
-
-                grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
                     1fr
-                    1fr;
-
-            }
-
-
-            .seller-sales-filter-button {
-
-                width:
-                    100%;
-
-            }
-
-        }
+                )
+            );
+    }
 
 
-        @media (
-            max-width: 600px
-        ) {
+    .sales-flow {
 
-            .seller-sales-user
-            > div:last-child {
-
-                display:
-                    none;
-
-            }
+        grid-template-columns:
+            1fr;
+    }
 
 
-            .seller-sales-content {
+    .sales-flow-symbol {
 
-                padding:
-                    20px 14px 45px;
+        text-align: center;
 
-            }
-
-
-            .seller-sales-hero {
-
-                min-height:
-                    auto;
-
-                padding:
-                    23px;
-
-                align-items:
-                    flex-start;
-
-            }
+        transform:
+            rotate(
+                90deg
+            );
+    }
 
 
-            .seller-sales-hero h2 {
+    .sales-insights {
 
-                font-size:
-                    20px;
-
-            }
-
-
-            .seller-sales-hero-icon {
-
-                width:
-                    53px;
-
-                height:
-                    53px;
-
-                font-size:
-                    19px;
-
-            }
+        grid-template-columns:
+            1fr;
+    }
+}
 
 
-            .seller-sales-stats,
-            .seller-sales-insights {
+@media (
+    max-width: 900px
+) {
 
-                grid-template-columns:
-                    1fr;
+    .sales-filter {
 
-            }
-
-
-            .seller-sales-filter-form {
-
-                grid-template-columns:
-                    1fr;
-
-            }
+        grid-template-columns:
+            1fr;
+    }
+}
 
 
-            .seller-sales-section-header {
+@media (
+    max-width: 768px
+) {
 
-                align-items:
-                    flex-start;
+    .seller-sales-main {
 
-                flex-direction:
-                    column;
+        width: 100%;
 
-            }
-
-        }
+        margin-left: 0;
+    }
 
 
-    </style>
+    .sales-topbar {
 
+        padding:
+            0 20px;
+    }
+
+
+    .sales-content {
+
+        padding:
+            24px 20px
+            50px;
+    }
+
+
+    .sales-filter-form {
+
+        grid-template-columns:
+            1fr
+            1fr;
+    }
+
+
+    .sales-filter-btn {
+
+        width: 100%;
+    }
+}
+
+
+@media (
+    max-width: 600px
+) {
+
+    .sales-content {
+
+        padding:
+            20px 14px
+            45px;
+    }
+
+
+    .sales-user
+    > div:last-child {
+
+        display: none;
+    }
+
+
+    .sales-hero {
+
+        min-height: auto;
+
+        padding: 23px;
+
+        align-items: flex-start;
+    }
+
+
+    .sales-hero h2 {
+
+        font-size: 20px;
+    }
+
+
+    .sales-hero-icon {
+
+        width: 53px;
+
+        height: 53px;
+
+        font-size: 19px;
+    }
+
+
+    .sales-stats {
+
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .sales-filter-form {
+
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .sales-section-header {
+
+        align-items: flex-start;
+
+        flex-direction: column;
+    }
+
+
+    .sales-commission-info {
+
+        align-items: flex-start;
+
+        flex-direction: column;
+    }
+}
+
+</style>
 
 </head>
 
 
-<body class="seller-dashboard-page seller-sales-page">
+<body
+    class="
+        seller-dashboard-page
+        seller-sales-page
+    "
+>
 
 
 <?php
@@ -2805,41 +3178,30 @@ require_once __DIR__ .
 ?>
 
 
-<!-- ===============================================================
-     MAIN
-================================================================ -->
-
 <main class="seller-sales-main">
 
 
-    <!-- ===========================================================
+    <!-- =========================================================
          TOPBAR
-    ============================================================ -->
+    ========================================================== -->
 
-    <header class="seller-sales-topbar">
+    <header class="sales-topbar">
 
 
-        <span class="seller-sales-topbar-label">
+        <span class="sales-topbar-label">
 
             Seller Center
 
         </span>
 
 
-        <div class="seller-sales-user">
+        <div class="sales-user">
 
 
-            <div class="seller-sales-avatar">
+            <div class="sales-avatar">
 
-                <?= sellerSalesEscape(
-                    strtoupper(
-                        substr(
-                            $vendor['name']
-                            ?? 'V',
-                            0,
-                            1
-                        )
-                    )
+                <?= salesEscape(
+                    $avatarInitial
                 ) ?>
 
             </div>
@@ -2850,9 +3212,8 @@ require_once __DIR__ .
 
                 <strong>
 
-                    <?= sellerSalesEscape(
-                        $vendor['name']
-                        ?? 'Vendor'
+                    <?= salesEscape(
+                        $vendorName
                     ) ?>
 
                 </strong>
@@ -2860,7 +3221,11 @@ require_once __DIR__ .
 
                 <small>
 
-                    Vendor
+                    <?= salesEscape(
+                        $vendor[
+                            'business_name'
+                        ]
+                    ) ?>
 
                 </small>
 
@@ -2875,21 +3240,21 @@ require_once __DIR__ .
 
 
 
-    <!-- ===========================================================
+    <!-- =========================================================
          CONTENT
-    ============================================================ -->
+    ========================================================== -->
 
-    <div class="seller-sales-content">
-
-
-        <!-- =======================================================
-             PAGE HEADER
-        ======================================================== -->
-
-        <section class="seller-sales-header">
+    <div class="sales-content">
 
 
-            <span class="seller-sales-eyebrow">
+        <!-- =====================================================
+             TITLE
+        ====================================================== -->
+
+        <section class="sales-heading">
+
+
+            <span class="sales-eyebrow">
 
                 SALES & PERFORMANCE
 
@@ -2905,11 +3270,18 @@ require_once __DIR__ .
 
             <p>
 
-                Track revenue and product performance for
+                Track sales, delivery fees,
+                commission and earnings for
 
-                <?= sellerSalesEscape(
-                    $vendor['business_name']
-                ) ?>.
+                <strong>
+
+                    <?= salesEscape(
+                        $vendor[
+                            'business_name'
+                        ]
+                    ) ?>
+
+                </strong>.
 
             </p>
 
@@ -2918,17 +3290,17 @@ require_once __DIR__ .
 
 
 
-        <!-- =======================================================
+        <!-- =====================================================
              HERO
-        ======================================================== -->
+        ====================================================== -->
 
-        <section class="seller-sales-hero">
-
-
-            <div class="seller-sales-hero-copy">
+        <section class="sales-hero">
 
 
-                <span class="seller-sales-hero-label">
+            <div class="sales-hero-copy">
+
+
+                <span class="sales-hero-label">
 
                     STORE PERFORMANCE
 
@@ -2937,16 +3309,17 @@ require_once __DIR__ .
 
                 <h2>
 
-                    Understand how your store is performing.
+                    Understand where your money goes.
 
                 </h2>
 
 
                 <p>
 
-                    Review your sales totals, completed revenue,
-                    pending transactions, top-selling products
-                    and daily sales activity in one place.
+                    Product sales, delivery fees,
+                    commission deductions and estimated
+                    net earnings are separated so you can
+                    understand your store's actual performance.
 
                 </p>
 
@@ -2954,7 +3327,7 @@ require_once __DIR__ .
             </div>
 
 
-            <div class="seller-sales-hero-icon">
+            <div class="sales-hero-icon">
 
                 <i class="fa-solid fa-chart-line"></i>
 
@@ -2965,14 +3338,14 @@ require_once __DIR__ .
 
 
 
-        <!-- =======================================================
-             DATE FILTER
-        ======================================================== -->
+        <!-- =====================================================
+             FILTER
+        ====================================================== -->
 
-        <section class="seller-sales-filter-card">
+        <section class="sales-filter">
 
 
-            <div class="seller-sales-filter-title">
+            <div class="sales-filter-title">
 
 
                 <strong>
@@ -2984,7 +3357,8 @@ require_once __DIR__ .
 
                 <span>
 
-                    Choose the date range you want to analyse.
+                    Choose a date range to analyse
+                    your store performance.
 
                 </span>
 
@@ -2995,11 +3369,11 @@ require_once __DIR__ .
             <form
                 method="GET"
                 action="sales.php"
-                class="seller-sales-filter-form"
+                class="sales-filter-form"
             >
 
 
-                <div class="seller-sales-filter-field">
+                <div class="sales-field">
 
 
                     <label for="start_date">
@@ -3013,7 +3387,7 @@ require_once __DIR__ .
                         type="date"
                         id="start_date"
                         name="start_date"
-                        value="<?= sellerSalesEscape(
+                        value="<?= salesEscape(
                             $startDate
                         ) ?>"
                         required
@@ -3023,7 +3397,7 @@ require_once __DIR__ .
                 </div>
 
 
-                <div class="seller-sales-filter-field">
+                <div class="sales-field">
 
 
                     <label for="end_date">
@@ -3037,7 +3411,7 @@ require_once __DIR__ .
                         type="date"
                         id="end_date"
                         name="end_date"
-                        value="<?= sellerSalesEscape(
+                        value="<?= salesEscape(
                             $endDate
                         ) ?>"
                         required
@@ -3050,7 +3424,7 @@ require_once __DIR__ .
                 <button
                     type="submit"
                     class="
-                        seller-sales-filter-button
+                        sales-filter-btn
                         apply
                     "
                 >
@@ -3065,7 +3439,7 @@ require_once __DIR__ .
                 <a
                     href="sales.php"
                     class="
-                        seller-sales-filter-button
+                        sales-filter-btn
                         reset
                     "
                 >
@@ -3082,36 +3456,36 @@ require_once __DIR__ .
 
 
 
-        <!-- =======================================================
-             STATS
-        ======================================================== -->
+        <!-- =====================================================
+             PRIMARY STATS
+        ====================================================== -->
 
-        <section class="seller-sales-stats">
-
-
-            <!-- TOTAL ORDERS -->
-
-            <article class="seller-sales-stat">
+        <section class="sales-stats">
 
 
-                <div class="seller-sales-stat-icon">
+            <article class="sales-stat">
+
+
+                <div class="sales-stat-icon">
 
                     <i class="fa-solid fa-receipt"></i>
 
                 </div>
 
 
-                <span class="seller-sales-stat-label">
+                <span class="sales-stat-label">
 
                     TOTAL ORDERS
 
                 </span>
 
 
-                <strong class="seller-sales-stat-value">
+                <strong class="sales-stat-value">
 
                     <?= number_format(
-                        $summary['total_orders']
+                        $summary[
+                            'total_orders'
+                        ]
                     ) ?>
 
                 </strong>
@@ -3121,36 +3495,29 @@ require_once __DIR__ .
 
 
 
-            <!-- TOTAL SALES -->
-
-            <article
-                class="
-                    seller-sales-stat
-                    purple
-                "
-            >
+            <article class="sales-stat purple">
 
 
-                <div class="seller-sales-stat-icon">
+                <div class="sales-stat-icon">
 
-                    <i class="fa-solid fa-chart-column"></i>
+                    <i class="fa-solid fa-bag-shopping"></i>
 
                 </div>
 
 
-                <span class="seller-sales-stat-label">
+                <span class="sales-stat-label">
 
-                    TOTAL SALES
+                    PRODUCT SALES
 
                 </span>
 
 
-                <strong class="seller-sales-stat-value">
+                <strong class="sales-stat-value">
 
-                    RM
-                    <?= number_format(
-                        $summary['total_sales'],
-                        2
+                    RM <?= salesMoney(
+                        $summary[
+                            'product_sales'
+                        ]
                     ) ?>
 
                 </strong>
@@ -3160,36 +3527,29 @@ require_once __DIR__ .
 
 
 
-            <!-- COMPLETED -->
-
-            <article
-                class="
-                    seller-sales-stat
-                    green
-                "
-            >
+            <article class="sales-stat orange">
 
 
-                <div class="seller-sales-stat-icon">
+                <div class="sales-stat-icon">
 
-                    <i class="fa-solid fa-circle-check"></i>
+                    <i class="fa-solid fa-percent"></i>
 
                 </div>
 
 
-                <span class="seller-sales-stat-label">
+                <span class="sales-stat-label">
 
-                    COMPLETED SALES
+                    COMMISSION
 
                 </span>
 
 
-                <strong class="seller-sales-stat-value">
+                <strong class="sales-stat-value">
 
-                    RM
-                    <?= number_format(
-                        $summary['completed_sales'],
-                        2
+                    RM <?= salesMoney(
+                        $summary[
+                            'commission'
+                        ]
                     ) ?>
 
                 </strong>
@@ -3199,36 +3559,29 @@ require_once __DIR__ .
 
 
 
-            <!-- PENDING -->
-
-            <article
-                class="
-                    seller-sales-stat
-                    orange
-                "
-            >
+            <article class="sales-stat green">
 
 
-                <div class="seller-sales-stat-icon">
+                <div class="sales-stat-icon">
 
-                    <i class="fa-solid fa-clock"></i>
+                    <i class="fa-solid fa-wallet"></i>
 
                 </div>
 
 
-                <span class="seller-sales-stat-label">
+                <span class="sales-stat-label">
 
-                    PENDING SALES
+                    NET EARNINGS
 
                 </span>
 
 
-                <strong class="seller-sales-stat-value">
+                <strong class="sales-stat-value">
 
-                    RM
-                    <?= number_format(
-                        $summary['pending_sales'],
-                        2
+                    RM <?= salesMoney(
+                        $summary[
+                            'net_earnings'
+                        ]
                     ) ?>
 
                 </strong>
@@ -3241,19 +3594,381 @@ require_once __DIR__ .
 
 
 
-        <!-- =======================================================
-             SMALL INSIGHTS
-        ======================================================== -->
+        <!-- =====================================================
+             COMMISSION RATE INFO
+        ====================================================== -->
 
-        <section class="seller-sales-insights">
-
-
-            <!-- BEST SELLER -->
-
-            <article class="seller-sales-insight">
+        <section class="sales-commission-info">
 
 
-                <div class="seller-sales-insight-icon">
+            <div class="sales-commission-info-left">
+
+
+                <div class="sales-commission-info-icon">
+
+                    <i class="fa-solid fa-percent"></i>
+
+                </div>
+
+
+                <div>
+
+
+                    <span>
+
+                        CURRENT STORE COMMISSION RATE
+
+                    </span>
+
+
+                    <strong>
+
+                        <?= number_format(
+                            $currentCommissionRate,
+                            2
+                        ) ?>%
+
+                    </strong>
+
+
+                </div>
+
+
+            </div>
+
+
+            <span>
+
+                The rate shown here is your
+                current vendor commission setting.
+
+            </span>
+
+
+        </section>
+
+
+
+        <!-- =====================================================
+             MONEY FLOW
+        ====================================================== -->
+
+        <section class="sales-flow">
+
+
+            <article class="sales-flow-card">
+
+
+                <div class="sales-flow-icon">
+
+                    <i class="fa-solid fa-box"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+
+                        PRODUCT SALES
+
+                    </span>
+
+                    <strong>
+
+                        RM <?= salesMoney(
+                            $summary[
+                                'product_sales'
+                            ]
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+            <div class="sales-flow-symbol">
+                +
+            </div>
+
+
+            <article class="
+                sales-flow-card
+                delivery
+            ">
+
+
+                <div class="sales-flow-icon">
+
+                    <i class="fa-solid fa-truck"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+
+                        DELIVERY FEES
+
+                    </span>
+
+                    <strong>
+
+                        RM <?= salesMoney(
+                            $summary[
+                                'delivery_fees'
+                            ]
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+            <div class="sales-flow-symbol">
+                −
+            </div>
+
+
+            <article class="
+                sales-flow-card
+                commission
+            ">
+
+
+                <div class="sales-flow-icon">
+
+                    <i class="fa-solid fa-percent"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+
+                        COMMISSION
+
+                    </span>
+
+                    <strong>
+
+                        RM <?= salesMoney(
+                            $summary[
+                                'commission'
+                            ]
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+            <div class="sales-flow-symbol">
+                =
+            </div>
+
+
+            <article class="
+                sales-flow-card
+                net
+            ">
+
+
+                <div class="sales-flow-icon">
+
+                    <i class="fa-solid fa-sack-dollar"></i>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+
+                        NET EARNINGS
+
+                    </span>
+
+                    <strong>
+
+                        RM <?= salesMoney(
+                            $summary[
+                                'net_earnings'
+                            ]
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+            </article>
+
+
+        </section>
+
+
+
+        <!-- =====================================================
+             SECONDARY STATS
+        ====================================================== -->
+
+        <section class="sales-stats">
+
+
+            <article class="sales-stat green">
+
+
+                <div class="sales-stat-icon">
+
+                    <i class="fa-solid fa-circle-check"></i>
+
+                </div>
+
+
+                <span class="sales-stat-label">
+
+                    COMPLETED SALES
+
+                </span>
+
+
+                <strong class="sales-stat-value">
+
+                    RM <?= salesMoney(
+                        $summary[
+                            'completed_sales'
+                        ]
+                    ) ?>
+
+                </strong>
+
+
+            </article>
+
+
+
+            <article class="sales-stat orange">
+
+
+                <div class="sales-stat-icon">
+
+                    <i class="fa-solid fa-clock"></i>
+
+                </div>
+
+
+                <span class="sales-stat-label">
+
+                    ACTIVE SALES
+
+                </span>
+
+
+                <strong class="sales-stat-value">
+
+                    RM <?= salesMoney(
+                        $summary[
+                            'processing_sales'
+                        ]
+                    ) ?>
+
+                </strong>
+
+
+            </article>
+
+
+
+            <article class="sales-stat purple">
+
+
+                <div class="sales-stat-icon">
+
+                    <i class="fa-solid fa-credit-card"></i>
+
+                </div>
+
+
+                <span class="sales-stat-label">
+
+                    PAID ORDERS
+
+                </span>
+
+
+                <strong class="sales-stat-value">
+
+                    <?= number_format(
+                        $summary[
+                            'paid_orders'
+                        ]
+                    ) ?>
+
+                </strong>
+
+
+            </article>
+
+
+
+            <article class="sales-stat red">
+
+
+                <div class="sales-stat-icon">
+
+                    <i class="fa-solid fa-hourglass-half"></i>
+
+                </div>
+
+
+                <span class="sales-stat-label">
+
+                    PENDING PAYMENTS
+
+                </span>
+
+
+                <strong class="sales-stat-value">
+
+                    <?= number_format(
+                        $summary[
+                            'pending_payments'
+                        ]
+                    ) ?>
+
+                </strong>
+
+
+            </article>
+
+
+        </section>
+
+
+
+        <!-- =====================================================
+             INSIGHTS
+        ====================================================== -->
+
+        <section class="sales-insights">
+
+
+            <article class="sales-insight">
+
+
+                <div class="sales-insight-icon">
 
                     <i class="fa-solid fa-trophy"></i>
 
@@ -3276,7 +3991,7 @@ require_once __DIR__ .
                         <?php if ($bestSellingProduct): ?>
 
 
-                            <?= sellerSalesEscape(
+                            <?= salesEscape(
                                 $bestSellingProduct[
                                     'product_name'
                                 ]
@@ -3302,21 +4017,19 @@ require_once __DIR__ .
 
 
                             RM
-                            <?= number_format(
-                                (float)
+                            <?= salesMoney(
                                 $bestSellingProduct[
                                     'total_revenue'
-                                ],
-                                2
+                                ]
                             ) ?>
-
                             revenue
 
 
                         <?php else: ?>
 
 
-                            Product performance will appear here.
+                            Product performance
+                            will appear here.
 
 
                         <?php endif; ?>
@@ -3332,12 +4045,10 @@ require_once __DIR__ .
 
 
 
-            <!-- UNITS -->
-
-            <article class="seller-sales-insight">
+            <article class="sales-insight">
 
 
-                <div class="seller-sales-insight-icon">
+                <div class="sales-insight-icon">
 
                     <i class="fa-solid fa-boxes-stacked"></i>
 
@@ -3369,7 +4080,51 @@ require_once __DIR__ .
 
                     <p>
 
-                        Across all non-cancelled sales in this period.
+                        Across non-cancelled sales.
+
+                    </p>
+
+
+                </div>
+
+
+            </article>
+
+
+
+            <article class="sales-insight">
+
+
+                <div class="sales-insight-icon">
+
+                    <i class="fa-solid fa-calculator"></i>
+
+                </div>
+
+
+                <div>
+
+
+                    <small>
+
+                        AVERAGE ORDER VALUE
+
+                    </small>
+
+
+                    <strong>
+
+                        RM <?= salesMoney(
+                            $averageOrderValue
+                        ) ?>
+
+                    </strong>
+
+
+                    <p>
+
+                        Average product subtotal
+                        per seller order.
 
                     </p>
 
@@ -3384,22 +4139,22 @@ require_once __DIR__ .
 
 
 
-        <!-- =======================================================
-             PRODUCT PERFORMANCE
-        ======================================================== -->
+        <!-- =====================================================
+             SALES TRANSACTIONS
+        ====================================================== -->
 
-        <section class="seller-sales-section">
-
-
-            <div class="seller-sales-section-header">
+        <section class="sales-section">
 
 
-                <div class="seller-sales-section-title">
+            <div class="sales-section-header">
 
 
-                    <div class="seller-sales-section-icon">
+                <div class="sales-section-title">
 
-                        <i class="fa-solid fa-box"></i>
+
+                    <div class="sales-section-icon">
+
+                        <i class="fa-solid fa-receipt"></i>
 
                     </div>
 
@@ -3409,14 +4164,15 @@ require_once __DIR__ .
 
                         <h2>
 
-                            Product Performance
+                            Sales Transactions
 
                         </h2>
 
 
                         <p>
 
-                            Compare units sold and revenue by product.
+                            Revenue, commission and net earnings
+                            for each seller order.
 
                         </p>
 
@@ -3427,17 +4183,19 @@ require_once __DIR__ .
                 </div>
 
 
-                <span class="seller-sales-range-pill">
+                <span class="sales-range-pill">
 
-                    <?= sellerSalesDate(
-                        $startDate
+                    <?= number_format(
+                        count(
+                            $orderSales
+                        )
                     ) ?>
 
-                    &nbsp;→&nbsp;
-
-                    <?= sellerSalesDate(
-                        $endDate
-                    ) ?>
+                    transaction<?= count(
+                        $orderSales
+                    ) !== 1
+                        ? 's'
+                        : '' ?>
 
                 </span>
 
@@ -3448,32 +4206,32 @@ require_once __DIR__ .
 
             <?php if (
                 empty(
-                    $productSales
+                    $orderSales
                 )
             ): ?>
 
 
-                <div class="seller-sales-empty">
+                <div class="sales-empty">
 
 
-                    <div class="seller-sales-empty-icon">
+                    <div class="sales-empty-icon">
 
-                        <i class="fa-solid fa-chart-column"></i>
+                        <i class="fa-solid fa-receipt"></i>
 
                     </div>
 
 
                     <h3>
 
-                        No product sales yet
+                        No sales transactions
 
                     </h3>
 
 
                     <p>
 
-                        No sales data is available for
-                        the selected period.
+                        No orders were found
+                        for this period.
 
                     </p>
 
@@ -3484,10 +4242,13 @@ require_once __DIR__ .
             <?php else: ?>
 
 
-                <div class="seller-sales-table-wrap">
+                <div class="sales-table-wrap">
 
 
-                    <table class="seller-sales-table">
+                    <table class="
+                        sales-table
+                        wide
+                    ">
 
 
                         <thead>
@@ -3495,21 +4256,45 @@ require_once __DIR__ .
 
                             <tr>
 
-
                                 <th>
-                                    Product
+                                    Order
                                 </th>
 
-
                                 <th>
-                                    Units Sold
+                                    Customer
                                 </th>
 
-
                                 <th>
-                                    Revenue
+                                    Delivery
                                 </th>
 
+                                <th>
+                                    Product Sales
+                                </th>
+
+                                <th>
+                                    Delivery Fee
+                                </th>
+
+                                <th>
+                                    Commission
+                                </th>
+
+                                <th>
+                                    Net
+                                </th>
+
+                                <th>
+                                    Payment
+                                </th>
+
+                                <th>
+                                    Order Status
+                                </th>
+
+                                <th>
+                                    Date
+                                </th>
 
                             </tr>
 
@@ -3520,150 +4305,397 @@ require_once __DIR__ .
                         <tbody>
 
 
-                            <?php foreach (
-                                $productSales
-                                as $sale
-                            ): ?>
+                        <?php foreach (
+                            $orderSales
+                            as $sale
+                        ): ?>
 
 
-                                <?php
+                            <?php
 
-                                $saleImage =
-                                    trim(
-                                        (string)
-                                        (
-                                            $sale['image']
-                                            ?? ''
-                                        )
-                                    );
-
-                                ?>
+                            $subtotal =
+                                (float) (
+                                    $sale[
+                                        'subtotal'
+                                    ]
+                                    ?? 0
+                                );
 
 
-                                <tr>
+                            $deliveryFee =
+                                (float) (
+                                    $sale[
+                                        'delivery_fee'
+                                    ]
+                                    ?? 0
+                                );
 
 
-                                    <!-- PRODUCT -->
-
-                                    <td>
-
-
-                                        <div class="seller-sales-product">
-
-
-                                            <div class="seller-sales-product-image">
+                            $commission =
+                                (float) (
+                                    $sale[
+                                        'commission_amount'
+                                    ]
+                                    ?? 0
+                                );
 
 
-                                                <?php if (
-                                                    $saleImage !== ''
-                                                ): ?>
+                            $net =
+                                max(
+                                    0,
+                                    $subtotal
+                                    -
+                                    $commission
+                                    +
+                                    $deliveryFee
+                                );
 
 
-                                                    <img
-                                                        src="../uploads/products/<?= sellerSalesEscape(
-                                                            rawurlencode(
-                                                                basename(
-                                                                    $saleImage
-                                                                )
-                                                            )
-                                                        ) ?>"
-                                                        alt="<?= sellerSalesEscape(
-                                                            $sale[
-                                                                'product_name'
-                                                            ]
-                                                        ) ?>"
-                                                        loading="lazy"
-                                                        onerror="
-                                                            this.style.display='none';
-                                                            this.parentElement.innerHTML='<i class=&quot;fa-solid fa-image&quot;></i>';
-                                                        "
-                                                    >
+                            $vendorStatus =
+                                $sale[
+                                    'vendor_status'
+                                ]
+                                ?? 'Pending';
 
 
-                                                <?php else: ?>
+                            $statusLower =
+                                strtolower(
+                                    (string)
+                                    $vendorStatus
+                                );
 
 
-                                                    <i class="fa-solid fa-image"></i>
+                            if (
+                                $statusLower ===
+                                'completed'
+                            ) {
+
+                                $statusClass =
+                                    'green';
+
+                            } elseif (
+                                $statusLower ===
+                                'cancelled'
+                            ) {
+
+                                $statusClass =
+                                    'red';
+
+                            } elseif (
+                                in_array(
+                                    $statusLower,
+                                    [
+                                        'processing',
+                                        'ready',
+                                        'shipped'
+                                    ],
+                                    true
+                                )
+                            ) {
+
+                                $statusClass =
+                                    'blue';
+
+                            } else {
+
+                                $statusClass =
+                                    'orange';
+                            }
 
 
-                                                <?php endif; ?>
+                            $paymentStatus =
+                                $sale[
+                                    'payment_status'
+                                ]
+                                ?? 'Pending';
 
 
-                                            </div>
+                            $paymentLower =
+                                strtolower(
+                                    (string)
+                                    $paymentStatus
+                                );
 
 
-                                            <span class="seller-sales-product-name">
+                            if (
+                                $paymentLower ===
+                                'paid'
+                            ) {
 
-                                                <?= sellerSalesEscape(
-                                                    $sale[
-                                                        'product_name'
-                                                    ]
-                                                ) ?>
+                                $paymentClass =
+                                    'green';
 
-                                            </span>
+                            } elseif (
+                                $paymentLower ===
+                                'failed'
+                            ) {
+
+                                $paymentClass =
+                                    'red';
+
+                            } elseif (
+                                $paymentLower ===
+                                'refunded'
+                            ) {
+
+                                $paymentClass =
+                                    'blue';
+
+                            } else {
+
+                                $paymentClass =
+                                    'orange';
+                            }
+
+                            ?>
 
 
-                                        </div>
+                            <tr>
 
 
-                                    </td>
+                                <td>
 
 
-
-                                    <!-- UNITS -->
-
-                                    <td>
+                                    <div class="sales-order">
 
 
-                                        <span class="seller-sales-unit-badge">
+                                        <strong>
 
-                                            <?= number_format(
-                                                (int)
+                                            Order
+                                            #<?= (int)
                                                 $sale[
-                                                    'total_quantity'
+                                                    'order_id'
+                                                ] ?>
+
+                                        </strong>
+
+
+                                        <small>
+
+                                            Vendor Order
+                                            #<?= (int)
+                                                $sale[
+                                                    'vendor_order_id'
+                                                ] ?>
+
+                                        </small>
+
+
+                                    </div>
+
+
+                                </td>
+
+
+
+                                <td>
+
+                                    <?= salesEscape(
+                                        $sale[
+                                            'customer_name'
+                                        ]
+                                        ?? 'Customer'
+                                    ) ?>
+
+                                </td>
+
+
+
+                                <td>
+
+
+                                    <span class="
+                                        sales-badge
+                                        blue
+                                    ">
+
+                                        <?= salesEscape(
+                                            $sale[
+                                                'delivery_method'
+                                            ]
+                                            ?? '—'
+                                        ) ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+
+                                <td>
+
+
+                                    <span class="sales-money">
+
+                                        RM
+                                        <?= salesMoney(
+                                            $subtotal
+                                        ) ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+
+                                <td>
+
+
+                                    <span class="sales-money">
+
+                                        RM
+                                        <?= salesMoney(
+                                            $deliveryFee
+                                        ) ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+
+                                <td>
+
+
+                                    <span class="
+                                        sales-money
+                                        red
+                                    ">
+
+                                        − RM
+                                        <?= salesMoney(
+                                            $commission
+                                        ) ?>
+
+                                    </span>
+
+
+                                    <div
+                                        style="
+                                            margin-top:3px;
+                                            color:#94a3b8;
+                                            font-size:7px;
+                                        "
+                                    >
+
+                                        <?= number_format(
+                                            (float) (
+                                                $sale[
+                                                    'commission_rate'
                                                 ]
-                                            ) ?>
+                                                ?? 0
+                                            ),
+                                            2
+                                        ) ?>%
 
-                                            unit<?= (int)
-                                                $sale[
-                                                    'total_quantity'
-                                                ] !== 1
-                                                    ? 's'
-                                                    : '' ?>
-
-                                        </span>
+                                    </div>
 
 
-                                    </td>
+                                </td>
 
 
 
-                                    <!-- REVENUE -->
-
-                                    <td>
+                                <td>
 
 
-                                        <span class="seller-sales-money">
+                                    <span class="
+                                        sales-money
+                                        green
+                                    ">
 
-                                            RM
-                                            <?= number_format(
-                                                (float)
-                                                $sale[
-                                                    'total_revenue'
-                                                ],
-                                                2
-                                            ) ?>
+                                        RM
+                                        <?= salesMoney(
+                                            $net
+                                        ) ?>
 
-                                        </span>
-
-
-                                    </td>
+                                    </span>
 
 
-                                </tr>
+                                </td>
 
 
-                            <?php endforeach; ?>
+
+                                <td>
+
+
+                                    <strong
+                                        style="
+                                            display:block;
+                                            margin-bottom:4px;
+                                            color:#334155;
+                                            font-size:8px;
+                                        "
+                                    >
+
+                                        <?= salesEscape(
+                                            $sale[
+                                                'payment_method'
+                                            ]
+                                            ?? '—'
+                                        ) ?>
+
+                                    </strong>
+
+
+                                    <span class="
+                                        sales-badge
+                                        <?= salesEscape(
+                                            $paymentClass
+                                        ) ?>
+                                    ">
+
+                                        <?= salesEscape(
+                                            $paymentStatus
+                                        ) ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+
+                                <td>
+
+
+                                    <span class="
+                                        sales-badge
+                                        <?= salesEscape(
+                                            $statusClass
+                                        ) ?>
+                                    ">
+
+                                        <?= salesEscape(
+                                            $vendorStatus
+                                        ) ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+
+                                <td>
+
+                                    <?= salesEscape(
+                                        salesDate(
+                                            $sale[
+                                                'created_at'
+                                            ]
+                                        )
+                                    ) ?>
+
+                                </td>
+
+
+                            </tr>
+
+
+                        <?php endforeach; ?>
 
 
                         </tbody>
@@ -3682,20 +4714,309 @@ require_once __DIR__ .
 
 
 
-        <!-- =======================================================
+        <!-- =====================================================
+             PRODUCT PERFORMANCE
+        ====================================================== -->
+
+        <section class="sales-section">
+
+
+            <div class="sales-section-header">
+
+
+                <div class="sales-section-title">
+
+
+                    <div class="sales-section-icon">
+
+                        <i class="fa-solid fa-box"></i>
+
+                    </div>
+
+
+                    <div>
+
+
+                        <h2>
+
+                            Product Performance
+
+                        </h2>
+
+
+                        <p>
+
+                            Compare units sold and
+                            product revenue.
+
+                        </p>
+
+
+                    </div>
+
+
+                </div>
+
+
+                <span class="sales-range-pill">
+
+                    <?= salesEscape(
+                        salesDate(
+                            $startDate
+                        )
+                    ) ?>
+
+                    &nbsp;→&nbsp;
+
+                    <?= salesEscape(
+                        salesDate(
+                            $endDate
+                        )
+                    ) ?>
+
+                </span>
+
+
+            </div>
+
+
+
+            <?php if (
+                empty(
+                    $productSales
+                )
+            ): ?>
+
+
+                <div class="sales-empty">
+
+
+                    <div class="sales-empty-icon">
+
+                        <i class="fa-solid fa-chart-column"></i>
+
+                    </div>
+
+
+                    <h3>
+
+                        No product sales yet
+
+                    </h3>
+
+
+                    <p>
+
+                        No product sales were found
+                        for this period.
+
+                    </p>
+
+
+                </div>
+
+
+            <?php else: ?>
+
+
+                <div class="sales-table-wrap">
+
+
+                    <table class="sales-table">
+
+
+                        <thead>
+
+
+                            <tr>
+
+                                <th>
+                                    Product
+                                </th>
+
+                                <th>
+                                    Units Sold
+                                </th>
+
+                                <th>
+                                    Revenue
+                                </th>
+
+                            </tr>
+
+
+                        </thead>
+
+
+                        <tbody>
+
+
+                        <?php foreach (
+                            $productSales
+                            as $productSale
+                        ): ?>
+
+
+                            <?php
+
+                            $image =
+                                salesImage(
+                                    $productSale[
+                                        'image'
+                                    ]
+                                    ?? ''
+                                );
+
+                            ?>
+
+
+                            <tr>
+
+
+                                <td>
+
+
+                                    <div class="sales-product">
+
+
+                                        <div class="sales-product-image">
+
+
+                                            <?php if (
+                                                $image !== ''
+                                            ): ?>
+
+
+                                                <img
+                                                    src="<?= salesEscape(
+                                                        $image
+                                                    ) ?>"
+                                                    alt="<?= salesEscape(
+                                                        $productSale[
+                                                            'product_name'
+                                                        ]
+                                                    ) ?>"
+                                                    loading="lazy"
+                                                    onerror="
+                                                        this.style.display='none';
+                                                        this.parentElement.innerHTML='<i class=&quot;fa-solid fa-image&quot;></i>';
+                                                    "
+                                                >
+
+
+                                            <?php else: ?>
+
+
+                                                <i class="fa-solid fa-image"></i>
+
+
+                                            <?php endif; ?>
+
+
+                                        </div>
+
+
+                                        <span class="sales-product-name">
+
+                                            <?= salesEscape(
+                                                $productSale[
+                                                    'product_name'
+                                                ]
+                                            ) ?>
+
+                                        </span>
+
+
+                                    </div>
+
+
+                                </td>
+
+
+
+                                <td>
+
+
+                                    <span class="
+                                        sales-badge
+                                        blue
+                                    ">
+
+                                        <?= number_format(
+                                            (int)
+                                            $productSale[
+                                                'total_quantity'
+                                            ]
+                                        ) ?>
+
+                                        unit<?= (int)
+                                            $productSale[
+                                                'total_quantity'
+                                            ] !== 1
+                                                ? 's'
+                                                : '' ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+
+                                <td>
+
+
+                                    <span class="sales-money">
+
+                                        RM
+                                        <?= salesMoney(
+                                            $productSale[
+                                                'total_revenue'
+                                            ]
+                                        ) ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+                            </tr>
+
+
+                        <?php endforeach; ?>
+
+
+                        </tbody>
+
+
+                    </table>
+
+
+                </div>
+
+
+            <?php endif; ?>
+
+
+        </section>
+
+
+
+        <!-- =====================================================
              DAILY SALES
-        ======================================================== -->
+        ====================================================== -->
 
-        <section class="seller-sales-section">
-
-
-            <div class="seller-sales-section-header">
+        <section class="sales-section">
 
 
-                <div class="seller-sales-section-title">
+            <div class="sales-section-header">
 
 
-                    <div class="seller-sales-section-icon">
+                <div class="sales-section-title">
+
+
+                    <div class="sales-section-icon">
 
                         <i class="fa-solid fa-calendar-days"></i>
 
@@ -3714,7 +5035,8 @@ require_once __DIR__ .
 
                         <p>
 
-                            Daily order activity and sales value.
+                            Daily product sales, delivery,
+                            commission and earnings.
 
                         </p>
 
@@ -3725,7 +5047,7 @@ require_once __DIR__ .
                 </div>
 
 
-                <span class="seller-sales-range-pill">
+                <span class="sales-range-pill">
 
                     <?= number_format(
                         count(
@@ -3733,7 +5055,9 @@ require_once __DIR__ .
                         )
                     ) ?>
 
-                    active day<?= count($dailySales) !== 1
+                    active day<?= count(
+                        $dailySales
+                    ) !== 1
                         ? 's'
                         : '' ?>
 
@@ -3751,10 +5075,10 @@ require_once __DIR__ .
             ): ?>
 
 
-                <div class="seller-sales-empty">
+                <div class="sales-empty">
 
 
-                    <div class="seller-sales-empty-icon">
+                    <div class="sales-empty-icon">
 
                         <i class="fa-solid fa-calendar-xmark"></i>
 
@@ -3771,7 +5095,7 @@ require_once __DIR__ .
                     <p>
 
                         Daily sales will appear once
-                        orders are recorded in this period.
+                        orders are recorded.
 
                     </p>
 
@@ -3782,10 +5106,10 @@ require_once __DIR__ .
             <?php else: ?>
 
 
-                <div class="seller-sales-table-wrap">
+                <div class="sales-table-wrap">
 
 
-                    <table class="seller-sales-table">
+                    <table class="sales-table">
 
 
                         <thead>
@@ -3793,21 +5117,29 @@ require_once __DIR__ .
 
                             <tr>
 
-
                                 <th>
                                     Date
                                 </th>
-
 
                                 <th>
                                     Orders
                                 </th>
 
-
                                 <th>
-                                    Sales
+                                    Product Sales
                                 </th>
 
+                                <th>
+                                    Delivery
+                                </th>
+
+                                <th>
+                                    Commission
+                                </th>
+
+                                <th>
+                                    Net
+                                </th>
 
                             </tr>
 
@@ -3818,102 +5150,196 @@ require_once __DIR__ .
                         <tbody>
 
 
-                            <?php foreach (
-                                $dailySales
-                                as $daily
-                            ): ?>
+                        <?php foreach (
+                            $dailySales
+                            as $daily
+                        ): ?>
 
 
-                                <tr>
+                            <?php
+
+                            $dailyProductSales =
+                                (float) (
+                                    $daily[
+                                        'product_sales'
+                                    ]
+                                    ?? 0
+                                );
 
 
-                                    <!-- DATE -->
-
-                                    <td>
-
-
-                                        <div class="seller-daily-date">
-
-
-                                            <div class="seller-daily-date-icon">
-
-                                                <i class="fa-regular fa-calendar"></i>
-
-                                            </div>
+                            $dailyDelivery =
+                                (float) (
+                                    $daily[
+                                        'delivery_fees'
+                                    ]
+                                    ?? 0
+                                );
 
 
-                                            <strong>
+                            $dailyCommission =
+                                (float) (
+                                    $daily[
+                                        'commission_amount'
+                                    ]
+                                    ?? 0
+                                );
 
-                                                <?= sellerSalesDate(
+
+                            $dailyNet =
+                                max(
+                                    0,
+                                    $dailyProductSales
+                                    -
+                                    $dailyCommission
+                                    +
+                                    $dailyDelivery
+                                );
+
+                            ?>
+
+
+                            <tr>
+
+
+                                <td>
+
+
+                                    <div class="sales-order">
+
+
+                                        <strong>
+
+                                            <?= salesEscape(
+                                                salesDate(
                                                     $daily[
                                                         'sale_date'
                                                     ]
-                                                ) ?>
-
-                                            </strong>
-
-
-                                        </div>
-
-
-                                    </td>
-
-
-
-                                    <!-- ORDERS -->
-
-                                    <td>
-
-
-                                        <span class="seller-sales-unit-badge">
-
-                                            <?= number_format(
-                                                (int)
-                                                $daily[
-                                                    'total_orders'
-                                                ]
+                                                )
                                             ) ?>
 
-                                            order<?= (int)
-                                                $daily[
-                                                    'total_orders'
-                                                ] !== 1
-                                                    ? 's'
-                                                    : '' ?>
-
-                                        </span>
+                                        </strong>
 
 
-                                    </td>
+                                        <small>
+
+                                            Sales day
+
+                                        </small>
+
+
+                                    </div>
+
+
+                                </td>
 
 
 
-                                    <!-- SALES -->
-
-                                    <td>
+                                <td>
 
 
-                                        <span class="seller-sales-money">
+                                    <span class="
+                                        sales-badge
+                                        blue
+                                    ">
 
-                                            RM
-                                            <?= number_format(
-                                                (float)
-                                                $daily[
-                                                    'total_sales'
-                                                ],
-                                                2
-                                            ) ?>
+                                        <?= number_format(
+                                            (int)
+                                            $daily[
+                                                'total_orders'
+                                            ]
+                                        ) ?>
 
-                                        </span>
+                                        order<?= (int)
+                                            $daily[
+                                                'total_orders'
+                                            ] !== 1
+                                                ? 's'
+                                                : '' ?>
+
+                                    </span>
 
 
-                                    </td>
+                                </td>
 
 
-                                </tr>
+
+                                <td>
 
 
-                            <?php endforeach; ?>
+                                    <span class="sales-money">
+
+                                        RM
+                                        <?= salesMoney(
+                                            $dailyProductSales
+                                        ) ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+
+                                <td>
+
+
+                                    <span class="sales-money">
+
+                                        RM
+                                        <?= salesMoney(
+                                            $dailyDelivery
+                                        ) ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+
+                                <td>
+
+
+                                    <span class="
+                                        sales-money
+                                        red
+                                    ">
+
+                                        − RM
+                                        <?= salesMoney(
+                                            $dailyCommission
+                                        ) ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+
+                                <td>
+
+
+                                    <span class="
+                                        sales-money
+                                        green
+                                    ">
+
+                                        RM
+                                        <?= salesMoney(
+                                            $dailyNet
+                                        ) ?>
+
+                                    </span>
+
+
+                                </td>
+
+
+                            </tr>
+
+
+                        <?php endforeach; ?>
 
 
                         </tbody>
@@ -3938,6 +5364,5 @@ require_once __DIR__ .
 
 
 </body>
-
 
 </html>
