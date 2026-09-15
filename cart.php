@@ -4,36 +4,7 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - CUSTOMER CART
 |--------------------------------------------------------------------------
-| File:
-| cart.php
-|--------------------------------------------------------------------------
-|
-| Purpose:
-| - Display customer shopping cart
-| - Support multiple vendors
-| - Update quantity
-| - Remove cart items
-| - Calculate subtotal
-| - Continue to checkout
-|
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| DATABASE / SESSION / FUNCTIONS
-|--------------------------------------------------------------------------
-*/
-
-require_once __DIR__ . '/database/db.php';
-require_once __DIR__ . '/includes/session.php';
-require_once __DIR__ . '/includes/functions.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| SESSION
+| File: cart.php
 |--------------------------------------------------------------------------
 */
 
@@ -41,18 +12,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| LOGIN CHECK
-|--------------------------------------------------------------------------
-*/
-
-if (!isset($_SESSION['user_id'])) {
-
-    header('Location: index.php');
-    exit;
-}
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/database/db.php';
+require_once __DIR__ . '/includes/functions.php';
 
 
 /*
@@ -63,7 +25,6 @@ if (!isset($_SESSION['user_id'])) {
 
 $db = getDB();
 
-
 if (!($db instanceof PDO)) {
     die('Database connection is not available.');
 }
@@ -71,11 +32,50 @@ if (!($db instanceof PDO)) {
 
 /*
 |--------------------------------------------------------------------------
-| USER
+| LOGIN
 |--------------------------------------------------------------------------
 */
 
-$userId = (int) $_SESSION['user_id'];
+$userId =
+    isset($_SESSION['user_id'])
+        ? (int) $_SESSION['user_id']
+        : 0;
+
+
+$userRole =
+    strtolower(
+        trim(
+            (string) (
+                $_SESSION['role']
+                ?? $_SESSION['user_role']
+                ?? ''
+            )
+        )
+    );
+
+
+if ($userId <= 0) {
+
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?login=1'
+    );
+
+    exit;
+}
+
+
+if ($userRole !== 'customer') {
+
+    header(
+        'Location: ' .
+        BASE_URL .
+        'dashboard.php'
+    );
+
+    exit;
+}
 
 
 /*
@@ -101,32 +101,55 @@ if (!function_exists('cartProductImage')) {
 
     function cartProductImage($image): string
     {
-        $image = trim((string) $image);
+        $image =
+            trim(
+                (string) $image
+            );
+
 
         if ($image === '') {
             return '';
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | ALREADY FULL / RELATIVE PATH
-        |--------------------------------------------------------------------------
-        */
-
         if (
-            str_starts_with($image, 'http://') ||
-            str_starts_with($image, 'https://') ||
-            str_starts_with($image, 'uploads/')
+            str_starts_with(
+                $image,
+                'http://'
+            )
+            ||
+            str_starts_with(
+                $image,
+                'https://'
+            )
         ) {
             return $image;
         }
 
 
+        if (
+            str_starts_with(
+                $image,
+                'uploads/'
+            )
+        ) {
+
+            return
+                BASE_URL .
+                ltrim(
+                    $image,
+                    '/'
+                );
+        }
+
+
         return
+            BASE_URL .
             'uploads/products/' .
             rawurlencode(
-                basename($image)
+                basename(
+                    $image
+                )
             );
     }
 }
@@ -136,7 +159,11 @@ if (!function_exists('cartVendorLogo')) {
 
     function cartVendorLogo($image): string
     {
-        $image = trim((string) $image);
+        $image =
+            trim(
+                (string) $image
+            );
+
 
         if ($image === '') {
             return '';
@@ -144,19 +171,365 @@ if (!function_exists('cartVendorLogo')) {
 
 
         if (
-            str_starts_with($image, 'http://') ||
-            str_starts_with($image, 'https://') ||
-            str_starts_with($image, 'uploads/')
+            str_starts_with(
+                $image,
+                'http://'
+            )
+            ||
+            str_starts_with(
+                $image,
+                'https://'
+            )
         ) {
             return $image;
         }
 
 
+        if (
+            str_starts_with(
+                $image,
+                'uploads/'
+            )
+        ) {
+
+            return
+                BASE_URL .
+                ltrim(
+                    $image,
+                    '/'
+                );
+        }
+
+
         return
+            BASE_URL .
             'uploads/vendors/' .
             rawurlencode(
-                basename($image)
+                basename(
+                    $image
+                )
             );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| AJAX QUANTITY UPDATE
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    &&
+    isset($_POST['ajax_quantity'])
+) {
+
+    header(
+        'Content-Type: application/json; charset=UTF-8'
+    );
+
+
+    $cartId =
+        filter_input(
+            INPUT_POST,
+            'cart_id',
+            FILTER_VALIDATE_INT
+        );
+
+
+    $quantity =
+        filter_input(
+            INPUT_POST,
+            'quantity',
+            FILTER_VALIDATE_INT
+        );
+
+
+    if (
+        !$cartId
+        ||
+        $quantity === false
+        ||
+        $quantity < 1
+    ) {
+
+        http_response_code(422);
+
+        echo json_encode([
+            'success' => false,
+            'message' =>
+                'Invalid cart quantity.'
+        ]);
+
+        exit;
+    }
+
+
+    try {
+
+        /*
+        |--------------------------------------------------------------------------
+        | GET CART PRODUCT
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $db->prepare("
+                SELECT
+                    c.cart_id,
+                    c.quantity,
+                    p.product_id,
+                    p.price,
+                    p.stock_quantity,
+                    p.status
+
+                FROM cart c
+
+                INNER JOIN products p
+                    ON c.product_id =
+                       p.product_id
+
+                WHERE c.cart_id = ?
+
+                AND c.customer_id = ?
+
+                LIMIT 1
+            ");
+
+
+        $stmt->execute([
+            $cartId,
+            $userId
+        ]);
+
+
+        $cartRow =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        if (!$cartRow) {
+
+            http_response_code(404);
+
+            echo json_encode([
+                'success' => false,
+                'message' =>
+                    'Cart item not found.'
+            ]);
+
+            exit;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCT STATUS
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $cartRow['status'] !==
+            'Available'
+        ) {
+
+            http_response_code(422);
+
+            echo json_encode([
+                'success' => false,
+                'message' =>
+                    'This product is no longer available.'
+            ]);
+
+            exit;
+        }
+
+
+        $stockQuantity =
+            (int)
+            $cartRow['stock_quantity'];
+
+
+        if ($stockQuantity <= 0) {
+
+            http_response_code(422);
+
+            echo json_encode([
+                'success' => false,
+                'message' =>
+                    'This product is out of stock.'
+            ]);
+
+            exit;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | LIMIT QUANTITY
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $quantity >
+            $stockQuantity
+        ) {
+
+            $quantity =
+                $stockQuantity;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $db->prepare("
+                UPDATE cart
+
+                SET quantity = ?
+
+                WHERE cart_id = ?
+
+                AND customer_id = ?
+            ");
+
+
+        $stmt->execute([
+            $quantity,
+            $cartId,
+            $userId
+        ]);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CART TOTALS
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt =
+            $db->prepare("
+                SELECT
+
+                    COALESCE(
+                        SUM(
+                            c.quantity *
+                            p.price
+                        ),
+                        0
+                    ) AS subtotal,
+
+                    COALESCE(
+                        SUM(
+                            c.quantity
+                        ),
+                        0
+                    ) AS total_items
+
+                FROM cart c
+
+                INNER JOIN products p
+                    ON c.product_id =
+                       p.product_id
+
+                WHERE c.customer_id = ?
+            ");
+
+
+        $stmt->execute([
+            $userId
+        ]);
+
+
+        $totals =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        $itemSubtotal =
+            (float)
+            $cartRow['price'] *
+            $quantity;
+
+
+        $cartSubtotal =
+            (float) (
+                $totals['subtotal']
+                ?? 0
+            );
+
+
+        $cartCount =
+            (int) (
+                $totals['total_items']
+                ?? 0
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESPONSE
+        |--------------------------------------------------------------------------
+        */
+
+        echo json_encode([
+            'success' =>
+                true,
+
+            'message' =>
+                'Quantity saved.',
+
+            'quantity' =>
+                $quantity,
+
+            'stock_quantity' =>
+                $stockQuantity,
+
+            'item_subtotal' =>
+                round(
+                    $itemSubtotal,
+                    2
+                ),
+
+            'cart_subtotal' =>
+                round(
+                    $cartSubtotal,
+                    2
+                ),
+
+            'cart_total' =>
+                round(
+                    $cartSubtotal,
+                    2
+                ),
+
+            'cart_count' =>
+                $cartCount
+        ]);
+
+        exit;
+
+
+    } catch (Throwable $e) {
+
+        http_response_code(500);
+
+        echo json_encode([
+            'success' =>
+                false,
+
+            'message' =>
+                'Unable to update cart.'
+        ]);
+
+        exit;
     }
 }
 
@@ -168,7 +541,8 @@ if (!function_exists('cartVendorLogo')) {
 */
 
 if (
-    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    &&
     isset($_POST['remove_cart'])
 ) {
 
@@ -209,144 +583,7 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| UPDATE QUANTITY
-|--------------------------------------------------------------------------
-*/
-
-if (
-    $_SERVER['REQUEST_METHOD'] === 'POST' &&
-    isset($_POST['update_cart'])
-) {
-
-    $cartId =
-        filter_input(
-            INPUT_POST,
-            'cart_id',
-            FILTER_VALIDATE_INT
-        );
-
-
-    $quantity =
-        filter_input(
-            INPUT_POST,
-            'quantity',
-            FILTER_VALIDATE_INT
-        );
-
-
-    if (
-        $cartId &&
-        $quantity !== false &&
-        $quantity > 0
-    ) {
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CHECK PRODUCT + STOCK + STATUS
-        |--------------------------------------------------------------------------
-        */
-
-        $stockStmt =
-            $db->prepare("
-                SELECT
-
-                    p.stock_quantity,
-                    p.status
-
-                FROM cart c
-
-                INNER JOIN products p
-                    ON c.product_id = p.product_id
-
-                WHERE c.cart_id = ?
-
-                AND c.customer_id = ?
-
-                LIMIT 1
-            ");
-
-
-        $stockStmt->execute([
-            $cartId,
-            $userId
-        ]);
-
-
-        $stock =
-            $stockStmt->fetch(
-                PDO::FETCH_ASSOC
-            );
-
-
-        if ($stock) {
-
-            $availableStock =
-                (int) $stock['stock_quantity'];
-
-
-            $productStatus =
-                trim(
-                    (string) $stock['status']
-                );
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | ONLY UPDATE IF AVAILABLE
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                $availableStock > 0 &&
-                $productStatus === 'Available'
-            ) {
-
-                if ($quantity > $availableStock) {
-                    $quantity = $availableStock;
-                }
-
-
-                $stmt =
-                    $db->prepare("
-                        UPDATE cart
-
-                        SET quantity = ?
-
-                        WHERE cart_id = ?
-
-                        AND customer_id = ?
-                    ");
-
-
-                $stmt->execute([
-                    $quantity,
-                    $cartId,
-                    $userId
-                ]);
-
-
-                header(
-                    'Location: cart.php?success=updated'
-                );
-
-                exit;
-            }
-        }
-    }
-
-
-    header(
-        'Location: cart.php?error=quantity'
-    );
-
-    exit;
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| GET CART ITEMS
+| GET CART
 |--------------------------------------------------------------------------
 */
 
@@ -375,13 +612,16 @@ $stmt =
         FROM cart c
 
         INNER JOIN products p
-            ON c.product_id = p.product_id
+            ON c.product_id =
+               p.product_id
 
         INNER JOIN vendors v
-            ON p.vendor_id = v.vendor_id
+            ON p.vendor_id =
+               v.vendor_id
 
         INNER JOIN categories cat
-            ON p.category_id = cat.category_id
+            ON p.category_id =
+               cat.category_id
 
         WHERE c.customer_id = ?
 
@@ -415,57 +655,56 @@ $totalItems = 0;
 $hasUnavailableItems = false;
 
 
-foreach ($cartItems as $item) {
+foreach (
+    $cartItems
+    as $item
+) {
 
     $quantity =
-        (int) $item['quantity'];
+        (int)
+        $item['quantity'];
 
 
     $price =
-        (float) $item['price'];
+        (float)
+        $item['price'];
 
 
     $subtotal +=
-        $price * $quantity;
+        $price *
+        $quantity;
 
 
     $totalItems +=
         $quantity;
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | CHECK WHETHER CHECKOUT SHOULD BE ALLOWED
-    |--------------------------------------------------------------------------
-    */
-
     if (
-        $item['status'] !== 'Available' ||
-        (int) $item['stock_quantity'] <= 0 ||
-        $quantity > (int) $item['stock_quantity']
+        $item['status'] !==
+        'Available'
+        ||
+        (int)
+        $item['stock_quantity']
+        <= 0
+        ||
+        $quantity >
+        (int)
+        $item['stock_quantity']
     ) {
 
-        $hasUnavailableItems = true;
+        $hasUnavailableItems =
+            true;
     }
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| DELIVERY
-|--------------------------------------------------------------------------
-*/
-
-$deliveryFee = 0;
-
 $total =
-    $subtotal +
-    $deliveryFee;
+    $subtotal;
 
 
 /*
 |--------------------------------------------------------------------------
-| SIDEBAR CART BADGE
+| NAV COUNTS
 |--------------------------------------------------------------------------
 */
 
@@ -473,43 +712,30 @@ $cartCount =
     $totalItems;
 
 
-/*
-|--------------------------------------------------------------------------
-| WISHLIST COUNT
-|--------------------------------------------------------------------------
-*/
-
 $wishlistCount = 0;
 
 
 try {
 
-    $wishlistStmt =
+    $stmt =
         $db->prepare("
-            SELECT COUNT(*) AS total
+            SELECT COUNT(*)
 
             FROM wishlist
 
-            WHERE customer_id = ?
+            WHERE user_id = ?
         ");
 
 
-    $wishlistStmt->execute([
+    $stmt->execute([
         $userId
     ]);
 
 
-    $wishlistRow =
-        $wishlistStmt->fetch(
-            PDO::FETCH_ASSOC
-        );
-
-
     $wishlistCount =
-        (int) (
-            $wishlistRow['total']
-            ?? 0
-        );
+        (int)
+        $stmt->fetchColumn();
+
 
 } catch (Throwable $e) {
 
@@ -519,20 +745,28 @@ try {
 
 /*
 |--------------------------------------------------------------------------
-| GROUP CART BY VENDOR
+| GROUP BY VENDOR
 |--------------------------------------------------------------------------
 */
 
 $vendors = [];
 
 
-foreach ($cartItems as $item) {
+foreach (
+    $cartItems
+    as $item
+) {
 
     $vendorId =
-        (int) $item['vendor_id'];
+        (int)
+        $item['vendor_id'];
 
 
-    if (!isset($vendors[$vendorId])) {
+    if (
+        !isset(
+            $vendors[$vendorId]
+        )
+    ) {
 
         $vendors[$vendorId] = [
 
@@ -540,13 +774,17 @@ foreach ($cartItems as $item) {
                 $vendorId,
 
             'business_name' =>
-                $item['business_name'],
+                $item[
+                    'business_name'
+                ],
 
             'business_logo' =>
-                $item['business_logo'],
+                $item[
+                    'business_logo'
+                ],
 
-            'items' => []
-
+            'items' =>
+                []
         ];
     }
 
@@ -558,18 +796,16 @@ foreach ($cartItems as $item) {
 
 /*
 |--------------------------------------------------------------------------
-| PAGE CONFIG
-|--------------------------------------------------------------------------
-|
-| IMPORTANT:
-| Catalog uses includes/header.php.
-| Cart now uses the same shared header too.
-|
+| PAGE
 |--------------------------------------------------------------------------
 */
 
 $pageTitle =
     'My Cart';
+
+
+$hideSiteMainWrapper =
+    true;
 
 
 $extraCSS = [
@@ -578,25 +814,9 @@ $extraCSS = [
 ];
 
 
-$hideSiteMainWrapper =
-    true;
-
-
-/*
-|--------------------------------------------------------------------------
-| SHARED HEADER
-|--------------------------------------------------------------------------
-*/
-
 require_once __DIR__ .
     '/includes/header.php';
 
-
-/*
-|--------------------------------------------------------------------------
-| CUSTOMER NAVIGATION
-|--------------------------------------------------------------------------
-*/
 
 require_once __DIR__ .
     '/includes/customer_sidebar.php';
@@ -604,14 +824,331 @@ require_once __DIR__ .
 ?>
 
 
-<!-- ===============================================================
-     CART PAGE
-================================================================ -->
+<style>
+
+/* ================================================================
+   SMART QUANTITY
+================================================================ */
+
+.hh-smart-quantity {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+
+.hh-smart-quantity-label {
+    color: #8a98ad;
+
+    font-size: 7px;
+    font-weight: 900;
+
+    letter-spacing: .8px;
+}
+
+
+.hh-quantity-stepper {
+    position: relative;
+
+    min-width: 158px;
+    height: 50px;
+
+    padding: 5px;
+
+    display: grid;
+
+    grid-template-columns:
+        40px
+        minmax(50px,1fr)
+        40px;
+
+    align-items: center;
+
+    gap: 4px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #f5f8ff,
+            #eef4ff
+        );
+
+    border:
+        1px solid
+        #d8e5fb;
+
+    border-radius: 16px;
+
+    box-shadow:
+        inset
+        0 1px 0
+        rgba(255,255,255,.9),
+
+        0 7px 18px
+        rgba(37,99,235,.06);
+
+    transition:
+        border-color .2s ease,
+        box-shadow .2s ease,
+        transform .2s ease;
+}
+
+
+.hh-quantity-stepper.updating {
+    border-color:
+        #93baf7;
+
+    box-shadow:
+        0
+        0
+        0
+        4px
+        rgba(37,99,235,.07);
+}
+
+
+.hh-quantity-btn {
+    width: 40px;
+    height: 40px;
+
+    padding: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border:
+        1px solid
+        #dce7f8;
+
+    border-radius: 11px;
+
+    color: #2563eb;
+
+    background: #ffffff;
+
+    font-family:
+        Inter,
+        Arial,
+        sans-serif;
+
+    font-size: 22px;
+    font-weight: 700;
+
+    line-height: 1;
+
+    cursor: pointer;
+
+    box-shadow:
+        0
+        4px
+        10px
+        rgba(30,70,150,.06);
+
+    transition:
+        .18s ease;
+}
+
+
+.hh-quantity-btn:hover:not(:disabled) {
+    color: #ffffff;
+
+    background:
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #397bf0
+        );
+
+    border-color:
+        #2563eb;
+
+    transform:
+        translateY(-1px);
+
+    box-shadow:
+        0
+        7px
+        16px
+        rgba(37,99,235,.20);
+}
+
+
+.hh-quantity-btn:active:not(:disabled) {
+    transform:
+        scale(.93);
+}
+
+
+.hh-quantity-btn:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+
+    box-shadow: none;
+}
+
+
+.hh-quantity-value {
+    width: 100%;
+
+    border: 0 !important;
+
+    outline: 0 !important;
+
+    padding: 0 !important;
+
+    color: #16233c !important;
+
+    background: transparent !important;
+
+    box-shadow: none !important;
+
+    text-align: center;
+
+    font-family:
+        Poppins,
+        Inter,
+        sans-serif;
+
+    font-size: 14px !important;
+    font-weight: 900 !important;
+
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+
+.hh-quantity-value::-webkit-outer-spin-button,
+.hh-quantity-value::-webkit-inner-spin-button {
+    margin: 0;
+
+    -webkit-appearance: none;
+}
+
+
+.hh-quantity-meta {
+    min-height: 15px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 5px;
+
+    color: #7c8da3;
+
+    font-size: 7px;
+    font-weight: 700;
+}
+
+
+.hh-quantity-meta i {
+    color: #16a34a;
+
+    font-size: 8px;
+}
+
+
+.hh-quantity-meta.saving {
+    color: #2563eb;
+}
+
+
+.hh-quantity-meta.saving i {
+    color: #2563eb;
+
+    animation:
+        hhQuantitySpin
+        .75s linear
+        infinite;
+}
+
+
+.hh-quantity-meta.error {
+    color: #dc2626;
+}
+
+
+.hh-quantity-meta.error i {
+    color: #dc2626;
+
+    animation: none;
+}
+
+
+@keyframes hhQuantitySpin {
+
+    to {
+        transform:
+            rotate(360deg);
+    }
+}
+
+
+/* ================================================================
+   QUANTITY NUMBER ANIMATION
+================================================================ */
+
+.hh-quantity-value.bump {
+    animation:
+        hhQuantityBump
+        .22s ease;
+}
+
+
+@keyframes hhQuantityBump {
+
+    0% {
+        transform:
+            scale(1);
+    }
+
+    50% {
+        transform:
+            scale(1.18);
+    }
+
+    100% {
+        transform:
+            scale(1);
+    }
+}
+
+
+/* ================================================================
+   CART PRODUCT TRANSITION
+================================================================ */
+
+.hh-cart-product {
+    transition:
+        opacity .2s ease,
+        transform .2s ease;
+}
+
+
+/* ================================================================
+   MOBILE
+================================================================ */
+
+@media (max-width: 720px) {
+
+    .hh-quantity-stepper {
+        min-width: 150px;
+    }
+}
+
+</style>
+
 
 <main class="hh-cart-page">
 
-
-    <div class="hh-cart-container">
+    <div
+        class="hh-cart-container"
+        data-cart-container
+    >
 
 
         <!-- =======================================================
@@ -636,16 +1173,20 @@ require_once __DIR__ .
                 <h1>
 
                     Your Cart,
-                    <span>Ready When You Are.</span>
+
+                    <span>
+                        Ready When You Are.
+                    </span>
 
                 </h1>
 
 
                 <p>
 
-                    Review your favourite finds, adjust quantities
-                    and continue to secure checkout when everything
-                    looks perfect.
+                    Review your favourite finds,
+                    adjust quantities and continue
+                    to secure checkout when
+                    everything looks perfect.
 
                 </p>
 
@@ -666,7 +1207,8 @@ require_once __DIR__ .
 
 
                     <?php if (
-                        !empty($cartItems) &&
+                        !empty($cartItems)
+                        &&
                         !$hasUnavailableItems
                     ): ?>
 
@@ -692,11 +1234,6 @@ require_once __DIR__ .
             </div>
 
 
-
-            <!-- ===================================================
-                 HERO VISUAL
-            ==================================================== -->
-
             <div class="hh-cart-hero-visual">
 
 
@@ -710,11 +1247,8 @@ require_once __DIR__ .
                 <div class="hh-cart-floating-card card-one">
 
                     <span>
-
                         <i class="bi bi-bag-check"></i>
-
                     </span>
-
 
                     <div>
 
@@ -722,7 +1256,7 @@ require_once __DIR__ .
                             ITEMS
                         </small>
 
-                        <strong>
+                        <strong data-cart-count-display>
                             <?= number_format(
                                 $totalItems
                             ) ?>
@@ -736,11 +1270,8 @@ require_once __DIR__ .
                 <div class="hh-cart-floating-card card-two">
 
                     <span>
-
                         <i class="bi bi-shield-check"></i>
-
                     </span>
-
 
                     <div>
 
@@ -765,7 +1296,7 @@ require_once __DIR__ .
 
 
         <!-- =======================================================
-             QUICK STATS
+             STATS
         ======================================================== -->
 
         <section class="hh-cart-stats">
@@ -773,13 +1304,11 @@ require_once __DIR__ .
 
             <article class="hh-cart-stat">
 
-
                 <div class="hh-cart-stat-icon blue">
 
                     <i class="bi bi-bag"></i>
 
                 </div>
-
 
                 <div>
 
@@ -787,14 +1316,15 @@ require_once __DIR__ .
                         ITEMS IN CART
                     </span>
 
-                    <strong>
+                    <strong data-cart-count-display>
+
                         <?= number_format(
                             $totalItems
                         ) ?>
+
                     </strong>
 
                 </div>
-
 
             </article>
 
@@ -802,13 +1332,11 @@ require_once __DIR__ .
 
             <article class="hh-cart-stat">
 
-
                 <div class="hh-cart-stat-icon purple">
 
                     <i class="bi bi-shop"></i>
 
                 </div>
-
 
                 <div>
 
@@ -817,13 +1345,16 @@ require_once __DIR__ .
                     </span>
 
                     <strong>
+
                         <?= number_format(
-                            count($vendors)
+                            count(
+                                $vendors
+                            )
                         ) ?>
+
                     </strong>
 
                 </div>
-
 
             </article>
 
@@ -831,13 +1362,11 @@ require_once __DIR__ .
 
             <article class="hh-cart-stat">
 
-
                 <div class="hh-cart-stat-icon green">
 
                     <i class="bi bi-wallet2"></i>
 
                 </div>
-
 
                 <div>
 
@@ -845,7 +1374,9 @@ require_once __DIR__ .
                         ESTIMATED TOTAL
                     </span>
 
-                    <strong>
+                    <strong
+                        data-cart-total
+                    >
 
                         RM
                         <?= number_format(
@@ -857,7 +1388,6 @@ require_once __DIR__ .
 
                 </div>
 
-
             </article>
 
 
@@ -866,57 +1396,22 @@ require_once __DIR__ .
 
 
         <!-- =======================================================
-             MESSAGE
+             REMOVE SUCCESS
         ======================================================== -->
 
         <?php if (
             isset($_GET['success'])
+            &&
+            $_GET['success'] ===
+            'removed'
         ): ?>
 
 
             <div class="hh-cart-alert success">
 
-
                 <i class="bi bi-check-circle-fill"></i>
 
-
-                <?php if (
-                    $_GET['success'] === 'removed'
-                ): ?>
-
-                    Item removed from your cart.
-
-                <?php elseif (
-                    $_GET['success'] === 'updated'
-                ): ?>
-
-                    Cart quantity updated successfully.
-
-                <?php else: ?>
-
-                    Cart updated successfully.
-
-                <?php endif; ?>
-
-
-            </div>
-
-
-        <?php endif; ?>
-
-
-        <?php if (
-            isset($_GET['error'])
-        ): ?>
-
-
-            <div class="hh-cart-alert error">
-
-
-                <i class="bi bi-exclamation-circle-fill"></i>
-
-                We couldn't update that item.
-                Check its availability and stock quantity.
+                Item removed from your cart.
 
             </div>
 
@@ -926,7 +1421,7 @@ require_once __DIR__ .
 
 
         <!-- =======================================================
-             EMPTY CART
+             EMPTY
         ======================================================== -->
 
         <?php if (empty($cartItems)): ?>
@@ -967,6 +1462,7 @@ require_once __DIR__ .
                 </div>
 
 
+
                 <div class="hh-empty-copy">
 
 
@@ -985,9 +1481,9 @@ require_once __DIR__ .
 
                     <p>
 
-                        Explore products from HochipoHub's local
-                        sellers and add something you love.
-                        Everything you add will appear right here.
+                        Explore products from
+                        HochipoHub's local sellers
+                        and add something you love.
 
                     </p>
 
@@ -1028,127 +1524,17 @@ require_once __DIR__ .
             </section>
 
 
-
-            <!-- ===================================================
-                 EMPTY PAGE BENEFITS
-            ==================================================== -->
-
-            <section class="hh-cart-benefits">
-
-
-                <article>
-
-
-                    <div>
-
-                        <i class="bi bi-shop"></i>
-
-                    </div>
-
-
-                    <span>
-                        SHOP LOCAL
-                    </span>
-
-
-                    <h3>
-                        Discover local sellers
-                    </h3>
-
-
-                    <p>
-
-                        Browse products from independent
-                        HochipoHub vendors in one marketplace.
-
-                    </p>
-
-
-                </article>
-
-
-
-                <article>
-
-
-                    <div>
-
-                        <i class="bi bi-shield-check"></i>
-
-                    </div>
-
-
-                    <span>
-                        SHOP SAFELY
-                    </span>
-
-
-                    <h3>
-                        Secure checkout flow
-                    </h3>
-
-
-                    <p>
-
-                        Review your order and delivery information
-                        before confirming your purchase.
-
-                    </p>
-
-
-                </article>
-
-
-
-                <article>
-
-
-                    <div>
-
-                        <i class="bi bi-box-seam"></i>
-
-                    </div>
-
-
-                    <span>
-                        ORDER TRACKING
-                    </span>
-
-
-                    <h3>
-                        Keep track of purchases
-                    </h3>
-
-
-                    <p>
-
-                        Your orders stay organised in one place
-                        after checkout.
-
-                    </p>
-
-
-                </article>
-
-
-            </section>
-
-
         <?php else: ?>
 
 
-            <!-- ===================================================
-                 UNAVAILABLE WARNING
-            ==================================================== -->
-
-            <?php if ($hasUnavailableItems): ?>
+            <?php if (
+                $hasUnavailableItems
+            ): ?>
 
 
                 <div class="hh-cart-alert warning">
 
-
                     <i class="bi bi-exclamation-triangle-fill"></i>
-
 
                     <div>
 
@@ -1156,11 +1542,10 @@ require_once __DIR__ .
                             Some items need your attention.
                         </strong>
 
-                        Remove or update unavailable items
-                        before proceeding to checkout.
+                        Remove unavailable items
+                        before checkout.
 
                     </div>
-
 
                 </div>
 
@@ -1180,7 +1565,10 @@ require_once __DIR__ .
                      ITEMS
                 ================================================== -->
 
-                <div class="hh-cart-items">
+                <div
+                    class="hh-cart-items"
+                    data-cart-list
+                >
 
 
                     <div class="hh-cart-section-header">
@@ -1208,9 +1596,11 @@ require_once __DIR__ .
 
                                 <p>
 
-                                    <?= number_format(
-                                        $totalItems
-                                    ) ?>
+                                    <span data-cart-count-display>
+                                        <?= number_format(
+                                            $totalItems
+                                        ) ?>
+                                    </span>
 
                                     item<?= $totalItems !== 1
                                         ? 's'
@@ -1219,7 +1609,9 @@ require_once __DIR__ .
                                     from
 
                                     <?= number_format(
-                                        count($vendors)
+                                        count(
+                                            $vendors
+                                        )
                                     ) ?>
 
                                     seller<?= count($vendors) !== 1
@@ -1252,7 +1644,9 @@ require_once __DIR__ .
 
                         $vendorLogo =
                             cartVendorLogo(
-                                $vendor['business_logo']
+                                $vendor[
+                                    'business_logo'
+                                ]
                             );
 
                         ?>
@@ -1284,11 +1678,12 @@ require_once __DIR__ .
                                                     $vendorLogo
                                                 ) ?>"
                                                 alt="<?= cartEscape(
-                                                    $vendor['business_name']
+                                                    $vendor[
+                                                        'business_name'
+                                                    ]
                                                 ) ?>"
                                                 onerror="
                                                     this.style.display='none';
-                                                    this.parentElement.innerHTML='<i class=&quot;bi bi-shop&quot;></i>';
                                                 "
                                             >
 
@@ -1307,20 +1702,19 @@ require_once __DIR__ .
 
                                     <div>
 
-
                                         <span>
                                             SELLER
                                         </span>
 
-
                                         <strong>
 
                                             <?= cartEscape(
-                                                $vendor['business_name']
+                                                $vendor[
+                                                    'business_name'
+                                                ]
                                             ) ?>
 
                                         </strong>
-
 
                                     </div>
 
@@ -1328,9 +1722,12 @@ require_once __DIR__ .
                                 </div>
 
 
+
                                 <a
                                     href="vendor.php?id=<?= (int)
-                                        $vendor['vendor_id'] ?>"
+                                        $vendor[
+                                            'vendor_id'
+                                        ] ?>"
                                     class="hh-cart-view-store"
                                 >
 
@@ -1361,11 +1758,17 @@ require_once __DIR__ .
                                     <?php
 
                                     $quantity =
-                                        (int) $item['quantity'];
+                                        (int)
+                                        $item[
+                                            'quantity'
+                                        ];
 
 
                                     $price =
-                                        (float) $item['price'];
+                                        (float)
+                                        $item[
+                                            'price'
+                                        ];
 
 
                                     $itemSubtotal =
@@ -1374,21 +1777,31 @@ require_once __DIR__ .
 
 
                                     $stockQuantity =
-                                        (int) $item['stock_quantity'];
+                                        (int)
+                                        $item[
+                                            'stock_quantity'
+                                        ];
 
 
                                     $productStatus =
-                                        (string) $item['status'];
+                                        (string)
+                                        $item[
+                                            'status'
+                                        ];
 
 
                                     $productAvailable =
-                                        $productStatus === 'Available' &&
+                                        $productStatus ===
+                                        'Available'
+                                        &&
                                         $stockQuantity > 0;
 
 
                                     $productImage =
                                         cartProductImage(
-                                            $item['image']
+                                            $item[
+                                                'image'
+                                            ]
                                         );
 
                                     ?>
@@ -1401,6 +1814,19 @@ require_once __DIR__ .
                                                 ? 'unavailable'
                                                 : '' ?>
                                         "
+                                        data-cart-item
+                                        data-cart-id="<?= (int)
+                                            $item[
+                                                'cart_id'
+                                            ] ?>"
+                                        data-item-price="<?= cartEscape(
+                                            number_format(
+                                                $price,
+                                                2,
+                                                '.',
+                                                ''
+                                            )
+                                        ) ?>"
                                     >
 
 
@@ -1408,7 +1834,9 @@ require_once __DIR__ .
 
                                         <a
                                             href="product_details.php?id=<?= (int)
-                                                $item['product_id'] ?>"
+                                                $item[
+                                                    'product_id'
+                                                ] ?>"
                                             class="hh-cart-product-image"
                                         >
 
@@ -1423,12 +1851,10 @@ require_once __DIR__ .
                                                         $productImage
                                                     ) ?>"
                                                     alt="<?= cartEscape(
-                                                        $item['product_name']
+                                                        $item[
+                                                            'product_name'
+                                                        ]
                                                     ) ?>"
-                                                    onerror="
-                                                        this.style.display='none';
-                                                        this.parentElement.innerHTML='<i class=&quot;bi bi-image&quot;></i>';
-                                                    "
                                                 >
 
 
@@ -1445,7 +1871,7 @@ require_once __DIR__ .
 
 
 
-                                        <!-- INFO -->
+                                        <!-- PRODUCT INFO -->
 
                                         <div class="hh-cart-product-info">
 
@@ -1453,7 +1879,9 @@ require_once __DIR__ .
                                             <span class="hh-cart-category">
 
                                                 <?= cartEscape(
-                                                    $item['category_name']
+                                                    $item[
+                                                        'category_name'
+                                                    ]
                                                 ) ?>
 
                                             </span>
@@ -1461,23 +1889,35 @@ require_once __DIR__ .
 
                                             <h3>
 
-
                                                 <a
                                                     href="product_details.php?id=<?= (int)
-                                                        $item['product_id'] ?>"
+                                                        $item[
+                                                            'product_id'
+                                                        ] ?>"
                                                 >
 
                                                     <?= cartEscape(
-                                                        $item['product_name']
+                                                        $item[
+                                                            'product_name'
+                                                        ]
                                                     ) ?>
 
                                                 </a>
 
-
                                             </h3>
 
 
-                                            <div class="hh-cart-product-price">
+                                            <div
+                                                class="hh-cart-product-price cart-item-price"
+                                                data-price="<?= cartEscape(
+                                                    number_format(
+                                                        $price,
+                                                        2,
+                                                        '.',
+                                                        ''
+                                                    )
+                                                ) ?>"
+                                            >
 
                                                 RM
                                                 <?= number_format(
@@ -1489,24 +1929,8 @@ require_once __DIR__ .
 
 
 
-                                            <!-- STATUS -->
-
                                             <?php if (
-                                                $productStatus === 'Hidden'
-                                            ): ?>
-
-
-                                                <div class="hh-product-warning">
-
-                                                    <i class="bi bi-eye-slash"></i>
-
-                                                    Product is no longer available.
-
-                                                </div>
-
-
-                                            <?php elseif (
-                                                $productStatus !== 'Available'
+                                                !$productAvailable
                                             ): ?>
 
 
@@ -1522,22 +1946,7 @@ require_once __DIR__ .
 
 
                                             <?php elseif (
-                                                $stockQuantity <= 0
-                                            ): ?>
-
-
-                                                <div class="hh-product-warning">
-
-                                                    <i class="bi bi-x-circle"></i>
-
-                                                    Out of stock.
-
-                                                </div>
-
-
-                                            <?php elseif (
-                                                $quantity >
-                                                $stockQuantity
+                                                $stockQuantity <= 5
                                             ): ?>
 
 
@@ -1547,7 +1956,7 @@ require_once __DIR__ .
 
                                                     Only
                                                     <?= $stockQuantity ?>
-                                                    available.
+                                                    left.
 
                                                 </div>
 
@@ -1571,40 +1980,55 @@ require_once __DIR__ .
 
 
 
-                                        <!-- QUANTITY -->
+                                        <!-- =================================
+                                             SMART QUANTITY
+                                        ================================== -->
 
-                                        <div class="hh-cart-product-quantity">
+                                        <div class="hh-smart-quantity">
 
 
-                                            <span>
+                                            <span class="hh-smart-quantity-label">
+
                                                 QUANTITY
+
                                             </span>
 
 
-                                            <form
-                                                method="POST"
-                                                action="cart.php"
-                                                class="hh-quantity-form"
+                                            <div
+                                                class="hh-quantity-stepper"
+                                                data-quantity-stepper
                                             >
 
 
-                                                <input
-                                                    type="hidden"
-                                                    name="cart_id"
-                                                    value="<?= (int)
-                                                        $item['cart_id'] ?>"
+                                                <button
+                                                    type="button"
+                                                    class="hh-quantity-btn"
+                                                    data-cart-decrease
+                                                    aria-label="Decrease quantity"
+                                                    <?= (
+                                                        !$productAvailable
+                                                        ||
+                                                        $quantity <= 1
+                                                    )
+                                                        ? 'disabled'
+                                                        : '' ?>
                                                 >
+                                                    −
+                                                </button>
 
 
                                                 <input
                                                     type="number"
-                                                    name="quantity"
+                                                    class="hh-quantity-value"
+                                                    data-cart-quantity
                                                     value="<?= $quantity ?>"
                                                     min="1"
                                                     max="<?= max(
                                                         1,
                                                         $stockQuantity
                                                     ) ?>"
+                                                    inputmode="numeric"
+                                                    aria-label="Product quantity"
                                                     <?= !$productAvailable
                                                         ? 'disabled'
                                                         : '' ?>
@@ -1612,36 +2036,65 @@ require_once __DIR__ .
 
 
                                                 <button
-                                                    type="submit"
-                                                    name="update_cart"
-                                                    <?= !$productAvailable
+                                                    type="button"
+                                                    class="hh-quantity-btn"
+                                                    data-cart-increase
+                                                    aria-label="Increase quantity"
+                                                    <?= (
+                                                        !$productAvailable
+                                                        ||
+                                                        $quantity >=
+                                                        $stockQuantity
+                                                    )
                                                         ? 'disabled'
                                                         : '' ?>
                                                 >
-
-                                                    Update
-
+                                                    +
                                                 </button>
 
 
-                                            </form>
+                                            </div>
+
+
+                                            <div
+                                                class="hh-quantity-meta"
+                                                data-quantity-status
+                                            >
+
+                                                <?php if (
+                                                    $productAvailable
+                                                ): ?>
+
+                                                    <i class="bi bi-cloud-check"></i>
+
+                                                    Auto saved
+
+                                                <?php else: ?>
+
+                                                    <i class="bi bi-exclamation-circle"></i>
+
+                                                    Unavailable
+
+                                                <?php endif; ?>
+
+                                            </div>
 
 
                                         </div>
 
 
 
-                                        <!-- PRICE -->
+                                        <!-- SUBTOTAL -->
 
                                         <div class="hh-cart-product-total">
-
 
                                             <span>
                                                 SUBTOTAL
                                             </span>
 
-
-                                            <strong>
+                                            <strong
+                                                data-item-subtotal
+                                            >
 
                                                 RM
                                                 <?= number_format(
@@ -1650,7 +2103,6 @@ require_once __DIR__ .
                                                 ) ?>
 
                                             </strong>
-
 
                                         </div>
 
@@ -1669,12 +2121,13 @@ require_once __DIR__ .
                                             "
                                         >
 
-
                                             <input
                                                 type="hidden"
                                                 name="cart_id"
                                                 value="<?= (int)
-                                                    $item['cart_id'] ?>"
+                                                    $item[
+                                                        'cart_id'
+                                                    ] ?>"
                                             >
 
 
@@ -1689,7 +2142,6 @@ require_once __DIR__ .
                                                 <i class="bi bi-trash3"></i>
 
                                             </button>
-
 
                                         </form>
 
@@ -1709,10 +2161,6 @@ require_once __DIR__ .
                     <?php endforeach; ?>
 
 
-
-                    <!-- =============================================
-                         CONTINUE
-                    ============================================== -->
 
                     <a
                         href="catalog.php"
@@ -1748,81 +2196,73 @@ require_once __DIR__ .
 
 
                         <span class="hh-summary-label">
-
                             ORDER SUMMARY
-
                         </span>
 
 
                         <h2>
-
                             Your Total
-
                         </h2>
 
 
                         <p class="hh-summary-description">
 
-                            Review your cart before moving
-                            to checkout.
+                            Your totals update automatically
+                            whenever you change quantity.
 
                         </p>
 
 
 
-                        <!-- ROW -->
-
                         <div class="hh-summary-row">
-
 
                             <span>
                                 Items
                             </span>
 
+                            <strong
+                                data-cart-count-display
+                            >
 
-                            <strong>
                                 <?= number_format(
                                     $totalItems
                                 ) ?>
-                            </strong>
 
+                            </strong>
 
                         </div>
 
 
 
-                        <!-- ROW -->
-
                         <div class="hh-summary-row">
-
 
                             <span>
                                 Sellers
                             </span>
 
-
                             <strong>
-                                <?= number_format(
-                                    count($vendors)
-                                ) ?>
-                            </strong>
 
+                                <?= number_format(
+                                    count(
+                                        $vendors
+                                    )
+                                ) ?>
+
+                            </strong>
 
                         </div>
 
 
 
-                        <!-- ROW -->
-
                         <div class="hh-summary-row">
-
 
                             <span>
                                 Subtotal
                             </span>
 
-
-                            <strong>
+                            <strong
+                                data-cart-subtotal
+                            >
 
                                 RM
                                 <?= number_format(
@@ -1832,27 +2272,19 @@ require_once __DIR__ .
 
                             </strong>
 
-
                         </div>
 
 
 
-                        <!-- ROW -->
-
                         <div class="hh-summary-row">
-
 
                             <span>
                                 Delivery
                             </span>
 
-
                             <strong class="delivery-text">
-
                                 At checkout
-
                             </strong>
-
 
                         </div>
 
@@ -1862,10 +2294,7 @@ require_once __DIR__ .
 
 
 
-                        <!-- TOTAL -->
-
                         <div class="hh-summary-total">
-
 
                             <div>
 
@@ -1880,7 +2309,9 @@ require_once __DIR__ .
                             </div>
 
 
-                            <strong>
+                            <strong
+                                data-cart-total
+                            >
 
                                 RM
                                 <?= number_format(
@@ -1890,12 +2321,9 @@ require_once __DIR__ .
 
                             </strong>
 
-
                         </div>
 
 
-
-                        <!-- CHECKOUT -->
 
                         <?php if (
                             !$hasUnavailableItems
@@ -1905,6 +2333,7 @@ require_once __DIR__ .
                             <a
                                 href="checkout.php"
                                 class="hh-checkout-button"
+                                data-cart-checkout
                             >
 
                                 <span>
@@ -1915,7 +2344,6 @@ require_once __DIR__ .
 
                                 </span>
 
-
                                 <i class="bi bi-arrow-right"></i>
 
                             </a>
@@ -1925,7 +2353,6 @@ require_once __DIR__ .
 
 
                             <div class="hh-checkout-disabled">
-
 
                                 <i class="bi bi-exclamation-triangle"></i>
 
@@ -1938,13 +2365,9 @@ require_once __DIR__ .
 
 
 
-                        <!-- SECURE -->
-
                         <div class="hh-secure-row">
 
-
                             <i class="bi bi-shield-check"></i>
-
 
                             <div>
 
@@ -1958,7 +2381,6 @@ require_once __DIR__ .
 
                             </div>
 
-
                         </div>
 
 
@@ -1966,12 +2388,7 @@ require_once __DIR__ .
 
 
 
-                    <!-- =============================================
-                         MULTI VENDOR
-                    ============================================== -->
-
                     <div class="hh-multi-vendor">
-
 
                         <div>
 
@@ -1979,24 +2396,21 @@ require_once __DIR__ .
 
                         </div>
 
-
                         <section>
 
                             <strong>
                                 Shopping from multiple sellers?
                             </strong>
 
-
                             <p>
 
-                                Each HochipoHub vendor will
-                                process their part of your
-                                order independently.
+                                Each HochipoHub vendor
+                                processes their part of
+                                the order independently.
 
                             </p>
 
                         </section>
-
 
                     </div>
 
@@ -2012,17 +2426,10 @@ require_once __DIR__ .
 
     </div>
 
-
 </main>
 
 
 <?php
-
-/*
-|--------------------------------------------------------------------------
-| FOOTER
-|--------------------------------------------------------------------------
-*/
 
 require_once __DIR__ .
     '/includes/footer.php';
@@ -2031,4 +2438,3 @@ require_once __DIR__ .
 
 
 <script src="js/cart.js"></script>
-<script src="js/script.js"></script>
