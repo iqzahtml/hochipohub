@@ -2,9 +2,8 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - MODAL JAVASCRIPT
 |--------------------------------------------------------------------------
-| File:
-| js/modal.js
-|
+| File: js/modal.js
+|--------------------------------------------------------------------------
 | Purpose:
 | - Open login modal
 | - Open register modal
@@ -14,6 +13,7 @@
 | - Escape to close
 | - Auto open register after registration error
 | - Auto open login after successful registration
+| - Toggle show/hide password
 |--------------------------------------------------------------------------
 */
 
@@ -50,7 +50,6 @@
             );
 
             return;
-
         }
 
 
@@ -85,7 +84,6 @@
                     'aria-hidden',
                     'true'
                 );
-
             }
 
 
@@ -101,7 +99,6 @@
                     'aria-hidden',
                     'true'
                 );
-
             }
 
 
@@ -112,7 +109,6 @@
             */
 
             modal.classList.add('active');
-
             modal.classList.add('show');
 
             modal.setAttribute(
@@ -142,15 +138,12 @@
 
 
                     if (firstInput) {
-
                         firstInput.focus();
-
                     }
 
                 },
                 150
             );
-
         }
 
 
@@ -168,7 +161,6 @@
 
 
             modal.classList.remove('active');
-
             modal.classList.remove('show');
 
 
@@ -202,9 +194,7 @@
                 document.body.classList.remove(
                     'modal-open'
                 );
-
             }
-
         }
 
 
@@ -233,26 +223,18 @@
                     'aria-hidden',
                     'true'
                 );
-
             }
 
 
             openModal(
                 targetModal
             );
-
         }
 
 
         /*
         |--------------------------------------------------------------------------
         | OPEN LOGIN / REGISTER
-        |--------------------------------------------------------------------------
-        |
-        | Guna event delegation.
-        |
-        | data-modal-open="loginModal"
-        | data-modal-open="registerModal"
         |--------------------------------------------------------------------------
         */
 
@@ -267,9 +249,7 @@
 
 
                 if (!button) {
-
                     return;
-
                 }
 
 
@@ -280,9 +260,7 @@
 
 
                 if (!targetId) {
-
                     return;
-
                 }
 
 
@@ -300,16 +278,8 @@
                     );
 
                     return;
-
                 }
 
-
-                /*
-                |----------------------------------------------------------
-                | PENTING:
-                | Jangan bagi button ikut default action.
-                |----------------------------------------------------------
-                */
 
                 event.preventDefault();
 
@@ -338,9 +308,7 @@
                     openModal(
                         targetModal
                     );
-
                 }
-
             }
         );
 
@@ -348,12 +316,6 @@
         /*
         |--------------------------------------------------------------------------
         | SWITCH BUTTON
-        |--------------------------------------------------------------------------
-        |
-        | Contoh:
-        |
-        | data-modal-switch="registerModal"
-        | data-modal-target="loginModal"
         |--------------------------------------------------------------------------
         */
 
@@ -368,9 +330,7 @@
 
 
                 if (!button) {
-
                     return;
-
                 }
 
 
@@ -381,9 +341,7 @@
 
 
                 if (!targetId) {
-
                     return;
-
                 }
 
 
@@ -401,7 +359,6 @@
                     );
 
                     return;
-
                 }
 
 
@@ -423,8 +380,8 @@
                     )
                 ) {
 
-                    currentModal = loginModal;
-
+                    currentModal =
+                        loginModal;
                 }
 
 
@@ -440,8 +397,8 @@
                     )
                 ) {
 
-                    currentModal = registerModal;
-
+                    currentModal =
+                        registerModal;
                 }
 
 
@@ -449,7 +406,6 @@
                     currentModal,
                     targetModal
                 );
-
             }
         );
 
@@ -471,9 +427,7 @@
 
 
                 if (!closeButton) {
-
                     return;
-
                 }
 
 
@@ -495,7 +449,148 @@
                 closeModal(
                     modal
                 );
+            }
+        );
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | PASSWORD TOGGLE
+        |--------------------------------------------------------------------------
+        | Any button with:
+        |
+        | data-password-target="inputId"
+        |
+        | will toggle the matching password field.
+        |--------------------------------------------------------------------------
+        */
+
+        document.addEventListener(
+            'click',
+            function (event) {
+
+                const toggleButton =
+                    event.target.closest(
+                        '[data-password-target]'
+                    );
+
+
+                if (!toggleButton) {
+                    return;
+                }
+
+
+                event.preventDefault();
+
+
+                const targetId =
+                    toggleButton.getAttribute(
+                        'data-password-target'
+                    );
+
+
+                if (!targetId) {
+                    return;
+                }
+
+
+                const passwordInput =
+                    document.getElementById(
+                        targetId
+                    );
+
+
+                if (!passwordInput) {
+
+                    console.warn(
+                        'HOCHIPOHUB: Password input tidak dijumpai:',
+                        targetId
+                    );
+
+                    return;
+                }
+
+
+                const isHidden =
+                    passwordInput.type ===
+                    'password';
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | TOGGLE TYPE
+                |--------------------------------------------------------------------------
+                */
+
+                passwordInput.type =
+                    isHidden
+                        ? 'text'
+                        : 'password';
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | ACCESSIBILITY
+                |--------------------------------------------------------------------------
+                */
+
+                toggleButton.setAttribute(
+                    'aria-pressed',
+                    isHidden
+                        ? 'true'
+                        : 'false'
+                );
+
+
+                toggleButton.setAttribute(
+                    'aria-label',
+                    isHidden
+                        ? 'Hide password'
+                        : 'Show password'
+                );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | ICON
+                |--------------------------------------------------------------------------
+                */
+
+                toggleButton.innerHTML =
+                    isHidden
+                        ? '🙈'
+                        : '👁';
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | KEEP FOCUS ON PASSWORD
+                |--------------------------------------------------------------------------
+                */
+
+                passwordInput.focus();
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | KEEP CURSOR AT END
+                |--------------------------------------------------------------------------
+                */
+
+                try {
+
+                    const valueLength =
+                        passwordInput.value.length;
+
+
+                    passwordInput.setSelectionRange(
+                        valueLength,
+                        valueLength
+                    );
+
+                } catch (error) {
+                    // Ignore unsupported selection behavior.
+                }
             }
         );
 
@@ -527,7 +622,6 @@
                     );
 
                     return;
-
                 }
 
 
@@ -547,7 +641,6 @@
                     );
 
                     return;
-
                 }
 
 
@@ -584,9 +677,7 @@
                     document.body.classList.remove(
                         'terms-open'
                     );
-
                 }
-
             }
         );
 
@@ -604,9 +695,7 @@
                 if (
                     event.key !== 'Escape'
                 ) {
-
                     return;
-
                 }
 
 
@@ -652,7 +741,6 @@
                     );
 
                     return;
-
                 }
 
 
@@ -679,7 +767,6 @@
                     );
 
                     return;
-
                 }
 
 
@@ -704,9 +791,7 @@
                     closeModal(
                         registerModal
                     );
-
                 }
-
             }
         );
 
@@ -727,7 +812,6 @@
         |--------------------------------------------------------------------------
         | SUCCESSFUL REGISTRATION
         |--------------------------------------------------------------------------
-        |
         | index.php?login=1
         |--------------------------------------------------------------------------
         */
@@ -752,15 +836,12 @@
 
 
                     if (loginEmail) {
-
                         loginEmail.focus();
-
                     }
 
                 },
                 250
             );
-
         }
 
 
@@ -768,7 +849,6 @@
         |--------------------------------------------------------------------------
         | REGISTRATION ERROR
         |--------------------------------------------------------------------------
-        |
         | index.php?register=1
         |--------------------------------------------------------------------------
         */
@@ -793,24 +873,18 @@
 
 
                     if (registerEmail) {
-
                         registerEmail.focus();
-
                     }
 
                 },
                 250
             );
-
         }
 
 
         /*
         |--------------------------------------------------------------------------
         | CLEAN URL
-        |--------------------------------------------------------------------------
-        |
-        | Buat selepas check parameter.
         |--------------------------------------------------------------------------
         */
 
@@ -828,7 +902,6 @@
                 document.title,
                 window.location.pathname
             );
-
         }
 
 
@@ -853,7 +926,6 @@
             document.body.classList.add(
                 'modal-open'
             );
-
         }
 
 
@@ -872,9 +944,7 @@
             document.body.classList.add(
                 'modal-open'
             );
-
         }
-
     }
 
 
@@ -896,7 +966,6 @@
     } else {
 
         initModalSystem();
-
     }
 
 })();
