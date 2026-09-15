@@ -7,33 +7,12 @@
 | File:
 | seller/setup_profile.php
 |--------------------------------------------------------------------------
-|
-| Purpose:
-| - Create vendor store profile
-| - Update vendor store profile
-| - Upload / change business logo
-| - Display vendor approval status
-|
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| CONFIG
-|--------------------------------------------------------------------------
 */
 
 require_once __DIR__ . '/../config.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| DATABASE
-|--------------------------------------------------------------------------
-*/
-
 require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
+require_once __DIR__ . '/../includes/functions.php';
 
 
 /*
@@ -42,70 +21,18 @@ require_once __DIR__ . '/../database/db.php';
 |--------------------------------------------------------------------------
 */
 
-require_once __DIR__ . '/../includes/session.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| FUNCTIONS
-|--------------------------------------------------------------------------
-*/
-
-require_once __DIR__ . '/../includes/functions.php';
-
-
-/*
-|--------------------------------------------------------------------------
-| START SESSION
-|--------------------------------------------------------------------------
-*/
-
 if (session_status() === PHP_SESSION_NONE) {
-
     session_start();
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN CHECK
+| LOGIN
 |--------------------------------------------------------------------------
 */
 
-if (!isset($_SESSION['user_id'])) {
-
-    header(
-        'Location: ../index.php'
-    );
-
-    exit;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| VENDOR ROLE CHECK
-|--------------------------------------------------------------------------
-*/
-
-if (
-    !isset($_SESSION['role']) ||
-    strtolower(
-        trim(
-            (string) $_SESSION['role']
-        )
-    ) !== 'vendor'
-) {
-
-    header(
-        'Location: ../dashboard.php'
-    );
-
-    exit;
-
-}
+requireLogin();
 
 
 /*
@@ -114,15 +41,7 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if (
-    !isset($db) ||
-    !($db instanceof PDO)
-) {
-
-    $db =
-        getDB();
-
-}
+$db = getDB();
 
 
 if (!($db instanceof PDO)) {
@@ -130,18 +49,102 @@ if (!($db instanceof PDO)) {
     die(
         'Database connection is not available.'
     );
-
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| USER ID
+| CURRENT USER
 |--------------------------------------------------------------------------
 */
 
 $userId =
-    (int) $_SESSION['user_id'];
+    (int) (
+        $_SESSION['user_id']
+        ?? 0
+    );
+
+
+if ($userId <= 0) {
+
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php'
+    );
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| USER
+|--------------------------------------------------------------------------
+*/
+
+$userStmt =
+    $db->prepare("
+        SELECT
+            user_id,
+            name,
+            email,
+            phone,
+            role,
+            status
+
+        FROM users
+
+        WHERE user_id = ?
+
+        LIMIT 1
+    ");
+
+
+$userStmt->execute([
+    $userId
+]);
+
+
+$currentUser =
+    $userStmt->fetch(
+        PDO::FETCH_ASSOC
+    );
+
+
+if (!$currentUser) {
+
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php'
+    );
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ROLE
+|--------------------------------------------------------------------------
+*/
+
+if (
+    strtolower(
+        (string)
+        $currentUser['role']
+    ) !== 'vendor'
+) {
+
+    header(
+        'Location: ' .
+        BASE_URL .
+        'dashboard.php'
+    );
+
+    exit;
+}
 
 
 /*
@@ -160,7 +163,20 @@ if (!function_exists('storeProfileEscape')) {
             'UTF-8'
         );
     }
+}
 
+
+if (!function_exists('storeProfileMoney')) {
+
+    function storeProfileMoney($value): string
+    {
+        return number_format(
+            (float) $value,
+            2,
+            '.',
+            ''
+        );
+    }
 }
 
 
@@ -168,304 +184,348 @@ if (!function_exists('storeProfileStatusClass')) {
 
     function storeProfileStatusClass($status): string
     {
-        $status =
-            strtolower(
+        return strtolower(
+            preg_replace(
+                '/[^a-zA-Z0-9]+/',
+                '-',
                 trim(
                     (string) $status
                 )
-            );
-
-
-        switch ($status) {
-
-            case 'approved':
-                return 'approved';
-
-            case 'pending':
-                return 'pending';
-
-            case 'rejected':
-                return 'rejected';
-
-            default:
-                return 'default';
-
-        }
-    }
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| ERROR LIST
-|--------------------------------------------------------------------------
-*/
-
-$errors = [];
-
-
-/*
-|--------------------------------------------------------------------------
-| GET EXISTING VENDOR
-|--------------------------------------------------------------------------
-*/
-
-try {
-
-    $stmt =
-        $db->prepare("
-            SELECT
-
-                v.vendor_id,
-                v.user_id,
-                v.business_name,
-                v.business_logo,
-                v.business_description,
-                v.business_address,
-                v.category,
-                v.delivery_method,
-                v.approval_status,
-                v.created_at,
-
-                u.name,
-                u.email,
-                u.phone
-
-            FROM vendors v
-
-            INNER JOIN users u
-                ON v.user_id = u.user_id
-
-            WHERE v.user_id = ?
-
-            LIMIT 1
-        ");
-
-
-    $stmt->execute([
-        $userId
-    ]);
-
-
-    $vendor =
-        $stmt->fetch(
-            PDO::FETCH_ASSOC
+            )
         );
-
-}
-
-catch (Throwable $e) {
-
-    $vendor = false;
-
+    }
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| GET USER DATA WHEN VENDOR PROFILE DOES NOT EXIST
+| GET VENDOR
+|--------------------------------------------------------------------------
+*/
+
+$vendorStmt =
+    $db->prepare("
+        SELECT
+
+            v.vendor_id,
+            v.user_id,
+            v.business_name,
+            v.business_logo,
+            v.business_description,
+            v.business_address,
+            v.category,
+            v.delivery_method,
+            v.postage_fee,
+            v.allow_vendor_delivery,
+            v.cod_enabled,
+            v.vendor_delivery_fee,
+            v.commission_rate,
+            v.approval_status,
+            v.created_at,
+            v.updated_at,
+
+            u.name,
+            u.email,
+            u.phone
+
+        FROM vendors v
+
+        INNER JOIN users u
+            ON v.user_id =
+               u.user_id
+
+        WHERE v.user_id = ?
+
+        LIMIT 1
+    ");
+
+
+$vendorStmt->execute([
+    $userId
+]);
+
+
+$vendor =
+    $vendorStmt->fetch(
+        PDO::FETCH_ASSOC
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| CREATE BASIC VENDOR PROFILE IF MISSING
 |--------------------------------------------------------------------------
 */
 
 if (!$vendor) {
 
-    try {
-
-        $stmt =
-            $db->prepare("
-                SELECT
-
-                    user_id,
-                    name,
-                    email,
-                    phone
-
-                FROM users
-
-                WHERE user_id = ?
-
-                LIMIT 1
-            ");
+    $defaultBusinessName =
+        trim(
+            (string)
+            $currentUser['name']
+        ) !== ''
+            ? trim(
+                (string)
+                $currentUser['name']
+            )
+            : 'My Store';
 
 
-        $stmt->execute([
-            $userId
-        ]);
+    $createVendor =
+        $db->prepare("
+            INSERT INTO vendors
+            (
+                user_id,
+                business_name,
+                delivery_method,
+                postage_fee,
+                allow_vendor_delivery,
+                cod_enabled,
+                vendor_delivery_fee,
+                commission_rate,
+                approval_status
+            )
+
+            VALUES
+            (
+                ?,
+                ?,
+                'Both',
+                0.00,
+                0,
+                0,
+                0.00,
+                5.00,
+                'Pending'
+            )
+        ");
 
 
-        $userData =
-            $stmt->fetch(
-                PDO::FETCH_ASSOC
-            );
-
-    }
-
-    catch (Throwable $e) {
-
-        $userData = [];
-
-    }
-
-}
-
-else {
-
-    $userData = $vendor;
-
-}
+    $createVendor->execute([
+        $userId,
+        $defaultBusinessName
+    ]);
 
 
-/*
-|--------------------------------------------------------------------------
-| SIDEBAR SESSION DATA
-|--------------------------------------------------------------------------
-*/
-
-if ($vendor) {
-
-    $_SESSION['business_name'] =
-        $vendor['business_name'];
+    $vendorStmt->execute([
+        $userId
+    ]);
 
 
-    $_SESSION['vendor_approval_status'] =
-        $vendor['approval_status'];
-
+    $vendor =
+        $vendorStmt->fetch(
+            PDO::FETCH_ASSOC
+        );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| DEFAULT VALUES
+| CURRENT VALUES
 |--------------------------------------------------------------------------
 */
+
+$vendorId =
+    (int) (
+        $vendor['vendor_id']
+        ?? 0
+    );
+
 
 $currentBusinessName =
-    $vendor['business_name']
-    ?? '';
-
-
-$currentBusinessDescription =
-    $vendor['business_description']
-    ?? '';
-
-
-$currentBusinessAddress =
-    $vendor['business_address']
-    ?? '';
-
-
-$currentCategory =
-    $vendor['category']
-    ?? '';
-
-
-$currentDeliveryMethod =
-    $vendor['delivery_method']
-    ?? 'Both';
+    (string) (
+        $vendor['business_name']
+        ?? ''
+    );
 
 
 $currentBusinessLogo =
-    $vendor['business_logo']
-    ?? '';
+    (string) (
+        $vendor['business_logo']
+        ?? ''
+    );
+
+
+$currentBusinessDescription =
+    (string) (
+        $vendor['business_description']
+        ?? ''
+    );
+
+
+$currentBusinessAddress =
+    (string) (
+        $vendor['business_address']
+        ?? ''
+    );
+
+
+$currentCategory =
+    (string) (
+        $vendor['category']
+        ?? ''
+    );
+
+
+$currentDeliveryMethod =
+    (string) (
+        $vendor['delivery_method']
+        ?? 'Both'
+    );
+
+
+$currentPostageFee =
+    (float) (
+        $vendor['postage_fee']
+        ?? 0
+    );
+
+
+$currentAllowVendorDelivery =
+    (int) (
+        $vendor['allow_vendor_delivery']
+        ?? 0
+    );
+
+
+$currentCodEnabled =
+    (int) (
+        $vendor['cod_enabled']
+        ?? 0
+    );
+
+
+$currentVendorDeliveryFee =
+    (float) (
+        $vendor['vendor_delivery_fee']
+        ?? 0
+    );
+
+
+$currentCommissionRate =
+    (float) (
+        $vendor['commission_rate']
+        ?? 5
+    );
 
 
 /*
 |--------------------------------------------------------------------------
-| FORM SUBMIT
+| SAFETY FOR OLD DATA
+|--------------------------------------------------------------------------
+|
+| Commission minimum is 5%.
+| If old vendor data contains less than 5, show 5.
+|--------------------------------------------------------------------------
+*/
+
+if ($currentCommissionRate < 5) {
+
+    $currentCommissionRate =
+        5.00;
+}
+
+
+$currentApprovalStatus =
+    (string) (
+        $vendor['approval_status']
+        ?? 'Pending'
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| FLASH
+|--------------------------------------------------------------------------
+*/
+
+$successMessage = '';
+
+$errorMessage = '';
+
+
+if (
+    isset(
+        $_SESSION[
+            'store_profile_success'
+        ]
+    )
+) {
+
+    $successMessage =
+        (string)
+        $_SESSION[
+            'store_profile_success'
+        ];
+
+
+    unset(
+        $_SESSION[
+            'store_profile_success'
+        ]
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| SAVE PROFILE
 |--------------------------------------------------------------------------
 */
 
 if (
-    $_SERVER['REQUEST_METHOD'] === 'POST'
+    $_SERVER['REQUEST_METHOD'] ===
+    'POST'
 ) {
-
 
     /*
     |--------------------------------------------------------------------------
-    | FORM VALUES
+    | BUSINESS
     |--------------------------------------------------------------------------
     */
 
     $businessName =
         trim(
-            $_POST['business_name']
-            ?? ''
+            (string) (
+                $_POST[
+                    'business_name'
+                ]
+                ?? ''
+            )
         );
 
 
     $businessDescription =
         trim(
-            $_POST['business_description']
-            ?? ''
+            (string) (
+                $_POST[
+                    'business_description'
+                ]
+                ?? ''
+            )
         );
 
 
     $businessAddress =
         trim(
-            $_POST['business_address']
-            ?? ''
+            (string) (
+                $_POST[
+                    'business_address'
+                ]
+                ?? ''
+            )
         );
 
 
     $category =
         trim(
-            $_POST['category']
-            ?? ''
+            (string) (
+                $_POST[
+                    'category'
+                ]
+                ?? ''
+            )
         );
-
-
-    $deliveryMethod =
-        trim(
-            $_POST['delivery_method']
-            ?? 'Both'
-        );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | VALIDATION
-    |--------------------------------------------------------------------------
-    */
-
-    if ($businessName === '') {
-
-        $errors[] =
-            'Business name is required.';
-
-    }
-
-
-    if (
-        mb_strlen(
-            $businessName
-        ) > 150
-    ) {
-
-        $errors[] =
-            'Business name must not exceed 150 characters.';
-
-    }
-
-
-    if ($category === '') {
-
-        $errors[] =
-            'Business category is required.';
-
-    }
-
-
-    if (
-        mb_strlen(
-            $category
-        ) > 100
-    ) {
-
-        $errors[] =
-            'Business category must not exceed 100 characters.';
-
-    }
 
 
     /*
@@ -474,16 +534,121 @@ if (
     |--------------------------------------------------------------------------
     */
 
-    $allowedDeliveryMethods = [
+    $deliveryMethod =
+        trim(
+            (string) (
+                $_POST[
+                    'delivery_method'
+                ]
+                ?? 'Both'
+            )
+        );
 
+
+    $postageFee =
+        isset(
+            $_POST[
+                'postage_fee'
+            ]
+        )
+            ? (float)
+                $_POST[
+                    'postage_fee'
+                ]
+            : 0.00;
+
+
+    $allowVendorDelivery =
+        isset(
+            $_POST[
+                'allow_vendor_delivery'
+            ]
+        )
+            ? 1
+            : 0;
+
+
+    $codEnabled =
+        isset(
+            $_POST[
+                'cod_enabled'
+            ]
+        )
+            ? 1
+            : 0;
+
+
+    $vendorDeliveryFee =
+        isset(
+            $_POST[
+                'vendor_delivery_fee'
+            ]
+        )
+            ? (float)
+                $_POST[
+                    'vendor_delivery_fee'
+                ]
+            : 0.00;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | COMMISSION
+    |--------------------------------------------------------------------------
+    |
+    | Vendor chooses their own commission.
+    |
+    | Minimum: 5%
+    | Maximum: 100%
+    |--------------------------------------------------------------------------
+    */
+
+    $commissionInput =
+        trim(
+            (string) (
+                $_POST[
+                    'commission_rate'
+                ]
+                ?? ''
+            )
+        );
+
+
+    $commissionRate =
+        is_numeric(
+            $commissionInput
+        )
+            ? (float)
+                $commissionInput
+            : 0.00;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDATION
+    |--------------------------------------------------------------------------
+    */
+
+    $allowedDeliveryMethods = [
         'Pickup',
         'Postage',
         'Both'
-
     ];
 
 
-    if (
+    if ($businessName === '') {
+
+        $errorMessage =
+            'Business name is required.';
+
+
+    } elseif ($category === '') {
+
+        $errorMessage =
+            'Business category is required.';
+
+
+    } elseif (
         !in_array(
             $deliveryMethod,
             $allowedDeliveryMethods,
@@ -491,543 +656,460 @@ if (
         )
     ) {
 
-        $errors[] =
+        $errorMessage =
             'Invalid delivery method.';
 
 
-        $deliveryMethod =
-            'Both';
+    } elseif (
+        in_array(
+            $deliveryMethod,
+            [
+                'Pickup',
+                'Both'
+            ],
+            true
+        ) &&
+        $businessAddress === ''
+    ) {
 
+        $errorMessage =
+            'Business / pickup address is required when Pickup is enabled.';
+
+
+    } elseif ($postageFee < 0) {
+
+        $errorMessage =
+            'Postage fee cannot be negative.';
+
+
+    } elseif ($vendorDeliveryFee < 0) {
+
+        $errorMessage =
+            'Vendor delivery fee cannot be negative.';
+
+
+    } elseif (
+        $commissionInput === '' ||
+        !is_numeric(
+            $commissionInput
+        )
+    ) {
+
+        $errorMessage =
+            'Please enter a valid commission rate.';
+
+
+    } elseif ($commissionRate < 5) {
+
+        $errorMessage =
+            'Commission rate must be at least 5%.';
+
+
+    } elseif ($commissionRate > 100) {
+
+        $errorMessage =
+            'Commission rate cannot exceed 100%.';
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | IMAGE
+    | NORMALIZE DELIVERY
     |--------------------------------------------------------------------------
     */
 
-    $businessLogo =
+    if (
+        $deliveryMethod ===
+        'Pickup'
+    ) {
+
+        $postageFee =
+            0.00;
+    }
+
+
+    if (!$allowVendorDelivery) {
+
+        $vendorDeliveryFee =
+            0.00;
+
+        $codEnabled =
+            0;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | NORMALIZE COMMISSION
+    |--------------------------------------------------------------------------
+    */
+
+    $commissionRate =
+        round(
+            $commissionRate,
+            2
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOGO
+    |--------------------------------------------------------------------------
+    */
+
+    $newLogo =
         $currentBusinessLogo;
 
 
-    $newLogoUploaded =
-        false;
-
-
-    $newLogoPath =
-        null;
-
-
     if (
+        $errorMessage === '' &&
         isset(
-            $_FILES['business_logo']
+            $_FILES[
+                'business_logo'
+            ]
         ) &&
-        $_FILES['business_logo']['error']
-            !== UPLOAD_ERR_NO_FILE
+        isset(
+            $_FILES[
+                'business_logo'
+            ][
+                'error'
+            ]
+        ) &&
+        $_FILES[
+            'business_logo'
+        ][
+            'error'
+        ] !== UPLOAD_ERR_NO_FILE
     ) {
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | FILE DATA
-        |--------------------------------------------------------------------------
-        */
-
-        $file =
-            $_FILES['business_logo'];
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | ERROR
-        |--------------------------------------------------------------------------
-        */
-
         if (
-            $file['error']
-            !== UPLOAD_ERR_OK
+            $_FILES[
+                'business_logo'
+            ][
+                'error'
+            ] !== UPLOAD_ERR_OK
         ) {
 
-            $errors[] =
+            $errorMessage =
                 'Unable to upload business logo.';
 
-        }
 
+        } else {
 
-        /*
-        |--------------------------------------------------------------------------
-        | SIZE
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            empty($errors) &&
-            (
-                !isset(
-                    $file['size']
-                ) ||
-                $file['size']
-                    > 5 * 1024 * 1024
-            )
-        ) {
-
-            $errors[] =
-                'Business logo must not exceed 5MB.';
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | VALID UPLOAD
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            empty($errors) &&
-            (
-                empty(
-                    $file['tmp_name']
-                ) ||
-                !is_uploaded_file(
-                    $file['tmp_name']
-                )
-            )
-        ) {
-
-            $errors[] =
-                'Invalid business logo upload.';
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | MIME
-        |--------------------------------------------------------------------------
-        */
-
-        $realMime =
-            null;
-
-
-        if (empty($errors)) {
-
-            if (!class_exists('finfo')) {
-
-                $errors[] =
-                    'PHP Fileinfo extension is required for image uploads.';
-
-            }
-
-            else {
-
-                $finfo =
-                    new finfo(
-                        FILEINFO_MIME_TYPE
-                    );
-
-
-                $realMime =
-                    $finfo->file(
-                        $file['tmp_name']
-                    );
-
-
-                $allowedMimeTypes = [
-
-                    'image/jpeg',
-                    'image/png',
-                    'image/webp'
-
-                ];
-
-
-                if (
-                    !$realMime ||
-                    !in_array(
-                        $realMime,
-                        $allowedMimeTypes,
-                        true
-                    )
-                ) {
-
-                    $errors[] =
-                        'Only JPG, JPEG, PNG and WEBP files are allowed.';
-
-                }
-
-            }
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | FILE NAME
-        |--------------------------------------------------------------------------
-        */
-
-        if (empty($errors)) {
-
-            $extensionMap = [
-
-                'image/jpeg' => 'jpg',
-                'image/png'  => 'png',
-                'image/webp' => 'webp'
-
-            ];
-
-
-            $extension =
-                $extensionMap[
-                    $realMime
-                ];
-
-
-            $businessLogo =
-                'vendor_' .
-                $userId .
-                '_' .
-                time() .
-                '_' .
-                bin2hex(
-                    random_bytes(4)
-                ) .
-                '.' .
-                $extension;
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | DIRECTORY
-            |--------------------------------------------------------------------------
-            */
-
-            $uploadDirectory =
-                __DIR__ .
-                '/../uploads/vendors/';
+            $maxSize =
+                5 * 1024 * 1024;
 
 
             if (
-                !is_dir(
-                    $uploadDirectory
-                )
+                (int)
+                $_FILES[
+                    'business_logo'
+                ][
+                    'size'
+                ] >
+                $maxSize
             ) {
 
-                if (
-                    !mkdir(
-                        $uploadDirectory,
-                        0755,
-                        true
-                    )
-                ) {
-
-                    $errors[] =
-                        'Unable to create vendor upload directory.';
-
-                }
-
-            }
+                $errorMessage =
+                    'Business logo must be 5MB or smaller.';
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | MOVE
-            |--------------------------------------------------------------------------
-            */
+            } else {
 
-            if (empty($errors)) {
+                $tmpFile =
+                    $_FILES[
+                        'business_logo'
+                    ][
+                        'tmp_name'
+                    ];
 
-                $newLogoPath =
-                    $uploadDirectory .
-                    $businessLogo;
+
+                $mimeType = '';
 
 
                 if (
-                    !move_uploaded_file(
-                        $file['tmp_name'],
-                        $newLogoPath
+                    function_exists(
+                        'finfo_open'
                     )
                 ) {
 
-                    $errors[] =
-                        'Unable to save business logo.';
+                    $finfo =
+                        finfo_open(
+                            FILEINFO_MIME_TYPE
+                        );
 
 
-                    $businessLogo =
-                        $currentBusinessLogo;
+                    if ($finfo) {
 
+                        $mimeType =
+                            (string)
+                            finfo_file(
+                                $finfo,
+                                $tmpFile
+                            );
+
+
+                        finfo_close(
+                            $finfo
+                        );
+                    }
                 }
 
-                else {
 
-                    $newLogoUploaded =
-                        true;
+                if ($mimeType === '') {
 
+                    $imageInfo =
+                        @getimagesize(
+                            $tmpFile
+                        );
+
+
+                    $mimeType =
+                        $imageInfo[
+                            'mime'
+                        ]
+                        ?? '';
                 }
 
+
+                $allowedImages = [
+
+                    'image/jpeg' =>
+                        'jpg',
+
+                    'image/png' =>
+                        'png',
+
+                    'image/webp' =>
+                        'webp'
+                ];
+
+
+                if (
+                    !isset(
+                        $allowedImages[
+                            $mimeType
+                        ]
+                    )
+                ) {
+
+                    $errorMessage =
+                        'Logo must be JPG, PNG or WEBP.';
+
+
+                } else {
+
+                    $uploadDirectory =
+                        __DIR__ .
+                        '/../uploads/vendors/';
+
+
+                    if (
+                        !is_dir(
+                            $uploadDirectory
+                        )
+                    ) {
+
+                        @mkdir(
+                            $uploadDirectory,
+                            0775,
+                            true
+                        );
+                    }
+
+
+                    if (
+                        !is_dir(
+                            $uploadDirectory
+                        ) ||
+                        !is_writable(
+                            $uploadDirectory
+                        )
+                    ) {
+
+                        $errorMessage =
+                            'Vendor logo folder is not writable.';
+
+
+                    } else {
+
+                        $extension =
+                            $allowedImages[
+                                $mimeType
+                            ];
+
+
+                        try {
+
+                            $randomString =
+                                bin2hex(
+                                    random_bytes(4)
+                                );
+
+                        } catch (Throwable $e) {
+
+                            $randomString =
+                                uniqid();
+                        }
+
+
+                        $fileName =
+                            'vendor_' .
+                            $vendorId .
+                            '_' .
+                            time() .
+                            '_' .
+                            $randomString .
+                            '.' .
+                            $extension;
+
+
+                        $destination =
+                            $uploadDirectory .
+                            $fileName;
+
+
+                        if (
+                            !move_uploaded_file(
+                                $tmpFile,
+                                $destination
+                            )
+                        ) {
+
+                            $errorMessage =
+                                'Failed to save business logo.';
+
+
+                        } else {
+
+                            $newLogo =
+                                $fileName;
+                        }
+                    }
+                }
             }
-
         }
-
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | SAVE
+    | UPDATE DATABASE
     |--------------------------------------------------------------------------
     */
 
-    if (empty($errors)) {
+    if ($errorMessage === '') {
+
+        try {
+
+            $db->beginTransaction();
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPDATE EXISTING VENDOR
-        |--------------------------------------------------------------------------
-        */
+            $updateStmt =
+                $db->prepare("
+                    UPDATE vendors
 
-        if ($vendor) {
+                    SET
 
-            try {
+                        business_name = ?,
+                        business_logo = ?,
+                        business_description = ?,
+                        business_address = ?,
+                        category = ?,
+                        delivery_method = ?,
+                        postage_fee = ?,
+                        allow_vendor_delivery = ?,
+                        cod_enabled = ?,
+                        vendor_delivery_fee = ?,
+                        commission_rate = ?
 
-                $stmt =
-                    $db->prepare("
-                        UPDATE vendors
+                    WHERE vendor_id = ?
 
-                        SET
-
-                            business_name = ?,
-                            business_logo = ?,
-                            business_description = ?,
-                            business_address = ?,
-                            category = ?,
-                            delivery_method = ?
-
-                        WHERE vendor_id = ?
-
-                        AND user_id = ?
-                    ");
+                    AND user_id = ?
+                ");
 
 
-                $stmt->execute([
+            $updateStmt->execute([
 
-                    $businessName,
+                $businessName,
 
-                    $businessLogo,
-
-                    $businessDescription,
-
-                    $businessAddress,
-
-                    $category,
-
-                    $deliveryMethod,
-
-                    (int)
-                    $vendor['vendor_id'],
-
-                    $userId
-
-                ]);
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | DELETE OLD LOGO
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    $newLogoUploaded &&
-                    !empty(
-                        $currentBusinessLogo
-                    ) &&
-                    $currentBusinessLogo !==
-                    $businessLogo
-                ) {
-
-                    $oldLogoPath =
-                        __DIR__ .
-                        '/../uploads/vendors/' .
-                        basename(
-                            $currentBusinessLogo
-                        );
-
-
-                    if (
-                        file_exists(
-                            $oldLogoPath
-                        ) &&
-                        is_file(
-                            $oldLogoPath
-                        )
-                    ) {
-
-                        @unlink(
-                            $oldLogoPath
-                        );
-
-                    }
-
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | SESSION
-                |--------------------------------------------------------------------------
-                */
-
-                $_SESSION['business_name'] =
-                    $businessName;
-
-
-                header(
-                    'Location: setup_profile.php?success=updated'
-                );
-
-                exit;
-
-            }
-
-            catch (Throwable $e) {
-
-                $errors[] =
-                    'Failed to update vendor profile.';
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | REMOVE NEW LOGO
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    $newLogoUploaded &&
-                    $newLogoPath &&
-                    file_exists(
-                        $newLogoPath
+                $newLogo !== ''
+                    ? basename(
+                        $newLogo
                     )
-                ) {
+                    : null,
 
-                    @unlink(
-                        $newLogoPath
-                    );
+                $businessDescription !== ''
+                    ? $businessDescription
+                    : null,
 
-                }
+                $businessAddress !== ''
+                    ? $businessAddress
+                    : null,
 
+                $category,
+
+                $deliveryMethod,
+
+                storeProfileMoney(
+                    $postageFee
+                ),
+
+                $allowVendorDelivery,
+
+                $codEnabled,
+
+                storeProfileMoney(
+                    $vendorDeliveryFee
+                ),
+
+                storeProfileMoney(
+                    $commissionRate
+                ),
+
+                $vendorId,
+
+                $userId
+            ]);
+
+
+            $db->commit();
+
+
+            $_SESSION[
+                'store_profile_success'
+            ] =
+                'Store profile updated successfully. Commission rate is now ' .
+                storeProfileMoney(
+                    $commissionRate
+                ) .
+                '%.';
+
+
+            header(
+                'Location: ' .
+                BASE_URL .
+                'seller/setup_profile.php'
+            );
+
+
+            exit;
+
+
+        } catch (Throwable $exception) {
+
+            if (
+                $db->inTransaction()
+            ) {
+
+                $db->rollBack();
             }
 
+
+            $errorMessage =
+                'Unable to update store profile. ' .
+                $exception->getMessage();
         }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CREATE NEW VENDOR
-        |--------------------------------------------------------------------------
-        */
-
-        else {
-
-            $approvalStatus =
-                'Pending';
-
-
-            try {
-
-                $stmt =
-                    $db->prepare("
-                        INSERT INTO vendors
-                        (
-                            user_id,
-                            business_name,
-                            business_logo,
-                            business_description,
-                            business_address,
-                            category,
-                            delivery_method,
-                            approval_status
-                        )
-
-                        VALUES
-                        (
-                            ?,
-                            ?,
-                            ?,
-                            ?,
-                            ?,
-                            ?,
-                            ?,
-                            ?
-                        )
-                    ");
-
-
-                $stmt->execute([
-
-                    $userId,
-
-                    $businessName,
-
-                    $businessLogo,
-
-                    $businessDescription,
-
-                    $businessAddress,
-
-                    $category,
-
-                    $deliveryMethod,
-
-                    $approvalStatus
-
-                ]);
-
-
-                $_SESSION['business_name'] =
-                    $businessName;
-
-
-                $_SESSION['vendor_approval_status'] =
-                    $approvalStatus;
-
-
-                header(
-                    'Location: setup_profile.php?success=created'
-                );
-
-                exit;
-
-            }
-
-            catch (Throwable $e) {
-
-                $errors[] =
-                    'Failed to create vendor profile.';
-
-
-                if (
-                    $newLogoUploaded &&
-                    $newLogoPath &&
-                    file_exists(
-                        $newLogoPath
-                    )
-                ) {
-
-                    @unlink(
-                        $newLogoPath
-                    );
-
-                }
-
-            }
-
-        }
-
     }
 
 
@@ -1057,9 +1139,48 @@ if (
         $deliveryMethod;
 
 
-    $currentBusinessLogo =
-        $businessLogo;
+    $currentPostageFee =
+        max(
+            0,
+            $postageFee
+        );
 
+
+    $currentAllowVendorDelivery =
+        $allowVendorDelivery;
+
+
+    $currentCodEnabled =
+        $codEnabled;
+
+
+    $currentVendorDeliveryFee =
+        max(
+            0,
+            $vendorDeliveryFee
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | KEEP COMMISSION VALUE
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        is_numeric(
+            $commissionInput
+        )
+    ) {
+
+        $currentCommissionRate =
+            (float)
+            $commissionInput;
+    }
+
+
+    $currentBusinessLogo =
+        $newLogo;
 }
 
 
@@ -1071,20 +1192,14 @@ if (
 
 $ownerName =
     $vendor['name']
-    ?? $userData['name']
-    ?? $_SESSION['name']
+    ?? $currentUser['name']
     ?? 'Vendor';
 
 
 $ownerEmail =
     $vendor['email']
-    ?? $userData['email']
+    ?? $currentUser['email']
     ?? '';
-
-
-$currentApprovalStatus =
-    $vendor['approval_status']
-    ?? 'Not Submitted';
 
 
 $statusClass =
@@ -1093,2242 +1208,1969 @@ $statusClass =
     );
 
 
+$currentLogoUrl = '';
+
+
+if (
+    trim(
+        (string)
+        $currentBusinessLogo
+    ) !== ''
+) {
+
+    $logoFile =
+        basename(
+            $currentBusinessLogo
+        );
+
+
+    $currentLogoUrl =
+        BASE_URL .
+        'uploads/vendors/' .
+        rawurlencode(
+            $logoFile
+        );
+}
+
+
 /*
 |--------------------------------------------------------------------------
-| LOGO URL
+| USER INITIAL
 |--------------------------------------------------------------------------
 */
 
-$currentLogoUrl =
-    $currentBusinessLogo !== ''
-        ? BASE_URL .
-            'uploads/vendors/' .
-            rawurlencode(
-                basename(
-                    $currentBusinessLogo
+$userInitial =
+    strtoupper(
+        substr(
+            trim(
+                (string)
+                $ownerName
+            ) !== ''
+                ? trim(
+                    (string)
+                    $ownerName
                 )
-            )
-        : '';
+                : 'V',
+            0,
+            1
+        )
+    );
 
-
-/*
-|--------------------------------------------------------------------------
-| PAGE TITLE
-|--------------------------------------------------------------------------
-*/
 
 $pageTitle =
-    $vendor
-        ? 'Store Profile | Seller | HochipoHub'
-        : 'Setup Store | Seller | HochipoHub';
+    'Store Profile | Seller | HochipoHub';
 
 ?>
 <!DOCTYPE html>
 
-
 <html lang="en">
-
 
 <head>
 
+<meta charset="UTF-8">
 
-    <meta charset="UTF-8">
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
 
+<title>
+    <?= storeProfileEscape(
+        $pageTitle
+    ) ?>
+</title>
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
 
+<link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+>
 
-    <title>
-        <?= storeProfileEscape(
-            $pageTitle
-        ) ?>
-    </title>
+<link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+>
 
+<link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@600;700;800&display=swap"
+    rel="stylesheet"
+>
 
-    <!-- ============================================================
-         GOOGLE FONTS
-    ============================================================= -->
+<link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+>
 
-    <link
-        rel="preconnect"
-        href="https://fonts.googleapis.com"
-    >
+<link
+    rel="stylesheet"
+    href="../css/style.css"
+>
 
+<link
+    rel="stylesheet"
+    href="../css/vendor.css"
+>
 
-    <link
-        rel="preconnect"
-        href="https://fonts.gstatic.com"
-        crossorigin
-    >
+<link
+    rel="stylesheet"
+    href="../css/responsive.css"
+>
 
 
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@600;700;800&display=swap"
-        rel="stylesheet"
-    >
+<style>
 
+/* =========================================================
+   BASE
+========================================================= */
 
-    <!-- ============================================================
-         FONT AWESOME
-    ============================================================= -->
+* {
+    box-sizing: border-box;
+}
 
-    <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-    >
 
+html,
+body {
 
-    <!-- ============================================================
-         PROJECT CSS
-    ============================================================= -->
+    margin: 0;
 
-    <link
-        rel="stylesheet"
-        href="../css/style.css"
-    >
+    min-height: 100%;
 
+    padding: 0;
+}
 
-    <link
-        rel="stylesheet"
-        href="../css/vendor.css"
-    >
 
+body.seller-dashboard-page {
 
-    <link
-        rel="stylesheet"
-        href="../css/responsive.css"
-    >
+    overflow-x: hidden;
 
+    color: #14213d;
 
-    <style>
+    background: #f5f8fc;
 
+    font-family:
+        Inter,
+        Arial,
+        sans-serif;
+}
 
-        /* ==========================================================
-           PAGE
-        ========================================================== */
 
-        .seller-store-page {
+/* =========================================================
+   MAIN
+========================================================= */
 
-            margin:
-                0;
+.seller-store-main {
 
-            min-height:
-                100vh;
+    width:
+        calc(
+            100% -
+            var(--seller-sidebar)
+        );
 
-            overflow-x:
-                hidden;
+    min-height: 100vh;
 
-            color:
-                #14213d;
+    margin-left:
+        var(--seller-sidebar);
 
-            background:
-                #f6f8fc;
+    background:
 
-            font-family:
-                Inter,
-                Arial,
-                sans-serif;
+        radial-gradient(
+            circle at 96% 5%,
+            rgba(
+                37,
+                99,
+                235,
+                .08
+            ),
+            transparent 22%
+        ),
 
-        }
+        #f5f8fc;
+}
 
 
-        /* ==========================================================
-           MAIN
-        ========================================================== */
+/* =========================================================
+   TOPBAR
+========================================================= */
 
-        .seller-store-main {
+.seller-store-topbar {
 
-            width:
-                calc(
-                    100% -
-                    var(
-                        --seller-sidebar
-                    )
-                );
+    height: 72px;
 
-            min-height:
-                100vh;
+    padding:
+        0 32px;
 
-            margin-left:
-                var(
-                    --seller-sidebar
-                );
+    display: flex;
 
-            background:
+    align-items: center;
 
-                radial-gradient(
-                    circle at 96% 7%,
-                    rgba(
-                        37,
-                        99,
-                        235,
-                        .07
-                    ),
-                    transparent 24%
-                ),
+    justify-content: space-between;
 
-                #f6f8fc;
+    gap: 20px;
 
-        }
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .97
+        );
 
+    border-bottom:
+        1px solid
+        #e8edf5;
+}
 
-        /* ==========================================================
-           TOPBAR
-        ========================================================== */
 
-        .seller-store-topbar {
+.seller-store-topbar-label {
 
-            height:
-                72px;
+    color: #8292ab;
 
-            padding:
-                0 32px;
+    font-size: 11px;
 
-            display:
-                flex;
+    font-weight: 700;
+}
 
-            align-items:
-                center;
 
-            justify-content:
-                space-between;
+.seller-store-topbar-user {
 
-            gap:
-                20px;
+    display: flex;
 
-            background:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .96
-                );
+    align-items: center;
 
-            border-bottom:
-                1px solid
-                #e8edf5;
+    gap: 10px;
+}
 
-        }
 
+.seller-store-topbar-avatar {
 
-        .seller-store-topbar-label {
+    width: 39px;
 
-            color:
-                #94a3b8;
+    height: 39px;
 
-            font-size:
-                11px;
+    overflow: hidden;
 
-            font-weight:
-                700;
+    display: flex;
 
-        }
+    align-items: center;
 
+    justify-content: center;
 
-        .seller-store-topbar-user {
+    flex-shrink: 0;
 
-            display:
-                flex;
+    color: #ffffff;
 
-            align-items:
-                center;
+    background:
 
-            gap:
-                9px;
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #6366f1
+        );
 
-        }
+    border-radius: 50%;
 
+    font-size: 12px;
 
-        .seller-store-topbar-avatar {
+    font-weight: 900;
+}
 
-            width:
-                38px;
 
-            height:
-                38px;
+.seller-store-topbar-avatar img {
 
-            display:
-                flex;
+    width: 100%;
 
-            align-items:
-                center;
+    height: 100%;
 
-            justify-content:
-                center;
+    object-fit: cover;
+}
 
-            overflow:
-                hidden;
 
-            color:
-                #ffffff;
+.seller-store-topbar-user strong {
 
-            background:
+    display: block;
 
-                linear-gradient(
-                    135deg,
-                    #3b82f6,
-                    #6366f1
-                );
+    color: #14213d;
 
-            border-radius:
-                50%;
+    font-size: 11px;
 
-            font-size:
-                12px;
+    font-weight: 800;
+}
 
-            font-weight:
-                900;
 
-        }
+.seller-store-topbar-user small {
 
+    display: block;
 
-        .seller-store-topbar-avatar img {
+    margin-top: 2px;
 
-            width:
-                100%;
+    color: #94a3b8;
 
-            height:
-                100%;
+    font-size: 8px;
+}
 
-            object-fit:
-                cover;
 
-        }
+/* =========================================================
+   CONTENT
+========================================================= */
 
+.seller-store-content {
 
-        .seller-store-topbar-user strong {
+    width: 100%;
 
-            display:
-                block;
+    max-width: 1450px;
 
-            color:
-                #14213d;
+    margin:
+        0 auto;
 
-            font-size:
-                11px;
+    padding:
+        29px 32px
+        65px;
+}
 
-        }
 
+/* =========================================================
+   HEADING
+========================================================= */
 
-        .seller-store-topbar-user small {
+.seller-store-heading {
 
-            display:
-                block;
+    margin-bottom: 22px;
 
-            margin-top:
-                2px;
+    display: flex;
 
-            color:
-                #94a3b8;
+    align-items: center;
 
-            font-size:
-                8px;
+    justify-content: space-between;
 
-        }
+    gap: 20px;
+}
 
 
-        /* ==========================================================
-           CONTENT
-        ========================================================== */
+.seller-store-eyebrow {
 
-        .seller-store-content {
+    display: block;
 
-            width:
-                100%;
+    margin-bottom: 7px;
 
-            max-width:
-                1450px;
+    color: #2563eb;
 
-            margin:
-                0 auto;
+    font-size: 8px;
 
-            padding:
-                28px 32px 60px;
+    font-weight: 900;
 
-        }
+    letter-spacing: 1.4px;
 
+    text-transform: uppercase;
+}
 
-        /* ==========================================================
-           HEADING
-        ========================================================== */
 
-        .seller-store-heading {
+.seller-store-heading h1 {
 
-            margin-bottom:
-                22px;
+    margin: 0;
 
-            display:
-                flex;
+    color: #10213f;
 
-            align-items:
-                center;
+    font-family:
+        Poppins,
+        Inter,
+        sans-serif;
 
-            justify-content:
-                space-between;
+    font-size:
+        clamp(
+            28px,
+            3vw,
+            35px
+        );
 
-            gap:
-                20px;
+    line-height: 1.15;
 
-        }
+    letter-spacing: -1px;
+}
 
 
-        .seller-store-eyebrow {
+.seller-store-heading p {
 
-            display:
-                block;
+    margin:
+        8px 0 0;
 
-            margin-bottom:
-                5px;
+    color: #8492a8;
 
-            color:
-                #2563eb;
+    font-size: 11px;
+}
 
-            font-size:
-                8px;
 
-            font-weight:
-                900;
+.seller-store-dashboard-link {
 
-            letter-spacing:
-                1.5px;
+    min-height: 42px;
 
-        }
+    padding:
+        0 15px;
 
+    display: inline-flex;
 
-        .seller-store-heading h1 {
+    align-items: center;
 
-            margin:
-                0;
+    justify-content: center;
 
-            color:
-                #14213d;
+    gap: 7px;
 
-            font-size:
+    color: #2c496d;
 
-                clamp(
-                    25px,
-                    3vw,
-                    33px
-                );
+    background: #ffffff;
 
-            font-weight:
-                900;
+    border:
+        1px solid
+        #dfe7f2;
 
-            letter-spacing:
-                -.8px;
+    border-radius: 13px;
 
-        }
+    box-shadow:
+        0 9px 24px
+        rgba(
+            32,
+            60,
+            104,
+            .06
+        );
 
+    font-size: 9px;
 
-        .seller-store-heading p {
+    font-weight: 800;
 
-            margin:
-                7px 0 0;
+    text-decoration: none;
+}
 
-            color:
-                #7b879c;
 
-            font-size:
-                11px;
+/* =========================================================
+   HERO
+========================================================= */
 
-        }
+.seller-store-hero {
 
+    position: relative;
 
-        .seller-store-dashboard-link {
+    overflow: hidden;
 
-            min-height:
-                42px;
+    min-height: 176px;
 
-            padding:
-                0 15px;
+    margin-bottom: 22px;
 
-            display:
-                inline-flex;
+    padding: 31px;
 
-            align-items:
-                center;
+    display: flex;
 
-            justify-content:
-                center;
+    align-items: center;
 
-            gap:
-                7px;
+    justify-content: space-between;
 
-            color:
-                #475569;
+    gap: 35px;
 
-            background:
-                #ffffff;
+    color: #ffffff;
 
-            border:
-                1px solid
-                #dfe6ef;
+    background:
 
-            border-radius:
-                11px;
+        linear-gradient(
+            112deg,
+            #103b82 0%,
+            #2367ca 48%,
+            #3488ee 100%
+        );
 
-            box-shadow:
+    border-radius: 23px;
 
-                0
-                8px
-                20px
-                rgba(
-                    40,
-                    65,
-                    120,
-                    .04
-                );
+    box-shadow:
+        0 18px 44px
+        rgba(
+            33,
+            94,
+            186,
+            .17
+        );
+}
 
-            font-size:
-                9px;
 
-            font-weight:
-                800;
+.seller-store-hero::before {
 
-            text-decoration:
-                none;
+    content: "";
 
-        }
+    position: absolute;
 
+    width: 250px;
 
-        /* ==========================================================
-           HERO
-        ========================================================== */
+    height: 250px;
 
-        .seller-store-hero {
+    right: -70px;
 
-            position:
-                relative;
+    top: -140px;
 
-            overflow:
-                hidden;
+    border-radius: 50%;
 
-            min-height:
-                180px;
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .07
+        );
+}
 
-            margin-bottom:
-                22px;
 
-            padding:
-                31px;
+.seller-store-hero::after {
 
-            display:
-                flex;
+    content: "";
 
-            align-items:
-                center;
+    position: absolute;
 
-            justify-content:
-                space-between;
+    width: 185px;
 
-            gap:
-                25px;
+    height: 185px;
 
-            color:
-                #ffffff;
+    right: 175px;
 
-            background:
+    bottom: -135px;
 
-                linear-gradient(
-                    110deg,
-                    #08265a 0%,
-                    #123d8c 48%,
-                    #2783ef 100%
-                );
+    border-radius: 50%;
 
-            border-radius:
-                23px;
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .045
+        );
+}
 
-            box-shadow:
 
-                0
-                17px
-                38px
-                rgba(
-                    18,
-                    70,
-                    150,
-                    .13
-                );
+.seller-store-hero-copy {
 
-        }
+    position: relative;
 
+    z-index: 2;
+}
 
-        .seller-store-hero::before {
 
-            content:
-                "";
+.seller-store-hero-label {
 
-            position:
-                absolute;
+    display: block;
 
-            width:
-                230px;
+    margin-bottom: 9px;
 
-            height:
-                230px;
+    color: #b9d7ff;
 
-            top:
-                -135px;
+    font-size: 8px;
 
-            right:
-                -50px;
+    font-weight: 900;
 
-            border-radius:
-                50%;
+    letter-spacing: 1.3px;
 
-            background:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .08
-                );
+    text-transform: uppercase;
+}
 
-        }
 
+.seller-store-hero h2 {
 
-        .seller-store-hero::after {
+    margin:
+        0 0 9px;
 
-            content:
-                "";
+    font-family:
+        Poppins,
+        Inter,
+        sans-serif;
 
-            position:
-                absolute;
+    font-size:
+        clamp(
+            21px,
+            3vw,
+            29px
+        );
 
-            width:
-                150px;
+    letter-spacing: -.7px;
+}
 
-            height:
-                150px;
 
-            right:
-                155px;
+.seller-store-hero p {
 
-            bottom:
-                -100px;
+    max-width: 670px;
 
-            border-radius:
-                50%;
+    margin: 0;
 
-            background:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .05
-                );
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .78
+        );
 
-        }
+    font-size: 10px;
 
+    line-height: 1.75;
+}
 
-        .seller-store-hero-copy {
 
-            position:
-                relative;
+.seller-store-hero-status {
 
-            z-index:
-                2;
+    position: relative;
 
-            max-width:
-                650px;
+    z-index: 2;
 
-        }
+    min-width: 140px;
 
+    min-height: 50px;
 
-        .seller-store-hero-label {
+    padding:
+        0 17px;
 
-            display:
-                block;
+    display: inline-flex;
 
-            margin-bottom:
-                8px;
+    align-items: center;
 
-            color:
-                #a8d4ff;
+    justify-content: center;
 
-            font-size:
-                8px;
+    gap: 8px;
 
-            font-weight:
-                900;
+    color: #ffffff;
 
-            letter-spacing:
-                1.3px;
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .12
+        );
 
-        }
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            .20
+        );
 
+    border-radius: 15px;
 
-        .seller-store-hero h2 {
+    backdrop-filter:
+        blur(8px);
 
-            margin:
-                0 0 8px;
+    font-size: 10px;
 
-            color:
-                #ffffff;
+    font-weight: 850;
+}
 
-            font-family:
-                Poppins,
-                Inter,
-                sans-serif;
 
-            font-size:
-                25px;
+/* =========================================================
+   ALERT
+========================================================= */
 
-            font-weight:
-                800;
+.seller-store-alert {
 
-        }
+    margin-bottom: 18px;
 
+    padding:
+        14px 17px;
 
-        .seller-store-hero p {
+    display: flex;
 
-            margin:
-                0;
+    align-items: center;
 
-            color:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .77
-                );
+    gap: 9px;
 
-            font-size:
-                10px;
+    border-radius: 14px;
 
-            line-height:
-                1.7;
+    font-size: 10px;
 
-        }
+    font-weight: 750;
+}
 
 
-        .seller-store-hero-logo {
+.seller-store-alert.success {
 
-            position:
-                relative;
+    color: #087443;
 
-            z-index:
-                2;
+    background: #ecfdf3;
 
-            width:
-                90px;
+    border:
+        1px solid
+        #a7f3d0;
+}
 
-            height:
-                90px;
 
-            flex-shrink:
-                0;
+.seller-store-alert.error {
 
-            overflow:
-                hidden;
+    color: #b42318;
 
-            display:
-                flex;
+    background: #fff2f1;
 
-            align-items:
-                center;
+    border:
+        1px solid
+        #fecaca;
+}
 
-            justify-content:
-                center;
 
-            color:
-                #ffffff;
+/* =========================================================
+   LAYOUT
+========================================================= */
 
-            background:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .14
-                );
+.seller-store-layout {
 
-            border:
-                1px solid
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .25
-                );
+    display: grid;
 
-            border-radius:
-                22px;
+    grid-template-columns:
+        minmax(
+            0,
+            1fr
+        )
+        320px;
 
-            font-size:
-                31px;
+    align-items: start;
 
-            backdrop-filter:
-                blur(10px);
+    gap: 22px;
+}
 
-        }
 
+/* =========================================================
+   FORM CARD
+========================================================= */
 
-        .seller-store-hero-logo img {
+.seller-store-form-card {
 
-            width:
-                100%;
+    overflow: hidden;
 
-            height:
-                100%;
+    background: #ffffff;
 
-            object-fit:
-                cover;
+    border:
+        1px solid
+        #e1e8f2;
 
-        }
+    border-radius: 22px;
 
+    box-shadow:
+        0 12px 34px
+        rgba(
+            28,
+            59,
+            103,
+            .055
+        );
+}
 
-        /* ==========================================================
-           ALERTS
-        ========================================================== */
 
-        .seller-store-alert {
+.seller-store-form-header {
 
-            margin-bottom:
-                18px;
+    padding:
+        22px 24px;
 
-            padding:
-                14px 16px;
+    display: flex;
 
-            display:
-                flex;
+    align-items: center;
 
-            align-items:
-                flex-start;
+    gap: 12px;
 
-            gap:
-                10px;
+    border-bottom:
+        1px solid
+        #edf1f6;
+}
 
-            border-radius:
-                12px;
 
-            font-size:
-                9px;
+.seller-store-form-icon {
 
-            line-height:
-                1.6;
+    width: 46px;
 
-        }
+    height: 46px;
 
+    display: flex;
 
-        .seller-store-alert.success {
+    align-items: center;
 
-            color:
-                #166534;
+    justify-content: center;
 
-            background:
-                #f0fdf4;
+    color: #ffffff;
 
-            border:
-                1px solid
-                #bbf7d0;
+    background:
 
-        }
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #3b82f6
+        );
 
+    border-radius: 13px;
 
-        .seller-store-alert.error {
+    box-shadow:
+        0 10px 20px
+        rgba(
+            37,
+            99,
+            235,
+            .18
+        );
 
-            color:
-                #991b1b;
+    font-size: 16px;
+}
 
-            background:
-                #fef2f2;
 
-            border:
-                1px solid
-                #fecaca;
+.seller-store-form-header h3 {
 
-        }
+    margin:
+        0 0 4px;
 
+    color: #11213e;
 
-        .seller-store-alert.info {
+    font-size: 16px;
+}
 
-            color:
-                #1e40af;
 
-            background:
-                #eff6ff;
+.seller-store-form-header p {
 
-            border:
-                1px solid
-                #bfdbfe;
+    margin: 0;
 
-        }
+    color: #8896aa;
 
+    font-size: 9px;
+}
 
-        .seller-store-alert ul {
 
-            margin:
-                5px 0 0;
+/* =========================================================
+   FORM SECTION
+========================================================= */
 
-            padding-left:
-                18px;
+.store-form-section {
 
-        }
+    padding: 25px;
 
+    border-bottom:
+        1px solid
+        #edf1f6;
+}
 
-        /* ==========================================================
-           STATUS
-        ========================================================== */
 
-        .seller-store-status {
+.store-form-section:last-of-type {
 
-            min-height:
-                28px;
+    border-bottom: none;
+}
 
-            padding:
-                0 9px;
 
-            display:
-                inline-flex;
+.store-section-title {
 
-            align-items:
-                center;
+    margin-bottom: 21px;
 
-            gap:
-                6px;
+    display: flex;
 
-            border-radius:
-                999px;
+    align-items: center;
 
-            font-size:
-                7px;
+    gap: 11px;
+}
 
-            font-weight:
-                900;
 
-            text-transform:
-                uppercase;
+.store-section-title-icon {
 
-        }
+    width: 39px;
 
+    height: 39px;
 
-        .seller-store-status::before {
+    display: flex;
 
-            content:
-                "";
+    align-items: center;
 
-            width:
-                6px;
+    justify-content: center;
 
-            height:
-                6px;
+    color: #2563eb;
 
-            border-radius:
-                50%;
+    background: #edf5ff;
 
-            background:
-                currentColor;
+    border:
+        1px solid
+        #dceaff;
 
-        }
+    border-radius: 11px;
 
+    font-size: 14px;
+}
 
-        .seller-store-status.approved {
 
-            color:
-                #15803d;
+.store-section-title h4 {
 
-            background:
-                #ecfdf3;
+    margin:
+        0 0 3px;
 
-        }
+    color: #18365e;
 
+    font-size: 14px;
+}
 
-        .seller-store-status.pending {
 
-            color:
-                #b45309;
+.store-section-title p {
 
-            background:
-                #fffbeb;
+    margin: 0;
 
-        }
+    color: #8c9aaf;
 
+    font-size: 8px;
+}
 
-        .seller-store-status.rejected {
 
-            color:
-                #b91c1c;
+/* =========================================================
+   FIELDS
+========================================================= */
 
-            background:
-                #fef2f2;
+.seller-store-field-grid {
 
-        }
+    display: grid;
 
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
 
-        .seller-store-status.default {
+    gap: 18px;
+}
 
-            color:
-                #64748b;
 
-            background:
-                #f1f5f9;
+.seller-store-field.full {
 
-        }
+    grid-column:
+        1 / -1;
+}
 
 
-        /* ==========================================================
-           LAYOUT
-        ========================================================== */
+.seller-store-field label {
 
-        .seller-store-layout {
+    margin-bottom: 7px;
 
-            display:
-                grid;
+    display: flex;
 
-            grid-template-columns:
+    align-items: center;
 
+    gap: 6px;
+
+    color: #2d405e;
+
+    font-size: 9px;
+
+    font-weight: 800;
+}
+
+
+.seller-store-field label i {
+
+    color: #2563eb;
+}
+
+
+.seller-store-required {
+
+    color: #ef4444;
+}
+
+
+.seller-store-field input,
+.seller-store-field select,
+.seller-store-field textarea {
+
+    width: 100%;
+
+    outline: none;
+
+    color: #1a3559;
+
+    background: #fbfdff;
+
+    border:
+        1px solid
+        #dce5f0;
+
+    border-radius: 12px;
+
+    font-family: inherit;
+
+    font-size: 10px;
+
+    transition:
+        .18s ease;
+}
+
+
+.seller-store-field input,
+.seller-store-field select {
+
+    height: 45px;
+
+    padding:
+        0 13px;
+}
+
+
+.seller-store-field textarea {
+
+    min-height: 115px;
+
+    padding: 13px;
+
+    line-height: 1.65;
+
+    resize: vertical;
+}
+
+
+.seller-store-field input:focus,
+.seller-store-field select:focus,
+.seller-store-field textarea:focus {
+
+    border-color: #4d8cf8;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 0 0 4px
+        rgba(
+            37,
+            99,
+            235,
+            .07
+        );
+}
+
+
+.seller-store-field small {
+
+    display: block;
+
+    margin-top: 6px;
+
+    color: #95a2b5;
+
+    font-size: 8px;
+
+    line-height: 1.55;
+}
+
+
+/* =========================================================
+   FILE
+========================================================= */
+
+.store-file-input {
+
+    padding:
+        10px !important;
+
+    height:
+        auto !important;
+}
+
+
+/* =========================================================
+   MONEY
+========================================================= */
+
+.store-money {
+
+    position: relative;
+}
+
+
+.store-money span {
+
+    position: absolute;
+
+    left: 13px;
+
+    top: 50%;
+
+    z-index: 2;
+
+    transform:
+        translateY(
+            -50%
+        );
+
+    color: #65768e;
+
+    font-size: 9px;
+
+    font-weight: 850;
+
+    pointer-events: none;
+}
+
+
+.store-money input {
+
+    padding-left: 43px;
+}
+
+
+/* =========================================================
+   PERCENT FIELD
+========================================================= */
+
+.store-percent {
+
+    position: relative;
+}
+
+
+.store-percent input {
+
+    padding-right:
+        42px;
+}
+
+
+.store-percent span {
+
+    position: absolute;
+
+    top: 50%;
+
+    right: 14px;
+
+    transform:
+        translateY(
+            -50%
+        );
+
+    color: #2563eb;
+
+    font-size: 10px;
+
+    font-weight: 900;
+
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   DELIVERY CARDS
+========================================================= */
+
+.store-delivery-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap: 11px;
+}
+
+
+.store-delivery-choice {
+
+    position: relative;
+
+    cursor: pointer;
+}
+
+
+.store-delivery-choice input {
+
+    position: absolute;
+
+    opacity: 0;
+
+    pointer-events: none;
+}
+
+
+.store-delivery-card {
+
+    min-height: 115px;
+
+    height: 100%;
+
+    padding: 16px;
+
+    background: #fbfdff;
+
+    border:
+        1.5px solid
+        #dfe7f1;
+
+    border-radius: 15px;
+
+    transition:
+        .18s ease;
+}
+
+
+.store-delivery-card i {
+
+    margin-bottom: 11px;
+
+    display: block;
+
+    color: #3b82f6;
+
+    font-size: 18px;
+}
+
+
+.store-delivery-card strong {
+
+    display: block;
+
+    margin-bottom: 5px;
+
+    color: #203c64;
+
+    font-size: 10px;
+}
+
+
+.store-delivery-card small {
+
+    color: #8998ad;
+
+    font-size: 8px;
+
+    line-height: 1.5;
+}
+
+
+.store-delivery-choice
+input:checked +
+.store-delivery-card {
+
+    border-color: #3b82f6;
+
+    background: #f0f6ff;
+
+    box-shadow:
+        0 0 0 3px
+        rgba(
+            59,
+            130,
+            246,
+            .07
+        );
+}
+
+
+/* =========================================================
+   CONDITIONAL
+========================================================= */
+
+.store-conditional {
+
+    margin-top: 16px;
+
+    padding: 18px;
+
+    background: #f8fbff;
+
+    border:
+        1px solid
+        #e0e8f3;
+
+    border-radius: 14px;
+}
+
+
+/* =========================================================
+   TOGGLE
+========================================================= */
+
+.store-toggle-row {
+
+    padding: 16px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 20px;
+
+    background: #fbfcfe;
+
+    border:
+        1px solid
+        #e3e9f2;
+
+    border-radius: 14px;
+}
+
+
+.store-toggle-copy strong {
+
+    display: block;
+
+    margin-bottom: 4px;
+
+    color: #213e67;
+
+    font-size: 10px;
+}
+
+
+.store-toggle-copy small {
+
+    color: #8c9bae;
+
+    font-size: 8px;
+
+    line-height: 1.5;
+}
+
+
+.store-switch {
+
+    position: relative;
+
+    width: 46px;
+
+    height: 25px;
+
+    flex-shrink: 0;
+}
+
+
+.store-switch input {
+
+    position: absolute;
+
+    opacity: 0;
+}
+
+
+.store-switch-slider {
+
+    position: absolute;
+
+    inset: 0;
+
+    cursor: pointer;
+
+    background: #cbd4e1;
+
+    border-radius: 999px;
+
+    transition: .2s;
+}
+
+
+.store-switch-slider::before {
+
+    content: "";
+
+    position: absolute;
+
+    width: 19px;
+
+    height: 19px;
+
+    left: 3px;
+
+    top: 3px;
+
+    background: #ffffff;
+
+    border-radius: 50%;
+
+    box-shadow:
+        0 2px 6px
+        rgba(
+            0,
+            0,
+            0,
+            .17
+        );
+
+    transition: .2s;
+}
+
+
+.store-switch
+input:checked +
+.store-switch-slider {
+
+    background: #2563eb;
+}
+
+
+.store-switch
+input:checked +
+.store-switch-slider::before {
+
+    transform:
+        translateX(
+            21px
+        );
+}
+
+
+/* =========================================================
+   COMMISSION
+========================================================= */
+
+.store-commission-box {
+
+    padding: 18px;
+
+    background:
+
+        linear-gradient(
+            135deg,
+            #f3f8ff,
+            #eef5ff
+        );
+
+    border:
+        1px solid
+        #d9e8fb;
+
+    border-radius: 14px;
+}
+
+
+.store-commission-notice {
+
+    margin-top: 12px;
+
+    padding:
+        11px 13px;
+
+    display: flex;
+
+    gap: 8px;
+
+    align-items: flex-start;
+
+    color: #315987;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .65
+        );
+
+    border:
+        1px solid
+        #dae8fa;
+
+    border-radius: 10px;
+
+    font-size: 8px;
+
+    line-height: 1.55;
+}
+
+
+.store-commission-notice i {
+
+    margin-top: 2px;
+
+    color: #2563eb;
+}
+
+
+/* =========================================================
+   SAVE
+========================================================= */
+
+.seller-store-save-row {
+
+    padding:
+        21px 25px;
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    background: #fafcff;
+
+    border-top:
+        1px solid
+        #edf1f6;
+}
+
+
+.seller-store-save {
+
+    min-height: 45px;
+
+    padding:
+        0 19px;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 7px;
+
+    color: #ffffff;
+
+    background:
+
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #4f46e5
+        );
+
+    border: none;
+
+    border-radius: 12px;
+
+    box-shadow:
+        0 9px 21px
+        rgba(
+            37,
+            99,
+            235,
+            .20
+        );
+
+    font-family: inherit;
+
+    font-size: 9px;
+
+    font-weight: 850;
+
+    cursor: pointer;
+}
+
+
+/* =========================================================
+   RIGHT SIDE
+========================================================= */
+
+.seller-store-side {
+
+    display: grid;
+
+    gap: 17px;
+}
+
+
+.seller-store-summary {
+
+    padding: 22px;
+
+    background: #ffffff;
+
+    border:
+        1px solid
+        #e0e7f1;
+
+    border-radius: 21px;
+
+    box-shadow:
+        0 12px 31px
+        rgba(
+            29,
+            58,
+            100,
+            .055
+        );
+}
+
+
+.seller-store-logo {
+
+    width: 103px;
+
+    height: 103px;
+
+    margin:
+        0 auto 15px;
+
+    overflow: hidden;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    color: #4169e1;
+
+    background:
+
+        linear-gradient(
+            135deg,
+            #eef4ff,
+            #f4efff
+        );
+
+    border:
+        1px solid
+        #e0e5ef;
+
+    border-radius: 22px;
+
+    font-size: 34px;
+}
+
+
+.seller-store-logo img {
+
+    width: 100%;
+
+    height: 100%;
+
+    object-fit: cover;
+}
+
+
+.seller-store-summary h3 {
+
+    margin:
+        0 0 4px;
+
+    text-align: center;
+
+    color: #152d53;
+
+    font-size: 17px;
+}
+
+
+.seller-store-category {
+
+    margin:
+        0 0 18px;
+
+    text-align: center;
+
+    color: #8b98ab;
+
+    font-size: 9px;
+}
+
+
+.seller-store-info-row {
+
+    padding:
+        11px 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 15px;
+
+    border-top:
+        1px solid
+        #edf1f6;
+
+    font-size: 9px;
+}
+
+
+.seller-store-info-row span {
+
+    color: #7f8da3;
+}
+
+
+.seller-store-info-row strong {
+
+    color: #213b62;
+
+    text-align: right;
+}
+
+
+.seller-store-status {
+
+    padding:
+        5px 8px;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    border-radius: 999px;
+
+    font-size: 8px;
+
+    font-weight: 850;
+}
+
+
+.seller-store-status.approved {
+
+    color: #047857;
+
+    background: #e9f9ef;
+}
+
+
+.seller-store-status.pending {
+
+    color: #a15c00;
+
+    background: #fff4d8;
+}
+
+
+.seller-store-status.rejected,
+.seller-store-status.suspended {
+
+    color: #b42318;
+
+    background: #ffefed;
+}
+
+
+/* =========================================================
+   GUIDE
+========================================================= */
+
+.seller-store-guide {
+
+    padding: 21px;
+
+    color: #ffffff;
+
+    background:
+
+        linear-gradient(
+            135deg,
+            #123b7a,
+            #2866c0
+        );
+
+    border-radius: 20px;
+
+    box-shadow:
+        0 14px 35px
+        rgba(
+            25,
+            76,
+            154,
+            .14
+        );
+}
+
+
+.seller-store-guide-icon {
+
+    width: 42px;
+
+    height: 42px;
+
+    margin-bottom: 13px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .12
+        );
+
+    border-radius: 12px;
+
+    font-size: 16px;
+}
+
+
+.seller-store-guide h3 {
+
+    margin:
+        0 0 7px;
+
+    font-size: 13px;
+}
+
+
+.seller-store-guide p {
+
+    margin: 0;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .76
+        );
+
+    font-size: 9px;
+
+    line-height: 1.7;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (
+    max-width: 1100px
+) {
+
+    .seller-store-layout {
+
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .seller-store-side {
+
+        grid-template-columns:
+            repeat(
+                2,
                 minmax(
                     0,
                     1fr
                 )
+            );
+    }
+}
 
-                300px;
 
-            align-items:
-                start;
+@media (
+    max-width: 850px
+) {
 
-            gap:
-                22px;
+    .seller-store-main {
 
-        }
+        width: 100%;
 
+        margin-left: 0;
+    }
 
-        /* ==========================================================
-           FORM CARD
-        ========================================================== */
 
-        .seller-store-form-card {
+    .seller-store-topbar {
 
-            overflow:
-                hidden;
+        padding-left: 70px;
+    }
 
-            background:
-                #ffffff;
 
-            border:
-                1px solid
-                #e5eaf2;
+    .seller-store-content {
 
-            border-radius:
-                21px;
+        padding:
+            24px
+            20px
+            50px;
+    }
+}
 
-            box-shadow:
 
-                0
-                12px
-                32px
-                rgba(
-                    40,
-                    65,
-                    120,
-                    .055
-                );
+@media (
+    max-width: 650px
+) {
 
-        }
+    .seller-store-topbar-user
+    > div:last-child {
 
+        display: none;
+    }
 
-        .seller-store-form-header {
 
-            min-height:
-                88px;
+    .seller-store-content {
 
-            padding:
-                20px 24px;
+        padding:
+            20px
+            14px
+            45px;
+    }
 
-            display:
-                flex;
 
-            align-items:
-                center;
+    .seller-store-heading {
 
-            gap:
-                13px;
+        align-items: flex-start;
 
-            border-bottom:
-                1px solid
-                #edf1f7;
+        flex-direction: column;
+    }
 
-        }
 
+    .seller-store-dashboard-link {
 
-        .seller-store-form-icon {
+        width: 100%;
+    }
 
-            width:
-                46px;
 
-            height:
-                46px;
+    .seller-store-hero {
 
-            flex-shrink:
-                0;
+        min-height: auto;
 
-            display:
-                flex;
+        padding: 24px;
 
-            align-items:
-                center;
+        align-items: flex-start;
 
-            justify-content:
-                center;
+        flex-direction: column;
+    }
 
-            color:
-                #ffffff;
 
-            background:
+    .seller-store-hero-status {
 
-                linear-gradient(
-                    135deg,
-                    #2563eb,
-                    #3b82f6
-                );
+        width: 100%;
+    }
 
-            border-radius:
-                13px;
 
-            box-shadow:
+    .seller-store-field-grid,
+    .store-delivery-grid,
+    .seller-store-side {
 
-                0
-                8px
-                18px
-                rgba(
-                    37,
-                    99,
-                    235,
-                    .22
-                );
+        grid-template-columns:
+            1fr;
+    }
 
-            font-size:
-                16px;
 
-        }
+    .store-form-section {
 
+        padding: 20px;
+    }
 
-        .seller-store-form-header h3 {
 
-            margin:
-                0 0 4px;
+    .seller-store-save-row {
 
-            color:
-                #14213d;
+        padding:
+            18px 20px;
+    }
 
-            font-size:
-                16px;
 
-            font-weight:
-                900;
+    .seller-store-save {
 
-        }
+        width: 100%;
+    }
+}
 
-
-        .seller-store-form-header p {
-
-            margin:
-                0;
-
-            color:
-                #8a97aa;
-
-            font-size:
-                9px;
-
-        }
-
-
-        .seller-store-form-body {
-
-            padding:
-                25px;
-
-        }
-
-
-        /* ==========================================================
-           FIELDS
-        ========================================================== */
-
-        .seller-store-field-grid {
-
-            display:
-                grid;
-
-            grid-template-columns:
-                1fr
-                1fr;
-
-            gap:
-                17px;
-
-        }
-
-
-        .seller-store-field {
-
-            margin-bottom:
-                18px;
-
-        }
-
-
-        .seller-store-field.full {
-
-            grid-column:
-                1 / -1;
-
-        }
-
-
-        .seller-store-field label {
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            gap:
-                6px;
-
-            margin-bottom:
-                7px;
-
-            color:
-                #334155;
-
-            font-size:
-                9px;
-
-            font-weight:
-                800;
-
-        }
-
-
-        .seller-store-field label i {
-
-            color:
-                #2563eb;
-
-            font-size:
-                9px;
-
-        }
-
-
-        .seller-store-required {
-
-            color:
-                #ef4444;
-
-        }
-
-
-        .seller-store-field input,
-        .seller-store-field textarea,
-        .seller-store-field select {
-
-            width:
-                100%;
-
-            outline:
-                none;
-
-            color:
-                #253750;
-
-            background:
-                #fbfdff;
-
-            border:
-                1px solid
-                #dbe5f0;
-
-            border-radius:
-                11px;
-
-            font-family:
-                inherit;
-
-            font-size:
-                10px;
-
-            transition:
-                .18s ease;
-
-        }
-
-
-        .seller-store-field input,
-        .seller-store-field select {
-
-            height:
-                45px;
-
-            padding:
-                0 13px;
-
-        }
-
-
-        .seller-store-field textarea {
-
-            min-height:
-                135px;
-
-            padding:
-                13px;
-
-            resize:
-                vertical;
-
-            line-height:
-                1.7;
-
-        }
-
-
-        .seller-store-field input:focus,
-        .seller-store-field textarea:focus,
-        .seller-store-field select:focus {
-
-            background:
-                #ffffff;
-
-            border-color:
-                #3b82f6;
-
-            box-shadow:
-
-                0
-                0
-                0
-                3px
-                rgba(
-                    59,
-                    130,
-                    246,
-                    .08
-                );
-
-        }
-
-
-        .seller-store-field small {
-
-            display:
-                block;
-
-            margin-top:
-                6px;
-
-            color:
-                #94a3b8;
-
-            font-size:
-                8px;
-
-            line-height:
-                1.5;
-
-        }
-
-
-        /* ==========================================================
-           LOGO UPLOAD
-        ========================================================== */
-
-        .seller-store-upload {
-
-            min-height:
-                180px;
-
-            padding:
-                20px;
-
-            display:
-                grid;
-
-            grid-template-columns:
-                125px
-                minmax(
-                    0,
-                    1fr
-                );
-
-            align-items:
-                center;
-
-            gap:
-                18px;
-
-            background:
-
-                linear-gradient(
-                    135deg,
-                    #f8fbff,
-                    #eef6ff
-                );
-
-            border:
-                1px dashed
-                #b9d4f5;
-
-            border-radius:
-                16px;
-
-        }
-
-
-        .seller-store-preview {
-
-            width:
-                125px;
-
-            height:
-                125px;
-
-            overflow:
-                hidden;
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            justify-content:
-                center;
-
-            color:
-                #2563eb;
-
-            background:
-                #ffffff;
-
-            border:
-                1px solid
-                #dce8f5;
-
-            border-radius:
-                18px;
-
-            box-shadow:
-
-                0
-                7px
-                18px
-                rgba(
-                    40,
-                    65,
-                    120,
-                    .06
-                );
-
-            font-size:
-                35px;
-
-        }
-
-
-        .seller-store-preview img {
-
-            width:
-                100%;
-
-            height:
-                100%;
-
-            object-fit:
-                cover;
-
-            object-position:
-                center;
-
-        }
-
-
-        .seller-store-upload-copy strong {
-
-            display:
-                block;
-
-            margin-bottom:
-                6px;
-
-            color:
-                #17345f;
-
-            font-size:
-                11px;
-
-            font-weight:
-                900;
-
-        }
-
-
-        .seller-store-upload-copy p {
-
-            margin:
-                0 0 12px;
-
-            color:
-                #8090a8;
-
-            font-size:
-                9px;
-
-            line-height:
-                1.6;
-
-        }
-
-
-        .seller-store-upload-copy input {
-
-            height:
-                auto;
-
-            padding:
-                9px;
-
-            background:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .9
-                );
-
-        }
-
-
-        .seller-store-upload-copy
-        input[type="file"]::file-selector-button {
-
-            margin-right:
-                9px;
-
-            padding:
-                8px 10px;
-
-            color:
-                #2563eb;
-
-            background:
-                #eff6ff;
-
-            border:
-                1px solid
-                #dbeafe;
-
-            border-radius:
-                8px;
-
-            font-family:
-                inherit;
-
-            font-size:
-                8px;
-
-            font-weight:
-                800;
-
-            cursor:
-                pointer;
-
-        }
-
-
-        /* ==========================================================
-           ACTIONS
-        ========================================================== */
-
-        .seller-store-actions {
-
-            margin-top:
-                3px;
-
-            padding-top:
-                20px;
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            justify-content:
-                flex-end;
-
-            gap:
-                9px;
-
-            border-top:
-                1px solid
-                #edf1f5;
-
-        }
-
-
-        .seller-store-action {
-
-            min-height:
-                42px;
-
-            padding:
-                0 16px;
-
-            display:
-                inline-flex;
-
-            align-items:
-                center;
-
-            justify-content:
-                center;
-
-            gap:
-                7px;
-
-            border-radius:
-                10px;
-
-            font-family:
-                inherit;
-
-            font-size:
-                9px;
-
-            font-weight:
-                800;
-
-            text-decoration:
-                none;
-
-            cursor:
-                pointer;
-
-        }
-
-
-        .seller-store-action.cancel {
-
-            color:
-                #64748b;
-
-            background:
-                #ffffff;
-
-            border:
-                1px solid
-                #dce5ef;
-
-        }
-
-
-        .seller-store-action.save {
-
-            color:
-                #ffffff;
-
-            background:
-
-                linear-gradient(
-                    135deg,
-                    #2563eb,
-                    #1d67df
-                );
-
-            border:
-                0;
-
-            box-shadow:
-
-                0
-                9px
-                20px
-                rgba(
-                    37,
-                    99,
-                    235,
-                    .22
-                );
-
-        }
-
-
-        /* ==========================================================
-           SIDE COLUMN
-        ========================================================== */
-
-        .seller-store-side {
-
-            display:
-                flex;
-
-            flex-direction:
-                column;
-
-            gap:
-                16px;
-
-        }
-
-
-        .seller-store-side-card {
-
-            padding:
-                20px;
-
-            background:
-                #ffffff;
-
-            border:
-                1px solid
-                #e5eaf2;
-
-            border-radius:
-                18px;
-
-            box-shadow:
-
-                0
-                9px
-                24px
-                rgba(
-                    40,
-                    65,
-                    120,
-                    .045
-                );
-
-        }
-
-
-        .seller-store-side-icon {
-
-            width:
-                42px;
-
-            height:
-                42px;
-
-            margin-bottom:
-                13px;
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            justify-content:
-                center;
-
-            color:
-                #2563eb;
-
-            background:
-                #eff6ff;
-
-            border-radius:
-                12px;
-
-            font-size:
-                15px;
-
-        }
-
-
-        .seller-store-side-card h4 {
-
-            margin:
-                0 0 7px;
-
-            color:
-                #14213d;
-
-            font-size:
-                12px;
-
-            font-weight:
-                900;
-
-        }
-
-
-        .seller-store-side-card p {
-
-            margin:
-                0;
-
-            color:
-                #8593a8;
-
-            font-size:
-                9px;
-
-            line-height:
-                1.7;
-
-        }
-
-
-        .seller-store-side-list {
-
-            margin:
-                12px 0 0;
-
-            padding:
-                0;
-
-            display:
-                flex;
-
-            flex-direction:
-                column;
-
-            gap:
-                9px;
-
-            list-style:
-                none;
-
-        }
-
-
-        .seller-store-side-list li {
-
-            display:
-                flex;
-
-            align-items:
-                flex-start;
-
-            gap:
-                8px;
-
-            color:
-                #67778f;
-
-            font-size:
-                8px;
-
-            line-height:
-                1.55;
-
-        }
-
-
-        .seller-store-side-list i {
-
-            margin-top:
-                2px;
-
-            color:
-                #22c55e;
-
-        }
-
-
-        /* ==========================================================
-           OWNER CARD
-        ========================================================== */
-
-        .seller-store-owner {
-
-            position:
-                relative;
-
-            overflow:
-                hidden;
-
-            padding:
-                20px;
-
-            color:
-                #ffffff;
-
-            background:
-
-                linear-gradient(
-                    135deg,
-                    #0b2d69,
-                    #276fda
-                );
-
-            border-radius:
-                18px;
-
-            box-shadow:
-
-                0
-                11px
-                27px
-                rgba(
-                    24,
-                    70,
-                    145,
-                    .14
-                );
-
-        }
-
-
-        .seller-store-owner::after {
-
-            content:
-                "";
-
-            position:
-                absolute;
-
-            width:
-                100px;
-
-            height:
-                100px;
-
-            right:
-                -35px;
-
-            bottom:
-                -40px;
-
-            border-radius:
-                50%;
-
-            background:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .07
-                );
-
-        }
-
-
-        .seller-store-owner > * {
-
-            position:
-                relative;
-
-            z-index:
-                2;
-
-        }
-
-
-        .seller-store-owner small {
-
-            display:
-                block;
-
-            margin-bottom:
-                6px;
-
-            color:
-                #a9d2ff;
-
-            font-size:
-                7px;
-
-            font-weight:
-                900;
-
-            letter-spacing:
-                .8px;
-
-        }
-
-
-        .seller-store-owner strong {
-
-            display:
-                block;
-
-            margin-bottom:
-                4px;
-
-            color:
-                #ffffff;
-
-            font-size:
-                13px;
-
-            font-weight:
-                900;
-
-        }
-
-
-        .seller-store-owner span {
-
-            display:
-                block;
-
-            color:
-                rgba(
-                    255,
-                    255,
-                    255,
-                    .72
-                );
-
-            font-size:
-                8px;
-
-        }
-
-
-        /* ==========================================================
-           RESPONSIVE
-        ========================================================== */
-
-        @media (
-            max-width: 1100px
-        ) {
-
-            .seller-store-layout {
-
-                grid-template-columns:
-                    1fr;
-
-            }
-
-
-            .seller-store-side {
-
-                display:
-                    grid;
-
-                grid-template-columns:
-                    1fr
-                    1fr;
-
-            }
-
-
-            .seller-store-owner {
-
-                grid-column:
-                    1 / -1;
-
-            }
-
-        }
-
-
-        @media (
-            max-width: 768px
-        ) {
-
-            .seller-store-main {
-
-                width:
-                    100%;
-
-                margin-left:
-                    0;
-
-            }
-
-
-            .seller-store-topbar {
-
-                padding:
-                    0 20px;
-
-            }
-
-
-            .seller-store-content {
-
-                padding:
-                    24px 20px 50px;
-
-            }
-
-
-            .seller-store-field-grid {
-
-                grid-template-columns:
-                    1fr;
-
-            }
-
-
-            .seller-store-field.full {
-
-                grid-column:
-                    auto;
-
-            }
-
-        }
-
-
-        @media (
-            max-width: 600px
-        ) {
-
-            .seller-store-topbar-user
-            > div:last-child {
-
-                display:
-                    none;
-
-            }
-
-
-            .seller-store-content {
-
-                padding:
-                    20px 14px 45px;
-
-            }
-
-
-            .seller-store-heading {
-
-                align-items:
-                    flex-start;
-
-                flex-direction:
-                    column;
-
-            }
-
-
-            .seller-store-dashboard-link {
-
-                width:
-                    100%;
-
-            }
-
-
-            .seller-store-hero {
-
-                min-height:
-                    auto;
-
-                padding:
-                    23px;
-
-                align-items:
-                    flex-start;
-
-            }
-
-
-            .seller-store-hero h2 {
-
-                font-size:
-                    20px;
-
-            }
-
-
-            .seller-store-hero-logo {
-
-                width:
-                    58px;
-
-                height:
-                    58px;
-
-                border-radius:
-                    16px;
-
-                font-size:
-                    21px;
-
-            }
-
-
-            .seller-store-form-body {
-
-                padding:
-                    18px;
-
-            }
-
-
-            .seller-store-upload {
-
-                grid-template-columns:
-                    1fr;
-
-            }
-
-
-            .seller-store-preview {
-
-                width:
-                    100%;
-
-                height:
-                    190px;
-
-            }
-
-
-            .seller-store-actions {
-
-                flex-direction:
-                    column-reverse;
-
-            }
-
-
-            .seller-store-action {
-
-                width:
-                    100%;
-
-            }
-
-
-            .seller-store-side {
-
-                display:
-                    flex;
-
-            }
-
-
-            .seller-store-owner {
-
-                grid-column:
-                    auto;
-
-            }
-
-        }
-
-
-    </style>
-
+</style>
 
 </head>
 
 
-<body class="seller-dashboard-page seller-store-page">
+<body
+    class="
+        seller-dashboard-page
+        seller-store-profile-page
+    "
+>
 
 
 <?php
-
-/*
-|--------------------------------------------------------------------------
-| SHARED SELLER SIDEBAR
-|--------------------------------------------------------------------------
-*/
 
 require_once __DIR__ .
     '/../includes/vendor_sidebar.php';
@@ -3336,16 +3178,12 @@ require_once __DIR__ .
 ?>
 
 
-<!-- ===============================================================
-     MAIN
-================================================================ -->
-
 <main class="seller-store-main">
 
 
-    <!-- ===========================================================
+    <!-- =========================================================
          TOPBAR
-    ============================================================ -->
+    ========================================================== -->
 
     <header class="seller-store-topbar">
 
@@ -3372,21 +3210,7 @@ require_once __DIR__ .
                         src="<?= storeProfileEscape(
                             $currentLogoUrl
                         ) ?>"
-                        alt="<?= storeProfileEscape(
-                            $currentBusinessName
-                        ) ?>"
-                        onerror="
-                            this.style.display='none';
-                            this.parentElement.innerHTML='<?= storeProfileEscape(
-                                strtoupper(
-                                    substr(
-                                        $ownerName,
-                                        0,
-                                        1
-                                    )
-                                )
-                            ) ?>';
-                        "
+                        alt="Store"
                     >
 
 
@@ -3394,13 +3218,7 @@ require_once __DIR__ .
 
 
                     <?= storeProfileEscape(
-                        strtoupper(
-                            substr(
-                                $ownerName,
-                                0,
-                                1
-                            )
-                        )
+                        $userInitial
                     ) ?>
 
 
@@ -3423,9 +3241,7 @@ require_once __DIR__ .
 
 
                 <small>
-
                     Vendor
-
                 </small>
 
 
@@ -3439,16 +3255,16 @@ require_once __DIR__ .
 
 
 
-    <!-- ===========================================================
+    <!-- =========================================================
          CONTENT
-    ============================================================ -->
+    ========================================================== -->
 
     <div class="seller-store-content">
 
 
-        <!-- =======================================================
+        <!-- =====================================================
              HEADING
-        ======================================================== -->
+        ====================================================== -->
 
         <section class="seller-store-heading">
 
@@ -3465,17 +3281,15 @@ require_once __DIR__ .
 
                 <h1>
 
-                    <?= $vendor
-                        ? 'Store Profile'
-                        : 'Setup Your Store' ?>
+                    Store Profile
 
                 </h1>
 
 
                 <p>
 
-                    Manage the business information customers
-                    see across HochipoHub.
+                    Manage your public store information,
+                    delivery settings and commission rate.
 
                 </p>
 
@@ -3501,9 +3315,9 @@ require_once __DIR__ .
 
 
 
-        <!-- =======================================================
+        <!-- =====================================================
              HERO
-        ======================================================== -->
+        ====================================================== -->
 
         <section class="seller-store-hero">
 
@@ -3513,24 +3327,24 @@ require_once __DIR__ .
 
                 <span class="seller-store-hero-label">
 
-                    YOUR STOREFRONT
+                    SELLER WORKSPACE
 
                 </span>
 
 
                 <h2>
 
-                    Make your store easy to recognise.
+                    Build a store customers trust.
 
                 </h2>
 
 
                 <p>
 
-                    Keep your store name, description,
-                    delivery options and branding up to date
-                    so customers know exactly who they are
-                    buying from.
+                    Keep your business details,
+                    pickup location, postage fee,
+                    vendor delivery settings and
+                    commission rate accurate.
 
                 </p>
 
@@ -3538,36 +3352,13 @@ require_once __DIR__ .
             </div>
 
 
-            <div class="seller-store-hero-logo">
+            <div class="seller-store-hero-status">
 
+                <i class="fa-solid fa-circle-check"></i>
 
-                <?php if (
-                    $currentLogoUrl !== ''
-                ): ?>
-
-
-                    <img
-                        src="<?= storeProfileEscape(
-                            $currentLogoUrl
-                        ) ?>"
-                        alt="<?= storeProfileEscape(
-                            $currentBusinessName
-                        ) ?>"
-                        onerror="
-                            this.style.display='none';
-                            this.parentElement.innerHTML='<i class=&quot;fa-solid fa-store&quot;></i>';
-                        "
-                    >
-
-
-                <?php else: ?>
-
-
-                    <i class="fa-solid fa-store"></i>
-
-
-                <?php endif; ?>
-
+                <?= storeProfileEscape(
+                    $currentApprovalStatus
+                ) ?>
 
             </div>
 
@@ -3576,63 +3367,29 @@ require_once __DIR__ .
 
 
 
-        <!-- =======================================================
-             SUCCESS
-        ======================================================== -->
+        <!-- =====================================================
+             ALERT
+        ====================================================== -->
 
         <?php if (
-            isset(
-                $_GET['success']
-            )
+            $successMessage !== ''
         ): ?>
 
 
-            <div
-                class="
-                    seller-store-alert
-                    success
-                "
-            >
-
+            <div class="
+                seller-store-alert
+                success
+            ">
 
                 <i class="fa-solid fa-circle-check"></i>
 
+                <span>
 
-                <div>
+                    <?= storeProfileEscape(
+                        $successMessage
+                    ) ?>
 
-
-                    <?php if (
-                        $_GET['success']
-                        === 'created'
-                    ): ?>
-
-
-                        <strong>
-                            Store profile created.
-                        </strong>
-
-                        Your vendor profile has been submitted
-                        and is now waiting for admin approval.
-
-
-                    <?php elseif (
-                        $_GET['success']
-                        === 'updated'
-                    ): ?>
-
-
-                        <strong>
-                            Store profile updated.
-                        </strong>
-
-                        Your store information has been saved successfully.
-
-
-                    <?php endif; ?>
-
-
-                </div>
-
+                </span>
 
             </div>
 
@@ -3640,65 +3397,25 @@ require_once __DIR__ .
         <?php endif; ?>
 
 
-
-        <!-- =======================================================
-             ERRORS
-        ======================================================== -->
-
         <?php if (
-            !empty(
-                $errors
-            )
+            $errorMessage !== ''
         ): ?>
 
 
-            <div
-                class="
-                    seller-store-alert
-                    error
-                "
-            >
+            <div class="
+                seller-store-alert
+                error
+            ">
 
+                <i class="fa-solid fa-circle-exclamation"></i>
 
-                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>
 
+                    <?= storeProfileEscape(
+                        $errorMessage
+                    ) ?>
 
-                <div>
-
-
-                    <strong>
-
-                        Please fix the following:
-
-                    </strong>
-
-
-                    <ul>
-
-
-                        <?php foreach (
-                            $errors
-                            as $error
-                        ): ?>
-
-
-                            <li>
-
-                                <?= storeProfileEscape(
-                                    $error
-                                ) ?>
-
-                            </li>
-
-
-                        <?php endforeach; ?>
-
-
-                    </ul>
-
-
-                </div>
-
+                </span>
 
             </div>
 
@@ -3707,82 +3424,22 @@ require_once __DIR__ .
 
 
 
-        <!-- =======================================================
-             APPROVAL STATUS
-        ======================================================== -->
-
-        <?php if ($vendor): ?>
-
-
-            <div
-                class="
-                    seller-store-alert
-                    info
-                "
-            >
-
-
-                <i class="fa-solid fa-shield-halved"></i>
-
-
-                <div>
-
-
-                    <strong>
-
-                        Store approval status
-
-                    </strong>
-
-
-                    <div
-                        style="
-                            margin-top:7px;
-                        "
-                    >
-
-
-                        <span
-                            class="
-                                seller-store-status
-                                <?= storeProfileEscape(
-                                    $statusClass
-                                ) ?>
-                            "
-                        >
-
-                            <?= storeProfileEscape(
-                                $currentApprovalStatus
-                            ) ?>
-
-                        </span>
-
-
-                    </div>
-
-
-                </div>
-
-
-            </div>
-
-
-        <?php endif; ?>
-
-
-
-        <!-- =======================================================
-             MAIN LAYOUT
-        ======================================================== -->
+        <!-- =====================================================
+             LAYOUT
+        ====================================================== -->
 
         <div class="seller-store-layout">
 
 
-            <!-- ===================================================
+            <!-- =================================================
                  FORM
-            ==================================================== -->
+            ================================================== -->
 
-            <section class="seller-store-form-card">
+            <form
+                method="POST"
+                enctype="multipart/form-data"
+                class="seller-store-form-card"
+            >
 
 
                 <div class="seller-store-form-header">
@@ -3797,21 +3454,18 @@ require_once __DIR__ .
 
                     <div>
 
-
                         <h3>
 
-                            Store Information
+                            Store Settings
 
                         </h3>
 
-
                         <p>
 
-                            Update the public information
-                            shown on your vendor profile.
+                            Update your business,
+                            delivery and commission settings.
 
                         </p>
-
 
                     </div>
 
@@ -3819,26 +3473,49 @@ require_once __DIR__ .
                 </div>
 
 
-                <form
-                    method="POST"
-                    enctype="multipart/form-data"
-                    class="seller-store-form-body"
-                >
+
+                <!-- =============================================
+                     BUSINESS INFORMATION
+                ============================================== -->
+
+                <section class="store-form-section">
+
+
+                    <div class="store-section-title">
+
+
+                        <div class="store-section-title-icon">
+
+                            <i class="fa-solid fa-building"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <h4>
+                                Business Information
+                            </h4>
+
+                            <p>
+                                Public information shown to customers.
+                            </p>
+
+                        </div>
+
+
+                    </div>
 
 
                     <div class="seller-store-field-grid">
 
-
-                        <!-- =========================================
-                             BUSINESS NAME
-                        ========================================== -->
 
                         <div class="seller-store-field">
 
 
                             <label for="business_name">
 
-                                <i class="fa-solid fa-shop"></i>
+                                <i class="fa-solid fa-store"></i>
 
                                 Business Name
 
@@ -3857,33 +3534,20 @@ require_once __DIR__ .
                                     $currentBusinessName
                                 ) ?>"
                                 maxlength="150"
-                                placeholder="Example: Hochipo Crafts"
                                 required
                             >
-
-
-                            <small>
-
-                                This name appears across your
-                                store and product listings.
-
-                            </small>
 
 
                         </div>
 
 
 
-                        <!-- =========================================
-                             CATEGORY
-                        ========================================== -->
-
                         <div class="seller-store-field">
 
 
                             <label for="category">
 
-                                <i class="fa-solid fa-layer-group"></i>
+                                <i class="fa-solid fa-tag"></i>
 
                                 Business Category
 
@@ -3902,106 +3566,19 @@ require_once __DIR__ .
                                     $currentCategory
                                 ) ?>"
                                 maxlength="100"
-                                placeholder="Example: Food, Fashion, Technology"
+                                placeholder="Example: Food & Beverage"
                                 required
                             >
-
-
-                            <small>
-
-                                Describe the main type of
-                                products your business sells.
-
-                            </small>
 
 
                         </div>
 
 
 
-                        <!-- =========================================
-                             DELIVERY
-                        ========================================== -->
-
-                        <div class="seller-store-field full">
-
-
-                            <label for="delivery_method">
-
-                                <i class="fa-solid fa-truck"></i>
-
-                                Delivery Method
-
-                                <span class="seller-store-required">
-                                    *
-                                </span>
-
-                            </label>
-
-
-                            <select
-                                id="delivery_method"
-                                name="delivery_method"
-                                required
-                            >
-
-
-                                <option
-                                    value="Pickup"
-                                    <?= $currentDeliveryMethod === 'Pickup'
-                                        ? 'selected'
-                                        : '' ?>
-                                >
-
-                                    Pickup Only
-
-                                </option>
-
-
-                                <option
-                                    value="Postage"
-                                    <?= $currentDeliveryMethod === 'Postage'
-                                        ? 'selected'
-                                        : '' ?>
-                                >
-
-                                    Postage Only
-
-                                </option>
-
-
-                                <option
-                                    value="Both"
-                                    <?= $currentDeliveryMethod === 'Both'
-                                        ? 'selected'
-                                        : '' ?>
-                                >
-
-                                    Pickup & Postage
-
-                                </option>
-
-
-                            </select>
-
-
-                            <small>
-
-                                Choose how customers can
-                                receive products from your store.
-
-                            </small>
-
-
-                        </div>
-
-
-
-                        <!-- =========================================
-                             DESCRIPTION
-                        ========================================== -->
-
-                        <div class="seller-store-field full">
+                        <div class="
+                            seller-store-field
+                            full
+                        ">
 
 
                             <label for="business_description">
@@ -4016,36 +3593,28 @@ require_once __DIR__ .
                             <textarea
                                 id="business_description"
                                 name="business_description"
-                                placeholder="Tell customers about your business, products and what makes your store special..."
+                                maxlength="2000"
+                                placeholder="Tell customers about your store..."
                             ><?= storeProfileEscape(
                                 $currentBusinessDescription
                             ) ?></textarea>
-
-
-                            <small>
-
-                                A short introduction helps customers
-                                understand your store.
-
-                            </small>
 
 
                         </div>
 
 
 
-                        <!-- =========================================
-                             ADDRESS
-                        ========================================== -->
-
-                        <div class="seller-store-field full">
+                        <div class="
+                            seller-store-field
+                            full
+                        ">
 
 
                             <label for="business_address">
 
                                 <i class="fa-solid fa-location-dot"></i>
 
-                                Business Address
+                                Business / Pickup Address
 
                             </label>
 
@@ -4053,7 +3622,8 @@ require_once __DIR__ .
                             <textarea
                                 id="business_address"
                                 name="business_address"
-                                placeholder="Enter your business address..."
+                                maxlength="1000"
+                                placeholder="Enter the complete store address..."
                             ><?= storeProfileEscape(
                                 $currentBusinessAddress
                             ) ?></textarea>
@@ -4061,8 +3631,8 @@ require_once __DIR__ .
 
                             <small>
 
-                                Keep this accurate if your
-                                business supports customer pickup.
+                                Required when Pickup
+                                is available.
 
                             </small>
 
@@ -4071,116 +3641,391 @@ require_once __DIR__ .
 
 
 
-                        <!-- =========================================
-                             BUSINESS LOGO
-                        ========================================== -->
-
-                        <div class="seller-store-field full">
+                        <div class="
+                            seller-store-field
+                            full
+                        ">
 
 
                             <label for="business_logo">
 
                                 <i class="fa-solid fa-image"></i>
 
-
-                                <?= $vendor
-                                    ? 'Business Logo'
-                                    : 'Upload Business Logo' ?>
-
+                                Business Logo
 
                             </label>
 
 
-                            <div class="seller-store-upload">
+                            <input
+                                type="file"
+                                id="business_logo"
+                                name="business_logo"
+                                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                                class="store-file-input"
+                            >
 
 
-                                <div
-                                    class="seller-store-preview"
-                                    id="storeLogoPreview"
+                            <small>
+
+                                JPG, PNG or WEBP.
+                                Maximum file size 5MB.
+
+                            </small>
+
+
+                        </div>
+
+
+                    </div>
+
+
+                </section>
+
+
+
+                <!-- =============================================
+                     DELIVERY SETTINGS
+                ============================================== -->
+
+                <section class="store-form-section">
+
+
+                    <div class="store-section-title">
+
+
+                        <div class="store-section-title-icon">
+
+                            <i class="fa-solid fa-truck"></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <h4>
+                                Delivery Settings
+                            </h4>
+
+                            <p>
+                                Choose how customers receive orders.
+                            </p>
+
+                        </div>
+
+
+                    </div>
+
+
+
+                    <div class="store-delivery-grid">
+
+
+                        <label class="store-delivery-choice">
+
+
+                            <input
+                                type="radio"
+                                name="delivery_method"
+                                value="Pickup"
+                                <?= $currentDeliveryMethod ===
+                                    'Pickup'
+                                        ? 'checked'
+                                        : '' ?>
+                            >
+
+
+                            <div class="store-delivery-card">
+
+                                <i class="fa-solid fa-store"></i>
+
+                                <strong>
+                                    Pickup
+                                </strong>
+
+                                <small>
+
+                                    Customers collect
+                                    orders from your store.
+
+                                </small>
+
+                            </div>
+
+
+                        </label>
+
+
+
+                        <label class="store-delivery-choice">
+
+
+                            <input
+                                type="radio"
+                                name="delivery_method"
+                                value="Postage"
+                                <?= $currentDeliveryMethod ===
+                                    'Postage'
+                                        ? 'checked'
+                                        : '' ?>
+                            >
+
+
+                            <div class="store-delivery-card">
+
+                                <i class="fa-solid fa-box"></i>
+
+                                <strong>
+                                    Postage
+                                </strong>
+
+                                <small>
+
+                                    Ship orders using
+                                    courier services.
+
+                                </small>
+
+                            </div>
+
+
+                        </label>
+
+
+
+                        <label class="store-delivery-choice">
+
+
+                            <input
+                                type="radio"
+                                name="delivery_method"
+                                value="Both"
+                                <?= $currentDeliveryMethod ===
+                                    'Both'
+                                        ? 'checked'
+                                        : '' ?>
+                            >
+
+
+                            <div class="store-delivery-card">
+
+                                <i class="fa-solid fa-arrows-left-right"></i>
+
+                                <strong>
+                                    Both
+                                </strong>
+
+                                <small>
+
+                                    Allow Pickup
+                                    and Postage.
+
+                                </small>
+
+                            </div>
+
+
+                        </label>
+
+
+                    </div>
+
+
+
+                    <!-- POSTAGE -->
+
+                    <div
+                        class="store-conditional"
+                        id="postageSettings"
+                    >
+
+
+                        <div class="seller-store-field">
+
+
+                            <label for="postage_fee">
+
+                                <i class="fa-solid fa-money-bill"></i>
+
+                                Postage Fee
+
+                            </label>
+
+
+                            <div class="store-money">
+
+                                <span>
+                                    RM
+                                </span>
+
+                                <input
+                                    type="number"
+                                    id="postage_fee"
+                                    name="postage_fee"
+                                    min="0"
+                                    step="0.01"
+                                    value="<?= storeProfileEscape(
+                                        storeProfileMoney(
+                                            $currentPostageFee
+                                        )
+                                    ) ?>"
                                 >
 
-
-                                    <?php if (
-                                        $currentLogoUrl !== ''
-                                    ): ?>
+                            </div>
 
 
-                                        <img
-                                            id="storeLogoPreviewImage"
-                                            src="<?= storeProfileEscape(
-                                                $currentLogoUrl
+                        </div>
+
+
+                    </div>
+
+
+
+                    <!-- VENDOR DELIVERY -->
+
+                    <div
+                        class="store-conditional"
+                        style="margin-top:16px;"
+                    >
+
+
+                        <div class="store-toggle-row">
+
+
+                            <div class="store-toggle-copy">
+
+                                <strong>
+
+                                    Enable Vendor Delivery
+
+                                </strong>
+
+                                <small>
+
+                                    Deliver orders directly
+                                    to your customers yourself.
+
+                                </small>
+
+                            </div>
+
+
+                            <label class="store-switch">
+
+                                <input
+                                    type="checkbox"
+                                    id="allow_vendor_delivery"
+                                    name="allow_vendor_delivery"
+                                    value="1"
+                                    <?= $currentAllowVendorDelivery
+                                        ? 'checked'
+                                        : '' ?>
+                                >
+
+                                <span class="store-switch-slider"></span>
+
+                            </label>
+
+
+                        </div>
+
+
+
+                        <div
+                            id="vendorDeliverySettings"
+                            style="margin-top:15px;"
+                        >
+
+
+                            <div class="seller-store-field-grid">
+
+
+                                <div class="seller-store-field">
+
+
+                                    <label for="vendor_delivery_fee">
+
+                                        <i class="fa-solid fa-motorcycle"></i>
+
+                                        Vendor Delivery Fee
+
+                                    </label>
+
+
+                                    <div class="store-money">
+
+                                        <span>
+                                            RM
+                                        </span>
+
+                                        <input
+                                            type="number"
+                                            id="vendor_delivery_fee"
+                                            name="vendor_delivery_fee"
+                                            min="0"
+                                            step="0.01"
+                                            value="<?= storeProfileEscape(
+                                                storeProfileMoney(
+                                                    $currentVendorDeliveryFee
+                                                )
                                             ) ?>"
-                                            alt="Store Logo"
                                         >
 
-
-                                        <i
-                                            class="fa-solid fa-store"
-                                            id="storeLogoPreviewIcon"
-                                            style="display:none;"
-                                        ></i>
-
-
-                                    <?php else: ?>
-
-
-                                        <img
-                                            id="storeLogoPreviewImage"
-                                            src=""
-                                            alt="Store Logo"
-                                            style="display:none;"
-                                        >
-
-
-                                        <i
-                                            class="fa-solid fa-store"
-                                            id="storeLogoPreviewIcon"
-                                        ></i>
-
-
-                                    <?php endif; ?>
+                                    </div>
 
 
                                 </div>
 
 
-                                <div class="seller-store-upload-copy">
+
+                                <div class="seller-store-field">
 
 
-                                    <strong>
+                                    <label>
+
+                                        <i class="fa-solid fa-money-bill-wave"></i>
+
+                                        Cash on Delivery
+
+                                    </label>
 
 
-                                        <?= $vendor
-                                            ? 'Change store logo'
-                                            : 'Choose your store logo' ?>
+                                    <div class="store-toggle-row">
 
 
-                                    </strong>
+                                        <div class="store-toggle-copy">
+
+                                            <strong>
+                                                Allow COD
+                                            </strong>
+
+                                            <small>
+
+                                                Customer can pay
+                                                cash during delivery.
+
+                                            </small>
+
+                                        </div>
 
 
-                                    <p>
+                                        <label class="store-switch">
 
-                                        Upload a clear square or near-square
-                                        image. HochipoHub will display it inside
-                                        controlled logo containers throughout
-                                        the marketplace.
+                                            <input
+                                                type="checkbox"
+                                                id="cod_enabled"
+                                                name="cod_enabled"
+                                                value="1"
+                                                <?= $currentCodEnabled
+                                                    ? 'checked'
+                                                    : '' ?>
+                                            >
 
-                                    </p>
+                                            <span class="store-switch-slider"></span>
+
+                                        </label>
 
 
-                                    <input
-                                        type="file"
-                                        id="business_logo"
-                                        name="business_logo"
-                                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                                    >
-
-
-                                    <small>
-
-                                        JPG, JPEG, PNG or WEBP · Maximum 5MB.
-
-                                    </small>
+                                    </div>
 
 
                                 </div>
@@ -4195,153 +4040,381 @@ require_once __DIR__ .
                     </div>
 
 
-
-                    <!-- =============================================
-                         ACTIONS
-                    ============================================== -->
-
-                    <div class="seller-store-actions">
+                </section>
 
 
-                        <a
-                            href="<?= storeProfileEscape(
-                                BASE_URL
-                            ) ?>seller/dashboard.php"
-                            class="
-                                seller-store-action
-                                cancel
-                            "
-                        >
 
-                            Cancel
+                <!-- =============================================
+                     COMMISSION
+                ============================================== -->
 
-                        </a>
+                <section class="store-form-section">
 
 
-                        <button
-                            type="submit"
-                            class="
-                                seller-store-action
-                                save
-                            "
-                        >
-
-                            <i class="fa-solid fa-floppy-disk"></i>
+                    <div class="store-section-title">
 
 
-                            <?= $vendor
-                                ? 'Update Store'
-                                : 'Create Store' ?>
+                        <div class="store-section-title-icon">
+
+                            <i class="fa-solid fa-percent"></i>
+
+                        </div>
 
 
-                        </button>
+                        <div>
+
+                            <h4>
+
+                                Commission Rate
+
+                            </h4>
+
+                            <p>
+
+                                Set your preferred
+                                commission percentage.
+
+                            </p>
+
+                        </div>
 
 
                     </div>
 
 
-                </form>
+
+                    <div class="store-commission-box">
 
 
-            </section>
+                        <div class="seller-store-field">
+
+
+                            <label for="commission_rate">
+
+                                <i class="fa-solid fa-percent"></i>
+
+                                Store Commission Rate
+
+                                <span class="seller-store-required">
+                                    *
+                                </span>
+
+                            </label>
+
+
+                            <div class="store-percent">
+
+
+                                <input
+                                    type="number"
+                                    id="commission_rate"
+                                    name="commission_rate"
+                                    min="5"
+                                    max="100"
+                                    step="0.01"
+                                    value="<?= storeProfileEscape(
+                                        storeProfileMoney(
+                                            $currentCommissionRate
+                                        )
+                                    ) ?>"
+                                    required
+                                >
+
+
+                                <span>
+                                    %
+                                </span>
+
+
+                            </div>
+
+
+                            <small>
+
+                                Minimum commission rate
+                                is <strong>5%</strong>.
+                                You may choose any rate
+                                from 5% up to 100%.
+
+                            </small>
+
+
+                        </div>
 
 
 
-            <!-- ===================================================
-                 SIDE CONTENT
-            ==================================================== -->
+                        <div class="store-commission-notice">
+
+                            <i class="fa-solid fa-circle-info"></i>
+
+                            <div>
+
+                                You control your store's
+                                commission rate. HochipoHub
+                                requires a minimum rate of
+                                <strong>5%</strong>. A rate
+                                below 5% will not be saved.
+
+                            </div>
+
+                        </div>
+
+
+                    </div>
+
+
+                </section>
+
+
+
+                <!-- =============================================
+                     SAVE
+                ============================================== -->
+
+                <div class="seller-store-save-row">
+
+
+                    <button
+                        type="submit"
+                        class="seller-store-save"
+                    >
+
+                        <i class="fa-solid fa-floppy-disk"></i>
+
+                        Save Store Profile
+
+                    </button>
+
+
+                </div>
+
+
+            </form>
+
+
+
+            <!-- =================================================
+                 RIGHT SIDE
+            ================================================== -->
 
             <aside class="seller-store-side">
 
 
-                <!-- ===============================================
-                     OWNER
-                ================================================ -->
+                <!-- STORE SUMMARY -->
 
-                <section class="seller-store-owner">
+                <section class="seller-store-summary">
 
 
-                    <small>
-
-                        STORE OWNER
-
-                    </small>
+                    <div class="seller-store-logo">
 
 
-                    <strong>
-
-                        <?= storeProfileEscape(
-                            $ownerName
-                        ) ?>
-
-                    </strong>
+                        <?php if (
+                            $currentLogoUrl !== ''
+                        ): ?>
 
 
-                    <span>
-
-                        <?= storeProfileEscape(
-                            $ownerEmail
-                        ) ?>
-
-                    </span>
-
-
-                </section>
+                            <img
+                                src="<?= storeProfileEscape(
+                                    $currentLogoUrl
+                                ) ?>"
+                                alt="<?= storeProfileEscape(
+                                    $currentBusinessName
+                                ) ?>"
+                            >
 
 
-
-                <!-- ===============================================
-                     STATUS
-                ================================================ -->
-
-                <section class="seller-store-side-card">
+                        <?php else: ?>
 
 
-                    <div class="seller-store-side-icon">
+                            <i class="fa-solid fa-store"></i>
 
-                        <i class="fa-solid fa-shield-halved"></i>
+
+                        <?php endif; ?>
+
 
                     </div>
 
 
-                    <h4>
+                    <h3>
 
-                        Approval Status
+                        <?= storeProfileEscape(
+                            $currentBusinessName !== ''
+                                ? $currentBusinessName
+                                : 'My Store'
+                        ) ?>
 
-                    </h4>
+                    </h3>
 
 
-                    <p>
+                    <p class="seller-store-category">
 
-                        Admin approval determines when your store
-                        and products can appear normally throughout
-                        the HochipoHub marketplace.
+                        <?= storeProfileEscape(
+                            $currentCategory !== ''
+                                ? $currentCategory
+                                : 'Store category'
+                        ) ?>
 
                     </p>
 
 
-                    <div
-                        style="
-                            margin-top:13px;
-                        "
-                    >
 
+                    <div class="seller-store-info-row">
 
-                        <span
-                            class="
-                                seller-store-status
-                                <?= storeProfileEscape(
-                                    $statusClass
-                                ) ?>
-                            "
-                        >
-
-                            <?= storeProfileEscape(
-                                $currentApprovalStatus
-                            ) ?>
-
+                        <span>
+                            Owner
                         </span>
 
+                        <strong>
+
+                            <?= storeProfileEscape(
+                                $ownerName
+                            ) ?>
+
+                        </strong>
+
+                    </div>
+
+
+
+                    <div class="seller-store-info-row">
+
+                        <span>
+                            Email
+                        </span>
+
+                        <strong>
+
+                            <?= storeProfileEscape(
+                                $ownerEmail !== ''
+                                    ? $ownerEmail
+                                    : '-'
+                            ) ?>
+
+                        </strong>
+
+                    </div>
+
+
+
+                    <div class="seller-store-info-row">
+
+                        <span>
+                            Status
+                        </span>
+
+                        <strong>
+
+                            <span
+                                class="
+                                    seller-store-status
+                                    <?= storeProfileEscape(
+                                        $statusClass
+                                    ) ?>
+                                "
+                            >
+
+                                <?= storeProfileEscape(
+                                    $currentApprovalStatus
+                                ) ?>
+
+                            </span>
+
+                        </strong>
+
+                    </div>
+
+
+
+                    <div class="seller-store-info-row">
+
+                        <span>
+                            Delivery
+                        </span>
+
+                        <strong>
+
+                            <?= storeProfileEscape(
+                                $currentDeliveryMethod
+                            ) ?>
+
+                        </strong>
+
+                    </div>
+
+
+
+                    <div class="seller-store-info-row">
+
+                        <span>
+                            Postage
+                        </span>
+
+                        <strong>
+
+                            RM
+                            <?= storeProfileEscape(
+                                storeProfileMoney(
+                                    $currentPostageFee
+                                )
+                            ) ?>
+
+                        </strong>
+
+                    </div>
+
+
+
+                    <div class="seller-store-info-row">
+
+                        <span>
+                            Vendor Delivery
+                        </span>
+
+                        <strong>
+
+                            <?= $currentAllowVendorDelivery
+                                ? 'Enabled'
+                                : 'Disabled' ?>
+
+                        </strong>
+
+                    </div>
+
+
+
+                    <div class="seller-store-info-row">
+
+                        <span>
+                            COD
+                        </span>
+
+                        <strong>
+
+                            <?= $currentCodEnabled
+                                ? 'Enabled'
+                                : 'Disabled' ?>
+
+                        </strong>
+
+                    </div>
+
+
+
+                    <div class="seller-store-info-row">
+
+                        <span>
+                            Commission
+                        </span>
+
+                        <strong>
+
+                            <?= storeProfileEscape(
+                                storeProfileMoney(
+                                    $currentCommissionRate
+                                )
+                            ) ?>%
+
+                        </strong>
 
                     </div>
 
@@ -4350,108 +4423,32 @@ require_once __DIR__ .
 
 
 
-                <!-- ===============================================
-                     PROFILE TIPS
-                ================================================ -->
+                <!-- GUIDE -->
 
-                <section class="seller-store-side-card">
+                <section class="seller-store-guide">
 
 
-                    <div class="seller-store-side-icon">
+                    <div class="seller-store-guide-icon">
 
-                        <i class="fa-regular fa-lightbulb"></i>
+                        <i class="fa-solid fa-lightbulb"></i>
 
                     </div>
 
 
-                    <h4>
+                    <h3>
 
-                        Better Store Profile
+                        Store Profile Tips
 
-                    </h4>
-
-
-                    <p>
-
-                        Complete profiles make your seller
-                        page easier for customers to trust.
-
-                    </p>
-
-
-                    <ul class="seller-store-side-list">
-
-
-                        <li>
-
-                            <i class="fa-solid fa-check"></i>
-
-                            Use a recognisable business name.
-
-                        </li>
-
-
-                        <li>
-
-                            <i class="fa-solid fa-check"></i>
-
-                            Add a clear business logo.
-
-                        </li>
-
-
-                        <li>
-
-                            <i class="fa-solid fa-check"></i>
-
-                            Explain what your store sells.
-
-                        </li>
-
-
-                        <li>
-
-                            <i class="fa-solid fa-check"></i>
-
-                            Keep delivery information accurate.
-
-                        </li>
-
-
-                    </ul>
-
-
-                </section>
-
-
-
-                <!-- ===============================================
-                     LOGO INFO
-                ================================================ -->
-
-                <section class="seller-store-side-card">
-
-
-                    <div class="seller-store-side-icon">
-
-                        <i class="fa-solid fa-camera"></i>
-
-                    </div>
-
-
-                    <h4>
-
-                        Logo Guidelines
-
-                    </h4>
+                    </h3>
 
 
                     <p>
 
-                        Supported formats are JPG, JPEG, PNG
-                        and WEBP with a maximum size of 5MB.
-                        A square image usually gives the best
-                        result in store cards and the seller sidebar.
+                        Keep your store information,
+                        pickup address and delivery fees
+                        accurate. You may also set your
+                        preferred commission rate, but
+                        HochipoHub requires at least 5%.
 
                     </p>
 
@@ -4471,12 +4468,11 @@ require_once __DIR__ .
 </main>
 
 
-
 <script>
 
 /*
 |--------------------------------------------------------------------------
-| STORE LOGO PREVIEW
+| DELIVERY UI
 |--------------------------------------------------------------------------
 */
 
@@ -4484,94 +4480,212 @@ document.addEventListener(
     'DOMContentLoaded',
     function () {
 
-        const fileInput =
+        const deliveryRadios =
+            document.querySelectorAll(
+                'input[name="delivery_method"]'
+            );
+
+        const postageSettings =
             document.getElementById(
-                'business_logo'
+                'postageSettings'
+            );
+
+        const postageFee =
+            document.getElementById(
+                'postage_fee'
             );
 
 
-        const previewImage =
+        const vendorDeliveryToggle =
             document.getElementById(
-                'storeLogoPreviewImage'
+                'allow_vendor_delivery'
+            );
+
+        const vendorDeliverySettings =
+            document.getElementById(
+                'vendorDeliverySettings'
+            );
+
+        const vendorDeliveryFee =
+            document.getElementById(
+                'vendor_delivery_fee'
+            );
+
+        const codEnabled =
+            document.getElementById(
+                'cod_enabled'
             );
 
 
-        const previewIcon =
+        const commissionRate =
             document.getElementById(
-                'storeLogoPreviewIcon'
+                'commission_rate'
             );
 
 
-        if (
-            !fileInput ||
-            !previewImage ||
-            !previewIcon
-        ) {
+        /*
+        |--------------------------------------------------------------------------
+        | POSTAGE
+        |--------------------------------------------------------------------------
+        */
 
-            return;
+        function updatePostageSettings()
+        {
+            const selected =
+                document.querySelector(
+                    'input[name="delivery_method"]:checked'
+                );
 
+
+            const method =
+                selected
+                    ? selected.value
+                    : 'Both';
+
+
+            const showPostage =
+                method === 'Postage' ||
+                method === 'Both';
+
+
+            if (postageSettings) {
+
+                postageSettings.style.display =
+                    showPostage
+                        ? 'block'
+                        : 'none';
+            }
+
+
+            if (postageFee) {
+
+                postageFee.disabled =
+                    !showPostage;
+            }
         }
 
 
-        fileInput.addEventListener(
-            'change',
-            function () {
+        deliveryRadios.forEach(
+            function (radio) {
 
-                const file =
-                    this.files &&
-                    this.files.length
-                        ? this.files[0]
-                        : null;
-
-
-                if (!file) {
-
-                    return;
-
-                }
-
-
-                if (
-                    !file.type.startsWith(
-                        'image/'
-                    )
-                ) {
-
-                    return;
-
-                }
-
-
-                const reader =
-                    new FileReader();
-
-
-                reader.addEventListener(
-                    'load',
-                    function (event) {
-
-                        previewImage.src =
-                            event.target.result;
-
-
-                        previewImage.style.display =
-                            'block';
-
-
-                        previewIcon.style.display =
-                            'none';
-
-                    }
+                radio.addEventListener(
+                    'change',
+                    updatePostageSettings
                 );
-
-
-                reader.readAsDataURL(
-                    file
-                );
-
             }
         );
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | VENDOR DELIVERY
+        |--------------------------------------------------------------------------
+        */
+
+        function updateVendorDeliverySettings()
+        {
+            const enabled =
+                vendorDeliveryToggle &&
+                vendorDeliveryToggle.checked;
+
+
+            if (vendorDeliverySettings) {
+
+                vendorDeliverySettings.style.display =
+                    enabled
+                        ? 'block'
+                        : 'none';
+            }
+
+
+            if (vendorDeliveryFee) {
+
+                vendorDeliveryFee.disabled =
+                    !enabled;
+            }
+
+
+            if (codEnabled) {
+
+                codEnabled.disabled =
+                    !enabled;
+
+
+                if (!enabled) {
+
+                    codEnabled.checked =
+                        false;
+                }
+            }
+        }
+
+
+        if (vendorDeliveryToggle) {
+
+            vendorDeliveryToggle.addEventListener(
+                'change',
+                updateVendorDeliverySettings
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | COMMISSION CLIENT VALIDATION
+        |--------------------------------------------------------------------------
+        */
+
+        if (commissionRate) {
+
+            commissionRate.addEventListener(
+                'input',
+                function () {
+
+                    const value =
+                        parseFloat(
+                            commissionRate.value
+                        );
+
+
+                    if (
+                        commissionRate.value !== '' &&
+                        !Number.isNaN(value) &&
+                        value < 5
+                    ) {
+
+                        commissionRate.setCustomValidity(
+                            'Commission rate must be at least 5%.'
+                        );
+
+                    } else if (
+                        !Number.isNaN(value) &&
+                        value > 100
+                    ) {
+
+                        commissionRate.setCustomValidity(
+                            'Commission rate cannot exceed 100%.'
+                        );
+
+                    } else {
+
+                        commissionRate.setCustomValidity(
+                            ''
+                        );
+                    }
+                }
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | INITIAL
+        |--------------------------------------------------------------------------
+        */
+
+        updatePostageSettings();
+
+        updateVendorDeliverySettings();
     }
 );
 
@@ -4579,6 +4693,5 @@ document.addEventListener(
 
 
 </body>
-
 
 </html>
