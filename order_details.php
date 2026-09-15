@@ -4,18 +4,23 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - PREMIUM ORDER DETAILS
 |--------------------------------------------------------------------------
-| File:
-| order_details.php
+| File: order_details.php
+|
+| Features:
+| - Customer can only view own order
+| - Per-vendor order status
+| - Payment information
+| - Delivery / tracking information
+| - Verified Purchase Review unlock
+| - One review per order_detail
+| - Review status:
+|       Locked
+|       Write Review
+|       Reviewed
 |--------------------------------------------------------------------------
 */
 
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRED FILES
-|--------------------------------------------------------------------------
-*/
-
+require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/database/db.php';
 require_once __DIR__ . '/includes/session.php';
 require_once __DIR__ . '/includes/functions.php';
@@ -23,7 +28,7 @@ require_once __DIR__ . '/includes/functions.php';
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN
+| LOGIN REQUIRED
 |--------------------------------------------------------------------------
 */
 
@@ -38,12 +43,8 @@ requireLogin();
 
 $db = getDB();
 
-
 if (!($db instanceof PDO)) {
-
-    die(
-        'Database connection is not available.'
-    );
+    die('Database connection is not available.');
 }
 
 
@@ -53,8 +54,16 @@ if (!($db instanceof PDO)) {
 |--------------------------------------------------------------------------
 */
 
-$userId =
-    (int) currentUserId();
+$userId = (int) currentUserId();
+
+if ($userId <= 0) {
+    header(
+        'Location: ' .
+        BASE_URL .
+        'index.php?login=1'
+    );
+    exit;
+}
 
 
 /*
@@ -63,9 +72,9 @@ $userId =
 |--------------------------------------------------------------------------
 */
 
-if (!function_exists('orderDetailsEscape')) {
+if (!function_exists('odEscape')) {
 
-    function orderDetailsEscape($value): string
+    function odEscape($value): string
     {
         return htmlspecialchars(
             (string) $value,
@@ -76,46 +85,42 @@ if (!function_exists('orderDetailsEscape')) {
 }
 
 
-if (!function_exists('orderDetailsImage')) {
+if (!function_exists('odMoney')) {
 
-    function orderDetailsImage($image): string
+    function odMoney($amount): string
     {
-        $image =
-            trim(
-                (string) $image
-            );
+        return number_format(
+            (float) $amount,
+            2
+        );
+    }
+}
 
+
+if (!function_exists('odImage')) {
+
+    function odImage($image): string
+    {
+        $image = trim(
+            (string) $image
+        );
 
         if ($image === '') {
-            return '';
+            return 'image/logo.jpg';
         }
 
-
         if (
-            str_starts_with(
-                $image,
-                'http://'
-            ) ||
-            str_starts_with(
-                $image,
-                'https://'
-            )
+            strpos($image, 'http://') === 0 ||
+            strpos($image, 'https://') === 0
         ) {
-
             return $image;
         }
 
-
         if (
-            str_starts_with(
-                $image,
-                'uploads/'
-            )
+            strpos($image, 'uploads/') === 0
         ) {
-
             return $image;
         }
-
 
         return
             'uploads/products/' .
@@ -126,111 +131,171 @@ if (!function_exists('orderDetailsImage')) {
 }
 
 
-if (!function_exists('orderStatusClass')) {
+if (!function_exists('odStatusClass')) {
 
-    function orderStatusClass($status): string
+    function odStatusClass($status): string
     {
-        $status =
-            strtolower(
-                trim(
-                    (string) $status
-                )
-            );
+        $status = strtolower(
+            trim(
+                (string) $status
+            )
+        );
 
+        switch ($status) {
 
-        return match ($status) {
+            case 'completed':
+            case 'delivered':
+            case 'paid':
+                return 'success';
 
-            'completed',
-            'delivered' =>
-                'success',
+            case 'processing':
+            case 'ready':
+            case 'shipped':
+                return 'processing';
 
-            'processing',
-            'ready',
-            'shipped' =>
-                'processing',
+            case 'cancelled':
+            case 'failed':
+            case 'refunded':
+                return 'danger';
 
-            'cancelled',
-            'failed' =>
-                'danger',
-
-            default =>
-                'pending'
-        };
+            default:
+                return 'pending';
+        }
     }
 }
 
 
-if (!function_exists('orderStatusIcon')) {
+if (!function_exists('odStatusIcon')) {
 
-    function orderStatusIcon($status): string
+    function odStatusIcon($status): string
     {
-        $status =
-            strtolower(
-                trim(
-                    (string) $status
-                )
-            );
+        $status = strtolower(
+            trim(
+                (string) $status
+            )
+        );
 
+        switch ($status) {
 
-        return match ($status) {
+            case 'completed':
+            case 'delivered':
+                return 'bi-check-circle-fill';
 
-            'completed',
-            'delivered' =>
-                'bi-check-circle-fill',
+            case 'processing':
+                return 'bi-arrow-repeat';
 
-            'processing' =>
-                'bi-arrow-repeat',
+            case 'ready':
+                return 'bi-box-seam-fill';
 
-            'ready' =>
-                'bi-box-seam',
+            case 'shipped':
+                return 'bi-truck';
 
-            'shipped' =>
-                'bi-truck',
+            case 'cancelled':
+            case 'failed':
+                return 'bi-x-circle-fill';
 
-            'cancelled',
-            'failed' =>
-                'bi-x-circle-fill',
-
-            default =>
-                'bi-clock-fill'
-        };
+            default:
+                return 'bi-clock-fill';
+        }
     }
 }
 
 
-if (!function_exists('orderStatusMessage')) {
+if (!function_exists('odStatusMessage')) {
 
-    function orderStatusMessage($status): string
+    function odStatusMessage($status): string
     {
-        $status =
-            strtolower(
-                trim(
-                    (string) $status
-                )
-            );
+        $status = strtolower(
+            trim(
+                (string) $status
+            )
+        );
+
+        switch ($status) {
+
+            case 'completed':
+                return
+                    'Your order has been completed successfully.';
+
+            case 'processing':
+                return
+                    'Your order is currently being prepared by the seller.';
+
+            case 'ready':
+                return
+                    'Your order is ready for the next delivery step.';
+
+            case 'shipped':
+                return
+                    'Your order has been shipped and is on the way.';
+
+            case 'cancelled':
+                return
+                    'This order has been cancelled.';
+
+            default:
+                return
+                    'Your order has been received and is waiting to be processed.';
+        }
+    }
+}
 
 
-        return match ($status) {
+if (!function_exists('odVendorStatusMessage')) {
 
-            'completed',
-            'delivered' =>
-                'Your order has been completed successfully.',
+    function odVendorStatusMessage($status): string
+    {
+        $status = strtolower(
+            trim(
+                (string) $status
+            )
+        );
 
-            'processing' =>
-                'Your order is currently being prepared by the seller.',
+        switch ($status) {
 
-            'ready' =>
-                'Your order is ready for the next delivery step.',
+            case 'completed':
+                return
+                    'Order received. Review is now unlocked.';
 
-            'shipped' =>
-                'Your order has been shipped and is on the way.',
+            case 'shipped':
+                return
+                    'Your parcel is currently on the way.';
 
-            'cancelled' =>
-                'This order has been cancelled.',
+            case 'ready':
+                return
+                    'Your order is ready.';
 
-            default =>
-                'Your order has been received and is waiting to be processed.'
-        };
+            case 'processing':
+                return
+                    'Seller is preparing your order.';
+
+            case 'cancelled':
+                return
+                    'This seller order has been cancelled.';
+
+            default:
+                return
+                    'Waiting for seller to process your order.';
+        }
+    }
+}
+
+
+if (!function_exists('odMapsUrl')) {
+
+    function odMapsUrl($address): string
+    {
+        $address = trim(
+            (string) $address
+        );
+
+        if ($address === '') {
+            return '';
+        }
+
+        return
+            'https://www.google.com/maps/dir/?api=1&destination=' .
+            rawurlencode($address);
     }
 }
 
@@ -252,11 +317,13 @@ if ($orderId <= 0) {
     $_SESSION['error'] =
         'Invalid order.';
 
-
-    redirect(
+    header(
+        'Location: ' .
         BASE_URL .
         'order.php'
     );
+
+    exit;
 }
 
 
@@ -266,36 +333,34 @@ if ($orderId <= 0) {
 |--------------------------------------------------------------------------
 */
 
-$stmt =
-    $db->prepare("
-        SELECT
+$stmt = $db->prepare("
+    SELECT
 
-            o.order_id,
-            o.customer_id,
-            o.order_date,
-            o.total_amount,
-            o.delivery_method,
-            o.delivery_address,
-            o.tracking_number,
-            o.order_status,
-            o.completed_date,
+        o.order_id,
+        o.customer_id,
+        o.order_date,
+        o.total_amount,
+        o.delivery_method,
+        o.delivery_address,
+        o.tracking_number,
+        o.order_status,
+        o.completed_date,
 
-            u.name AS customer_name,
-            u.email AS customer_email,
-            u.phone AS customer_phone
+        u.name AS customer_name,
+        u.email AS customer_email,
+        u.phone AS customer_phone
 
-        FROM orders o
+    FROM orders o
 
-        INNER JOIN users u
-            ON o.customer_id =
-               u.user_id
+    INNER JOIN users u
+        ON o.customer_id =
+           u.user_id
 
-        WHERE o.order_id = ?
+    WHERE o.order_id = ?
+      AND o.customer_id = ?
 
-        AND o.customer_id = ?
-
-        LIMIT 1
-    ");
+    LIMIT 1
+");
 
 
 $stmt->execute([
@@ -315,11 +380,13 @@ if (!$order) {
     $_SESSION['error'] =
         'Order not found or you do not have permission to view it.';
 
-
-    redirect(
+    header(
+        'Location: ' .
         BASE_URL .
         'order.php'
     );
+
+    exit;
 }
 
 
@@ -327,42 +394,78 @@ if (!$order) {
 |--------------------------------------------------------------------------
 | GET ORDER ITEMS
 |--------------------------------------------------------------------------
+|
+| Important:
+| - We fetch order_detail_id
+| - Vendor information
+| - Vendor order status
+| - Existing review
+|
+|--------------------------------------------------------------------------
 */
 
-$stmt =
-    $db->prepare("
-        SELECT
+$stmt = $db->prepare("
+    SELECT
 
-            od.order_detail_id,
-            od.product_id,
-            od.quantity,
-            od.unit_price,
-            od.subtotal,
+        od.order_detail_id,
+        od.order_id,
+        od.product_id,
+        od.quantity,
+        od.unit_price,
+        od.subtotal,
 
-            p.product_name,
-            p.image,
+        p.product_name,
+        p.image,
+        p.vendor_id,
 
-            v.vendor_id,
-            v.business_name
+        v.business_name,
+        v.business_logo,
+        v.business_address,
 
-        FROM order_details od
+        vo.vendor_order_id,
+        vo.vendor_status,
+        vo.tracking_number AS vendor_tracking_number,
+        vo.delivery_fee,
+        vo.completed_at,
 
-        INNER JOIN products p
-            ON od.product_id =
-               p.product_id
+        r.review_id,
+        r.rating AS review_rating,
+        r.review_title,
+        r.review AS review_text,
+        r.image AS review_image,
+        r.review_date
 
-        INNER JOIN vendors v
-            ON p.vendor_id =
-               v.vendor_id
+    FROM order_details od
 
-        WHERE od.order_id = ?
+    INNER JOIN products p
+        ON od.product_id =
+           p.product_id
 
-        ORDER BY
-            od.order_detail_id ASC
-    ");
+    INNER JOIN vendors v
+        ON p.vendor_id =
+           v.vendor_id
+
+    LEFT JOIN vendor_orders vo
+        ON vo.order_id =
+           od.order_id
+       AND vo.vendor_id =
+           p.vendor_id
+
+    LEFT JOIN reviews r
+        ON r.order_detail_id =
+           od.order_detail_id
+       AND r.customer_id = ?
+
+    WHERE od.order_id = ?
+
+    ORDER BY
+        v.business_name ASC,
+        od.order_detail_id ASC
+");
 
 
 $stmt->execute([
+    $userId,
     $orderId
 ]);
 
@@ -379,32 +482,37 @@ $items =
 |--------------------------------------------------------------------------
 */
 
-$stmt =
-    $db->prepare("
-        SELECT
+$stmt = $db->prepare("
+    SELECT
 
-            vo.vendor_order_id,
-            vo.vendor_id,
-            vo.subtotal,
-            vo.delivery_fee,
-            vo.vendor_status,
-            vo.tracking_number,
-            vo.created_at,
-            vo.completed_at,
+        vo.vendor_order_id,
+        vo.order_id,
+        vo.vendor_id,
+        vo.subtotal,
+        vo.delivery_fee,
+        vo.vendor_status,
+        vo.tracking_number,
+        vo.created_at,
+        vo.completed_at,
 
-            v.business_name
+        v.business_name,
+        v.business_logo,
+        v.business_address,
+        v.delivery_method,
+        v.allow_vendor_delivery,
+        v.cod_enabled
 
-        FROM vendor_orders vo
+    FROM vendor_orders vo
 
-        INNER JOIN vendors v
-            ON vo.vendor_id =
-               v.vendor_id
+    INNER JOIN vendors v
+        ON vo.vendor_id =
+           v.vendor_id
 
-        WHERE vo.order_id = ?
+    WHERE vo.order_id = ?
 
-        ORDER BY
-            vo.vendor_order_id ASC
-    ");
+    ORDER BY
+        vo.vendor_order_id ASC
+");
 
 
 $stmt->execute([
@@ -420,30 +528,31 @@ $vendorOrders =
 
 /*
 |--------------------------------------------------------------------------
-| GET PAYMENT
+| GET LATEST PAYMENT
 |--------------------------------------------------------------------------
 */
 
-$stmt =
-    $db->prepare("
-        SELECT
+$stmt = $db->prepare("
+    SELECT
 
-            payment_id,
-            payment_method,
-            payment_status,
-            payment_date,
-            amount,
-            transaction_reference
+        payment_id,
+        payment_method,
+        payment_status,
+        payment_date,
+        amount,
+        transaction_reference,
+        payment_gateway,
+        gateway_order_reference
 
-        FROM payments
+    FROM payments
 
-        WHERE order_id = ?
+    WHERE order_id = ?
 
-        ORDER BY
-            payment_id DESC
+    ORDER BY
+        payment_id DESC
 
-        LIMIT 1
-    ");
+    LIMIT 1
+");
 
 
 $stmt->execute([
@@ -459,31 +568,47 @@ $payment =
 
 /*
 |--------------------------------------------------------------------------
-| COUNTS
+| CALCULATIONS
 |--------------------------------------------------------------------------
 */
 
 $totalItems = 0;
+$productSubtotal = 0.00;
+$totalDeliveryFee = 0.00;
 
 
 foreach ($items as $item) {
 
     $totalItems +=
         (int) $item['quantity'];
+
+    $productSubtotal +=
+        (float) $item['subtotal'];
 }
 
 
-$vendorCount =
-    count(
-        $vendorOrders
+foreach ($vendorOrders as $vendorOrder) {
+
+    $totalDeliveryFee +=
+        (float) (
+            $vendorOrder['delivery_fee']
+            ?? 0
+        );
+}
+
+
+$grandTotal =
+    (float) $order['total_amount'];
+
+
+$deliveryMethod =
+    trim(
+        (string) (
+            $order['delivery_method']
+            ?? ''
+        )
     );
 
-
-/*
-|--------------------------------------------------------------------------
-| STATUS
-|--------------------------------------------------------------------------
-*/
 
 $orderStatus =
     $order['order_status']
@@ -491,26 +616,26 @@ $orderStatus =
 
 
 $orderStatusClass =
-    orderStatusClass(
+    odStatusClass(
         $orderStatus
     );
 
 
 $orderStatusIcon =
-    orderStatusIcon(
+    odStatusIcon(
         $orderStatus
     );
 
 
 $orderStatusMessage =
-    orderStatusMessage(
+    odStatusMessage(
         $orderStatus
     );
 
 
 /*
 |--------------------------------------------------------------------------
-| PAYMENT
+| PAYMENT DISPLAY
 |--------------------------------------------------------------------------
 */
 
@@ -524,42 +649,117 @@ $paymentMethod =
     ?? '—';
 
 
+$paymentDisplay =
+    $paymentMethod;
+
+
+if (
+    strtolower(
+        (string) $paymentMethod
+    ) === 'cash'
+) {
+
+    if ($deliveryMethod === 'Pickup') {
+
+        $paymentDisplay =
+            'Cash at Pickup';
+
+    } elseif (
+        $deliveryMethod ===
+        'Vendor Delivery'
+    ) {
+
+        $paymentDisplay =
+            'Cash on Delivery';
+
+    } else {
+
+        $paymentDisplay =
+            'Cash';
+    }
+}
+
+
 /*
 |--------------------------------------------------------------------------
-| CUSTOMER NAV COUNTS
+| DELIVERY INFO
+|--------------------------------------------------------------------------
+*/
+
+$deliveryIcon =
+    'bi-truck';
+
+
+$deliveryDescription =
+    'Your order will be delivered using postage or courier.';
+
+
+switch ($deliveryMethod) {
+
+    case 'Pickup':
+
+        $deliveryIcon =
+            'bi-shop';
+
+        $deliveryDescription =
+            'Collect your order directly from the seller.';
+
+        break;
+
+
+    case 'Vendor Delivery':
+
+        $deliveryIcon =
+            'bi-truck-front-fill';
+
+        $deliveryDescription =
+            'The seller will personally deliver your order.';
+
+        break;
+
+
+    case 'Postage':
+
+    default:
+
+        $deliveryIcon =
+            'bi-truck';
+
+        $deliveryDescription =
+            'Your order will be delivered using postage or courier.';
+
+        break;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| SIDEBAR COUNTS
 |--------------------------------------------------------------------------
 */
 
 $cartCount = 0;
-
 $wishlistCount = 0;
 
 
 try {
 
-    $stmt =
-        $db->prepare("
-            SELECT
-                COALESCE(
-                    SUM(quantity),
-                    0
-                )
-
-            FROM cart
-
-            WHERE customer_id = ?
-        ");
-
+    $stmt = $db->prepare("
+        SELECT
+            COALESCE(
+                SUM(quantity),
+                0
+            )
+        FROM cart
+        WHERE customer_id = ?
+    ");
 
     $stmt->execute([
         $userId
     ]);
 
-
     $cartCount =
-        (int)
-        $stmt->fetchColumn();
-
+        (int) $stmt->fetchColumn();
 
 } catch (Throwable $e) {
 
@@ -569,30 +769,131 @@ try {
 
 try {
 
-    $stmt =
-        $db->prepare("
-            SELECT
-                COUNT(*)
-
-            FROM wishlist
-
-            WHERE user_id = ?
-        ");
-
+    $stmt = $db->prepare("
+        SELECT COUNT(*)
+        FROM wishlist
+        WHERE user_id = ?
+    ");
 
     $stmt->execute([
         $userId
     ]);
 
-
     $wishlistCount =
-        (int)
-        $stmt->fetchColumn();
-
+        (int) $stmt->fetchColumn();
 
 } catch (Throwable $e) {
 
     $wishlistCount = 0;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GROUP ITEMS BY VENDOR
+|--------------------------------------------------------------------------
+*/
+
+$groupedItems = [];
+
+
+foreach ($items as $item) {
+
+    $vendorId =
+        (int) $item['vendor_id'];
+
+    if (
+        !isset(
+            $groupedItems[$vendorId]
+        )
+    ) {
+
+        $groupedItems[$vendorId] = [
+            'vendor_id' =>
+                $vendorId,
+
+            'business_name' =>
+                $item['business_name'],
+
+            'business_logo' =>
+                $item['business_logo'],
+
+            'business_address' =>
+                $item['business_address'],
+
+            'vendor_status' =>
+                $item['vendor_status']
+                ?? 'Pending',
+
+            'tracking_number' =>
+                $item['vendor_tracking_number']
+                ?? '',
+
+            'delivery_fee' =>
+                $item['delivery_fee']
+                ?? 0,
+
+            'completed_at' =>
+                $item['completed_at']
+                ?? null,
+
+            'items' => []
+        ];
+    }
+
+
+    $groupedItems[
+        $vendorId
+    ]['items'][] =
+        $item;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| REVIEW COUNTS
+|--------------------------------------------------------------------------
+*/
+
+$reviewableCount = 0;
+$reviewedCount = 0;
+$lockedCount = 0;
+
+
+foreach ($items as $item) {
+
+    $vendorStatus =
+        strtolower(
+            trim(
+                (string) (
+                    $item['vendor_status']
+                    ?? ''
+                )
+            )
+        );
+
+
+    $hasReview =
+        !empty(
+            $item['review_id']
+        );
+
+
+    if ($hasReview) {
+
+        $reviewedCount++;
+
+    } elseif (
+        $vendorStatus ===
+        'completed'
+    ) {
+
+        $reviewableCount++;
+
+    } else {
+
+        $lockedCount++;
+    }
 }
 
 
@@ -608,8 +909,7 @@ $pageTitle =
     ' - HochipoHub';
 
 
-$hideSiteMainWrapper =
-    true;
+$hideSiteMainWrapper = true;
 
 
 $extraCSS = [
@@ -629,2011 +929,2211 @@ require_once __DIR__ .
 
 <style>
 
-/* ================================================================
-   PAGE
-================================================================ */
+* {
+    box-sizing: border-box;
+}
+
 
 .hh-order-page {
+
     width: 100%;
     min-height: 100vh;
 
     padding:
-        42px
-        24px
-        75px;
-
-    overflow-x: hidden;
-
-    color: #14213d;
-
-    background:
-        radial-gradient(
-            circle at 92% 4%,
-            rgba(59,130,246,.08),
-            transparent 24%
-        ),
-        linear-gradient(
-            180deg,
-            #f5f8ff 0%,
-            #f8faff 55%,
-            #ffffff 100%
-        );
+        36px 25px 75px;
 
     font-family:
         Inter,
         Arial,
         sans-serif;
+
+    color:
+        #172b4d;
+
+    background:
+        radial-gradient(
+            circle at 92% 4%,
+            rgba(37, 99, 235, .10),
+            transparent 26%
+        ),
+        linear-gradient(
+            180deg,
+            #f4f8ff 0%,
+            #f8fbff 45%,
+            #ffffff 100%
+        );
 }
 
 
 .hh-order-container {
+
     width: 100%;
-    max-width: 1340px;
-    margin: 0 auto;
+    max-width: 1360px;
+
+    margin:
+        0 auto;
 }
 
 
-/* ================================================================
-   SUCCESS BANNER
-================================================================ */
+/* =========================================================
+   SUCCESS MESSAGE
+========================================================= */
 
-.hh-order-success {
-    margin-bottom: 18px;
-    padding: 14px 17px;
+.hh-success {
 
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    margin-bottom: 20px;
 
-    color: #166534;
+    padding:
+        15px 18px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    gap:
+        10px;
+
+    color:
+        #166534;
 
     background:
-        linear-gradient(
-            135deg,
-            #f0fdf4,
-            #ecfdf5
-        );
+        #ecfdf3;
 
     border:
         1px solid #bbf7d0;
 
-    border-radius: 13px;
+    border-radius:
+        16px;
 
-    font-size: 9px;
-    font-weight: 750;
+    font-size:
+        13px;
+
+    font-weight:
+        700;
 }
 
 
-.hh-order-success i {
-    font-size: 15px;
-}
-
-
-/* ================================================================
+/* =========================================================
    HERO
-================================================================ */
+========================================================= */
 
 .hh-order-hero {
-    position: relative;
 
-    min-height: 310px;
+    position:
+        relative;
 
-    margin-bottom: 22px;
+    overflow:
+        hidden;
+
+    margin-bottom:
+        24px;
 
     padding:
-        45px
-        50px;
+        46px 48px;
 
-    overflow: hidden;
-
-    display: grid;
+    display:
+        grid;
 
     grid-template-columns:
-        minmax(0,1fr)
-        350px;
+        minmax(0, 1fr)
+        320px;
 
-    align-items: center;
+    align-items:
+        center;
 
-    gap: 40px;
+    gap:
+        30px;
 
-    color: #ffffff;
+    color:
+        #ffffff;
 
     background:
         linear-gradient(
-            115deg,
-            #0b2c6b 0%,
-            #154a98 48%,
-            #2784ee 100%
+            120deg,
+            #071d4f 0%,
+            #0d4290 45%,
+            #2685f4 100%
         );
 
-    border-radius: 28px;
+    border-radius:
+        30px;
 
     box-shadow:
-        0
-        20px
-        50px
-        rgba(23,79,165,.16);
+        0 24px 55px
+        rgba(20, 77, 166, .18);
 }
 
 
 .hh-order-hero::before {
-    content: "";
 
-    position: absolute;
+    content:
+        "";
 
-    width: 300px;
-    height: 300px;
+    position:
+        absolute;
 
-    top: -160px;
-    right: -65px;
+    width:
+        330px;
 
-    border-radius: 50%;
+    height:
+        330px;
+
+    right:
+        -120px;
+
+    top:
+        -160px;
+
+    border-radius:
+        50%;
 
     background:
-        rgba(255,255,255,.08);
+        rgba(
+            255,
+            255,
+            255,
+            .08
+        );
 }
 
 
 .hh-order-hero::after {
-    content: "";
 
-    position: absolute;
+    content:
+        "";
 
-    width: 185px;
-    height: 185px;
+    position:
+        absolute;
 
-    right: 185px;
-    bottom: -135px;
+    width:
+        220px;
 
-    border-radius: 50%;
+    height:
+        220px;
+
+    right:
+        180px;
+
+    bottom:
+        -170px;
+
+    border-radius:
+        50%;
 
     background:
-        rgba(111,231,243,.10);
+        rgba(
+            255,
+            255,
+            255,
+            .06
+        );
 }
 
 
-.hh-order-hero-copy {
-    position: relative;
-    z-index: 2;
+.hh-hero-content {
+
+    position:
+        relative;
+
+    z-index:
+        2;
 }
 
 
-.hh-order-pill {
-    min-height: 33px;
+.hh-hero-label {
 
-    padding: 0 13px;
+    width:
+        fit-content;
 
-    margin-bottom: 17px;
+    margin-bottom:
+        15px;
 
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
+    padding:
+        8px 13px;
 
-    color: #ffffff;
+    display:
+        inline-flex;
+
+    align-items:
+        center;
+
+    gap:
+        7px;
 
     background:
-        rgba(255,255,255,.11);
+        rgba(
+            255,
+            255,
+            255,
+            .12
+        );
 
     border:
         1px solid
-        rgba(255,255,255,.22);
+        rgba(
+            255,
+            255,
+            255,
+            .20
+        );
 
-    border-radius: 999px;
+    border-radius:
+        999px;
 
-    font-size: 9px;
-    font-weight: 900;
+    font-size:
+        10px;
+
+    font-weight:
+        800;
+
+    letter-spacing:
+        .6px;
+
+    text-transform:
+        uppercase;
 }
 
 
 .hh-order-hero h1 {
-    margin: 0;
 
-    color: #ffffff;
-
-    font-family:
-        Poppins,
-        Inter,
-        sans-serif;
+    margin:
+        0 0 11px;
 
     font-size:
         clamp(
-            35px,
-            4.4vw,
-            54px
+            34px,
+            5vw,
+            53px
         );
 
-    line-height: 1.08;
+    line-height:
+        1;
 
-    font-weight: 800;
+    letter-spacing:
+        -2px;
 
-    letter-spacing: -1.8px;
-}
-
-
-.hh-order-hero h1 span {
-    color: #6fe7f3;
+    font-weight:
+        850;
 }
 
 
 .hh-order-hero p {
-    margin: 14px 0 0;
+
+    max-width:
+        680px;
+
+    margin:
+        0;
 
     color:
-        rgba(255,255,255,.76);
+        rgba(
+            255,
+            255,
+            255,
+            .78
+        );
 
-    font-size: 11px;
-    line-height: 1.75;
-}
-
-
-.hh-order-hero-actions {
-    margin-top: 21px;
-
-    display: flex;
-    flex-wrap: wrap;
-    gap: 9px;
-}
-
-
-.hh-order-back,
-.hh-order-shop {
-    min-height: 43px;
-
-    padding: 0 15px;
-
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-
-    border-radius: 11px;
-
-    font-size: 8px;
-    font-weight: 850;
-
-    text-decoration: none;
-}
-
-
-.hh-order-back {
-    color: #1757ad;
-    background: #ffffff;
-}
-
-
-.hh-order-shop {
-    color: #ffffff;
-
-    background:
-        rgba(255,255,255,.10);
-
-    border:
-        1px solid
-        rgba(255,255,255,.22);
-}
-
-
-/* ================================================================
-   HERO VISUAL
-================================================================ */
-
-.hh-order-art {
-    position: relative;
-    z-index: 2;
-
-    height: 220px;
-}
-
-
-.hh-order-main-icon {
-    position: absolute;
-
-    width: 150px;
-    height: 150px;
-
-    top: 30px;
-    right: 78px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    color: #ffffff;
-
-    background:
-        rgba(255,255,255,.12);
-
-    border:
-        1px solid
-        rgba(255,255,255,.18);
-
-    border-radius: 39px;
-
-    font-size: 61px;
-
-    backdrop-filter:
-        blur(12px);
-
-    transform:
-        rotate(-4deg);
-}
-
-
-.hh-order-float {
-    position: absolute;
-
-    min-width: 145px;
-
-    padding:
-        11px
+    font-size:
         13px;
 
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    line-height:
+        1.8;
+}
 
-    color: #26405f;
+
+.hh-hero-status {
+
+    position:
+        relative;
+
+    z-index:
+        2;
+
+    padding:
+        24px;
+
+    color:
+        #133561;
 
     background:
-        rgba(255,255,255,.96);
-
-    border-radius: 12px;
-
-    box-shadow:
-        0
-        14px
-        32px
-        rgba(5,35,80,.17);
-
-    font-size: 8px;
-    font-weight: 850;
-}
-
-
-.hh-order-float i {
-    width: 31px;
-    height: 31px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    color: #2563eb;
-    background: #eff6ff;
-
-    border-radius: 9px;
-}
-
-
-.hh-order-float.one {
-    top: 4px;
-    left: 0;
-}
-
-
-.hh-order-float.two {
-    right: 0;
-    bottom: 4px;
-}
-
-
-/* ================================================================
-   STATS
-================================================================ */
-
-.hh-order-stats {
-    margin-bottom: 22px;
-
-    display: grid;
-
-    grid-template-columns:
-        repeat(4,minmax(0,1fr));
-
-    gap: 14px;
-}
-
-
-.hh-order-stat {
-    min-height: 92px;
-
-    padding: 17px;
-
-    display: flex;
-    align-items: center;
-    gap: 12px;
-
-    background: #ffffff;
+        rgba(
+            255,
+            255,
+            255,
+            .94
+        );
 
     border:
-        1px solid #e2e9f3;
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            .55
+        );
 
-    border-radius: 17px;
+    border-radius:
+        22px;
 
     box-shadow:
-        0
-        8px
-        24px
-        rgba(40,65,120,.045);
+        0 15px 35px
+        rgba(
+            0,
+            30,
+            80,
+            .13
+        );
 }
 
 
-.hh-order-stat-icon {
-    width: 43px;
-    height: 43px;
+.hh-hero-status-icon {
 
-    flex-shrink: 0;
+    width:
+        48px;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    height:
+        48px;
 
-    border-radius: 12px;
+    margin-bottom:
+        13px;
 
-    font-size: 15px;
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    color:
+        #2563eb;
+
+    background:
+        #eaf3ff;
+
+    border-radius:
+        15px;
+
+    font-size:
+        21px;
 }
 
 
-.hh-order-stat-icon.blue {
-    color: #2563eb;
-    background: #eff6ff;
+.hh-hero-status span {
+
+    display:
+        block;
+
+    margin-bottom:
+        5px;
+
+    color:
+        #7990af;
+
+    font-size:
+        9px;
+
+    font-weight:
+        800;
+
+    letter-spacing:
+        .7px;
+
+    text-transform:
+        uppercase;
 }
 
 
-.hh-order-stat-icon.green {
-    color: #15803d;
-    background: #ecfdf3;
+.hh-hero-status strong {
+
+    display:
+        block;
+
+    margin-bottom:
+        6px;
+
+    color:
+        #102f5c;
+
+    font-size:
+        20px;
 }
 
 
-.hh-order-stat-icon.orange {
-    color: #c2410c;
-    background: #fff7ed;
+.hh-hero-status p {
+
+    color:
+        #7288a5;
+
+    font-size:
+        10px;
+
+    line-height:
+        1.6;
 }
 
 
-.hh-order-stat-icon.purple {
-    color: #7c3aed;
-    background: #f5f3ff;
-}
+/* =========================================================
+   STATS
+========================================================= */
 
+.hh-stat-grid {
 
-.hh-order-stat span {
-    display: block;
+    margin-bottom:
+        24px;
 
-    margin-bottom: 4px;
-
-    color: #8a98aa;
-
-    font-size: 6px;
-    font-weight: 850;
-    letter-spacing: .7px;
-}
-
-
-.hh-order-stat strong {
-    display: block;
-
-    color: #17233c;
-
-    font-size: 16px;
-    font-weight: 900;
-}
-
-
-/* ================================================================
-   STATUS PANEL
-================================================================ */
-
-.hh-order-status-card {
-    margin-bottom: 22px;
-    padding: 22px;
-
-    display: grid;
+    display:
+        grid;
 
     grid-template-columns:
-        auto
-        minmax(0,1fr)
+        repeat(
+            4,
+            minmax(0, 1fr)
+        );
+
+    gap:
+        16px;
+}
+
+
+.hh-stat-card {
+
+    padding:
+        21px;
+
+    background:
+        #ffffff;
+
+    border:
+        1px solid
+        #e0eaf7;
+
+    border-radius:
+        20px;
+
+    box-shadow:
+        0 11px 30px
+        rgba(
+            43,
+            76,
+            125,
+            .055
+        );
+}
+
+
+.hh-stat-icon {
+
+    width:
+        38px;
+
+    height:
+        38px;
+
+    margin-bottom:
+        12px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    color:
+        #2563eb;
+
+    background:
+        #eff6ff;
+
+    border-radius:
+        12px;
+
+    font-size:
+        16px;
+}
+
+
+.hh-stat-label {
+
+    display:
+        block;
+
+    margin-bottom:
+        5px;
+
+    color:
+        #8a9ab0;
+
+    font-size:
+        9px;
+
+    font-weight:
+        800;
+
+    text-transform:
+        uppercase;
+
+    letter-spacing:
+        .7px;
+}
+
+
+.hh-stat-value {
+
+    color:
+        #153660;
+
+    font-size:
+        17px;
+
+    font-weight:
+        850;
+}
+
+
+/* =========================================================
+   SECTION
+========================================================= */
+
+.hh-section {
+
+    margin-bottom:
+        24px;
+
+    padding:
+        27px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .96
+        );
+
+    border:
+        1px solid
+        #dfe9f5;
+
+    border-radius:
+        24px;
+
+    box-shadow:
+        0 14px 38px
+        rgba(
+            39,
+            78,
+            132,
+            .06
+        );
+}
+
+
+.hh-section-heading {
+
+    margin-bottom:
+        21px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+    gap:
+        18px;
+}
+
+
+.hh-section-heading-left {
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    gap:
+        12px;
+}
+
+
+.hh-section-heading-icon {
+
+    width:
+        43px;
+
+    height:
+        43px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    color:
+        #2469da;
+
+    background:
+        #edf5ff;
+
+    border:
+        1px solid
+        #d9e9ff;
+
+    border-radius:
+        14px;
+
+    font-size:
+        17px;
+}
+
+
+.hh-section-heading span {
+
+    display:
+        block;
+
+    margin-bottom:
+        3px;
+
+    color:
+        #8ca0ba;
+
+    font-size:
+        8px;
+
+    font-weight:
+        850;
+
+    text-transform:
+        uppercase;
+
+    letter-spacing:
+        .9px;
+}
+
+
+.hh-section-heading h2 {
+
+    margin:
+        0;
+
+    color:
+        #123463;
+
+    font-size:
+        19px;
+}
+
+
+/* =========================================================
+   REVIEW DASHBOARD
+========================================================= */
+
+.hh-review-banner {
+
+    position:
+        relative;
+
+    overflow:
+        hidden;
+
+    margin-bottom:
+        24px;
+
+    padding:
+        26px 28px;
+
+    display:
+        grid;
+
+    grid-template-columns:
+        minmax(0, 1fr)
         auto;
 
-    align-items: center;
+    align-items:
+        center;
 
-    gap: 16px;
+    gap:
+        25px;
 
-    background: #ffffff;
+    color:
+        #ffffff;
 
-    border:
-        1px solid #e2e9f3;
+    background:
+        linear-gradient(
+            120deg,
+            #6d28d9 0%,
+            #7c3aed 42%,
+            #2563eb 100%
+        );
 
-    border-radius: 18px;
+    border-radius:
+        24px;
 
     box-shadow:
-        0
-        8px
-        24px
-        rgba(40,65,120,.045);
+        0 18px 38px
+        rgba(
+            91,
+            33,
+            182,
+            .18
+        );
 }
 
 
-.hh-status-main-icon {
-    width: 52px;
-    height: 52px;
+.hh-review-banner::after {
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    content:
+        "★";
 
-    border-radius: 14px;
+    position:
+        absolute;
 
-    font-size: 19px;
+    right:
+        28%;
+
+    top:
+        -38px;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .08
+        );
+
+    font-size:
+        150px;
+
+    transform:
+        rotate(12deg);
 }
 
 
-.hh-order-status-card.pending
-.hh-status-main-icon {
-    color: #b45309;
-    background: #fff7ed;
+.hh-review-banner-content {
+
+    position:
+        relative;
+
+    z-index:
+        2;
 }
 
 
-.hh-order-status-card.processing
-.hh-status-main-icon {
-    color: #2563eb;
-    background: #eff6ff;
+.hh-review-banner-label {
+
+    margin-bottom:
+        7px;
+
+    display:
+        block;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .72
+        );
+
+    font-size:
+        9px;
+
+    font-weight:
+        850;
+
+    letter-spacing:
+        1px;
+
+    text-transform:
+        uppercase;
 }
 
 
-.hh-order-status-card.success
-.hh-status-main-icon {
-    color: #15803d;
-    background: #ecfdf3;
+.hh-review-banner h2 {
+
+    margin:
+        0 0 8px;
+
+    font-size:
+        23px;
 }
 
 
-.hh-order-status-card.danger
-.hh-status-main-icon {
-    color: #dc2626;
-    background: #fef2f2;
+.hh-review-banner p {
+
+    max-width:
+        720px;
+
+    margin:
+        0;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .78
+        );
+
+    font-size:
+        11px;
+
+    line-height:
+        1.7;
 }
 
 
-.hh-status-copy small {
-    display: block;
+.hh-review-count {
 
-    margin-bottom: 3px;
+    position:
+        relative;
 
-    color: #2563eb;
+    z-index:
+        2;
 
-    font-size: 6px;
-    font-weight: 900;
-    letter-spacing: .9px;
+    min-width:
+        120px;
+
+    padding:
+        17px;
+
+    text-align:
+        center;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .13
+        );
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            .19
+        );
+
+    border-radius:
+        18px;
 }
 
 
-.hh-status-copy h2 {
-    margin: 0 0 4px;
+.hh-review-count strong {
 
-    color: #17233c;
+    display:
+        block;
 
-    font-size: 15px;
-    font-weight: 900;
+    font-size:
+        29px;
 }
 
 
-.hh-status-copy p {
-    margin: 0;
+.hh-review-count span {
 
-    color: #8391a4;
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .78
+        );
 
-    font-size: 8px;
-    line-height: 1.6;
+    font-size:
+        8px;
+
+    font-weight:
+        800;
+
+    text-transform:
+        uppercase;
+}
+
+
+/* =========================================================
+   SELLER GROUP
+========================================================= */
+
+.hh-seller-card {
+
+    margin-bottom:
+        18px;
+
+    overflow:
+        hidden;
+
+    background:
+        #ffffff;
+
+    border:
+        1px solid
+        #dfe8f5;
+
+    border-radius:
+        22px;
+}
+
+
+.hh-seller-header {
+
+    padding:
+        18px 20px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+    gap:
+        16px;
+
+    background:
+        linear-gradient(
+            180deg,
+            #fbfdff,
+            #f7faff
+        );
+
+    border-bottom:
+        1px solid
+        #e7eef7;
+}
+
+
+.hh-seller-info {
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    gap:
+        12px;
+}
+
+
+.hh-seller-logo {
+
+    width:
+        43px;
+
+    height:
+        43px;
+
+    overflow:
+        hidden;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    color:
+        #2469da;
+
+    background:
+        #edf5ff;
+
+    border:
+        1px solid
+        #d8e9ff;
+
+    border-radius:
+        13px;
+
+    font-weight:
+        850;
+}
+
+
+.hh-seller-logo img {
+
+    width:
+        100%;
+
+    height:
+        100%;
+
+    object-fit:
+        cover;
+}
+
+
+.hh-seller-name {
+
+    color:
+        #173a67;
+
+    font-size:
+        13px;
+
+    font-weight:
+        850;
+}
+
+
+.hh-seller-sub {
+
+    margin-top:
+        2px;
+
+    color:
+        #8b9bb1;
+
+    font-size:
+        9px;
 }
 
 
 .hh-status-badge {
-    min-height: 31px;
 
-    padding: 0 11px;
+    padding:
+        7px 11px;
 
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    display:
+        inline-flex;
 
-    border-radius: 999px;
+    align-items:
+        center;
 
-    font-size: 7px;
-    font-weight: 900;
-}
+    gap:
+        6px;
 
+    border-radius:
+        999px;
 
-.hh-status-badge.pending {
-    color: #b45309;
-    background: #fff7ed;
-}
+    font-size:
+        9px;
 
-
-.hh-status-badge.processing {
-    color: #1d4ed8;
-    background: #eff6ff;
+    font-weight:
+        850;
 }
 
 
 .hh-status-badge.success {
-    color: #15803d;
-    background: #ecfdf3;
+
+    color:
+        #047857;
+
+    background:
+        #ecfdf5;
+
+    border:
+        1px solid
+        #a7f3d0;
+}
+
+
+.hh-status-badge.processing {
+
+    color:
+        #1d4ed8;
+
+    background:
+        #eff6ff;
+
+    border:
+        1px solid
+        #bfdbfe;
+}
+
+
+.hh-status-badge.pending {
+
+    color:
+        #92400e;
+
+    background:
+        #fffbeb;
+
+    border:
+        1px solid
+        #fde68a;
 }
 
 
 .hh-status-badge.danger {
-    color: #dc2626;
-    background: #fef2f2;
-}
 
+    color:
+        #b91c1c;
 
-/* ================================================================
-   MAIN GRID
-================================================================ */
-
-.hh-order-layout {
-    display: grid;
-
-    grid-template-columns:
-        minmax(0,1fr)
-        350px;
-
-    align-items: start;
-
-    gap: 21px;
-}
-
-
-.hh-order-main {
-    min-width: 0;
-
-    display: flex;
-    flex-direction: column;
-    gap: 19px;
-}
-
-
-.hh-order-side {
-    position: sticky;
-    top: 22px;
-
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-
-/* ================================================================
-   SECTION
-================================================================ */
-
-.hh-order-section {
-    overflow: hidden;
-
-    background: #ffffff;
+    background:
+        #fef2f2;
 
     border:
-        1px solid #e2e9f3;
-
-    border-radius: 20px;
-
-    box-shadow:
-        0
-        10px
-        28px
-        rgba(40,65,120,.045);
+        1px solid
+        #fecaca;
 }
 
 
-.hh-order-section-header {
-    min-height: 88px;
+/* =========================================================
+   PRODUCT ITEM
+========================================================= */
 
-    padding: 19px 22px;
+.hh-product {
 
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 15px;
+    padding:
+        20px;
 
-    border-bottom:
-        1px solid #edf1f5;
-}
-
-
-.hh-section-title {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-}
-
-
-.hh-section-icon {
-    width: 44px;
-    height: 44px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    color: #ffffff;
-
-    background:
-        linear-gradient(
-            135deg,
-            #2563eb,
-            #438bf2
-        );
-
-    border-radius: 12px;
-
-    box-shadow:
-        0
-        8px
-        17px
-        rgba(37,99,235,.16);
-}
-
-
-.hh-section-icon.purple {
-    background:
-        linear-gradient(
-            135deg,
-            #7c3aed,
-            #9b6af5
-        );
-}
-
-
-.hh-section-icon.green {
-    background:
-        linear-gradient(
-            135deg,
-            #16a34a,
-            #4ade80
-        );
-}
-
-
-.hh-section-title small {
-    display: block;
-
-    margin-bottom: 2px;
-
-    color: #2563eb;
-
-    font-size: 6px;
-    font-weight: 900;
-    letter-spacing: .8px;
-}
-
-
-.hh-section-title h2 {
-    margin: 0;
-
-    color: #17233c;
-
-    font-size: 15px;
-    font-weight: 900;
-}
-
-
-.hh-section-count {
-    min-height: 29px;
-
-    padding: 0 10px;
-
-    display: inline-flex;
-    align-items: center;
-
-    color: #2563eb;
-    background: #eff6ff;
-
-    border-radius: 999px;
-
-    font-size: 7px;
-    font-weight: 850;
-}
-
-
-/* ================================================================
-   PRODUCT ITEMS
-================================================================ */
-
-.hh-order-items {
-    padding: 5px 20px;
-}
-
-
-.hh-order-item {
-    padding: 16px 0;
-
-    display: grid;
+    display:
+        grid;
 
     grid-template-columns:
-        82px
-        minmax(0,1fr)
+        108px
+        minmax(0, 1fr)
         auto;
 
-    align-items: center;
+    align-items:
+        center;
 
-    gap: 14px;
+    gap:
+        18px;
 
     border-bottom:
-        1px solid #edf1f5;
+        1px solid
+        #edf1f7;
 }
 
 
-.hh-order-item:last-child {
-    border-bottom: 0;
+.hh-product:last-child {
+
+    border-bottom:
+        none;
 }
 
 
-.hh-order-item-image {
-    width: 82px;
-    height: 82px;
+.hh-product-image {
 
-    overflow: hidden;
+    width:
+        108px;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    height:
+        108px;
 
-    color: #2563eb;
+    overflow:
+        hidden;
+
+    padding:
+        8px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    background:
+        #f5f9ff;
+
+    border:
+        1px solid
+        #e0eaf7;
+
+    border-radius:
+        18px;
+}
+
+
+.hh-product-image img {
+
+    width:
+        100%;
+
+    height:
+        100%;
+
+    object-fit:
+        contain;
+
+    border-radius:
+        11px;
+}
+
+
+.hh-product-info {
+
+    min-width:
+        0;
+}
+
+
+.hh-product-info h3 {
+
+    margin:
+        0 0 5px;
+
+    color:
+        #153864;
+
+    font-size:
+        14px;
+
+    font-weight:
+        850;
+}
+
+
+.hh-product-info h3 a {
+
+    color:
+        inherit;
+
+    text-decoration:
+        none;
+}
+
+
+.hh-product-meta {
+
+    margin-bottom:
+        10px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    flex-wrap:
+        wrap;
+
+    gap:
+        7px;
+
+    color:
+        #8497b1;
+
+    font-size:
+        9px;
+}
+
+
+.hh-product-pricing {
+
+    display:
+        flex;
+
+    flex-wrap:
+        wrap;
+
+    gap:
+        12px;
+
+    color:
+        #58708e;
+
+    font-size:
+        10px;
+}
+
+
+.hh-product-pricing strong {
+
+    color:
+        #173b6c;
+}
+
+
+.hh-review-action {
+
+    min-width:
+        165px;
+
+    text-align:
+        right;
+}
+
+
+.hh-review-button {
+
+    min-height:
+        42px;
+
+    padding:
+        0 17px;
+
+    display:
+        inline-flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    gap:
+        7px;
+
+    color:
+        #ffffff;
 
     background:
         linear-gradient(
-            135deg,
-            #f1f6ff,
-            #eaf2ff
+            110deg,
+            #7c3aed,
+            #2563eb
         );
 
     border:
-        1px solid #dee8f5;
+        none;
 
-    border-radius: 13px;
+    border-radius:
+        13px;
 
-    font-size: 24px;
+    box-shadow:
+        0 9px 20px
+        rgba(
+            82,
+            65,
+            220,
+            .18
+        );
+
+    font-size:
+        9px;
+
+    font-weight:
+        850;
+
+    text-decoration:
+        none;
+
+    transition:
+        .2s ease;
 }
 
 
-.hh-order-item-image img {
-    width: 100%;
-    height: 100%;
+.hh-review-button:hover {
 
-    padding: 6px;
+    color:
+        #ffffff;
 
-    object-fit: contain;
-    object-position: center;
+    transform:
+        translateY(-2px);
+
+    box-shadow:
+        0 13px 25px
+        rgba(
+            82,
+            65,
+            220,
+            .24
+        );
 }
 
 
-.hh-order-item-info {
-    min-width: 0;
-}
+.hh-review-completed {
 
+    padding:
+        10px 13px;
 
-.hh-order-item-info h3 {
-    margin: 0 0 5px;
+    display:
+        inline-flex;
 
-    color: #263a55;
+    align-items:
+        center;
 
-    font-size: 11px;
-    font-weight: 900;
-}
+    gap:
+        6px;
 
+    color:
+        #047857;
 
-.hh-item-vendor {
-    margin-bottom: 6px;
-
-    display: flex;
-    align-items: center;
-    gap: 5px;
-
-    color: #8492a6;
-
-    font-size: 7px;
-}
-
-
-.hh-item-vendor i {
-    color: #2563eb;
-}
-
-
-.hh-item-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-
-.hh-item-meta span {
-    min-height: 25px;
-
-    padding: 0 8px;
-
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-
-    color: #66788f;
-
-    background: #f8fafc;
+    background:
+        #ecfdf5;
 
     border:
-        1px solid #e5eaf1;
+        1px solid
+        #a7f3d0;
 
-    border-radius: 7px;
+    border-radius:
+        12px;
 
-    font-size: 6px;
-    font-weight: 750;
+    font-size:
+        9px;
+
+    font-weight:
+        850;
 }
 
 
-.hh-order-item-price {
-    text-align: right;
+.hh-review-stars-small {
+
+    display:
+        block;
+
+    margin-top:
+        7px;
+
+    color:
+        #f59e0b;
+
+    font-size:
+        11px;
+
+    letter-spacing:
+        1px;
 }
 
 
-.hh-order-item-price small {
-    display: block;
+.hh-review-locked {
 
-    margin-bottom: 3px;
+    padding:
+        10px 12px;
 
-    color: #94a0b2;
+    display:
+        inline-flex;
 
-    font-size: 6px;
-    font-weight: 850;
-}
+    align-items:
+        center;
 
+    gap:
+        6px;
 
-.hh-order-item-price strong {
-    color: #1c4a87;
+    color:
+        #7d8da5;
 
-    font-size: 14px;
-    font-weight: 900;
-
-    white-space: nowrap;
-}
-
-
-/* ================================================================
-   TOTAL BAR
-================================================================ */
-
-.hh-order-total-bar {
-    padding: 18px 21px;
-
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    background: #f8fbff;
-
-    border-top:
-        1px solid #edf1f5;
-}
-
-
-.hh-order-total-bar span {
-    color: #708198;
-
-    font-size: 8px;
-    font-weight: 850;
-}
-
-
-.hh-order-total-bar strong {
-    color: #2563eb;
-
-    font-size: 19px;
-    font-weight: 900;
-}
-
-
-/* ================================================================
-   VENDOR ORDERS
-================================================================ */
-
-.hh-vendor-orders {
-    padding: 18px;
-
-    display: grid;
-    grid-template-columns:
-        repeat(2,minmax(0,1fr));
-
-    gap: 12px;
-}
-
-
-.hh-vendor-order {
-    padding: 16px;
-
-    background: #fbfdff;
+    background:
+        #f7f9fc;
 
     border:
-        1px solid #e0e8f2;
+        1px solid
+        #e2e8f0;
 
-    border-radius: 14px;
+    border-radius:
+        12px;
+
+    font-size:
+        8px;
+
+    font-weight:
+        800;
 }
 
 
-.hh-vendor-order-top {
-    margin-bottom: 13px;
+.hh-review-hint {
 
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    display:
+        block;
+
+    margin-top:
+        6px;
+
+    color:
+        #94a3b8;
+
+    font-size:
+        8px;
 }
 
 
-.hh-vendor-name {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-
-.hh-vendor-icon {
-    width: 37px;
-    height: 37px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    color: #2563eb;
-    background: #eff6ff;
-
-    border-radius: 10px;
-}
-
-
-.hh-vendor-name strong {
-    display: block;
-
-    color: #263a55;
-
-    font-size: 9px;
-    font-weight: 900;
-}
-
-
-.hh-vendor-name small {
-    color: #8b98aa;
-
-    font-size: 6px;
-}
-
-
-.hh-vendor-data {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-
-    gap: 8px;
-}
-
-
-.hh-vendor-data div {
-    padding: 10px;
-
-    background: #ffffff;
-
-    border:
-        1px solid #e7ecf3;
-
-    border-radius: 9px;
-}
-
-
-.hh-vendor-data span {
-    display: block;
-
-    margin-bottom: 3px;
-
-    color: #97a3b3;
-
-    font-size: 5px;
-    font-weight: 850;
-    letter-spacing: .6px;
-}
-
-
-.hh-vendor-data strong {
-    color: #354760;
-
-    font-size: 8px;
-    font-weight: 850;
-}
-
-
-/* ================================================================
-   INFORMATION
-================================================================ */
+/* =========================================================
+   TWO COLUMN INFO
+========================================================= */
 
 .hh-info-grid {
-    padding: 18px;
 
-    display: grid;
+    display:
+        grid;
 
     grid-template-columns:
         repeat(
             2,
-            minmax(0,1fr)
+            minmax(0, 1fr)
         );
 
-    gap: 11px;
+    gap:
+        20px;
 }
 
 
 .hh-info-card {
-    min-height: 95px;
 
-    padding: 15px;
+    padding:
+        23px;
 
-    background: #fbfdff;
-
-    border:
-        1px solid #e1e8f2;
-
-    border-radius: 13px;
-}
-
-
-.hh-info-card.full {
-    grid-column:
-        1 / -1;
-}
-
-
-.hh-info-icon {
-    width: 34px;
-    height: 34px;
-
-    margin-bottom: 10px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    color: #2563eb;
-    background: #eff6ff;
-
-    border-radius: 9px;
-}
-
-
-.hh-info-card span {
-    display: block;
-
-    margin-bottom: 4px;
-
-    color: #8b98aa;
-
-    font-size: 5px;
-    font-weight: 900;
-    letter-spacing: .7px;
-}
-
-
-.hh-info-card strong,
-.hh-info-card h3 {
-    margin: 0;
-
-    color: #263a55;
-
-    font-size: 10px;
-    font-weight: 900;
-}
-
-
-.hh-info-card p {
-    margin: 0;
-
-    color: #53657d;
-
-    font-size: 8px;
-    line-height: 1.65;
-}
-
-
-/* ================================================================
-   SUMMARY SIDE
-================================================================ */
-
-.hh-side-card {
-    overflow: hidden;
-
-    background: #ffffff;
+    background:
+        #ffffff;
 
     border:
-        1px solid #e1e8f2;
+        1px solid
+        #e0e9f5;
 
-    border-radius: 18px;
+    border-radius:
+        22px;
 
     box-shadow:
-        0
-        11px
-        28px
-        rgba(40,65,120,.05);
+        0 13px 34px
+        rgba(
+            39,
+            78,
+            132,
+            .05
+        );
 }
 
 
-.hh-side-card-header {
-    padding: 19px;
+.hh-info-row {
+
+    padding:
+        11px 0;
+
+    display:
+        flex;
+
+    align-items:
+        flex-start;
+
+    justify-content:
+        space-between;
+
+    gap:
+        20px;
 
     border-bottom:
-        1px solid #edf1f5;
+        1px dashed
+        #e7edf5;
+
+    font-size:
+        10px;
 }
 
 
-.hh-side-card-header small {
-    display: block;
+.hh-info-row:last-child {
 
-    margin-bottom: 3px;
-
-    color: #2563eb;
-
-    font-size: 6px;
-    font-weight: 900;
-    letter-spacing: .8px;
+    border-bottom:
+        none;
 }
 
 
-.hh-side-card-header h3 {
-    margin: 0;
+.hh-info-row span {
 
-    color: #17233c;
-
-    font-size: 14px;
-    font-weight: 900;
+    color:
+        #899ab0;
 }
 
 
-.hh-side-body {
-    padding: 18px;
+.hh-info-row strong {
+
+    color:
+        #173a66;
+
+    text-align:
+        right;
 }
 
 
-.hh-side-row {
-    min-height: 34px;
+.hh-payment-status {
 
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    padding:
+        5px 9px;
 
-    gap: 10px;
+    border-radius:
+        999px;
 }
 
 
-.hh-side-row span {
-    color: #8290a4;
+.hh-payment-status.success {
 
-    font-size: 7px;
+    color:
+        #047857;
+
+    background:
+        #ecfdf5;
 }
 
 
-.hh-side-row strong {
-    color: #32455f;
+.hh-payment-status.pending {
 
-    font-size: 8px;
-    font-weight: 850;
+    color:
+        #92400e;
 
-    text-align: right;
+    background:
+        #fffbeb;
 }
 
 
-.hh-side-divider {
-    height: 1px;
+.hh-payment-status.danger {
 
-    margin: 11px 0;
+    color:
+        #b91c1c;
 
-    background: #e8edf4;
+    background:
+        #fef2f2;
 }
 
 
-.hh-side-total {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
+/* =========================================================
+   TRACKING
+========================================================= */
 
-    gap: 10px;
+.hh-tracking-box {
+
+    margin-top:
+        15px;
+
+    padding:
+        15px;
+
+    color:
+        #31577f;
+
+    background:
+        #f6faff;
+
+    border:
+        1px solid
+        #dceaff;
+
+    border-radius:
+        14px;
+
+    font-size:
+        10px;
+
+    line-height:
+        1.7;
 }
 
 
-.hh-side-total span {
-    color: #74849a;
+.hh-tracking-number {
 
-    font-size: 7px;
-    font-weight: 850;
+    margin-top:
+        7px;
+
+    display:
+        inline-flex;
+
+    padding:
+        6px 10px;
+
+    color:
+        #1458ba;
+
+    background:
+        #eaf3ff;
+
+    border-radius:
+        9px;
+
+    font-weight:
+        850;
+
+    letter-spacing:
+        .4px;
 }
 
 
-.hh-side-total strong {
-    color: #2563eb;
+/* =========================================================
+   ORDER TOTAL
+========================================================= */
 
-    font-size: 20px;
-    font-weight: 900;
-}
+.hh-total-box {
 
+    margin-top:
+        18px;
 
-/* ================================================================
-   CUSTOMER
-================================================================ */
-
-.hh-customer-card {
-    padding: 18px;
-
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    padding:
+        20px;
 
     background:
         linear-gradient(
             135deg,
-            #ffffff,
-            #f8fbff
+            #f5f9ff,
+            #edf5ff
         );
 
     border:
-        1px solid #e1e8f2;
+        1px solid
+        #d7e7fb;
 
-    border-radius: 18px;
+    border-radius:
+        18px;
 }
 
 
-.hh-customer-avatar {
-    width: 47px;
-    height: 47px;
+.hh-total-row {
 
-    flex-shrink: 0;
+    margin-bottom:
+        10px;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display:
+        flex;
 
-    color: #ffffff;
+    justify-content:
+        space-between;
+
+    gap:
+        20px;
+
+    color:
+        #6c819e;
+
+    font-size:
+        10px;
+}
+
+
+.hh-total-row:last-child {
+
+    margin:
+        13px 0 0;
+
+    padding-top:
+        13px;
+
+    border-top:
+        1px solid
+        #d4e2f3;
+
+    color:
+        #103a72;
+
+    font-size:
+        16px;
+
+    font-weight:
+        850;
+}
+
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+.hh-bottom-actions {
+
+    margin-top:
+        24px;
+
+    display:
+        flex;
+
+    flex-wrap:
+        wrap;
+
+    gap:
+        10px;
+}
+
+
+.hh-btn {
+
+    min-height:
+        43px;
+
+    padding:
+        0 17px;
+
+    display:
+        inline-flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    gap:
+        7px;
+
+    border-radius:
+        13px;
+
+    font-size:
+        9px;
+
+    font-weight:
+        850;
+
+    text-decoration:
+        none;
+
+    transition:
+        .2s ease;
+}
+
+
+.hh-btn-primary {
+
+    color:
+        #ffffff;
 
     background:
-        linear-gradient(
-            135deg,
-            #2563eb,
-            #7c3aed
-        );
-
-    border-radius: 13px;
-
-    font-size: 17px;
-}
-
-
-.hh-customer-copy strong {
-    display: block;
-
-    margin-bottom: 3px;
-
-    color: #263a55;
-
-    font-size: 9px;
-    font-weight: 900;
-}
-
-
-.hh-customer-copy span {
-    display: block;
-
-    color: #8492a6;
-
-    font-size: 6px;
-    line-height: 1.6;
-}
-
-
-/* ================================================================
-   SAFE CARD
-================================================================ */
-
-.hh-order-safe {
-    padding: 17px;
-
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #f3fbf6,
-            #ecfdf3
-        );
+        #2563eb;
 
     border:
-        1px solid #c8f1d5;
-
-    border-radius: 16px;
+        1px solid
+        #2563eb;
 }
 
 
-.hh-order-safe-icon {
-    width: 37px;
-    height: 37px;
+.hh-btn-secondary {
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    color:
+        #315985;
 
-    color: #15803d;
-    background: #ffffff;
+    background:
+        #ffffff;
 
-    border-radius: 10px;
+    border:
+        1px solid
+        #dce6f2;
 }
 
 
-.hh-order-safe strong {
-    display: block;
+.hh-btn:hover {
 
-    margin-bottom: 3px;
-
-    color: #24583a;
-
-    font-size: 8px;
-    font-weight: 900;
+    transform:
+        translateY(-2px);
 }
 
 
-.hh-order-safe p {
-    margin: 0;
-
-    color: #668776;
-
-    font-size: 7px;
-    line-height: 1.6;
-}
-
-
-/* ================================================================
-   EMPTY
-================================================================ */
-
-.hh-order-empty {
-    padding: 45px 20px;
-
-    text-align: center;
-
-    color: #8391a5;
-}
-
-
-.hh-order-empty i {
-    display: block;
-
-    margin-bottom: 10px;
-
-    color: #2563eb;
-
-    font-size: 28px;
-}
-
-
-.hh-order-empty h3 {
-    margin: 0 0 5px;
-
-    color: #263a55;
-
-    font-size: 12px;
-}
-
-
-/* ================================================================
+/* =========================================================
    RESPONSIVE
-================================================================ */
+========================================================= */
 
-@media (max-width: 1080px) {
+@media (
+    max-width: 1050px
+) {
 
-    .hh-order-stats {
-        grid-template-columns:
-            repeat(2,1fr);
-    }
+    .hh-order-hero {
 
-
-    .hh-order-layout {
         grid-template-columns:
             1fr;
     }
 
 
-    .hh-order-side {
-        position: static;
+    .hh-stat-grid {
 
-        display: grid;
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+
+
+    .hh-info-grid {
+
+        grid-template-columns:
+            1fr;
+    }
+}
+
+
+@media (
+    max-width: 720px
+) {
+
+    .hh-order-page {
+
+        padding:
+            20px 14px 55px;
+    }
+
+
+    .hh-order-hero {
+
+        padding:
+            30px 24px;
+
+        border-radius:
+            22px;
+    }
+
+
+    .hh-order-hero h1 {
+
+        font-size:
+            35px;
+    }
+
+
+    .hh-stat-grid {
 
         grid-template-columns:
             1fr 1fr;
     }
 
 
-    .hh-side-card {
-        grid-row:
-            span 2;
-    }
-}
+    .hh-review-banner {
 
-
-@media (max-width: 850px) {
-
-    .hh-order-page {
-        padding:
-            30px
-            18px
-            60px;
-    }
-
-
-    .hh-order-hero {
-        grid-template-columns:
-            1fr;
-
-        min-height: auto;
-
-        padding: 37px;
-    }
-
-
-    .hh-order-art {
-        display: none;
-    }
-
-
-    .hh-vendor-orders {
-        grid-template-columns:
-            1fr;
-    }
-}
-
-
-@media (max-width: 650px) {
-
-    .hh-order-page {
-        padding:
-            21px
-            13px
-            50px;
-    }
-
-
-    .hh-order-hero {
-        padding:
-            28px
-            23px;
-
-        border-radius: 21px;
-    }
-
-
-    .hh-order-hero h1 {
-        font-size: 30px;
-    }
-
-
-    .hh-order-hero-actions {
-        flex-direction: column;
-    }
-
-
-    .hh-order-back,
-    .hh-order-shop {
-        width: 100%;
-    }
-
-
-    .hh-order-stats {
         grid-template-columns:
             1fr;
     }
 
 
-    .hh-order-status-card {
-        grid-template-columns:
-            auto
-            minmax(0,1fr);
+    .hh-review-count {
+
+        width:
+            fit-content;
     }
 
 
-    .hh-status-badge {
+    .hh-product {
+
+        grid-template-columns:
+            78px
+            minmax(0, 1fr);
+    }
+
+
+    .hh-product-image {
+
+        width:
+            78px;
+
+        height:
+            78px;
+    }
+
+
+    .hh-review-action {
+
         grid-column:
             1 / -1;
 
-        width: fit-content;
+        width:
+            100%;
+
+        text-align:
+            left;
     }
 
 
-    .hh-order-item {
-        grid-template-columns:
-            65px
-            minmax(0,1fr);
+    .hh-review-button,
+    .hh-review-completed,
+    .hh-review-locked {
+
+        width:
+            100%;
     }
 
 
-    .hh-order-item-image {
-        width: 65px;
-        height: 65px;
+    .hh-seller-header {
+
+        align-items:
+            flex-start;
+
+        flex-direction:
+            column;
     }
 
 
-    .hh-order-item-price {
-        grid-column: 2;
-        text-align: left;
+    .hh-section {
+
+        padding:
+            20px;
     }
+}
 
 
-    .hh-info-grid {
+@media (
+    max-width: 470px
+) {
+
+    .hh-stat-grid {
+
         grid-template-columns:
             1fr;
     }
-
-
-    .hh-info-card.full {
-        grid-column:
-            auto;
-    }
-
-
-    .hh-order-side {
-        display: flex;
-    }
-
 }
 
 </style>
 
 
-<!-- ===============================================================
-     ORDER DETAILS
-================================================================ -->
-
 <main class="hh-order-page">
-
 
     <div class="hh-order-container">
 
 
-        <!-- =======================================================
-             SUCCESS
-        ======================================================== -->
-
         <?php if (
             isset($_GET['success']) &&
-            $_GET['success'] == '1'
+            $_GET['success'] === '1'
         ): ?>
 
-
-            <div class="hh-order-success">
+            <div class="hh-success">
 
                 <i class="bi bi-check-circle-fill"></i>
 
-                Your order has been placed successfully.
-                Order #<?= $orderId ?> is now being processed.
+                Order placed successfully.
+                Thank you for shopping with HochipoHub.
 
             </div>
-
 
         <?php endif; ?>
 
 
+        <?php if (
+            isset($_GET['payment'])
+        ): ?>
 
-        <!-- =======================================================
+            <?php
+
+            $paymentResult =
+                strtolower(
+                    trim(
+                        (string)
+                        $_GET['payment']
+                    )
+                );
+
+            ?>
+
+            <?php if (
+                $paymentResult === 'success'
+            ): ?>
+
+                <div class="hh-success">
+
+                    <i class="bi bi-credit-card-fill"></i>
+
+                    Payment completed successfully.
+
+                </div>
+
+            <?php elseif (
+                $paymentResult === 'processing'
+            ): ?>
+
+                <div
+                    class="hh-success"
+                    style="
+                        color:#92400e;
+                        background:#fffbeb;
+                        border-color:#fde68a;
+                    "
+                >
+
+                    <i class="bi bi-hourglass-split"></i>
+
+                    Payment is currently being verified.
+
+                </div>
+
+            <?php elseif (
+                $paymentResult === 'failed'
+            ): ?>
+
+                <div
+                    class="hh-success"
+                    style="
+                        color:#b91c1c;
+                        background:#fef2f2;
+                        border-color:#fecaca;
+                    "
+                >
+
+                    <i class="bi bi-x-circle-fill"></i>
+
+                    Payment was not successful.
+
+                </div>
+
+            <?php endif; ?>
+
+        <?php endif; ?>
+
+
+        <!-- =====================================================
              HERO
-        ======================================================== -->
+        ====================================================== -->
 
         <section class="hh-order-hero">
 
+            <div class="hh-hero-content">
 
-            <div class="hh-order-hero-copy">
+                <div class="hh-hero-label">
 
+                    <i class="bi bi-bag-check-fill"></i>
 
-                <span class="hh-order-pill">
+                    Order Journey
 
-                    <i class="bi bi-receipt"></i>
-
-                    ORDER DETAILS
-
-                </span>
+                </div>
 
 
                 <h1>
 
                     Order
-
-                    <span>
-                        #<?= $orderId ?>
-                    </span>
+                    #<?= (int) $orderId ?>
 
                 </h1>
 
 
                 <p>
 
-                    Placed on
-
-                    <?= orderDetailsEscape(
-                        date(
-                            'd M Y, h:i A',
-                            strtotime(
-                                $order[
-                                    'order_date'
-                                ]
-                            )
-                        )
-                    ) ?>
+                    Everything about your purchase is here —
+                    payment, delivery, seller progress and your
+                    verified-purchase review access.
 
                 </p>
 
-
-                <div class="hh-order-hero-actions">
-
-
-                    <a
-                        href="order.php"
-                        class="hh-order-back"
-                    >
-
-                        <i class="bi bi-arrow-left"></i>
-
-                        My Orders
-
-                    </a>
-
-
-                    <a
-                        href="catalog.php"
-                        class="hh-order-shop"
-                    >
-
-                        <i class="bi bi-bag"></i>
-
-                        Continue Shopping
-
-                    </a>
-
-
-                </div>
-
-
             </div>
 
 
+            <div class="hh-hero-status">
 
-            <!-- HERO ART -->
+                <div class="hh-hero-status-icon">
 
-            <div class="hh-order-art">
-
-
-                <div class="hh-order-main-icon">
-
-                    <i class="bi bi-box-seam"></i>
-
-                </div>
-
-
-                <div class="hh-order-float one">
-
-                    <i class="bi bi-bag-check"></i>
-
-                    <?= $totalItems ?>
-
-                    item<?= $totalItems !== 1
-                        ? 's'
-                        : '' ?>
-
-                </div>
-
-
-                <div class="hh-order-float two">
-
-                    <i class="bi bi-shop"></i>
-
-                    <?= $vendorCount ?>
-
-                    seller<?= $vendorCount !== 1
-                        ? 's'
-                        : '' ?>
-
-                </div>
-
-
-            </div>
-
-
-        </section>
-
-
-
-        <!-- =======================================================
-             STATS
-        ======================================================== -->
-
-        <section class="hh-order-stats">
-
-
-            <article class="hh-order-stat">
-
-
-                <div class="hh-order-stat-icon blue">
-
-                    <i class="bi bi-bag"></i>
-
-                </div>
-
-
-                <div>
-
-                    <span>
-                        TOTAL ITEMS
-                    </span>
-
-                    <strong>
-                        <?= $totalItems ?>
-                    </strong>
-
-                </div>
-
-
-            </article>
-
-
-
-            <article class="hh-order-stat">
-
-
-                <div class="hh-order-stat-icon green">
-
-                    <i class="bi bi-cash-stack"></i>
-
-                </div>
-
-
-                <div>
-
-                    <span>
-                        ORDER TOTAL
-                    </span>
-
-                    <strong>
-
-                        RM
-                        <?= number_format(
-                            (float)
-                            $order[
-                                'total_amount'
-                            ],
-                            2
-                        ) ?>
-
-                    </strong>
-
-                </div>
-
-
-            </article>
-
-
-
-            <article class="hh-order-stat">
-
-
-                <div class="hh-order-stat-icon orange">
-
-                    <i class="bi bi-truck"></i>
-
-                </div>
-
-
-                <div>
-
-                    <span>
-                        DELIVERY
-                    </span>
-
-                    <strong>
-
-                        <?= orderDetailsEscape(
-                            $order[
-                                'delivery_method'
-                            ]
-                            ?? '—'
-                        ) ?>
-
-                    </strong>
-
-                </div>
-
-
-            </article>
-
-
-
-            <article class="hh-order-stat">
-
-
-                <div class="hh-order-stat-icon purple">
-
-                    <i class="bi bi-credit-card"></i>
-
-                </div>
-
-
-                <div>
-
-                    <span>
-                        PAYMENT
-                    </span>
-
-                    <strong>
-
-                        <?= orderDetailsEscape(
-                            $paymentStatus
-                        ) ?>
-
-                    </strong>
-
-                </div>
-
-
-            </article>
-
-
-        </section>
-
-
-
-        <!-- =======================================================
-             STATUS
-        ======================================================== -->
-
-        <section
-            class="
-                hh-order-status-card
-                <?= orderDetailsEscape(
-                    $orderStatusClass
-                ) ?>
-            "
-        >
-
-
-            <div class="hh-status-main-icon">
-
-                <i
-                    class="
-                        bi
-                        <?= orderDetailsEscape(
+                    <i
+                        class="bi <?= odEscape(
                             $orderStatusIcon
-                        ) ?>
-                    "
-                ></i>
+                        ) ?>"
+                    ></i>
 
-            </div>
+                </div>
 
 
-            <div class="hh-status-copy">
+                <span>
+                    Current Status
+                </span>
 
-                <small>
-                    CURRENT STATUS
-                </small>
 
-                <h2>
+                <strong>
 
-                    <?= orderDetailsEscape(
+                    <?= odEscape(
                         $orderStatus
                     ) ?>
 
-                </h2>
+                </strong>
+
 
                 <p>
 
-                    <?= orderDetailsEscape(
+                    <?= odEscape(
                         $orderStatusMessage
                     ) ?>
 
@@ -2641,1129 +3141,1255 @@ require_once __DIR__ .
 
             </div>
 
-
-            <span
-                class="
-                    hh-status-badge
-                    <?= orderDetailsEscape(
-                        $orderStatusClass
-                    ) ?>
-                "
-            >
-
-                <i
-                    class="
-                        bi
-                        <?= orderDetailsEscape(
-                            $orderStatusIcon
-                        ) ?>
-                    "
-                ></i>
-
-                <?= orderDetailsEscape(
-                    $orderStatus
-                ) ?>
-
-            </span>
-
-
         </section>
 
 
+        <!-- =====================================================
+             STATS
+        ====================================================== -->
 
-        <!-- =======================================================
-             MAIN LAYOUT
-        ======================================================== -->
+        <section class="hh-stat-grid">
 
-        <section class="hh-order-layout">
+            <div class="hh-stat-card">
 
+                <div class="hh-stat-icon">
+                    <i class="bi bi-box-seam"></i>
+                </div>
 
-            <!-- ===================================================
-                 LEFT
-            ==================================================== -->
+                <span class="hh-stat-label">
+                    Total Items
+                </span>
 
-            <div class="hh-order-main">
+                <strong class="hh-stat-value">
 
+                    <?= (int) $totalItems ?>
 
-                <!-- ===============================================
-                     PURCHASED ITEMS
-                ================================================ -->
-
-                <section class="hh-order-section">
-
-
-                    <div class="hh-order-section-header">
-
-
-                        <div class="hh-section-title">
-
-
-                            <div class="hh-section-icon">
-
-                                <i class="bi bi-bag-check"></i>
-
-                            </div>
-
-
-                            <div>
-
-                                <small>
-                                    PURCHASED ITEMS
-                                </small>
-
-                                <h2>
-                                    Order Products
-                                </h2>
-
-                            </div>
-
-
-                        </div>
-
-
-                        <span class="hh-section-count">
-
-                            <?= $totalItems ?>
-
-                            item<?= $totalItems !== 1
-                                ? 's'
-                                : '' ?>
-
-                        </span>
-
-
-                    </div>
-
-
-
-                    <?php if (empty($items)): ?>
-
-
-                        <div class="hh-order-empty">
-
-                            <i class="bi bi-box"></i>
-
-                            <h3>
-                                No order items found
-                            </h3>
-
-                            <p>
-                                Product information is unavailable.
-                            </p>
-
-                        </div>
-
-
-                    <?php else: ?>
-
-
-                        <div class="hh-order-items">
-
-
-                            <?php foreach (
-                                $items
-                                as $item
-                            ): ?>
-
-
-                                <?php
-
-                                $itemImage =
-                                    orderDetailsImage(
-                                        $item[
-                                            'image'
-                                        ]
-                                        ?? ''
-                                    );
-
-                                ?>
-
-
-                                <article class="hh-order-item">
-
-
-                                    <div class="hh-order-item-image">
-
-
-                                        <?php if (
-                                            $itemImage !== ''
-                                        ): ?>
-
-
-                                            <img
-                                                src="<?= orderDetailsEscape(
-                                                    $itemImage
-                                                ) ?>"
-                                                alt="<?= orderDetailsEscape(
-                                                    $item[
-                                                        'product_name'
-                                                    ]
-                                                ) ?>"
-                                                onerror="
-                                                    this.style.display='none';
-                                                    this.parentElement.innerHTML='<i class=&quot;bi bi-image&quot;></i>';
-                                                "
-                                            >
-
-
-                                        <?php else: ?>
-
-
-                                            <i class="bi bi-image"></i>
-
-
-                                        <?php endif; ?>
-
-
-                                    </div>
-
-
-
-                                    <div class="hh-order-item-info">
-
-
-                                        <h3>
-
-                                            <?= orderDetailsEscape(
-                                                $item[
-                                                    'product_name'
-                                                ]
-                                            ) ?>
-
-                                        </h3>
-
-
-                                        <div class="hh-item-vendor">
-
-                                            <i class="bi bi-shop"></i>
-
-                                            <?= orderDetailsEscape(
-                                                $item[
-                                                    'business_name'
-                                                ]
-                                            ) ?>
-
-                                        </div>
-
-
-                                        <div class="hh-item-meta">
-
-
-                                            <span>
-
-                                                <i class="bi bi-box"></i>
-
-                                                Qty:
-                                                <?= (int)
-                                                    $item[
-                                                        'quantity'
-                                                    ] ?>
-
-                                            </span>
-
-
-                                            <span>
-
-                                                RM
-                                                <?= number_format(
-                                                    (float)
-                                                    $item[
-                                                        'unit_price'
-                                                    ],
-                                                    2
-                                                ) ?>
-
-                                                each
-
-                                            </span>
-
-
-                                        </div>
-
-
-                                    </div>
-
-
-
-                                    <div class="hh-order-item-price">
-
-
-                                        <small>
-                                            SUBTOTAL
-                                        </small>
-
-
-                                        <strong>
-
-                                            RM
-                                            <?= number_format(
-                                                (float)
-                                                $item[
-                                                    'subtotal'
-                                                ],
-                                                2
-                                            ) ?>
-
-                                        </strong>
-
-
-                                    </div>
-
-
-                                </article>
-
-
-                            <?php endforeach; ?>
-
-
-                        </div>
-
-
-
-                        <div class="hh-order-total-bar">
-
-                            <span>
-                                Order Total
-                            </span>
-
-                            <strong>
-
-                                RM
-                                <?= number_format(
-                                    (float)
-                                    $order[
-                                        'total_amount'
-                                    ],
-                                    2
-                                ) ?>
-
-                            </strong>
-
-                        </div>
-
-
-                    <?php endif; ?>
-
-
-                </section>
-
-
-
-                <!-- ===============================================
-                     VENDOR ORDERS
-                ================================================ -->
-
-                <?php if (
-                    !empty(
-                        $vendorOrders
-                    )
-                ): ?>
-
-
-                    <section class="hh-order-section">
-
-
-                        <div class="hh-order-section-header">
-
-
-                            <div class="hh-section-title">
-
-
-                                <div class="hh-section-icon purple">
-
-                                    <i class="bi bi-shop"></i>
-
-                                </div>
-
-
-                                <div>
-
-                                    <small>
-                                        MULTI-VENDOR ORDER
-                                    </small>
-
-                                    <h2>
-                                        Seller Fulfilment
-                                    </h2>
-
-                                </div>
-
-
-                            </div>
-
-
-                            <span class="hh-section-count">
-
-                                <?= $vendorCount ?>
-
-                                seller<?= $vendorCount !== 1
-                                    ? 's'
-                                    : '' ?>
-
-                            </span>
-
-
-                        </div>
-
-
-
-                        <div class="hh-vendor-orders">
-
-
-                            <?php foreach (
-                                $vendorOrders
-                                as $vendorOrder
-                            ): ?>
-
-
-                                <?php
-
-                                $vendorStatus =
-                                    $vendorOrder[
-                                        'vendor_status'
-                                    ]
-                                    ?? 'Pending';
-
-
-                                $vendorClass =
-                                    orderStatusClass(
-                                        $vendorStatus
-                                    );
-
-                                ?>
-
-
-                                <article class="hh-vendor-order">
-
-
-                                    <div class="hh-vendor-order-top">
-
-
-                                        <div class="hh-vendor-name">
-
-
-                                            <div class="hh-vendor-icon">
-
-                                                <i class="bi bi-shop"></i>
-
-                                            </div>
-
-
-                                            <div>
-
-                                                <strong>
-
-                                                    <?= orderDetailsEscape(
-                                                        $vendorOrder[
-                                                            'business_name'
-                                                        ]
-                                                    ) ?>
-
-                                                </strong>
-
-                                                <small>
-                                                    Seller Order
-                                                </small>
-
-                                            </div>
-
-
-                                        </div>
-
-
-                                        <span
-                                            class="
-                                                hh-status-badge
-                                                <?= orderDetailsEscape(
-                                                    $vendorClass
-                                                ) ?>
-                                            "
-                                        >
-
-                                            <?= orderDetailsEscape(
-                                                $vendorStatus
-                                            ) ?>
-
-                                        </span>
-
-
-                                    </div>
-
-
-
-                                    <div class="hh-vendor-data">
-
-
-                                        <div>
-
-                                            <span>
-                                                SUBTOTAL
-                                            </span>
-
-                                            <strong>
-
-                                                RM
-                                                <?= number_format(
-                                                    (float)
-                                                    $vendorOrder[
-                                                        'subtotal'
-                                                    ],
-                                                    2
-                                                ) ?>
-
-                                            </strong>
-
-                                        </div>
-
-
-                                        <div>
-
-                                            <span>
-                                                DELIVERY
-                                            </span>
-
-                                            <strong>
-
-                                                RM
-                                                <?= number_format(
-                                                    (float)
-                                                    $vendorOrder[
-                                                        'delivery_fee'
-                                                    ],
-                                                    2
-                                                ) ?>
-
-                                            </strong>
-
-                                        </div>
-
-
-                                        <div>
-
-                                            <span>
-                                                TRACKING
-                                            </span>
-
-                                            <strong>
-
-                                                <?= !empty(
-                                                    $vendorOrder[
-                                                        'tracking_number'
-                                                    ]
-                                                )
-                                                    ? orderDetailsEscape(
-                                                        $vendorOrder[
-                                                            'tracking_number'
-                                                        ]
-                                                    )
-                                                    : 'Not available' ?>
-
-                                            </strong>
-
-                                        </div>
-
-
-                                        <div>
-
-                                            <span>
-                                                ORDER ID
-                                            </span>
-
-                                            <strong>
-
-                                                #
-                                                <?= (int)
-                                                    $vendorOrder[
-                                                        'vendor_order_id'
-                                                    ] ?>
-
-                                            </strong>
-
-                                        </div>
-
-
-                                    </div>
-
-
-                                </article>
-
-
-                            <?php endforeach; ?>
-
-
-                        </div>
-
-
-                    </section>
-
-
-                <?php endif; ?>
-
-
-
-                <!-- ===============================================
-                     DELIVERY
-                ================================================ -->
-
-                <section class="hh-order-section">
-
-
-                    <div class="hh-order-section-header">
-
-
-                        <div class="hh-section-title">
-
-
-                            <div class="hh-section-icon green">
-
-                                <i class="bi bi-truck"></i>
-
-                            </div>
-
-
-                            <div>
-
-                                <small>
-                                    DELIVERY
-                                </small>
-
-                                <h2>
-                                    Delivery Information
-                                </h2>
-
-                            </div>
-
-
-                        </div>
-
-
-                    </div>
-
-
-
-                    <div class="hh-info-grid">
-
-
-                        <article class="hh-info-card">
-
-
-                            <div class="hh-info-icon">
-
-                                <i class="bi bi-box-seam"></i>
-
-                            </div>
-
-
-                            <span>
-                                DELIVERY METHOD
-                            </span>
-
-
-                            <strong>
-
-                                <?= orderDetailsEscape(
-                                    $order[
-                                        'delivery_method'
-                                    ]
-                                    ?? '—'
-                                ) ?>
-
-                            </strong>
-
-
-                        </article>
-
-
-
-                        <article class="hh-info-card">
-
-
-                            <div class="hh-info-icon">
-
-                                <i class="bi bi-upc-scan"></i>
-
-                            </div>
-
-
-                            <span>
-                                TRACKING NUMBER
-                            </span>
-
-
-                            <strong>
-
-                                <?= !empty(
-                                    $order[
-                                        'tracking_number'
-                                    ]
-                                )
-                                    ? orderDetailsEscape(
-                                        $order[
-                                            'tracking_number'
-                                        ]
-                                    )
-                                    : 'Not available yet' ?>
-
-                            </strong>
-
-
-                        </article>
-
-
-
-                        <?php if (
-                            $order[
-                                'delivery_method'
-                            ] === 'Postage'
-                        ): ?>
-
-
-                            <article class="hh-info-card full">
-
-
-                                <div class="hh-info-icon">
-
-                                    <i class="bi bi-geo-alt"></i>
-
-                                </div>
-
-
-                                <span>
-                                    DELIVERY ADDRESS
-                                </span>
-
-
-                                <p>
-
-                                    <?= nl2br(
-                                        orderDetailsEscape(
-                                            $order[
-                                                'delivery_address'
-                                            ]
-                                            ?? ''
-                                        )
-                                    ) ?>
-
-                                </p>
-
-
-                            </article>
-
-
-                        <?php endif; ?>
-
-
-                    </div>
-
-
-                </section>
-
+                </strong>
 
             </div>
 
 
+            <div class="hh-stat-card">
 
-            <!-- ===================================================
-                 RIGHT
-            ==================================================== -->
+                <div class="hh-stat-icon">
+                    <i class="bi bi-shop"></i>
+                </div>
 
-            <aside class="hh-order-side">
+                <span class="hh-stat-label">
+                    Sellers
+                </span>
 
+                <strong class="hh-stat-value">
 
-                <!-- ===============================================
-                     SUMMARY
-                ================================================ -->
+                    <?= count(
+                        $groupedItems
+                    ) ?>
 
-                <section class="hh-side-card">
+                </strong>
 
+            </div>
 
-                    <div class="hh-side-card-header">
 
-                        <small>
-                            ORDER SUMMARY
-                        </small>
+            <div class="hh-stat-card">
 
-                        <h3>
-                            Payment & Total
-                        </h3>
+                <div class="hh-stat-icon">
+                    <i class="bi bi-credit-card"></i>
+                </div>
 
-                    </div>
+                <span class="hh-stat-label">
+                    Payment
+                </span>
 
+                <strong class="hh-stat-value">
 
-                    <div class="hh-side-body">
+                    <?= odEscape(
+                        $paymentStatus
+                    ) ?>
 
+                </strong>
 
-                        <div class="hh-side-row">
+            </div>
 
-                            <span>
-                                Order ID
-                            </span>
 
-                            <strong>
-                                #<?= $orderId ?>
-                            </strong>
+            <div class="hh-stat-card">
 
-                        </div>
+                <div class="hh-stat-icon">
+                    <i class="bi bi-receipt"></i>
+                </div>
 
+                <span class="hh-stat-label">
+                    Order Total
+                </span>
 
-                        <div class="hh-side-row">
+                <strong class="hh-stat-value">
 
-                            <span>
-                                Items
-                            </span>
+                    RM
+                    <?= odMoney(
+                        $grandTotal
+                    ) ?>
 
-                            <strong>
-                                <?= $totalItems ?>
-                            </strong>
+                </strong>
 
-                        </div>
+            </div>
 
+        </section>
 
-                        <div class="hh-side-row">
 
-                            <span>
-                                Sellers
-                            </span>
+        <!-- =====================================================
+             REVIEW JOURNEY
+        ====================================================== -->
 
-                            <strong>
-                                <?= $vendorCount ?>
-                            </strong>
+        <section class="hh-review-banner">
 
-                        </div>
+            <div class="hh-review-banner-content">
 
+                <span class="hh-review-banner-label">
 
-                        <div class="hh-side-row">
+                    Verified Purchase Reviews
 
-                            <span>
-                                Delivery
-                            </span>
+                </span>
 
-                            <strong>
 
-                                <?= orderDetailsEscape(
-                                    $order[
-                                        'delivery_method'
-                                    ]
-                                    ?? '—'
-                                ) ?>
+                <h2>
 
-                            </strong>
+                    Your voice unlocks after delivery ✨
 
-                        </div>
+                </h2>
 
 
-                        <div class="hh-side-row">
+                <p>
 
-                            <span>
-                                Payment Method
-                            </span>
+                    When a seller marks your purchased item as
+                    Completed, HochipoHub automatically unlocks
+                    your verified review. Every review here is
+                    connected to an actual purchased order item.
 
-                            <strong>
+                </p>
 
-                                <?= orderDetailsEscape(
-                                    $paymentMethod
-                                ) ?>
+            </div>
 
-                            </strong>
 
-                        </div>
+            <div class="hh-review-count">
 
+                <strong>
 
-                        <div class="hh-side-row">
+                    <?= (int)
+                        $reviewableCount ?>
 
-                            <span>
-                                Payment Status
-                            </span>
+                </strong>
 
-                            <strong>
+                <span>
 
-                                <?= orderDetailsEscape(
-                                    $paymentStatus
-                                ) ?>
+                    Ready to Review
 
-                            </strong>
+                </span>
 
-                        </div>
+            </div>
 
+        </section>
 
-                        <div class="hh-side-divider"></div>
 
+        <!-- =====================================================
+             PRODUCTS BY SELLER
+        ====================================================== -->
 
-                        <div class="hh-side-total">
+        <section class="hh-section">
 
-                            <span>
-                                TOTAL
-                            </span>
+            <div class="hh-section-heading">
 
-                            <strong>
+                <div class="hh-section-heading-left">
 
-                                RM
-                                <?= number_format(
-                                    (float)
-                                    $order[
-                                        'total_amount'
-                                    ],
-                                    2
-                                ) ?>
+                    <div class="hh-section-heading-icon">
 
-                            </strong>
-
-                        </div>
-
-
-                    </div>
-
-
-                </section>
-
-
-
-                <!-- ===============================================
-                     CUSTOMER
-                ================================================ -->
-
-                <section class="hh-customer-card">
-
-
-                    <div class="hh-customer-avatar">
-
-                        <i class="bi bi-person-fill"></i>
-
-                    </div>
-
-
-                    <div class="hh-customer-copy">
-
-                        <strong>
-
-                            <?= orderDetailsEscape(
-                                $order[
-                                    'customer_name'
-                                ]
-                                ?? 'Customer'
-                            ) ?>
-
-                        </strong>
-
-
-                        <span>
-
-                            <?= orderDetailsEscape(
-                                $order[
-                                    'customer_email'
-                                ]
-                                ?? ''
-                            ) ?>
-
-                        </span>
-
-
-                        <?php if (
-                            !empty(
-                                $order[
-                                    'customer_phone'
-                                ]
-                            )
-                        ): ?>
-
-
-                            <span>
-
-                                <?= orderDetailsEscape(
-                                    $order[
-                                        'customer_phone'
-                                    ]
-                                ) ?>
-
-                            </span>
-
-
-                        <?php endif; ?>
-
-
-                    </div>
-
-
-                </section>
-
-
-
-                <!-- ===============================================
-                     PAYMENT DETAILS
-                ================================================ -->
-
-                <?php if ($payment): ?>
-
-
-                    <section class="hh-side-card">
-
-
-                        <div class="hh-side-card-header">
-
-                            <small>
-                                PAYMENT DETAILS
-                            </small>
-
-                            <h3>
-                                Transaction
-                            </h3>
-
-                        </div>
-
-
-                        <div class="hh-side-body">
-
-
-                            <div class="hh-side-row">
-
-                                <span>
-                                    Method
-                                </span>
-
-                                <strong>
-
-                                    <?= orderDetailsEscape(
-                                        $payment[
-                                            'payment_method'
-                                        ]
-                                        ?? '—'
-                                    ) ?>
-
-                                </strong>
-
-                            </div>
-
-
-                            <div class="hh-side-row">
-
-                                <span>
-                                    Status
-                                </span>
-
-                                <strong>
-
-                                    <?= orderDetailsEscape(
-                                        $payment[
-                                            'payment_status'
-                                        ]
-                                        ?? 'Pending'
-                                    ) ?>
-
-                                </strong>
-
-                            </div>
-
-
-                            <div class="hh-side-row">
-
-                                <span>
-                                    Amount
-                                </span>
-
-                                <strong>
-
-                                    RM
-                                    <?= number_format(
-                                        (float)
-                                        $payment[
-                                            'amount'
-                                        ],
-                                        2
-                                    ) ?>
-
-                                </strong>
-
-                            </div>
-
-
-                            <div class="hh-side-row">
-
-                                <span>
-                                    Reference
-                                </span>
-
-                                <strong>
-
-                                    <?= !empty(
-                                        $payment[
-                                            'transaction_reference'
-                                        ]
-                                    )
-                                        ? orderDetailsEscape(
-                                            $payment[
-                                                'transaction_reference'
-                                            ]
-                                        )
-                                        : '—' ?>
-
-                                </strong>
-
-                            </div>
-
-
-                        </div>
-
-
-                    </section>
-
-
-                <?php endif; ?>
-
-
-
-                <!-- ===============================================
-                     SECURITY
-                ================================================ -->
-
-                <section class="hh-order-safe">
-
-
-                    <div class="hh-order-safe-icon">
-
-                        <i class="bi bi-shield-check"></i>
+                        <i class="bi bi-stars"></i>
 
                     </div>
 
 
                     <div>
 
+                        <span>
+                            Purchased Products
+                        </span>
+
+                        <h2>
+                            Your Order Items
+                        </h2>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    style="
+                        color:#8b9bb1;
+                        font-size:9px;
+                        font-weight:700;
+                    "
+                >
+
+                    <?= (int)
+                        $reviewedCount ?>
+                    reviewed ·
+
+                    <?= (int)
+                        $reviewableCount ?>
+                    ready
+
+                </div>
+
+            </div>
+
+
+            <?php if (
+                empty(
+                    $groupedItems
+                )
+            ): ?>
+
+                <div
+                    style="
+                        padding:45px 20px;
+                        text-align:center;
+                        color:#8ca0b8;
+                    "
+                >
+
+                    No order items found.
+
+                </div>
+
+            <?php else: ?>
+
+
+                <?php foreach (
+                    $groupedItems
+                    as $seller
+                ): ?>
+
+
+                    <?php
+
+                    $sellerStatus =
+                        $seller[
+                            'vendor_status'
+                        ]
+                        ?? 'Pending';
+
+
+                    $sellerStatusClass =
+                        odStatusClass(
+                            $sellerStatus
+                        );
+
+
+                    $sellerStatusIcon =
+                        odStatusIcon(
+                            $sellerStatus
+                        );
+
+
+                    $sellerLogo =
+                        trim(
+                            (string) (
+                                $seller[
+                                    'business_logo'
+                                ]
+                                ?? ''
+                            )
+                        );
+
+
+                    if (
+                        $sellerLogo !== ''
+                    ) {
+
+                        $sellerLogoUrl =
+                            'uploads/vendors/' .
+                            rawurlencode(
+                                basename(
+                                    $sellerLogo
+                                )
+                            );
+
+                    } else {
+
+                        $sellerLogoUrl =
+                            '';
+                    }
+
+                    ?>
+
+
+                    <div class="hh-seller-card">
+
+
+                        <!-- SELLER HEADER -->
+
+                        <div class="hh-seller-header">
+
+                            <div class="hh-seller-info">
+
+                                <div class="hh-seller-logo">
+
+                                    <?php if (
+                                        $sellerLogoUrl !== ''
+                                    ): ?>
+
+                                        <img
+                                            src="<?= odEscape(
+                                                $sellerLogoUrl
+                                            ) ?>"
+                                            alt="Seller"
+                                        >
+
+                                    <?php else: ?>
+
+                                        <i
+                                            class="bi bi-shop"
+                                        ></i>
+
+                                    <?php endif; ?>
+
+                                </div>
+
+
+                                <div>
+
+                                    <div class="hh-seller-name">
+
+                                        <?= odEscape(
+                                            $seller[
+                                                'business_name'
+                                            ]
+                                        ) ?>
+
+                                    </div>
+
+
+                                    <div class="hh-seller-sub">
+
+                                        <?= odEscape(
+                                            odVendorStatusMessage(
+                                                $sellerStatus
+                                            )
+                                        ) ?>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+                            <span
+                                class="
+                                    hh-status-badge
+                                    <?= odEscape(
+                                        $sellerStatusClass
+                                    ) ?>
+                                "
+                            >
+
+                                <i
+                                    class="bi <?= odEscape(
+                                        $sellerStatusIcon
+                                    ) ?>"
+                                ></i>
+
+                                <?= odEscape(
+                                    $sellerStatus
+                                ) ?>
+
+                            </span>
+
+                        </div>
+
+
+                        <!-- PRODUCTS -->
+
+                        <?php foreach (
+                            $seller['items']
+                            as $item
+                        ): ?>
+
+
+                            <?php
+
+                            $hasReview =
+                                !empty(
+                                    $item[
+                                        'review_id'
+                                    ]
+                                );
+
+
+                            $itemVendorStatus =
+                                strtolower(
+                                    trim(
+                                        (string) (
+                                            $item[
+                                                'vendor_status'
+                                            ]
+                                            ?? ''
+                                        )
+                                    )
+                                );
+
+
+                            $canReview =
+                                !$hasReview &&
+                                $itemVendorStatus ===
+                                'completed';
+
+
+                            $reviewLocked =
+                                !$hasReview &&
+                                !$canReview;
+
+
+                            $reviewRating =
+                                (int) (
+                                    $item[
+                                        'review_rating'
+                                    ]
+                                    ?? 0
+                                );
+
+                            ?>
+
+
+                            <article class="hh-product">
+
+
+                                <!-- PRODUCT IMAGE -->
+
+                                <a
+                                    href="<?= odEscape(
+                                        BASE_URL
+                                    ) ?>product_details.php?id=<?= (int)
+                                        $item[
+                                            'product_id'
+                                        ] ?>"
+                                    class="hh-product-image"
+                                >
+
+                                    <img
+                                        src="<?= odEscape(
+                                            odImage(
+                                                $item[
+                                                    'image'
+                                                ]
+                                            )
+                                        ) ?>"
+                                        alt="<?= odEscape(
+                                            $item[
+                                                'product_name'
+                                            ]
+                                        ) ?>"
+                                    >
+
+                                </a>
+
+
+                                <!-- PRODUCT INFO -->
+
+                                <div class="hh-product-info">
+
+                                    <h3>
+
+                                        <a
+                                            href="<?= odEscape(
+                                                BASE_URL
+                                            ) ?>product_details.php?id=<?= (int)
+                                                $item[
+                                                    'product_id'
+                                                ] ?>"
+                                        >
+
+                                            <?= odEscape(
+                                                $item[
+                                                    'product_name'
+                                                ]
+                                            ) ?>
+
+                                        </a>
+
+                                    </h3>
+
+
+                                    <div class="hh-product-meta">
+
+                                        <span>
+
+                                            <i class="bi bi-shop"></i>
+
+                                            <?= odEscape(
+                                                $item[
+                                                    'business_name'
+                                                ]
+                                            ) ?>
+
+                                        </span>
+
+
+                                        <span>
+                                            •
+                                        </span>
+
+
+                                        <span>
+
+                                            Qty:
+                                            <?= (int)
+                                                $item[
+                                                    'quantity'
+                                                ] ?>
+
+                                        </span>
+
+
+                                        <span>
+                                            •
+                                        </span>
+
+
+                                        <span>
+
+                                            Verified Purchase
+
+                                            <i
+                                                class="bi bi-patch-check-fill"
+                                                style="
+                                                    color:#2563eb;
+                                                "
+                                            ></i>
+
+                                        </span>
+
+                                    </div>
+
+
+                                    <div class="hh-product-pricing">
+
+                                        <span>
+
+                                            Unit Price:
+
+                                            <strong>
+
+                                                RM
+                                                <?= odMoney(
+                                                    $item[
+                                                        'unit_price'
+                                                    ]
+                                                ) ?>
+
+                                            </strong>
+
+                                        </span>
+
+
+                                        <span>
+
+                                            Subtotal:
+
+                                            <strong>
+
+                                                RM
+                                                <?= odMoney(
+                                                    $item[
+                                                        'subtotal'
+                                                    ]
+                                                ) ?>
+
+                                            </strong>
+
+                                        </span>
+
+                                    </div>
+
+                                </div>
+
+
+                                <!-- REVIEW ACTION -->
+
+                                <div class="hh-review-action">
+
+
+                                    <?php if (
+                                        $hasReview
+                                    ): ?>
+
+
+                                        <div class="hh-review-completed">
+
+                                            <i
+                                                class="bi bi-patch-check-fill"
+                                            ></i>
+
+                                            Reviewed
+
+                                        </div>
+
+
+                                        <?php if (
+                                            $reviewRating > 0
+                                        ): ?>
+
+                                            <span class="hh-review-stars-small">
+
+                                                <?php
+
+                                                for (
+                                                    $star = 1;
+                                                    $star <= 5;
+                                                    $star++
+                                                ) {
+
+                                                    echo
+                                                        $star <=
+                                                        $reviewRating
+                                                            ? '★'
+                                                            : '☆';
+                                                }
+
+                                                ?>
+
+                                            </span>
+
+                                        <?php endif; ?>
+
+
+                                        <span class="hh-review-hint">
+
+                                            Thank you for sharing
+                                            your experience.
+
+                                        </span>
+
+
+                                    <?php elseif (
+                                        $canReview
+                                    ): ?>
+
+
+                                        <a
+                                            href="<?= odEscape(
+                                                BASE_URL
+                                            ) ?>review.php?order_detail_id=<?= (int)
+                                                $item[
+                                                    'order_detail_id'
+                                                ] ?>"
+                                            class="hh-review-button"
+                                        >
+
+                                            <i
+                                                class="bi bi-stars"
+                                            ></i>
+
+                                            Write Review
+
+                                        </a>
+
+
+                                        <span class="hh-review-hint">
+
+                                            Verified review unlocked ✨
+
+                                        </span>
+
+
+                                    <?php elseif (
+                                        $reviewLocked
+                                    ): ?>
+
+
+                                        <div class="hh-review-locked">
+
+                                            <i
+                                                class="bi bi-lock-fill"
+                                            ></i>
+
+                                            Review Locked
+
+                                        </div>
+
+
+                                        <span class="hh-review-hint">
+
+                                            Available after this
+                                            seller order is completed.
+
+                                        </span>
+
+
+                                    <?php endif; ?>
+
+
+                                </div>
+
+                            </article>
+
+                        <?php endforeach; ?>
+
+
+                        <?php if (
+                            !empty(
+                                $seller[
+                                    'tracking_number'
+                                ]
+                            )
+                        ): ?>
+
+                            <div
+                                style="
+                                    padding:
+                                        0 20px 20px;
+                                "
+                            >
+
+                                <div class="hh-tracking-box">
+
+                                    <i class="bi bi-truck"></i>
+
+                                    Tracking information provided
+                                    by seller.
+
+                                    <div class="hh-tracking-number">
+
+                                        <?= odEscape(
+                                            $seller[
+                                                'tracking_number'
+                                            ]
+                                        ) ?>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        <?php endif; ?>
+
+
+                    </div>
+
+                <?php endforeach; ?>
+
+
+            <?php endif; ?>
+
+        </section>
+
+
+        <!-- =====================================================
+             PAYMENT + DELIVERY
+        ====================================================== -->
+
+        <div class="hh-info-grid">
+
+
+            <!-- PAYMENT -->
+
+            <section class="hh-info-card">
+
+                <div class="hh-section-heading">
+
+                    <div class="hh-section-heading-left">
+
+                        <div class="hh-section-heading-icon">
+
+                            <i
+                                class="bi bi-credit-card-fill"
+                            ></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                Transaction
+                            </span>
+
+                            <h2>
+                                Payment Details
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="hh-info-row">
+
+                    <span>
+                        Payment Method
+                    </span>
+
+                    <strong>
+
+                        <?= odEscape(
+                            $paymentDisplay
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <div class="hh-info-row">
+
+                    <span>
+                        Payment Status
+                    </span>
+
+                    <strong>
+
+                        <span
+                            class="
+                                hh-payment-status
+                                <?= odEscape(
+                                    odStatusClass(
+                                        $paymentStatus
+                                    )
+                                ) ?>
+                            "
+                        >
+
+                            <?= odEscape(
+                                $paymentStatus
+                            ) ?>
+
+                        </span>
+
+                    </strong>
+
+                </div>
+
+
+                <div class="hh-info-row">
+
+                    <span>
+                        Amount
+                    </span>
+
+                    <strong>
+
+                        RM
+                        <?= odMoney(
+                            $payment[
+                                'amount'
+                            ]
+                            ?? $grandTotal
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <?php if (
+                    !empty(
+                        $payment[
+                            'payment_gateway'
+                        ]
+                    )
+                ): ?>
+
+                    <div class="hh-info-row">
+
+                        <span>
+                            Payment Gateway
+                        </span>
+
                         <strong>
-                            Order information secured
+
+                            <?= odEscape(
+                                $payment[
+                                    'payment_gateway'
+                                ]
+                            ) ?>
+
                         </strong>
 
-                        <p>
+                    </div>
 
-                            Only your customer account
-                            can view the details of this
-                            order.
+                <?php endif; ?>
 
-                        </p>
+
+                <?php if (
+                    !empty(
+                        $payment[
+                            'transaction_reference'
+                        ]
+                    )
+                ): ?>
+
+                    <div class="hh-info-row">
+
+                        <span>
+                            Transaction Reference
+                        </span>
+
+                        <strong>
+
+                            <?= odEscape(
+                                $payment[
+                                    'transaction_reference'
+                                ]
+                            ) ?>
+
+                        </strong>
+
+                    </div>
+
+                <?php endif; ?>
+
+
+                <?php if (
+                    !empty(
+                        $payment[
+                            'payment_date'
+                        ]
+                    )
+                ): ?>
+
+                    <div class="hh-info-row">
+
+                        <span>
+                            Payment Date
+                        </span>
+
+                        <strong>
+
+                            <?= odEscape(
+                                date(
+                                    'd M Y, h:i A',
+                                    strtotime(
+                                        $payment[
+                                            'payment_date'
+                                        ]
+                                    )
+                                )
+                            ) ?>
+
+                        </strong>
+
+                    </div>
+
+                <?php endif; ?>
+
+
+            </section>
+
+
+            <!-- DELIVERY -->
+
+            <section class="hh-info-card">
+
+                <div class="hh-section-heading">
+
+                    <div class="hh-section-heading-left">
+
+                        <div class="hh-section-heading-icon">
+
+                            <i
+                                class="bi <?= odEscape(
+                                    $deliveryIcon
+                                ) ?>"
+                            ></i>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                Fulfilment
+                            </span>
+
+                            <h2>
+                                Delivery Details
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="hh-info-row">
+
+                    <span>
+                        Delivery Method
+                    </span>
+
+                    <strong>
+
+                        <?= odEscape(
+                            $deliveryMethod !== ''
+                                ? $deliveryMethod
+                                : '—'
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <div class="hh-info-row">
+
+                    <span>
+                        Order Date
+                    </span>
+
+                    <strong>
+
+                        <?= odEscape(
+                            date(
+                                'd M Y, h:i A',
+                                strtotime(
+                                    $order[
+                                        'order_date'
+                                    ]
+                                )
+                            )
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <?php if (
+                    !empty(
+                        $order[
+                            'completed_date'
+                        ]
+                    )
+                ): ?>
+
+                    <div class="hh-info-row">
+
+                        <span>
+                            Completed Date
+                        </span>
+
+                        <strong>
+
+                            <?= odEscape(
+                                date(
+                                    'd M Y, h:i A',
+                                    strtotime(
+                                        $order[
+                                            'completed_date'
+                                        ]
+                                    )
+                                )
+                            ) ?>
+
+                        </strong>
+
+                    </div>
+
+                <?php endif; ?>
+
+
+                <?php if (
+                    $deliveryMethod !==
+                    'Pickup' &&
+                    !empty(
+                        $order[
+                            'delivery_address'
+                        ]
+                    )
+                ): ?>
+
+                    <div class="hh-info-row">
+
+                        <span>
+                            Delivery Address
+                        </span>
+
+                        <strong>
+
+                            <?= nl2br(
+                                odEscape(
+                                    $order[
+                                        'delivery_address'
+                                    ]
+                                )
+                            ) ?>
+
+                        </strong>
+
+                    </div>
+
+                <?php endif; ?>
+
+
+                <div class="hh-tracking-box">
+
+                    <?= odEscape(
+                        $deliveryDescription
+                    ) ?>
+
+                </div>
+
+            </section>
+
+        </div>
+
+
+        <!-- =====================================================
+             ORDER SUMMARY
+        ====================================================== -->
+
+        <section
+            class="hh-section"
+            style="
+                margin-top:24px;
+            "
+        >
+
+            <div class="hh-section-heading">
+
+                <div class="hh-section-heading-left">
+
+                    <div class="hh-section-heading-icon">
+
+                        <i class="bi bi-receipt-cutoff"></i>
 
                     </div>
 
 
-                </section>
+                    <div>
+
+                        <span>
+                            Payment Breakdown
+                        </span>
+
+                        <h2>
+                            Order Summary
+                        </h2>
+
+                    </div>
+
+                </div>
+
+            </div>
 
 
-            </aside>
+            <div class="hh-total-box">
 
+                <div class="hh-total-row">
+
+                    <span>
+                        Product Subtotal
+                    </span>
+
+                    <strong>
+
+                        RM
+                        <?= odMoney(
+                            $productSubtotal
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <div class="hh-total-row">
+
+                    <span>
+                        Delivery Fee
+                    </span>
+
+                    <strong>
+
+                        RM
+                        <?= odMoney(
+                            $totalDeliveryFee
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+
+                <div class="hh-total-row">
+
+                    <span>
+                        Grand Total
+                    </span>
+
+                    <strong>
+
+                        RM
+                        <?= odMoney(
+                            $grandTotal
+                        ) ?>
+
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <div class="hh-bottom-actions">
+
+                <a
+                    href="<?= odEscape(
+                        BASE_URL
+                    ) ?>order.php"
+                    class="
+                        hh-btn
+                        hh-btn-secondary
+                    "
+                >
+
+                    <i class="bi bi-arrow-left"></i>
+
+                    Back to Orders
+
+                </a>
+
+
+                <a
+                    href="<?= odEscape(
+                        BASE_URL
+                    ) ?>product.php"
+                    class="
+                        hh-btn
+                        hh-btn-primary
+                    "
+                >
+
+                    <i class="bi bi-bag"></i>
+
+                    Continue Shopping
+
+                </a>
+
+            </div>
 
         </section>
 
 
     </div>
 
-
 </main>
 
 
 <?php
-
-/*
-|--------------------------------------------------------------------------
-| FOOTER
-|--------------------------------------------------------------------------
-*/
 
 require_once __DIR__ .
     '/includes/footer.php';
