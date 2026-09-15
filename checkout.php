@@ -2,37 +2,35 @@
 
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB - PREMIUM CHECKOUT
+| HOCHIPOHUB - CHECKOUT
 |--------------------------------------------------------------------------
-| File:
-| checkout.php
-|--------------------------------------------------------------------------
+| File: checkout.php
 |
-| Features:
-| - Customer checkout
-| - Delivery method
-| - Delivery address
-| - Payment method
-| - Order summary
-| - Multi-vendor order creation
-| - Stock reduction
-| - Inventory sync
-| - Payment record
-| - Commission record
+| FINAL VERSION
 |
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| REQUIRED FILES
+| Supports:
+| - Pickup
+| - Postage
+| - Vendor Delivery
+| - Vendor configurable postage fee
+| - Vendor configurable delivery fee
+| - FPX via Fiuu
+| - Credit Card via Fiuu
+| - Debit Card via Fiuu
+| - Cash at Pickup
+| - Cash on Delivery
+| - Multi-vendor cart
+| - Vendor orders
+| - Vendor commission
+| - Stock update
+| - Inventory update
 |--------------------------------------------------------------------------
 */
 
 require_once __DIR__ . '/database/db.php';
 require_once __DIR__ . '/includes/session.php';
 require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/fiuu_config.php';
 
 
 /*
@@ -63,23 +61,23 @@ requireLogin();
 
 $db = getDB();
 
-
 if (!($db instanceof PDO)) {
-
-    die(
-        'Database connection is not available.'
-    );
+    die('Database connection is not available.');
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CURRENT USER
+| CUSTOMER
 |--------------------------------------------------------------------------
 */
 
-$user_id =
-    (int) $_SESSION['user_id'];
+$userId = (int) ($_SESSION['user_id'] ?? 0);
+
+if ($userId <= 0) {
+    header('Location: index.php');
+    exit;
+}
 
 
 /*
@@ -88,40 +86,23 @@ $user_id =
 |--------------------------------------------------------------------------
 */
 
-$currentRole =
-    strtolower(
-        trim(
-            (string) (
-                $_SESSION['role']
-                ?? $_SESSION['user_role']
-                ?? ''
-            )
+$currentRole = strtolower(
+    trim(
+        (string) (
+            $_SESSION['role']
+            ?? $_SESSION['user_role']
+            ?? ''
         )
-    );
-
+    )
+);
 
 if (
     $currentRole !== '' &&
     $currentRole !== 'customer'
 ) {
-
-    header(
-        'Location: dashboard.php'
-    );
-
+    header('Location: dashboard.php');
     exit;
 }
-
-
-/*
-|--------------------------------------------------------------------------
-| VARIABLES
-|--------------------------------------------------------------------------
-*/
-
-$error = '';
-
-$success = false;
 
 
 /*
@@ -130,257 +111,108 @@ $success = false;
 |--------------------------------------------------------------------------
 */
 
-if (!function_exists('checkoutEscape')) {
-
-    function checkoutEscape($value): string
-    {
-        return htmlspecialchars(
-            (string) $value,
-            ENT_QUOTES,
-            'UTF-8'
-        );
-    }
+function checkoutEscape($value): string
+{
+    return htmlspecialchars(
+        (string) $value,
+        ENT_QUOTES,
+        'UTF-8'
+    );
 }
 
 
-if (!function_exists('checkoutProductImage')) {
-
-    function checkoutProductImage($image): string
-    {
-        $image =
-            trim(
-                (string) $image
-            );
-
-
-        if ($image === '') {
-            return '';
-        }
+function checkoutMoney($value): string
+{
+    return number_format(
+        (float) $value,
+        2,
+        '.',
+        ''
+    );
+}
 
 
-        if (
-            str_starts_with(
-                $image,
-                'http://'
-            ) ||
-            str_starts_with(
-                $image,
-                'https://'
-            )
-        ) {
+function checkoutProductImage($image): string
+{
+    $image = trim((string) $image);
 
-            return $image;
-        }
-
-
-        if (
-            str_starts_with(
-                $image,
-                'uploads/'
-            )
-        ) {
-
-            return $image;
-        }
-
-
-        return
-            'uploads/products/' .
-            rawurlencode(
-                basename($image)
-            );
+    if ($image === '') {
+        return '';
     }
+
+    if (
+        str_starts_with($image, 'http://') ||
+        str_starts_with($image, 'https://')
+    ) {
+        return $image;
+    }
+
+    if (
+        str_starts_with(
+            $image,
+            'uploads/'
+        )
+    ) {
+        return $image;
+    }
+
+    return
+        'uploads/products/' .
+        rawurlencode(
+            basename($image)
+        );
+}
+
+
+function checkoutMapsUrl($address): string
+{
+    return
+        'https://www.google.com/maps/dir/?api=1&destination=' .
+        rawurlencode(
+            trim((string) $address)
+        );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| GET CART
+| CUSTOMER DETAILS
 |--------------------------------------------------------------------------
 */
 
-$stmt =
-    $db->prepare("
-        SELECT
+$customerStmt = $db->prepare("
+    SELECT
+        user_id,
+        name,
+        email,
+        phone
+    FROM users
+    WHERE user_id = ?
+    LIMIT 1
+");
 
-            c.cart_id,
-            c.product_id,
-            c.quantity,
-
-            p.product_name,
-            p.price,
-            p.stock_quantity,
-            p.image,
-            p.status,
-
-            v.vendor_id,
-            v.business_name
-
-        FROM cart c
-
-        INNER JOIN products p
-            ON c.product_id =
-               p.product_id
-
-        INNER JOIN vendors v
-            ON p.vendor_id =
-               v.vendor_id
-
-        WHERE c.customer_id = ?
-
-        ORDER BY
-            v.business_name ASC,
-            p.product_name ASC
-    ");
-
-
-$stmt->execute([
-    $user_id
+$customerStmt->execute([
+    $userId
 ]);
 
-
-$cartItems =
-    $stmt->fetchAll(
+$customer =
+    $customerStmt->fetch(
         PDO::FETCH_ASSOC
     );
 
-
-/*
-|--------------------------------------------------------------------------
-| EMPTY CART
-|--------------------------------------------------------------------------
-*/
-
-if (empty($cartItems)) {
-
-    header(
-        'Location: cart.php'
-    );
-
+if (!$customer) {
+    header('Location: index.php');
     exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CALCULATE TOTAL
+| VALUES
 |--------------------------------------------------------------------------
 */
 
-$subtotal = 0;
-
-$totalItems = 0;
-
-$vendorIds = [];
-
-
-foreach ($cartItems as $item) {
-
-    $quantity =
-        (int) $item['quantity'];
-
-
-    $price =
-        (float) $item['price'];
-
-
-    $subtotal +=
-        $price *
-        $quantity;
-
-
-    $totalItems +=
-        $quantity;
-
-
-    $vendorIds[
-        (int) $item['vendor_id']
-    ] = true;
-}
-
-
-$vendorCount =
-    count(
-        $vendorIds
-    );
-
-
-/*
-|--------------------------------------------------------------------------
-| DELIVERY
-|--------------------------------------------------------------------------
-|
-| Current database logic uses RM0 delivery fee.
-| Keep total consistent with existing checkout backend.
-|
-|--------------------------------------------------------------------------
-*/
-
-$deliveryFee = 0.00;
-
-$grandTotal =
-    $subtotal +
-    $deliveryFee;
-
-
-/*
-|--------------------------------------------------------------------------
-| CHECK STOCK / STATUS
-|--------------------------------------------------------------------------
-*/
-
-foreach ($cartItems as $item) {
-
-
-    if (
-        strtolower(
-            trim(
-                (string)
-                $item['status']
-            )
-        ) !== 'available'
-    ) {
-
-        $error =
-            $item['product_name'] .
-            ' is currently unavailable.';
-
-        break;
-    }
-
-
-    if (
-        (int) $item['quantity'] >
-        (int) $item['stock_quantity']
-    ) {
-
-        $error =
-            'Insufficient stock for ' .
-            $item['product_name'];
-
-        break;
-    }
-
-
-    if (
-        (int) $item['stock_quantity']
-        <= 0
-    ) {
-
-        $error =
-            $item['product_name'] .
-            ' is out of stock.';
-
-        break;
-    }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| FORM VALUES
-|--------------------------------------------------------------------------
-*/
+$error = '';
 
 $selectedDelivery =
     trim(
@@ -390,7 +222,6 @@ $selectedDelivery =
         )
     );
 
-
 $selectedAddress =
     trim(
         (string) (
@@ -398,7 +229,6 @@ $selectedAddress =
             ?? ''
         )
     );
-
 
 $selectedPayment =
     trim(
@@ -411,45 +241,509 @@ $selectedPayment =
 
 /*
 |--------------------------------------------------------------------------
-| CHECKOUT
+| GET CART
+|--------------------------------------------------------------------------
+*/
+
+$cartStmt = $db->prepare("
+    SELECT
+
+        c.cart_id,
+        c.customer_id,
+        c.product_id,
+        c.quantity,
+
+        p.product_name,
+        p.description,
+        p.price,
+        p.stock_quantity,
+        p.image,
+        p.status,
+
+        v.vendor_id,
+        v.business_name,
+        v.business_address,
+
+        v.delivery_method
+            AS vendor_delivery_method,
+
+        v.postage_fee,
+
+        v.allow_vendor_delivery,
+
+        v.cod_enabled,
+
+        v.vendor_delivery_fee,
+
+        v.commission_rate
+
+    FROM cart c
+
+    INNER JOIN products p
+        ON p.product_id =
+           c.product_id
+
+    INNER JOIN vendors v
+        ON v.vendor_id =
+           p.vendor_id
+
+    WHERE c.customer_id = ?
+
+    ORDER BY
+        v.business_name ASC,
+        p.product_name ASC
+");
+
+$cartStmt->execute([
+    $userId
+]);
+
+$cartItems =
+    $cartStmt->fetchAll(
+        PDO::FETCH_ASSOC
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| EMPTY CART
+|--------------------------------------------------------------------------
+*/
+
+if (empty($cartItems)) {
+    header('Location: cart.php');
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| BUILD VENDOR DATA
+|--------------------------------------------------------------------------
+*/
+
+$vendors = [];
+
+$subtotal = 0.00;
+
+$totalItems = 0;
+
+foreach ($cartItems as $item) {
+
+    $vendorId =
+        (int) $item['vendor_id'];
+
+    if (
+        !isset(
+            $vendors[$vendorId]
+        )
+    ) {
+
+        $vendors[$vendorId] = [
+
+            'vendor_id' =>
+                $vendorId,
+
+            'business_name' =>
+                (string) (
+                    $item['business_name']
+                    ?? 'Seller'
+                ),
+
+            'business_address' =>
+                trim(
+                    (string) (
+                        $item['business_address']
+                        ?? ''
+                    )
+                ),
+
+            'delivery_method' =>
+                (string) (
+                    $item[
+                        'vendor_delivery_method'
+                    ]
+                    ?? 'Both'
+                ),
+
+            'postage_fee' =>
+                max(
+                    0,
+                    (float) (
+                        $item['postage_fee']
+                        ?? 0
+                    )
+                ),
+
+            'allow_vendor_delivery' =>
+                (int) (
+                    $item[
+                        'allow_vendor_delivery'
+                    ]
+                    ?? 0
+                ),
+
+            'cod_enabled' =>
+                (int) (
+                    $item[
+                        'cod_enabled'
+                    ]
+                    ?? 0
+                ),
+
+            'vendor_delivery_fee' =>
+                max(
+                    0,
+                    (float) (
+                        $item[
+                            'vendor_delivery_fee'
+                        ]
+                        ?? 0
+                    )
+                ),
+
+            'commission_rate' =>
+                max(
+                    0,
+                    min(
+                        100,
+                        (float) (
+                            $item[
+                                'commission_rate'
+                            ]
+                            ?? 5
+                        )
+                    )
+                ),
+
+            'subtotal' =>
+                0.00
+        ];
+    }
+
+
+    $quantity =
+        max(
+            0,
+            (int) $item['quantity']
+        );
+
+    $price =
+        max(
+            0,
+            (float) $item['price']
+        );
+
+    $itemSubtotal =
+        $quantity *
+        $price;
+
+
+    $vendors[$vendorId]['subtotal'] +=
+        $itemSubtotal;
+
+
+    $subtotal +=
+        $itemSubtotal;
+
+
+    $totalItems +=
+        $quantity;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DELIVERY AVAILABILITY
+|--------------------------------------------------------------------------
+*/
+
+$pickupAvailable = true;
+
+$postageAvailable = true;
+
+$vendorDeliveryAvailable = true;
+
+$vendorDeliveryCodAvailable = true;
+
+
+foreach ($vendors as $vendor) {
+
+    $deliveryMethod =
+        trim(
+            (string) $vendor[
+                'delivery_method'
+            ]
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PICKUP
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $deliveryMethod !== 'Pickup' &&
+        $deliveryMethod !== 'Both'
+    ) {
+
+        $pickupAvailable = false;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | POSTAGE
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $deliveryMethod !== 'Postage' &&
+        $deliveryMethod !== 'Both'
+    ) {
+
+        $postageAvailable = false;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VENDOR DELIVERY
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        (int) $vendor[
+            'allow_vendor_delivery'
+        ] !== 1
+    ) {
+
+        $vendorDeliveryAvailable = false;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | COD
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        (int) $vendor[
+            'allow_vendor_delivery'
+        ] !== 1 ||
+        (int) $vendor[
+            'cod_enabled'
+        ] !== 1
+    ) {
+
+        $vendorDeliveryCodAvailable = false;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL POSTAGE FEE
+|--------------------------------------------------------------------------
+*/
+
+$postageFee = 0.00;
+
+foreach ($vendors as $vendor) {
+
+    $postageFee +=
+        max(
+            0,
+            (float) $vendor[
+                'postage_fee'
+            ]
+        );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| TOTAL VENDOR DELIVERY FEE
+|--------------------------------------------------------------------------
+*/
+
+$vendorDeliveryFee = 0.00;
+
+foreach ($vendors as $vendor) {
+
+    $vendorDeliveryFee +=
+        max(
+            0,
+            (float) $vendor[
+                'vendor_delivery_fee'
+            ]
+        );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CURRENT DELIVERY FEE
+|--------------------------------------------------------------------------
+*/
+
+$currentDeliveryFee = 0.00;
+
+if (
+    $selectedDelivery ===
+    'Postage'
+) {
+
+    $currentDeliveryFee =
+        $postageFee;
+
+} elseif (
+    $selectedDelivery ===
+    'Vendor Delivery'
+) {
+
+    $currentDeliveryFee =
+        $vendorDeliveryFee;
+}
+
+
+$grandTotal =
+    $subtotal +
+    $currentDeliveryFee;
+
+
+/*
+|--------------------------------------------------------------------------
+| STOCK VALIDATION
+|--------------------------------------------------------------------------
+*/
+
+foreach ($cartItems as $item) {
+
+    $productStatus =
+        strtolower(
+            trim(
+                (string) $item['status']
+            )
+        );
+
+
+    if (
+        $productStatus !==
+        'available'
+    ) {
+
+        $error =
+            $item['product_name'] .
+            ' is currently unavailable.';
+
+        break;
+    }
+
+
+    $availableStock =
+        (int) $item[
+            'stock_quantity'
+        ];
+
+
+    $requestedQuantity =
+        (int) $item[
+            'quantity'
+        ];
+
+
+    if ($availableStock <= 0) {
+
+        $error =
+            $item['product_name'] .
+            ' is out of stock.';
+
+        break;
+    }
+
+
+    if (
+        $requestedQuantity >
+        $availableStock
+    ) {
+
+        $error =
+            'Insufficient stock for ' .
+            $item['product_name'] .
+            '.';
+
+        break;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PLACE ORDER
 |--------------------------------------------------------------------------
 */
 
 if (
     $_SERVER['REQUEST_METHOD'] === 'POST' &&
-    empty($error)
+    $error === ''
 ) {
 
-    $delivery_method =
-        $_POST['delivery_method']
-        ?? '';
+    /*
+    |--------------------------------------------------------------------------
+    | FORM VALUES
+    |--------------------------------------------------------------------------
+    */
 
-
-    $delivery_address =
+    $deliveryMethod =
         trim(
-            $_POST['delivery_address']
-            ?? ''
+            (string) (
+                $_POST[
+                    'delivery_method'
+                ]
+                ?? ''
+            )
         );
 
 
-    $payment_method =
-        $_POST['payment_method']
-        ?? '';
+    $deliveryAddress =
+        trim(
+            (string) (
+                $_POST[
+                    'delivery_address'
+                ]
+                ?? ''
+            )
+        );
+
+
+    $paymentMethod =
+        trim(
+            (string) (
+                $_POST[
+                    'payment_method'
+                ]
+                ?? ''
+            )
+        );
 
 
     /*
     |--------------------------------------------------------------------------
-    | VALIDATION
+    | ALLOWED VALUES
     |--------------------------------------------------------------------------
     */
 
-    $allowedDelivery = [
+    $allowedDeliveryMethods = [
         'Pickup',
-        'Postage'
+        'Postage',
+        'Vendor Delivery'
     ];
 
 
-    $allowedPayment = [
+    $allowedPaymentMethods = [
         'FPX',
         'Credit Card',
         'Debit Card',
@@ -457,10 +751,34 @@ if (
     ];
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | ONLINE PAYMENT
+    |--------------------------------------------------------------------------
+    */
+
+    $isOnlinePayment =
+        in_array(
+            $paymentMethod,
+            [
+                'FPX',
+                'Credit Card',
+                'Debit Card'
+            ],
+            true
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELIVERY VALIDATION
+    |--------------------------------------------------------------------------
+    */
+
     if (
         !in_array(
-            $delivery_method,
-            $allowedDelivery,
+            $deliveryMethod,
+            $allowedDeliveryMethods,
             true
         )
     ) {
@@ -468,27 +786,137 @@ if (
         $error =
             'Please select a valid delivery method.';
 
-
     } elseif (
-        $delivery_method === 'Postage' &&
-        empty($delivery_address)
+        $deliveryMethod ===
+        'Pickup' &&
+        !$pickupAvailable
     ) {
 
         $error =
-            'Delivery address is required for postage.';
+            'Pickup is not available for all sellers in your cart.';
 
+    } elseif (
+        $deliveryMethod ===
+        'Postage' &&
+        !$postageAvailable
+    ) {
+
+        $error =
+            'Postage is not available for all sellers in your cart.';
+
+    } elseif (
+        $deliveryMethod ===
+        'Vendor Delivery' &&
+        !$vendorDeliveryAvailable
+    ) {
+
+        $error =
+            'Vendor Delivery is not available for all sellers in your cart.';
+
+    } elseif (
+        (
+            $deliveryMethod ===
+            'Postage' ||
+
+            $deliveryMethod ===
+            'Vendor Delivery'
+        ) &&
+        $deliveryAddress === ''
+    ) {
+
+        $error =
+            'Please enter your delivery address.';
 
     } elseif (
         !in_array(
-            $payment_method,
-            $allowedPayment,
+            $paymentMethod,
+            $allowedPaymentMethods,
             true
         )
     ) {
 
         $error =
             'Please select a valid payment method.';
+
+    } elseif (
+        $deliveryMethod ===
+        'Postage' &&
+        $paymentMethod ===
+        'Cash'
+    ) {
+
+        $error =
+            'Cash payment is not available for Postage.';
+
+    } elseif (
+        $deliveryMethod ===
+        'Vendor Delivery' &&
+        $paymentMethod ===
+        'Cash' &&
+        !$vendorDeliveryCodAvailable
+    ) {
+
+        $error =
+            'Cash on Delivery is not available for all sellers in your cart.';
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FINAL DELIVERY FEE
+    |--------------------------------------------------------------------------
+    */
+
+    $finalDeliveryFee = 0.00;
+
+
+    if (
+        $error === '' &&
+        $deliveryMethod ===
+        'Postage'
+    ) {
+
+        foreach ($vendors as $vendor) {
+
+            $finalDeliveryFee +=
+                max(
+                    0,
+                    (float) $vendor[
+                        'postage_fee'
+                    ]
+                );
+        }
+    }
+
+
+    if (
+        $error === '' &&
+        $deliveryMethod ===
+        'Vendor Delivery'
+    ) {
+
+        foreach ($vendors as $vendor) {
+
+            $finalDeliveryFee +=
+                max(
+                    0,
+                    (float) $vendor[
+                        'vendor_delivery_fee'
+                    ]
+                );
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FINAL TOTAL
+    |--------------------------------------------------------------------------
+    */
+
+    $finalGrandTotal =
+        $subtotal +
+        $finalDeliveryFee;
 
 
     /*
@@ -497,7 +925,7 @@ if (
     |--------------------------------------------------------------------------
     */
 
-    if (empty($error)) {
+    if ($error === '') {
 
         try {
 
@@ -506,11 +934,11 @@ if (
 
             /*
             |--------------------------------------------------------------------------
-            | CREATE MAIN ORDER
+            | MAIN ORDER
             |--------------------------------------------------------------------------
             */
 
-            $stmt =
+            $orderStmt =
                 $db->prepare("
                     INSERT INTO orders
                     (
@@ -532,24 +960,40 @@ if (
                 ");
 
 
-            $stmt->execute([
+            $storedAddress =
+                $deliveryMethod ===
+                'Pickup'
 
-                $user_id,
+                    ? null
 
-                $subtotal,
+                    : $deliveryAddress;
 
-                $delivery_method,
 
-                $delivery_method === 'Postage'
-                    ? $delivery_address
-                    : null
+            $orderStmt->execute([
 
+                $userId,
+
+                checkoutMoney(
+                    $finalGrandTotal
+                ),
+
+                $deliveryMethod,
+
+                $storedAddress
             ]);
 
 
-            $order_id =
+            $orderId =
                 (int)
                 $db->lastInsertId();
+
+
+            if ($orderId <= 0) {
+
+                throw new Exception(
+                    'Unable to create order.'
+                );
+            }
 
 
             /*
@@ -582,12 +1026,71 @@ if (
 
             /*
             |--------------------------------------------------------------------------
-            | GROUP ITEMS BY VENDOR
+            | STOCK UPDATE
             |--------------------------------------------------------------------------
             */
 
-            $vendorTotals = [];
+            $stockStmt =
+                $db->prepare("
+                    UPDATE products
 
+                    SET
+                        stock_quantity =
+                            stock_quantity - ?,
+
+                        status =
+                            CASE
+
+                                WHEN stock_quantity - ? <= 0
+                                THEN 'Out of Stock'
+
+                                ELSE status
+
+                            END
+
+                    WHERE product_id = ?
+
+                    AND stock_quantity >= ?
+
+                    AND status = 'Available'
+                ");
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | INVENTORY
+            |--------------------------------------------------------------------------
+            */
+
+            $inventoryStmt =
+                $db->prepare("
+                    INSERT INTO inventory
+                    (
+                        product_id,
+                        quantity
+                    )
+
+                    VALUES
+                    (
+                        ?,
+                        ?
+                    )
+
+                    ON DUPLICATE KEY UPDATE
+
+                        quantity =
+                            VALUES(quantity),
+
+                        last_updated =
+                            CURRENT_TIMESTAMP
+                ");
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | INSERT ITEMS + REDUCE STOCK
+            |--------------------------------------------------------------------------
+            */
 
             foreach (
                 $cartItems
@@ -604,7 +1107,7 @@ if (
                     $item['price'];
 
 
-                $itemSubtotal =
+                $lineSubtotal =
                     $quantity *
                     $price;
 
@@ -617,49 +1120,23 @@ if (
 
                 $detailStmt->execute([
 
-                    $order_id,
+                    $orderId,
 
                     (int)
-                    $item['product_id'],
+                    $item[
+                        'product_id'
+                    ],
 
                     $quantity,
 
-                    $price,
+                    checkoutMoney(
+                        $price
+                    ),
 
-                    $itemSubtotal
-
-                ]);
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | VENDOR TOTAL
-                |--------------------------------------------------------------------------
-                */
-
-                $vendor_id =
-                    (int)
-                    $item['vendor_id'];
-
-
-                if (
-                    !isset(
-                        $vendorTotals[
-                            $vendor_id
-                        ]
+                    checkoutMoney(
+                        $lineSubtotal
                     )
-                ) {
-
-                    $vendorTotals[
-                        $vendor_id
-                    ] = 0;
-                }
-
-
-                $vendorTotals[
-                    $vendor_id
-                ] +=
-                    $itemSubtotal;
+                ]);
 
 
                 /*
@@ -668,30 +1145,6 @@ if (
                 |--------------------------------------------------------------------------
                 */
 
-                $stockStmt =
-                    $db->prepare("
-                        UPDATE products
-
-                        SET
-                            stock_quantity =
-                                stock_quantity - ?,
-
-                            status =
-                                CASE
-                                    WHEN
-                                        stock_quantity - ? <= 0
-                                    THEN
-                                        'Out of Stock'
-                                    ELSE
-                                        'Available'
-                                END
-
-                        WHERE product_id = ?
-
-                        AND stock_quantity >= ?
-                    ");
-
-
                 $stockStmt->execute([
 
                     $quantity,
@@ -699,10 +1152,11 @@ if (
                     $quantity,
 
                     (int)
-                    $item['product_id'],
+                    $item[
+                        'product_id'
+                    ],
 
                     $quantity
-
                 ]);
 
 
@@ -713,56 +1167,64 @@ if (
 
                     throw new Exception(
                         'Stock changed for ' .
-                        $item['product_name'] .
-                        '. Please try again.'
+                        $item[
+                            'product_name'
+                        ] .
+                        '. Please return to cart and try again.'
                     );
                 }
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | INVENTORY
+                | CURRENT STOCK
                 |--------------------------------------------------------------------------
                 */
 
-                $inventoryStmt =
+                $stockLookup =
                     $db->prepare("
-                        INSERT INTO inventory
-                        (
-                            product_id,
-                            quantity
-                        )
+                        SELECT
+                            stock_quantity
 
-                        VALUES
-                        (
-                            ?,
-                            ?
-                        )
+                        FROM products
 
-                        ON DUPLICATE KEY UPDATE
+                        WHERE product_id = ?
 
-                            quantity =
-                                VALUES(quantity)
+                        LIMIT 1
                     ");
+
+
+                $stockLookup->execute([
+                    (int)
+                    $item[
+                        'product_id'
+                    ]
+                ]);
 
 
                 $newStock =
                     (int)
-                    $item['stock_quantity']
-                    -
-                    $quantity;
+                    $stockLookup
+                        ->fetchColumn();
 
+
+                /*
+                |--------------------------------------------------------------------------
+                | UPDATE INVENTORY
+                |--------------------------------------------------------------------------
+                */
 
                 $inventoryStmt->execute([
 
                     (int)
-                    $item['product_id'],
+                    $item[
+                        'product_id'
+                    ],
 
                     max(
                         0,
                         $newStock
                     )
-
                 ]);
             }
 
@@ -789,71 +1251,10 @@ if (
                         ?,
                         ?,
                         ?,
-                        0.00,
+                        ?,
                         'Pending'
                     )
                 ");
-
-
-            foreach (
-                $vendorTotals
-                as $vendor_id =>
-                   $vendorTotal
-            ) {
-
-                $vendorOrderStmt->execute([
-
-                    $order_id,
-
-                    $vendor_id,
-
-                    $vendorTotal
-
-                ]);
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | PAYMENT
-            |--------------------------------------------------------------------------
-            */
-
-            $paymentStatus =
-                'Pending';
-
-
-            $paymentStmt =
-                $db->prepare("
-                    INSERT INTO payments
-                    (
-                        order_id,
-                        payment_method,
-                        payment_status,
-                        amount
-                    )
-
-                    VALUES
-                    (
-                        ?,
-                        ?,
-                        ?,
-                        ?
-                    )
-                ");
-
-
-            $paymentStmt->execute([
-
-                $order_id,
-
-                $payment_method,
-
-                $paymentStatus,
-
-                $subtotal
-
-            ]);
 
 
             /*
@@ -861,10 +1262,6 @@ if (
             | COMMISSION
             |--------------------------------------------------------------------------
             */
-
-            $commissionRate =
-                5.00;
-
 
             $commissionStmt =
                 $db->prepare("
@@ -890,82 +1287,229 @@ if (
                 ");
 
 
+            /*
+            |--------------------------------------------------------------------------
+            | CREATE VENDOR ORDERS
+            |--------------------------------------------------------------------------
+            */
+
             foreach (
-                $vendorTotals
-                as $vendor_id =>
-                   $vendorTotal
+                $vendors
+                as $vendor
             ) {
+
+                $vendorId =
+                    (int)
+                    $vendor[
+                        'vendor_id'
+                    ];
+
+
+                $vendorSubtotal =
+                    (float)
+                    $vendor[
+                        'subtotal'
+                    ];
 
 
                 /*
                 |--------------------------------------------------------------------------
-                | VENDOR ORDER ID
+                | PER-VENDOR DELIVERY FEE
                 |--------------------------------------------------------------------------
                 */
 
-                $vendorOrderLookup =
-                    $db->prepare("
-                        SELECT
-                            vendor_order_id
-
-                        FROM vendor_orders
-
-                        WHERE order_id = ?
-
-                        AND vendor_id = ?
-
-                        LIMIT 1
-                    ");
+                $vendorFee =
+                    0.00;
 
 
-                $vendorOrderLookup->execute([
+                if (
+                    $deliveryMethod ===
+                    'Postage'
+                ) {
 
-                    $order_id,
+                    $vendorFee =
+                        max(
+                            0,
+                            (float)
+                            $vendor[
+                                'postage_fee'
+                            ]
+                        );
 
-                    $vendor_id
+                } elseif (
+                    $deliveryMethod ===
+                    'Vendor Delivery'
+                ) {
 
-                ]);
-
-
-                $vendorOrder =
-                    $vendorOrderLookup->fetch(
-                        PDO::FETCH_ASSOC
-                    );
-
-
-                if (!$vendorOrder) {
-
-                    throw new Exception(
-                        'Unable to create vendor order.'
-                    );
+                    $vendorFee =
+                        max(
+                            0,
+                            (float)
+                            $vendor[
+                                'vendor_delivery_fee'
+                            ]
+                        );
                 }
 
 
+                /*
+                |--------------------------------------------------------------------------
+                | COMMISSION RATE
+                |--------------------------------------------------------------------------
+                */
+
+                $commissionRate =
+                    max(
+                        0,
+                        min(
+                            100,
+                            (float)
+                            $vendor[
+                                'commission_rate'
+                            ]
+                        )
+                    );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | COMMISSION AMOUNT
+                |--------------------------------------------------------------------------
+                |
+                | Commission is calculated on product subtotal only.
+                | Delivery fee is NOT included.
+                |
+                |--------------------------------------------------------------------------
+                */
+
                 $commissionAmount =
-                    $vendorTotal *
+                    $vendorSubtotal *
                     (
                         $commissionRate /
                         100
                     );
 
 
-                $commissionStmt->execute([
+                /*
+                |--------------------------------------------------------------------------
+                | CREATE VENDOR ORDER
+                |--------------------------------------------------------------------------
+                */
 
-                    $vendor_id,
+                $vendorOrderStmt
+                    ->execute([
 
-                    $order_id,
+                        $orderId,
 
+                        $vendorId,
+
+                        checkoutMoney(
+                            $vendorSubtotal
+                        ),
+
+                        checkoutMoney(
+                            $vendorFee
+                        )
+                    ]);
+
+
+                $vendorOrderId =
                     (int)
-                    $vendorOrder[
-                        'vendor_order_id'
-                    ],
+                    $db->lastInsertId();
 
-                    $commissionRate,
 
-                    $commissionAmount
+                if (
+                    $vendorOrderId <= 0
+                ) {
 
-                ]);
+                    throw new Exception(
+                        'Unable to create seller order.'
+                    );
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CREATE COMMISSION
+                |--------------------------------------------------------------------------
+                */
+
+                $commissionStmt
+                    ->execute([
+
+                        $vendorId,
+
+                        $orderId,
+
+                        $vendorOrderId,
+
+                        checkoutMoney(
+                            $commissionRate
+                        ),
+
+                        checkoutMoney(
+                            $commissionAmount
+                        )
+                    ]);
             }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | PAYMENT
+            |--------------------------------------------------------------------------
+            */
+
+            $paymentGateway =
+                $isOnlinePayment
+                    ? 'Fiuu'
+                    : null;
+
+
+            $paymentStmt =
+                $db->prepare("
+                    INSERT INTO payments
+                    (
+                        order_id,
+                        payment_method,
+                        payment_status,
+                        amount,
+                        payment_gateway,
+                        gateway_order_reference
+                    )
+
+                    VALUES
+                    (
+                        ?,
+                        ?,
+                        'Pending',
+                        ?,
+                        ?,
+                        ?
+                    )
+                ");
+
+
+            $gatewayOrderReference =
+                $isOnlinePayment
+                    ? (string) $orderId
+                    : null;
+
+
+            $paymentStmt->execute([
+
+                $orderId,
+
+                $paymentMethod,
+
+                checkoutMoney(
+                    $finalGrandTotal
+                ),
+
+                $paymentGateway,
+
+                $gatewayOrderReference
+            ]);
 
 
             /*
@@ -977,13 +1521,12 @@ if (
             $clearCart =
                 $db->prepare("
                     DELETE FROM cart
-
                     WHERE customer_id = ?
                 ");
 
 
             $clearCart->execute([
-                $user_id
+                $userId
             ]);
 
 
@@ -996,97 +1539,124 @@ if (
             $db->commit();
 
 
-            $success = true;
+            /*
+            |--------------------------------------------------------------------------
+            | ONLINE PAYMENT -> FIUU
+            |--------------------------------------------------------------------------
+            */
 
+            if ($isOnlinePayment) {
+
+                $_SESSION[
+                    'fiuu_last_order_id'
+                ] =
+                    $orderId;
+
+
+                header(
+                    'Location: fiuu_payment.php?order_id=' .
+                    $orderId
+                );
+
+                exit;
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CASH -> ORDER DETAILS
+            |--------------------------------------------------------------------------
+            */
 
             header(
                 'Location: order_details.php?id=' .
-                $order_id .
+                $orderId .
                 '&success=1'
             );
-
 
             exit;
 
 
-        } catch (Throwable $e) {
-
+        } catch (Throwable $exception) {
 
             if (
                 $db->inTransaction()
             ) {
-
                 $db->rollBack();
             }
 
 
             $error =
-                'Checkout failed: ' .
-                $e->getMessage();
+                'Unable to place order. ' .
+                $exception->getMessage();
         }
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESTORE SELECTED VALUES
+    |--------------------------------------------------------------------------
+    */
+
+    $selectedDelivery =
+        $deliveryMethod;
+
+
+    $selectedAddress =
+        $deliveryAddress;
+
+
+    $selectedPayment =
+        $paymentMethod;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | REFRESH CURRENT DELIVERY FEE
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $selectedDelivery ===
+        'Postage'
+    ) {
+
+        $currentDeliveryFee =
+            $postageFee;
+
+    } elseif (
+        $selectedDelivery ===
+        'Vendor Delivery'
+    ) {
+
+        $currentDeliveryFee =
+            $vendorDeliveryFee;
+
+    } else {
+
+        $currentDeliveryFee =
+            0.00;
+    }
+
+
+    $grandTotal =
+        $subtotal +
+        $currentDeliveryFee;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CUSTOMER NAV COUNTS
+| HEADER
 |--------------------------------------------------------------------------
 */
 
-$cartCount =
-    $totalItems;
-
-
-$wishlistCount = 0;
-
-
-try {
-
-    $wishlistStmt =
-        $db->prepare("
-            SELECT COUNT(*)
-
-            FROM wishlist
-
-            WHERE user_id = ?
-        ");
-
-
-    $wishlistStmt->execute([
-        $user_id
-    ]);
-
-
-    $wishlistCount =
-        (int)
-        $wishlistStmt->fetchColumn();
-
-
-} catch (Throwable $e) {
-
-    $wishlistCount = 0;
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| PAGE
-|--------------------------------------------------------------------------
-*/
-
-$pageTitle =
-    'Checkout - HochipoHub';
-
-
-$hideSiteMainWrapper =
-    true;
-
+$hideSiteMainWrapper = true;
 
 $extraCSS = [
     'dashboard.css'
 ];
-
 
 require_once __DIR__ .
     '/includes/header.php';
@@ -1100,2984 +1670,1983 @@ require_once __DIR__ .
 
 <style>
 
-/* ================================================================
+* {
+    box-sizing: border-box;
+}
+
+
+/* =========================================================
    PAGE
-================================================================ */
+========================================================= */
 
 .hh-checkout-page {
 
-    width:
-        100%;
+    width: 100%;
 
-    min-height:
-        100vh;
+    min-height: 100vh;
 
     padding:
-        42px
-        24px
-        75px;
+        36px 28px
+        70px;
 
-    overflow-x:
-        hidden;
-
-    color:
-        #14213d;
+    color: #14213d;
 
     background:
-
-        radial-gradient(
-            circle at 92% 4%,
-            rgba(59,130,246,.08),
-            transparent 24%
-        ),
-
-        linear-gradient(
-            180deg,
-            #f5f8ff 0%,
-            #f8faff 55%,
-            #ffffff 100%
-        );
-
-    font-family:
-        Inter,
-        Arial,
-        sans-serif;
-
+        #f6f8fc;
 }
 
 
 .hh-checkout-container {
 
-    width:
-        100%;
+    width: 100%;
 
-    max-width:
-        1340px;
+    max-width: 1260px;
 
-    margin:
-        0 auto;
-
+    margin: 0 auto;
 }
 
 
-/* ================================================================
+/* =========================================================
    HERO
-================================================================ */
+========================================================= */
 
 .hh-checkout-hero {
 
-    position:
-        relative;
+    position: relative;
 
-    min-height:
-        290px;
+    overflow: hidden;
 
-    margin-bottom:
-        22px;
+    margin-bottom: 24px;
 
-    padding:
-        43px
-        50px;
+    padding: 30px 32px;
 
-    overflow:
-        hidden;
-
-    display:
-        grid;
-
-    grid-template-columns:
-
-        minmax(
-            0,
-            1fr
-        )
-
-        340px;
-
-    align-items:
-        center;
-
-    gap:
-        35px;
-
-    color:
-        #ffffff;
+    border-radius: 24px;
 
     background:
-
         linear-gradient(
-            115deg,
-            #0b2c6b 0%,
-            #154a98 48%,
-            #2784ee 100%
+            135deg,
+            #1264f6,
+            #4169e1 58%,
+            #6366f1
         );
 
-    border-radius:
-        27px;
+    color: #ffffff;
 
     box-shadow:
-
-        0
-        20px
-        50px
-        rgba(23,79,165,.15);
-
-}
-
-
-.hh-checkout-hero::before {
-
-    content:
-        "";
-
-    position:
-        absolute;
-
-    width:
-        290px;
-
-    height:
-        290px;
-
-    top:
-        -155px;
-
-    right:
-        -65px;
-
-    border-radius:
-        50%;
-
-    background:
-        rgba(255,255,255,.08);
-
+        0 18px 50px
+        rgba(
+            37,
+            99,
+            235,
+            0.18
+        );
 }
 
 
 .hh-checkout-hero::after {
 
-    content:
-        "";
+    content: "";
 
-    position:
-        absolute;
+    position: absolute;
 
-    width:
-        175px;
+    width: 260px;
 
-    height:
-        175px;
+    height: 260px;
 
-    right:
-        170px;
+    right: -80px;
 
-    bottom:
-        -125px;
+    top: -110px;
 
-    border-radius:
-        50%;
+    border-radius: 50%;
 
     background:
-        rgba(255,255,255,.055);
-
+        rgba(
+            255,
+            255,
+            255,
+            0.10
+        );
 }
 
 
-.hh-checkout-hero-copy {
+.hh-checkout-hero-content {
 
-    position:
-        relative;
+    position: relative;
 
-    z-index:
-        2;
-
+    z-index: 2;
 }
 
 
-.hh-checkout-pill {
+.hh-checkout-hero-label {
 
-    min-height:
-        33px;
+    display: flex;
 
-    padding:
-        0
-        13px;
+    align-items: center;
 
-    margin-bottom:
-        17px;
+    gap: 8px;
 
-    display:
-        inline-flex;
+    margin-bottom: 10px;
 
-    align-items:
-        center;
+    font-size: 12px;
 
-    gap:
-        7px;
+    font-weight: 800;
 
-    color:
-        #ffffff;
+    text-transform: uppercase;
 
-    background:
-        rgba(255,255,255,.11);
+    letter-spacing: 0.08em;
 
-    border:
-        1px solid
-        rgba(255,255,255,.22);
-
-    border-radius:
-        999px;
-
-    font-size:
-        9px;
-
-    font-weight:
-        850;
-
+    opacity: 0.9;
 }
 
 
 .hh-checkout-hero h1 {
 
     margin:
-        0;
+        0 0 7px;
 
-    color:
-        #ffffff;
+    font-size: 30px;
 
-    font-family:
-        Poppins,
-        Inter,
-        sans-serif;
+    font-weight: 900;
 
-    font-size:
-
-        clamp(
-            34px,
-            4.3vw,
-            51px
-        );
-
-    line-height:
-        1.08;
-
-    font-weight:
-        800;
-
-    letter-spacing:
-        -1.7px;
-
-}
-
-
-.hh-checkout-hero h1 span {
-
-    color:
-        #6fe7f3;
-
+    letter-spacing: -0.7px;
 }
 
 
 .hh-checkout-hero p {
 
-    max-width:
-        590px;
+    max-width: 700px;
 
-    margin:
-        14px
-        0
-        0;
+    margin: 0;
 
     color:
-        rgba(255,255,255,.77);
+        rgba(
+            255,
+            255,
+            255,
+            0.85
+        );
 
-    font-size:
-        11px;
+    font-size: 13px;
 
-    line-height:
-        1.75;
-
+    line-height: 1.7;
 }
 
 
-/* ================================================================
-   HERO ART
-================================================================ */
-
-.hh-checkout-hero-art {
-
-    position:
-        relative;
-
-    z-index:
-        2;
-
-    height:
-        205px;
-
-}
-
-
-.hh-checkout-main-icon {
-
-    position:
-        absolute;
-
-    width:
-        145px;
-
-    height:
-        145px;
-
-    top:
-        28px;
-
-    right:
-        75px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    color:
-        #ffffff;
-
-    background:
-        rgba(255,255,255,.12);
-
-    border:
-        1px solid
-        rgba(255,255,255,.18);
-
-    border-radius:
-        38px;
-
-    backdrop-filter:
-        blur(10px);
-
-    font-size:
-        57px;
-
-    transform:
-        rotate(-4deg);
-
-}
-
-
-.hh-checkout-floating {
-
-    position:
-        absolute;
-
-    min-width:
-        140px;
-
-    padding:
-        11px
-        13px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    gap:
-        8px;
-
-    color:
-        #26405f;
-
-    background:
-        rgba(255,255,255,.96);
-
-    border-radius:
-        12px;
-
-    box-shadow:
-        0
-        14px
-        32px
-        rgba(5,35,80,.16);
-
-    font-size:
-        8px;
-
-    font-weight:
-        850;
-
-}
-
-
-.hh-checkout-floating i {
-
-    width:
-        32px;
-
-    height:
-        32px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    color:
-        #2563eb;
-
-    background:
-        #eff6ff;
-
-    border-radius:
-        9px;
-
-}
-
-
-.hh-checkout-floating.one {
-
-    top:
-        3px;
-
-    left:
-        0;
-
-}
-
-
-.hh-checkout-floating.two {
-
-    right:
-        0;
-
-    bottom:
-        3px;
-
-}
-
-
-/* ================================================================
-   PROGRESS
-================================================================ */
-
-.hh-checkout-progress {
-
-    margin-bottom:
-        22px;
-
-    padding:
-        18px
-        22px;
-
-    display:
-        grid;
-
-    grid-template-columns:
-        repeat(3,1fr);
-
-    gap:
-        13px;
-
-    background:
-        #ffffff;
-
-    border:
-        1px solid #e2e9f3;
-
-    border-radius:
-        18px;
-
-    box-shadow:
-        0
-        8px
-        24px
-        rgba(40,65,120,.045);
-
-}
-
-
-.hh-progress-step {
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    gap:
-        10px;
-
-}
-
-
-.hh-progress-number {
-
-    width:
-        37px;
-
-    height:
-        37px;
-
-    flex-shrink:
-        0;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    color:
-        #ffffff;
-
-    background:
-        #2563eb;
-
-    border-radius:
-        10px;
-
-    font-size:
-        10px;
-
-    font-weight:
-        900;
-
-}
-
-
-.hh-progress-step:nth-child(2)
-.hh-progress-number {
-
-    background:
-        #7c3aed;
-
-}
-
-
-.hh-progress-step:nth-child(3)
-.hh-progress-number {
-
-    background:
-        #16a34a;
-
-}
-
-
-.hh-progress-step span {
-
-    display:
-        block;
-
-    color:
-        #8b98aa;
-
-    font-size:
-        6px;
-
-    font-weight:
-        850;
-
-    letter-spacing:
-        .6px;
-
-}
-
-
-.hh-progress-step strong {
-
-    display:
-        block;
-
-    margin-top:
-        2px;
-
-    color:
-        #263a55;
-
-    font-size:
-        9px;
-
-    font-weight:
-        900;
-
-}
-
-
-/* ================================================================
-   ERROR
-================================================================ */
+/* =========================================================
+   ALERT
+========================================================= */
 
 .hh-checkout-error {
 
-    margin-bottom:
-        20px;
+    display: flex;
 
-    padding:
-        14px
-        16px;
+    align-items: flex-start;
 
-    display:
-        flex;
+    gap: 10px;
 
-    align-items:
-        center;
+    margin-bottom: 20px;
 
-    gap:
-        9px;
-
-    color:
-        #991b1b;
-
-    background:
-        #fef2f2;
+    padding: 15px 17px;
 
     border:
-        1px solid #fecaca;
+        1px solid
+        #ffd1ce;
 
-    border-radius:
-        12px;
+    border-radius: 14px;
 
-    font-size:
-        9px;
+    color: #b42318;
 
-    font-weight:
-        700;
+    background: #fff1f0;
 
+    font-size: 13px;
+
+    font-weight: 650;
 }
 
 
-/* ================================================================
+/* =========================================================
    LAYOUT
-================================================================ */
+========================================================= */
 
 .hh-checkout-layout {
 
-    display:
-        grid;
+    display: grid;
 
     grid-template-columns:
+        minmax(0, 1fr)
+        350px;
 
-        minmax(
-            0,
-            1fr
-        )
+    gap: 22px;
 
-        360px;
-
-    align-items:
-        start;
-
-    gap:
-        21px;
-
+    align-items: start;
 }
 
-
-/* ================================================================
-   MAIN FORM
-================================================================ */
 
 .hh-checkout-left {
 
-    min-width:
-        0;
+    display: grid;
 
-    display:
-        flex;
-
-    flex-direction:
-        column;
-
-    gap:
-        18px;
-
+    gap: 20px;
 }
 
 
-.hh-checkout-section {
+.hh-card {
 
-    overflow:
-        hidden;
-
-    background:
-        #ffffff;
+    overflow: hidden;
 
     border:
-        1px solid #e2e9f3;
+        1px solid
+        #e5eaf2;
 
-    border-radius:
-        20px;
+    border-radius: 20px;
+
+    background: #ffffff;
 
     box-shadow:
-        0
-        10px
-        28px
-        rgba(40,65,120,.045);
-
+        0 8px 28px
+        rgba(
+            31,
+            41,
+            55,
+            0.05
+        );
 }
 
 
-.hh-checkout-section-header {
+.hh-card-header {
 
-    min-height:
-        88px;
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
 
     padding:
-        19px
-        22px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    gap:
-        12px;
+        21px 23px;
 
     border-bottom:
-        1px solid #edf1f6;
-
+        1px solid
+        #edf0f5;
 }
 
 
-.hh-checkout-section-icon {
+.hh-card-icon {
 
-    width:
-        45px;
+    display: flex;
 
-    height:
-        45px;
+    align-items: center;
 
-    flex-shrink:
-        0;
+    justify-content: center;
 
-    display:
-        flex;
+    width: 42px;
 
-    align-items:
-        center;
+    height: 42px;
 
-    justify-content:
-        center;
+    border-radius: 13px;
 
-    color:
-        #ffffff;
+    background: #edf4ff;
 
-    background:
+    color: #2563eb;
 
-        linear-gradient(
-            135deg,
-            #2563eb,
-            #438bf2
-        );
-
-    border-radius:
-        12px;
-
-    box-shadow:
-        0
-        8px
-        18px
-        rgba(37,99,235,.18);
-
+    font-size: 18px;
 }
 
 
-.hh-checkout-section-header.purple
-.hh-checkout-section-icon {
+.hh-card-header h2 {
 
-    background:
+    margin: 0;
 
-        linear-gradient(
-            135deg,
-            #7c3aed,
-            #9b6af5
-        );
+    font-size: 16px;
 
+    font-weight: 850;
 }
 
 
-.hh-checkout-section-header h2 {
+.hh-card-header p {
 
     margin:
-        0
-        0
-        3px;
+        4px 0 0;
 
-    color:
-        #17233c;
+    color: #8290a5;
 
-    font-size:
-        15px;
-
-    font-weight:
-        900;
-
+    font-size: 11px;
 }
 
 
-.hh-checkout-section-header p {
+.hh-card-body {
 
-    margin:
-        0;
-
-    color:
-        #8b98aa;
-
-    font-size:
-        8px;
-
+    padding: 23px;
 }
 
 
-.hh-checkout-section-body {
-
-    padding:
-        22px;
-
-}
-
-
-/* ================================================================
+/* =========================================================
    DELIVERY OPTIONS
-================================================================ */
+========================================================= */
 
 .hh-delivery-grid {
 
-    display:
-        grid;
+    display: grid;
 
     grid-template-columns:
-        1fr
-        1fr;
+        repeat(
+            3,
+            minmax(0, 1fr)
+        );
 
-    gap:
-        13px;
-
+    gap: 13px;
 }
 
 
-.hh-choice {
+.hh-option {
 
-    position:
-        relative;
+    position: relative;
 
-    min-height:
-        122px;
-
-    padding:
-        17px;
-
-    cursor:
-        pointer;
-
+    cursor: pointer;
 }
 
 
-.hh-choice input {
+.hh-option input {
 
-    position:
-        absolute;
+    position: absolute;
 
-    opacity:
-        0;
+    opacity: 0;
 
-    pointer-events:
-        none;
-
+    pointer-events: none;
 }
 
 
-.hh-choice-content {
+.hh-option-box {
 
-    width:
-        100%;
+    min-height: 145px;
 
-    height:
-        100%;
+    height: 100%;
 
-    min-height:
-        110px;
-
-    padding:
-        16px;
-
-    display:
-        flex;
-
-    align-items:
-        flex-start;
-
-    gap:
-        12px;
-
-    background:
-        #fbfdff;
+    padding: 18px;
 
     border:
-        1px solid #dfe7f1;
+        1.5px solid
+        #e2e8f0;
 
-    border-radius:
-        14px;
+    border-radius: 15px;
+
+    background: #ffffff;
 
     transition:
-        .18s ease;
-
+        all 0.2s ease;
 }
 
 
-.hh-choice input:checked +
-.hh-choice-content {
-
-    background:
-        #eff6ff;
+.hh-option-box:hover {
 
     border-color:
-        #7db0f9;
+        #a8c2ff;
 
-    box-shadow:
-        0
-        0
-        0
-        3px
-        rgba(59,130,246,.07);
-
+    transform:
+        translateY(-1px);
 }
 
 
-.hh-choice-icon {
+.hh-option-icon {
 
-    width:
-        41px;
+    display: flex;
 
-    height:
-        41px;
+    align-items: center;
 
-    flex-shrink:
-        0;
+    justify-content: center;
 
-    display:
-        flex;
+    width: 42px;
 
-    align-items:
-        center;
+    height: 42px;
 
-    justify-content:
-        center;
+    margin-bottom: 13px;
 
-    color:
-        #2563eb;
+    border-radius: 12px;
+
+    background: #edf4ff;
+
+    color: #2563eb;
+
+    font-size: 18px;
+}
+
+
+.hh-option-box strong {
+
+    display: block;
+
+    margin-bottom: 6px;
+
+    color: #263248;
+
+    font-size: 13px;
+}
+
+
+.hh-option-box small {
+
+    display: block;
+
+    color: #8290a5;
+
+    font-size: 10px;
+
+    line-height: 1.6;
+}
+
+
+.hh-option-box .hh-fee {
+
+    display: inline-block;
+
+    margin-top: 10px;
+
+    padding:
+        5px 8px;
+
+    border-radius: 7px;
 
     background:
-        #ffffff;
+        #f2f6ff;
+
+    color: #315da8;
+
+    font-size: 9px;
+
+    font-weight: 850;
+}
+
+
+.hh-option input:checked +
+.hh-option-box {
+
+    border-color: #2563eb;
+
+    background: #f5f8ff;
+
+    box-shadow:
+        0 0 0 3px
+        rgba(
+            37,
+            99,
+            235,
+            0.08
+        );
+}
+
+
+.hh-option.disabled {
+
+    cursor: not-allowed;
+
+    opacity: 0.45;
+}
+
+
+.hh-option.disabled
+.hh-option-box:hover {
+
+    transform: none;
+}
+
+
+/* =========================================================
+   PICKUP LOCATION
+========================================================= */
+
+.hh-pickup-locations {
+
+    display: none;
+
+    margin-top: 20px;
+
+    padding-top: 20px;
+
+    border-top:
+        1px solid
+        #edf0f5;
+}
+
+
+.hh-pickup-locations h3 {
+
+    margin:
+        0 0 12px;
+
+    font-size: 13px;
+}
+
+
+.hh-pickup-list {
+
+    display: grid;
+
+    gap: 10px;
+}
+
+
+.hh-pickup-item {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 16px;
+
+    padding: 13px 14px;
 
     border:
-        1px solid #dce8f7;
+        1px solid
+        #e5eaf2;
 
-    border-radius:
-        11px;
+    border-radius: 12px;
 
-    font-size:
-        14px;
-
+    background: #fafcff;
 }
 
 
-.hh-choice strong {
+.hh-pickup-store {
 
-    display:
-        block;
-
-    margin-bottom:
-        5px;
-
-    color:
-        #263a55;
-
-    font-size:
-        10px;
-
-    font-weight:
-        900;
-
+    min-width: 0;
 }
 
 
-.hh-choice span {
+.hh-pickup-store strong {
 
-    display:
-        block;
+    display: block;
 
-    color:
-        #8593a7;
+    margin-bottom: 4px;
 
-    font-size:
-        7px;
+    color: #263248;
 
-    line-height:
-        1.6;
-
+    font-size: 11px;
 }
 
 
-/* ================================================================
+.hh-pickup-store span {
+
+    display: block;
+
+    color: #78869d;
+
+    font-size: 9px;
+
+    line-height: 1.5;
+}
+
+
+.hh-navigate {
+
+    flex: 0 0 auto;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    padding:
+        8px 10px;
+
+    border-radius: 8px;
+
+    color: #ffffff;
+
+    background: #2563eb;
+
+    text-decoration: none;
+
+    font-size: 9px;
+
+    font-weight: 800;
+}
+
+
+/* =========================================================
    ADDRESS
-================================================================ */
+========================================================= */
 
 .hh-address-field {
 
-    display:
-        none;
+    display: none;
 
-    margin-top:
-        17px;
-
+    margin-top: 20px;
 }
 
 
 .hh-address-field label {
 
-    display:
-        block;
+    display: block;
 
-    margin-bottom:
-        7px;
+    margin-bottom: 8px;
 
-    color:
-        #334155;
+    color: #344054;
 
-    font-size:
-        8px;
+    font-size: 11px;
 
-    font-weight:
-        850;
-
+    font-weight: 800;
 }
 
 
 .hh-address-field textarea {
 
-    width:
-        100%;
+    width: 100%;
 
-    min-height:
-        125px;
+    min-height: 110px;
 
-    padding:
-        13px;
+    padding: 13px 14px;
 
-    resize:
-        vertical;
-
-    outline:
-        none;
-
-    color:
-        #34445d;
-
-    background:
-        #fbfdff;
+    resize: vertical;
 
     border:
-        1px solid #dbe5f0;
+        1px solid
+        #dce3ed;
 
-    border-radius:
-        11px;
+    border-radius: 12px;
 
-    font-family:
-        inherit;
+    outline: none;
 
-    font-size:
-        9px;
+    color: #273142;
 
-    line-height:
-        1.6;
+    background: #ffffff;
 
+    font-family: inherit;
+
+    font-size: 11px;
+
+    line-height: 1.6;
 }
 
 
 .hh-address-field textarea:focus {
 
-    background:
-        #ffffff;
-
-    border-color:
-        #3b82f6;
+    border-color: #3b82f6;
 
     box-shadow:
-        0
-        0
-        0
-        3px
-        rgba(59,130,246,.08);
-
+        0 0 0 3px
+        rgba(
+            59,
+            130,
+            246,
+            0.08
+        );
 }
 
 
-/* ================================================================
+/* =========================================================
    PAYMENT
-================================================================ */
+========================================================= */
 
 .hh-payment-grid {
 
-    display:
-        grid;
+    display: grid;
 
     grid-template-columns:
-        repeat(2,1fr);
+        repeat(
+            2,
+            minmax(0, 1fr)
+        );
 
-    gap:
-        11px;
-
+    gap: 12px;
 }
 
 
 .hh-payment-option {
 
-    position:
-        relative;
+    position: relative;
 
-    cursor:
-        pointer;
-
+    cursor: pointer;
 }
 
 
 .hh-payment-option input {
 
-    position:
-        absolute;
+    position: absolute;
 
-    opacity:
-        0;
+    opacity: 0;
 
+    pointer-events: none;
 }
 
 
 .hh-payment-box {
 
-    min-height:
-        81px;
+    display: flex;
 
-    padding:
-        13px;
+    align-items: center;
 
-    display:
-        flex;
+    gap: 13px;
 
-    align-items:
-        center;
+    min-height: 78px;
 
-    gap:
-        10px;
-
-    color:
-        #334155;
-
-    background:
-        #fbfdff;
+    padding: 14px;
 
     border:
-        1px solid #dfe7f1;
+        1.5px solid
+        #e2e8f0;
 
-    border-radius:
-        12px;
+    border-radius: 13px;
+
+    background: #ffffff;
 
     transition:
-        .18s ease;
+        all 0.2s ease;
+}
 
+
+.hh-payment-icon {
+
+    flex: 0 0 auto;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 42px;
+
+    height: 42px;
+
+    border-radius: 12px;
+
+    background: #edf4ff;
+
+    color: #2563eb;
+
+    font-size: 17px;
+}
+
+
+.hh-payment-copy strong {
+
+    display: block;
+
+    margin-bottom: 3px;
+
+    color: #253149;
+
+    font-size: 11px;
+}
+
+
+.hh-payment-copy small {
+
+    display: block;
+
+    color: #8491a6;
+
+    font-size: 9px;
+
+    line-height: 1.5;
 }
 
 
 .hh-payment-option input:checked +
 .hh-payment-box {
 
-    color:
-        #1d4ed8;
+    border-color: #2563eb;
 
-    background:
-        #eff6ff;
-
-    border-color:
-        #7db0f9;
+    background: #f5f8ff;
 
     box-shadow:
-        0
-        0
-        0
-        3px
-        rgba(59,130,246,.07);
-
+        0 0 0 3px
+        rgba(
+            37,
+            99,
+            235,
+            0.08
+        );
 }
 
 
-.hh-payment-icon {
+.hh-payment-option.disabled {
 
-    width:
-        39px;
+    cursor: not-allowed;
 
-    height:
-        39px;
-
-    flex-shrink:
-        0;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    color:
-        #2563eb;
-
-    background:
-        #ffffff;
-
-    border:
-        1px solid #dce8f7;
-
-    border-radius:
-        10px;
-
-    font-size:
-        14px;
-
+    opacity: 0.45;
 }
 
 
-.hh-payment-box strong {
+.hh-payment-note {
 
-    display:
-        block;
+    display: flex;
 
-    color:
-        inherit;
+    align-items: flex-start;
 
-    font-size:
-        9px;
+    gap: 10px;
 
-    font-weight:
-        900;
+    margin-top: 16px;
 
+    padding: 13px 14px;
+
+    border-radius: 12px;
+
+    color: #52647c;
+
+    background: #f5f8fd;
+
+    font-size: 10px;
+
+    line-height: 1.6;
 }
 
 
-.hh-payment-box small {
+.hh-payment-note i {
 
-    display:
-        block;
+    margin-top: 1px;
 
-    margin-top:
-        3px;
+    color: #2563eb;
 
-    color:
-        #8d9aae;
-
-    font-size:
-        6px;
-
+    font-size: 15px;
 }
 
 
-/* ================================================================
-   SIDEBAR
-================================================================ */
+/* =========================================================
+   CART ITEMS
+========================================================= */
 
-.hh-checkout-right {
+.hh-item-list {
 
-    position:
-        sticky;
+    display: grid;
 
-    top:
-        22px;
-
-    display:
-        flex;
-
-    flex-direction:
-        column;
-
-    gap:
-        15px;
-
+    gap: 12px;
 }
 
+
+.hh-cart-item {
+
+    display: grid;
+
+    grid-template-columns:
+        64px
+        minmax(0, 1fr)
+        auto;
+
+    gap: 13px;
+
+    align-items: center;
+
+    padding:
+        11px 0;
+
+    border-bottom:
+        1px solid
+        #edf0f5;
+}
+
+
+.hh-cart-item:last-child {
+
+    border-bottom: 0;
+}
+
+
+.hh-product-image {
+
+    width: 64px;
+
+    height: 64px;
+
+    overflow: hidden;
+
+    border-radius: 12px;
+
+    background: #eef2f7;
+}
+
+
+.hh-product-image img {
+
+    width: 100%;
+
+    height: 100%;
+
+    object-fit: cover;
+}
+
+
+.hh-product-placeholder {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 100%;
+
+    height: 100%;
+
+    color: #9ba7b8;
+
+    font-size: 18px;
+}
+
+
+.hh-product-info {
+
+    min-width: 0;
+}
+
+
+.hh-product-info strong {
+
+    display: block;
+
+    overflow: hidden;
+
+    margin-bottom: 5px;
+
+    color: #263248;
+
+    font-size: 11px;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+
+.hh-product-info span {
+
+    color: #8390a4;
+
+    font-size: 9px;
+}
+
+
+.hh-product-price {
+
+    text-align: right;
+}
+
+
+.hh-product-price strong {
+
+    display: block;
+
+    color: #1d4ed8;
+
+    font-size: 11px;
+}
+
+
+.hh-product-price small {
+
+    color: #8a96a9;
+
+    font-size: 9px;
+}
+
+
+/* =========================================================
+   SUMMARY
+========================================================= */
 
 .hh-summary-card {
 
-    overflow:
-        hidden;
+    position: sticky;
 
-    background:
-        #ffffff;
+    top: 20px;
+
+    overflow: hidden;
 
     border:
-        1px solid #e1e8f2;
+        1px solid
+        #e5eaf2;
 
-    border-radius:
-        20px;
+    border-radius: 20px;
+
+    background: #ffffff;
 
     box-shadow:
-        0
-        12px
-        31px
-        rgba(40,65,120,.06);
-
+        0 12px 35px
+        rgba(
+            31,
+            41,
+            55,
+            0.08
+        );
 }
 
 
 .hh-summary-header {
 
-    padding:
-        21px;
+    padding: 22px;
 
     border-bottom:
-        1px solid #edf1f5;
-
-}
-
-
-.hh-summary-header-icon {
-
-    width:
-        43px;
-
-    height:
-        43px;
-
-    margin-bottom:
-        12px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    color:
-        #ffffff;
-
-    background:
-
-        linear-gradient(
-            135deg,
-            #2563eb,
-            #438bf2
-        );
-
-    border-radius:
-        12px;
-
-}
-
-
-.hh-summary-header small {
-
-    display:
-        block;
-
-    margin-bottom:
-        3px;
-
-    color:
-        #2563eb;
-
-    font-size:
-        6px;
-
-    font-weight:
-        900;
-
-    letter-spacing:
-        .8px;
-
+        1px solid
+        #edf0f5;
 }
 
 
 .hh-summary-header h2 {
 
-    margin:
-        0;
+    margin: 0;
 
-    color:
-        #17233c;
+    color: #202b40;
 
-    font-size:
-        17px;
-
-    font-weight:
-        900;
-
+    font-size: 16px;
 }
 
 
-/* ================================================================
-   ITEMS
-================================================================ */
+.hh-summary-body {
 
-.hh-checkout-items {
-
-    max-height:
-        340px;
-
-    overflow-y:
-        auto;
-
-}
-
-
-.hh-checkout-item {
-
-    padding:
-        14px
-        18px;
-
-    display:
-        grid;
-
-    grid-template-columns:
-        62px
-        minmax(0,1fr)
-        auto;
-
-    align-items:
-        center;
-
-    gap:
-        10px;
-
-    border-bottom:
-        1px solid #edf1f5;
-
-}
-
-
-.hh-checkout-item:last-child {
-
-    border-bottom:
-        0;
-
-}
-
-
-.hh-checkout-item-image {
-
-    width:
-        62px;
-
-    height:
-        62px;
-
-    overflow:
-        hidden;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    color:
-        #2563eb;
-
-    background:
-        #f1f6ff;
-
-    border:
-        1px solid #deE9f7;
-
-    border-radius:
-        11px;
-
-    font-size:
-        20px;
-
-}
-
-
-.hh-checkout-item-image img {
-
-    width:
-        100%;
-
-    height:
-        100%;
-
-    padding:
-        4px;
-
-    object-fit:
-        contain;
-
-    object-position:
-        center;
-
-}
-
-
-.hh-checkout-item-info {
-
-    min-width:
-        0;
-
-}
-
-
-.hh-checkout-item-info h3 {
-
-    margin:
-        0
-        0
-        4px;
-
-    overflow:
-        hidden;
-
-    color:
-        #263a55;
-
-    font-size:
-        9px;
-
-    font-weight:
-        900;
-
-    text-overflow:
-        ellipsis;
-
-    white-space:
-        nowrap;
-
-}
-
-
-.hh-checkout-item-info span {
-
-    display:
-        block;
-
-    color:
-        #8291a5;
-
-    font-size:
-        6px;
-
-}
-
-
-.hh-checkout-item-info small {
-
-    display:
-        block;
-
-    margin-top:
-        3px;
-
-    color:
-        #2563eb;
-
-    font-size:
-        6px;
-
-    font-weight:
-        800;
-
-}
-
-
-.hh-checkout-item-price {
-
-    color:
-        #183d71;
-
-    font-size:
-        8px;
-
-    font-weight:
-        900;
-
-    white-space:
-        nowrap;
-
-}
-
-
-/* ================================================================
-   TOTAL
-================================================================ */
-
-.hh-summary-totals {
-
-    padding:
-        18px
-        20px;
-
-    background:
-        #fbfdff;
-
-    border-top:
-        1px solid #edf1f5;
-
+    padding: 20px 22px;
 }
 
 
 .hh-summary-row {
 
-    min-height:
-        32px;
+    display: flex;
 
-    display:
-        flex;
+    justify-content: space-between;
 
-    align-items:
-        center;
+    align-items: center;
 
-    justify-content:
-        space-between;
+    gap: 15px;
 
-    gap:
-        12px;
+    margin-bottom: 13px;
 
-}
+    color: #708097;
 
-
-.hh-summary-row span {
-
-    color:
-        #7f8da0;
-
-    font-size:
-        7px;
-
+    font-size: 11px;
 }
 
 
 .hh-summary-row strong {
 
-    color:
-        #31445f;
+    color: #28364d;
 
-    font-size:
-        8px;
-
-    font-weight:
-        850;
-
+    font-size: 11px;
 }
 
 
 .hh-summary-divider {
 
-    height:
-        1px;
+    height: 1px;
 
     margin:
-        12px 0;
+        17px 0;
 
-    background:
-        #e5eaf1;
-
+    background: #edf0f5;
 }
 
 
-.hh-summary-grand {
+.hh-summary-total {
 
-    display:
-        flex;
+    display: flex;
 
-    align-items:
-        flex-end;
+    justify-content: space-between;
 
-    justify-content:
-        space-between;
+    align-items: center;
 
-    gap:
-        12px;
+    gap: 15px;
 
+    margin-bottom: 20px;
 }
 
 
-.hh-summary-grand span {
+.hh-summary-total span {
 
-    display:
-        block;
+    color: #263248;
 
-    color:
-        #7b899d;
+    font-size: 13px;
 
-    font-size:
-        7px;
-
-    font-weight:
-        900;
-
-    letter-spacing:
-        .6px;
-
+    font-weight: 800;
 }
 
 
-.hh-summary-grand small {
+.hh-summary-total strong {
 
-    display:
-        block;
+    color: #1769ff;
 
-    margin-top:
-        3px;
+    font-size: 20px;
 
-    color:
-        #a0acbb;
-
-    font-size:
-        6px;
-
+    font-weight: 900;
 }
 
-
-.hh-summary-grand strong {
-
-    color:
-        #2563eb;
-
-    font-size:
-        20px;
-
-    font-weight:
-        900;
-
-    white-space:
-        nowrap;
-
-}
-
-
-/* ================================================================
-   PLACE ORDER
-================================================================ */
 
 .hh-place-order {
 
-    width:
-        100%;
+    width: 100%;
 
-    min-height:
-        50px;
+    min-height: 48px;
 
-    margin-top:
-        17px;
+    display: flex;
 
-    padding:
-        0
-        15px;
+    align-items: center;
 
-    display:
-        flex;
+    justify-content: center;
 
-    align-items:
-        center;
+    gap: 8px;
 
-    justify-content:
-        space-between;
+    border: 0;
 
-    gap:
-        10px;
+    border-radius: 12px;
 
-    color:
-        #ffffff;
+    color: #ffffff;
 
     background:
-
         linear-gradient(
             135deg,
-            #2563eb,
-            #347eee
+            #1769ff,
+            #5b5df6
         );
 
-    border:
-        0;
+    font-family: inherit;
 
-    border-radius:
-        11px;
+    font-size: 11px;
 
-    box-shadow:
-        0
-        9px
-        20px
-        rgba(37,99,235,.22);
+    font-weight: 850;
 
-    font-family:
-        inherit;
-
-    font-size:
-        9px;
-
-    font-weight:
-        900;
-
-    cursor:
-        pointer;
-
-    transition:
-        .18s ease;
-
-}
-
-
-.hh-place-order:hover {
-
-    transform:
-        translateY(-2px);
+    cursor: pointer;
 
     box-shadow:
-        0
-        12px
-        25px
-        rgba(37,99,235,.28);
-
+        0 9px 24px
+        rgba(
+            37,
+            99,
+            235,
+            0.22
+        );
 }
 
 
 .hh-place-order:disabled {
 
-    opacity:
-        .65;
+    cursor: not-allowed;
 
-    cursor:
-        wait;
-
-    transform:
-        none;
-
+    opacity: 0.65;
 }
 
 
-/* ================================================================
-   SECURITY
-================================================================ */
+.hh-secure-note {
 
-.hh-security-card {
+    display: flex;
 
-    padding:
-        17px;
+    align-items: center;
 
-    display:
-        flex;
+    justify-content: center;
 
-    align-items:
-        flex-start;
+    gap: 6px;
 
-    gap:
-        11px;
+    margin-top: 13px;
 
-    background:
+    color: #8a96a9;
 
-        linear-gradient(
-            135deg,
-            #f3fbf6,
-            #ecfdf3
-        );
-
-    border:
-        1px solid #c8f1d5;
-
-    border-radius:
-        16px;
-
+    font-size: 8px;
 }
 
 
-.hh-security-icon {
+/* =========================================================
+   SELLER FEE BREAKDOWN
+========================================================= */
 
-    width:
-        38px;
+.hh-fee-breakdown {
 
-    height:
-        38px;
+    margin-top: 17px;
 
-    flex-shrink:
-        0;
+    padding-top: 15px;
 
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    color:
-        #15803d;
-
-    background:
-        #ffffff;
-
-    border:
-        1px solid #d6f4df;
-
-    border-radius:
-        10px;
-
+    border-top:
+        1px solid
+        #edf0f5;
 }
 
 
-.hh-security-card strong {
-
-    display:
-        block;
-
-    margin-bottom:
-        4px;
-
-    color:
-        #24583a;
-
-    font-size:
-        8px;
-
-    font-weight:
-        900;
-
-}
-
-
-.hh-security-card p {
+.hh-fee-breakdown h4 {
 
     margin:
-        0;
+        0 0 10px;
 
-    color:
-        #658772;
-
-    font-size:
-        7px;
-
-    line-height:
-        1.6;
-
+    font-size: 10px;
 }
 
 
-/* ================================================================
-   BACK
-================================================================ */
+.hh-vendor-fee-row {
 
-.hh-back-cart {
+    display: flex;
 
-    min-height:
-        43px;
+    justify-content: space-between;
 
-    display:
-        flex;
+    gap: 12px;
 
-    align-items:
-        center;
+    margin-top: 8px;
 
-    justify-content:
-        center;
+    color: #8190a5;
 
-    gap:
-        7px;
-
-    color:
-        #52647c;
-
-    background:
-        #ffffff;
-
-    border:
-        1px solid #dce5ef;
-
-    border-radius:
-        11px;
-
-    font-size:
-        8px;
-
-    font-weight:
-        850;
-
-    text-decoration:
-        none;
-
+    font-size: 9px;
 }
 
 
-.hh-back-cart:hover {
-
-    color:
-        #2563eb;
-
-    background:
-        #f8fbff;
-
-}
-
-
-/* ================================================================
+/* =========================================================
    RESPONSIVE
-================================================================ */
+========================================================= */
 
-@media (max-width: 1050px) {
+@media (
+    max-width: 1050px
+) {
 
     .hh-checkout-layout {
 
         grid-template-columns:
             1fr;
-
-    }
-
-
-    .hh-checkout-right {
-
-        position:
-            static;
-
-        display:
-            grid;
-
-        grid-template-columns:
-            1fr
-            1fr;
-
     }
 
 
     .hh-summary-card {
 
-        grid-row:
-            span 2;
-
+        position: static;
     }
-
 }
 
 
-@media (max-width: 850px) {
+@media (
+    max-width: 760px
+) {
 
     .hh-checkout-page {
 
         padding:
-            30px
-            18px
-            60px;
-
-    }
-
-
-    .hh-checkout-hero {
-
-        grid-template-columns:
-            1fr;
-
-        min-height:
-            auto;
-
-        padding:
-            37px;
-
-    }
-
-
-    .hh-checkout-hero-art {
-
-        display:
-            none;
-
-    }
-
-
-    .hh-checkout-progress {
-
-        grid-template-columns:
-            1fr;
-
-    }
-
-}
-
-
-@media (max-width: 650px) {
-
-    .hh-checkout-page {
-
-        padding:
-            21px
-            13px
+            22px 14px
             50px;
-
     }
 
 
     .hh-checkout-hero {
 
         padding:
-            28px
-            23px;
-
-        border-radius:
-            21px;
-
+            25px 21px;
     }
 
 
     .hh-checkout-hero h1 {
 
-        font-size:
-            31px;
-
+        font-size: 25px;
     }
 
 
-    .hh-delivery-grid,
+    .hh-delivery-grid {
+
+        grid-template-columns:
+            1fr;
+    }
+
+
     .hh-payment-grid {
 
         grid-template-columns:
             1fr;
-
     }
 
 
-    .hh-checkout-section-body {
+    .hh-card-header,
+    .hh-card-body {
 
         padding:
-            17px;
-
+            18px;
     }
-
-
-    .hh-checkout-right {
-
-        display:
-            flex;
-
-    }
-
-
-    .hh-checkout-item {
-
-        grid-template-columns:
-            55px
-            minmax(0,1fr);
-
-    }
-
-
-    .hh-checkout-item-image {
-
-        width:
-            55px;
-
-        height:
-            55px;
-
-    }
-
-
-    .hh-checkout-item-price {
-
-        grid-column:
-            2;
-
-    }
-
 }
 
 </style>
 
 
-<!-- ===============================================================
-     CHECKOUT
-================================================================ -->
+<div class="hh-checkout-page">
 
-<main class="hh-checkout-page">
+<div class="hh-checkout-container">
 
 
-    <div class="hh-checkout-container">
+    <!-- =====================================================
+         HERO
+    ====================================================== -->
 
+    <section class="hh-checkout-hero">
 
-        <!-- =======================================================
-             HERO
-        ======================================================== -->
+        <div class="hh-checkout-hero-content">
 
-        <section class="hh-checkout-hero">
+            <div class="hh-checkout-hero-label">
 
+                <i class="bi bi-bag-check-fill"></i>
 
-            <div class="hh-checkout-hero-copy">
-
-
-                <span class="hh-checkout-pill">
-
-                    <i class="bi bi-shield-check"></i>
-
-                    SECURE CHECKOUT
-
-                </span>
-
-
-                <h1>
-
-                    Almost There.
-
-                    <span>
-                        Complete Your Order.
-                    </span>
-
-                </h1>
-
-
-                <p>
-
-                    Choose how you'd like to receive your
-                    order, select a payment method and
-                    review everything before placing
-                    your HochipoHub order.
-
-                </p>
-
+                Secure Checkout
 
             </div>
 
+            <h1>
+                Complete Your Order
+            </h1>
 
+            <p>
+                Select how you want to receive your order
+                and choose your preferred payment method.
+            </p>
 
-            <!-- HERO ART -->
+        </div>
 
-            <div class="hh-checkout-hero-art">
+    </section>
 
 
-                <div class="hh-checkout-main-icon">
+    <!-- =====================================================
+         ERROR
+    ====================================================== -->
 
-                    <i class="bi bi-bag-check"></i>
+    <?php if ($error !== ''): ?>
 
-                </div>
+        <div class="hh-checkout-error">
 
+            <i class="bi bi-exclamation-circle-fill"></i>
 
-                <div class="hh-checkout-floating one">
-
-                    <i class="bi bi-box-seam"></i>
-
-                    <span>
-
-                        <?= number_format(
-                            $totalItems
-                        ) ?>
-
-                        items
-
-                    </span>
-
-                </div>
-
-
-                <div class="hh-checkout-floating two">
-
-                    <i class="bi bi-shield-lock"></i>
-
-                    <span>
-                        Secure order
-                    </span>
-
-                </div>
-
-
-            </div>
-
-
-        </section>
-
-
-
-        <!-- =======================================================
-             PROGRESS
-        ======================================================== -->
-
-        <section class="hh-checkout-progress">
-
-
-            <div class="hh-progress-step">
-
-
-                <div class="hh-progress-number">
-                    1
-                </div>
-
-
-                <div>
-
-                    <span>
-                        STEP ONE
-                    </span>
-
-                    <strong>
-                        Delivery
-                    </strong>
-
-                </div>
-
-
-            </div>
-
-
-
-            <div class="hh-progress-step">
-
-
-                <div class="hh-progress-number">
-                    2
-                </div>
-
-
-                <div>
-
-                    <span>
-                        STEP TWO
-                    </span>
-
-                    <strong>
-                        Payment
-                    </strong>
-
-                </div>
-
-
-            </div>
-
-
-
-            <div class="hh-progress-step">
-
-
-                <div class="hh-progress-number">
-                    3
-                </div>
-
-
-                <div>
-
-                    <span>
-                        FINAL STEP
-                    </span>
-
-                    <strong>
-                        Place Order
-                    </strong>
-
-                </div>
-
-
-            </div>
-
-
-        </section>
-
-
-
-        <!-- =======================================================
-             ERROR
-        ======================================================== -->
-
-        <?php if (
-            !empty($error)
-        ): ?>
-
-
-            <div class="hh-checkout-error">
-
-                <i class="bi bi-exclamation-circle-fill"></i>
-
+            <div>
                 <?= checkoutEscape(
                     $error
                 ) ?>
-
             </div>
 
+        </div>
 
-        <?php endif; ?>
-
-
-
-        <!-- =======================================================
-             FORM
-        ======================================================== -->
-
-        <form
-            method="POST"
-            action=""
-            id="checkoutForm"
-        >
+    <?php endif; ?>
 
 
-            <div class="hh-checkout-layout">
+    <form
+        method="POST"
+        action="checkout.php"
+        id="checkoutForm"
+    >
+
+        <div class="hh-checkout-layout">
 
 
-                <!-- =================================================
-                     LEFT
-                ================================================== -->
+            <!-- =================================================
+                 LEFT
+            ================================================== -->
 
-                <div class="hh-checkout-left">
-
-
-                    <!-- =============================================
-                         DELIVERY
-                    ============================================== -->
-
-                    <section class="hh-checkout-section">
+            <div class="hh-checkout-left">
 
 
-                        <div class="hh-checkout-section-header">
+                <!-- =============================================
+                     DELIVERY
+                ============================================== -->
 
+                <section class="hh-card">
 
-                            <div class="hh-checkout-section-icon">
+                    <div class="hh-card-header">
 
-                                <i class="bi bi-truck"></i>
+                        <div class="hh-card-icon">
 
-                            </div>
-
-
-                            <div>
-
-                                <h2>
-                                    Delivery Method
-                                </h2>
-
-                                <p>
-
-                                    Choose how you want
-                                    to receive your order.
-
-                                </p>
-
-                            </div>
-
+                            <i class="bi bi-truck"></i>
 
                         </div>
 
-
-
-                        <div class="hh-checkout-section-body">
-
-
-                            <div class="hh-delivery-grid">
-
-
-                                <!-- PICKUP -->
-
-                                <label class="hh-choice">
-
-
-                                    <input
-                                        type="radio"
-                                        name="delivery_method"
-                                        value="Pickup"
-                                        <?= $selectedDelivery === 'Pickup'
-                                            ? 'checked'
-                                            : '' ?>
-                                        required
-                                    >
-
-
-                                    <div class="hh-choice-content">
-
-
-                                        <div class="hh-choice-icon">
-
-                                            <i class="bi bi-shop"></i>
-
-                                        </div>
-
-
-                                        <div>
-
-                                            <strong>
-                                                Pickup
-                                            </strong>
-
-                                            <span>
-
-                                                Collect your order
-                                                directly from the
-                                                seller. No delivery
-                                                address required.
-
-                                            </span>
-
-                                        </div>
-
-
-                                    </div>
-
-
-                                </label>
-
-
-
-                                <!-- POSTAGE -->
-
-                                <label class="hh-choice">
-
-
-                                    <input
-                                        type="radio"
-                                        name="delivery_method"
-                                        value="Postage"
-                                        <?= $selectedDelivery === 'Postage'
-                                            ? 'checked'
-                                            : '' ?>
-                                        required
-                                    >
-
-
-                                    <div class="hh-choice-content">
-
-
-                                        <div class="hh-choice-icon">
-
-                                            <i class="bi bi-box-seam"></i>
-
-                                        </div>
-
-
-                                        <div>
-
-                                            <strong>
-                                                Postage
-                                            </strong>
-
-                                            <span>
-
-                                                Have your order
-                                                delivered to your
-                                                preferred address.
-
-                                            </span>
-
-                                        </div>
-
-
-                                    </div>
-
-
-                                </label>
-
-
-                            </div>
-
-
-
-                            <!-- ADDRESS -->
-
-                            <div
-                                class="hh-address-field"
-                                id="addressField"
-                            >
-
-
-                                <label for="delivery_address">
-
-                                    <i class="bi bi-geo-alt"></i>
-
-                                    Delivery Address
-
-                                </label>
-
-
-                                <textarea
-                                    id="delivery_address"
-                                    name="delivery_address"
-                                    rows="4"
-                                    placeholder="Enter your full delivery address..."
-                                ><?= checkoutEscape(
-                                    $selectedAddress
-                                ) ?></textarea>
-
-
-                            </div>
-
-
-                        </div>
-
-
-                    </section>
-
-
-
-                    <!-- =============================================
-                         PAYMENT
-                    ============================================== -->
-
-                    <section class="hh-checkout-section">
-
-
-                        <div class="
-                            hh-checkout-section-header
-                            purple
-                        ">
-
-
-                            <div class="hh-checkout-section-icon">
-
-                                <i class="bi bi-credit-card"></i>
-
-                            </div>
-
-
-                            <div>
-
-                                <h2>
-                                    Payment Method
-                                </h2>
-
-                                <p>
-
-                                    Select your preferred
-                                    payment option.
-
-                                </p>
-
-                            </div>
-
-
-                        </div>
-
-
-
-                        <div class="hh-checkout-section-body">
-
-
-                            <div class="hh-payment-grid">
-
-
-                                <!-- FPX -->
-
-                                <label class="hh-payment-option">
-
-
-                                    <input
-                                        type="radio"
-                                        name="payment_method"
-                                        value="FPX"
-                                        <?= $selectedPayment === 'FPX'
-                                            ? 'checked'
-                                            : '' ?>
-                                        required
-                                    >
-
-
-                                    <div class="hh-payment-box">
-
-
-                                        <div class="hh-payment-icon">
-
-                                            <i class="bi bi-bank"></i>
-
-                                        </div>
-
-
-                                        <div>
-
-                                            <strong>
-                                                Online Banking
-                                            </strong>
-
-                                            <small>
-                                                FPX
-                                            </small>
-
-                                        </div>
-
-
-                                    </div>
-
-
-                                </label>
-
-
-
-                                <!-- CREDIT CARD -->
-
-                                <label class="hh-payment-option">
-
-
-                                    <input
-                                        type="radio"
-                                        name="payment_method"
-                                        value="Credit Card"
-                                        <?= $selectedPayment === 'Credit Card'
-                                            ? 'checked'
-                                            : '' ?>
-                                        required
-                                    >
-
-
-                                    <div class="hh-payment-box">
-
-
-                                        <div class="hh-payment-icon">
-
-                                            <i class="bi bi-credit-card-2-front"></i>
-
-                                        </div>
-
-
-                                        <div>
-
-                                            <strong>
-                                                Credit Card
-                                            </strong>
-
-                                            <small>
-                                                Card payment
-                                            </small>
-
-                                        </div>
-
-
-                                    </div>
-
-
-                                </label>
-
-
-
-                                <!-- DEBIT CARD -->
-
-                                <label class="hh-payment-option">
-
-
-                                    <input
-                                        type="radio"
-                                        name="payment_method"
-                                        value="Debit Card"
-                                        <?= $selectedPayment === 'Debit Card'
-                                            ? 'checked'
-                                            : '' ?>
-                                        required
-                                    >
-
-
-                                    <div class="hh-payment-box">
-
-
-                                        <div class="hh-payment-icon">
-
-                                            <i class="bi bi-credit-card"></i>
-
-                                        </div>
-
-
-                                        <div>
-
-                                            <strong>
-                                                Debit Card
-                                            </strong>
-
-                                            <small>
-                                                Direct card payment
-                                            </small>
-
-                                        </div>
-
-
-                                    </div>
-
-
-                                </label>
-
-
-
-                                <!-- CASH -->
-
-                                <label class="hh-payment-option">
-
-
-                                    <input
-                                        type="radio"
-                                        name="payment_method"
-                                        value="Cash"
-                                        <?= $selectedPayment === 'Cash'
-                                            ? 'checked'
-                                            : '' ?>
-                                        required
-                                    >
-
-
-                                    <div class="hh-payment-box">
-
-
-                                        <div class="hh-payment-icon">
-
-                                            <i class="bi bi-cash-stack"></i>
-
-                                        </div>
-
-
-                                        <div>
-
-                                            <strong>
-                                                Cash
-                                            </strong>
-
-                                            <small>
-                                                Pay offline
-                                            </small>
-
-                                        </div>
-
-
-                                    </div>
-
-
-                                </label>
-
-
-                            </div>
-
-
-                        </div>
-
-
-                    </section>
-
-
-                </div>
-
-
-
-                <!-- =================================================
-                     RIGHT
-                ================================================== -->
-
-                <aside class="hh-checkout-right">
-
-
-                    <!-- =============================================
-                         SUMMARY
-                    ============================================== -->
-
-                    <section class="hh-summary-card">
-
-
-                        <div class="hh-summary-header">
-
-
-                            <div class="hh-summary-header-icon">
-
-                                <i class="bi bi-receipt"></i>
-
-                            </div>
-
-
-                            <small>
-                                ORDER SUMMARY
-                            </small>
-
+                        <div>
 
                             <h2>
-                                Review Your Order
+                                Delivery Method
                             </h2>
 
+                            <p>
+                                Choose how you want to receive
+                                your order.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="hh-card-body">
+
+                        <div class="hh-delivery-grid">
+
+
+                            <!-- PICKUP -->
+
+                            <label
+                                class="hh-option <?= !$pickupAvailable
+                                    ? 'disabled'
+                                    : '' ?>"
+                            >
+
+                                <input
+                                    type="radio"
+                                    name="delivery_method"
+                                    value="Pickup"
+                                    <?= $selectedDelivery ===
+                                        'Pickup'
+                                            ? 'checked'
+                                            : '' ?>
+                                    <?= !$pickupAvailable
+                                        ? 'disabled'
+                                        : '' ?>
+                                >
+
+                                <div class="hh-option-box">
+
+                                    <div class="hh-option-icon">
+
+                                        <i class="bi bi-shop"></i>
+
+                                    </div>
+
+                                    <strong>
+                                        Pickup
+                                    </strong>
+
+                                    <small>
+                                        Collect from seller
+                                        location.
+                                    </small>
+
+                                    <span class="hh-fee">
+                                        FREE
+                                    </span>
+
+                                </div>
+
+                            </label>
+
+
+                            <!-- POSTAGE -->
+
+                            <label
+                                class="hh-option <?= !$postageAvailable
+                                    ? 'disabled'
+                                    : '' ?>"
+                            >
+
+                                <input
+                                    type="radio"
+                                    name="delivery_method"
+                                    value="Postage"
+                                    <?= $selectedDelivery ===
+                                        'Postage'
+                                            ? 'checked'
+                                            : '' ?>
+                                    <?= !$postageAvailable
+                                        ? 'disabled'
+                                        : '' ?>
+                                >
+
+                                <div class="hh-option-box">
+
+                                    <div class="hh-option-icon">
+
+                                        <i class="bi bi-box-seam"></i>
+
+                                    </div>
+
+                                    <strong>
+                                        Postage
+                                    </strong>
+
+                                    <small>
+                                        Delivered using courier
+                                        service.
+                                    </small>
+
+                                    <span class="hh-fee">
+
+                                        RM <?= checkoutEscape(
+                                            checkoutMoney(
+                                                $postageFee
+                                            )
+                                        ) ?>
+
+                                    </span>
+
+                                </div>
+
+                            </label>
+
+
+                            <!-- VENDOR DELIVERY -->
+
+                            <label
+                                class="hh-option <?= !$vendorDeliveryAvailable
+                                    ? 'disabled'
+                                    : '' ?>"
+                            >
+
+                                <input
+                                    type="radio"
+                                    name="delivery_method"
+                                    value="Vendor Delivery"
+                                    <?= $selectedDelivery ===
+                                        'Vendor Delivery'
+                                            ? 'checked'
+                                            : '' ?>
+                                    <?= !$vendorDeliveryAvailable
+                                        ? 'disabled'
+                                        : '' ?>
+                                >
+
+                                <div class="hh-option-box">
+
+                                    <div class="hh-option-icon">
+
+                                        <i class="bi bi-scooter"></i>
+
+                                    </div>
+
+                                    <strong>
+                                        Vendor Delivery
+                                    </strong>
+
+                                    <small>
+                                        Seller delivers directly
+                                        to you.
+                                    </small>
+
+                                    <span class="hh-fee">
+
+                                        RM <?= checkoutEscape(
+                                            checkoutMoney(
+                                                $vendorDeliveryFee
+                                            )
+                                        ) ?>
+
+                                    </span>
+
+                                </div>
+
+                            </label>
 
                         </div>
 
 
+                        <!-- =========================================
+                             PICKUP LOCATIONS
+                        ========================================== -->
 
-                        <!-- ITEMS -->
+                        <div
+                            class="hh-pickup-locations"
+                            id="pickupLocations"
+                        >
 
-                        <div class="hh-checkout-items">
+                            <h3>
+                                Pickup Locations
+                            </h3>
 
+                            <div class="hh-pickup-list">
+
+                                <?php foreach (
+                                    $vendors
+                                    as $vendor
+                                ): ?>
+
+                                    <div class="hh-pickup-item">
+
+                                        <div class="hh-pickup-store">
+
+                                            <strong>
+
+                                                <?= checkoutEscape(
+                                                    $vendor[
+                                                        'business_name'
+                                                    ]
+                                                ) ?>
+
+                                            </strong>
+
+                                            <span>
+
+                                                <?= checkoutEscape(
+                                                    $vendor[
+                                                        'business_address'
+                                                    ] !== ''
+                                                        ? $vendor[
+                                                            'business_address'
+                                                        ]
+                                                        : 'Address not provided.'
+                                                ) ?>
+
+                                            </span>
+
+                                        </div>
+
+
+                                        <?php if (
+                                            $vendor[
+                                                'business_address'
+                                            ] !== ''
+                                        ): ?>
+
+                                            <a
+                                                href="<?= checkoutEscape(
+                                                    checkoutMapsUrl(
+                                                        $vendor[
+                                                            'business_address'
+                                                        ]
+                                                    )
+                                                ) ?>"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="hh-navigate"
+                                            >
+
+                                                <i class="bi bi-geo-alt-fill"></i>
+
+                                                Navigate
+
+                                            </a>
+
+                                        <?php endif; ?>
+
+                                    </div>
+
+                                <?php endforeach; ?>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- =========================================
+                             ADDRESS
+                        ========================================== -->
+
+                        <div
+                            class="hh-address-field"
+                            id="addressField"
+                        >
+
+                            <label for="delivery_address">
+
+                                <i class="bi bi-geo-alt"></i>
+
+                                Delivery Address
+
+                            </label>
+
+                            <textarea
+                                id="delivery_address"
+                                name="delivery_address"
+                                rows="4"
+                                placeholder="Enter your full delivery address..."
+                            ><?= checkoutEscape(
+                                $selectedAddress
+                            ) ?></textarea>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+
+                <!-- =============================================
+                     PAYMENT
+                ============================================== -->
+
+                <section class="hh-card">
+
+                    <div class="hh-card-header">
+
+                        <div class="hh-card-icon">
+
+                            <i class="bi bi-credit-card"></i>
+
+                        </div>
+
+                        <div>
+
+                            <h2>
+                                Payment Method
+                            </h2>
+
+                            <p>
+                                Online payments are processed
+                                through Fiuu.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="hh-card-body">
+
+                        <div class="hh-payment-grid">
+
+
+                            <!-- FPX -->
+
+                            <label class="hh-payment-option">
+
+                                <input
+                                    type="radio"
+                                    name="payment_method"
+                                    value="FPX"
+                                    <?= $selectedPayment ===
+                                        'FPX'
+                                            ? 'checked'
+                                            : '' ?>
+                                >
+
+                                <div class="hh-payment-box">
+
+                                    <div class="hh-payment-icon">
+
+                                        <i class="bi bi-bank"></i>
+
+                                    </div>
+
+                                    <div class="hh-payment-copy">
+
+                                        <strong>
+                                            FPX
+                                        </strong>
+
+                                        <small>
+                                            Online Banking via Fiuu
+                                        </small>
+
+                                    </div>
+
+                                </div>
+
+                            </label>
+
+
+                            <!-- CREDIT CARD -->
+
+                            <label class="hh-payment-option">
+
+                                <input
+                                    type="radio"
+                                    name="payment_method"
+                                    value="Credit Card"
+                                    <?= $selectedPayment ===
+                                        'Credit Card'
+                                            ? 'checked'
+                                            : '' ?>
+                                >
+
+                                <div class="hh-payment-box">
+
+                                    <div class="hh-payment-icon">
+
+                                        <i class="bi bi-credit-card-fill"></i>
+
+                                    </div>
+
+                                    <div class="hh-payment-copy">
+
+                                        <strong>
+                                            Credit Card
+                                        </strong>
+
+                                        <small>
+                                            Secure card payment
+                                            via Fiuu
+                                        </small>
+
+                                    </div>
+
+                                </div>
+
+                            </label>
+
+
+                            <!-- DEBIT CARD -->
+
+                            <label class="hh-payment-option">
+
+                                <input
+                                    type="radio"
+                                    name="payment_method"
+                                    value="Debit Card"
+                                    <?= $selectedPayment ===
+                                        'Debit Card'
+                                            ? 'checked'
+                                            : '' ?>
+                                >
+
+                                <div class="hh-payment-box">
+
+                                    <div class="hh-payment-icon">
+
+                                        <i class="bi bi-credit-card-2-front-fill"></i>
+
+                                    </div>
+
+                                    <div class="hh-payment-copy">
+
+                                        <strong>
+                                            Debit Card
+                                        </strong>
+
+                                        <small>
+                                            Secure debit payment
+                                            via Fiuu
+                                        </small>
+
+                                    </div>
+
+                                </div>
+
+                            </label>
+
+
+                            <!-- CASH -->
+
+                            <label
+                                class="hh-payment-option"
+                                id="cashOption"
+                            >
+
+                                <input
+                                    type="radio"
+                                    id="cashPayment"
+                                    name="payment_method"
+                                    value="Cash"
+                                    <?= $selectedPayment ===
+                                        'Cash'
+                                            ? 'checked'
+                                            : '' ?>
+                                >
+
+                                <div class="hh-payment-box">
+
+                                    <div class="hh-payment-icon">
+
+                                        <i class="bi bi-cash-stack"></i>
+
+                                    </div>
+
+                                    <div class="hh-payment-copy">
+
+                                        <strong id="cashTitle">
+                                            Cash
+                                        </strong>
+
+                                        <small id="cashText">
+                                            Depends on selected delivery.
+                                        </small>
+
+                                    </div>
+
+                                </div>
+
+                            </label>
+
+                        </div>
+
+
+                        <div
+                            class="hh-payment-note"
+                            id="paymentNote"
+                        >
+
+                            <i class="bi bi-shield-lock-fill"></i>
+
+                            <div>
+
+                                Select a payment method.
+                                FPX, Credit Card and Debit Card
+                                will redirect you to Fiuu.
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+
+                <!-- =============================================
+                     ITEMS
+                ============================================== -->
+
+                <section class="hh-card">
+
+                    <div class="hh-card-header">
+
+                        <div class="hh-card-icon">
+
+                            <i class="bi bi-bag"></i>
+
+                        </div>
+
+                        <div>
+
+                            <h2>
+                                Order Items
+                            </h2>
+
+                            <p>
+                                <?= (int) $totalItems ?>
+                                item(s) in this order.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="hh-card-body">
+
+                        <div class="hh-item-list">
 
                             <?php foreach (
                                 $cartItems
                                 as $item
                             ): ?>
 
-
                                 <?php
 
-                                $image =
+                                $imageUrl =
                                     checkoutProductImage(
                                         $item['image']
                                         ?? ''
                                     );
 
-
-                                $lineTotal =
+                                $lineSubtotal =
                                     (float)
-                                    $item['price']
-                                    *
+                                    $item['price'] *
                                     (int)
                                     $item['quantity'];
 
                                 ?>
 
+                                <div class="hh-cart-item">
 
-                                <div class="hh-checkout-item">
-
-
-                                    <div class="hh-checkout-item-image">
-
+                                    <div class="hh-product-image">
 
                                         <?php if (
-                                            $image !== ''
+                                            $imageUrl !== ''
                                         ): ?>
-
 
                                             <img
                                                 src="<?= checkoutEscape(
-                                                    $image
+                                                    $imageUrl
                                                 ) ?>"
                                                 alt="<?= checkoutEscape(
                                                     $item[
                                                         'product_name'
                                                     ]
                                                 ) ?>"
-                                                onerror="
-                                                    this.style.display='none';
-                                                    this.parentElement.innerHTML='<i class=&quot;bi bi-image&quot;></i>';
-                                                "
                                             >
-
 
                                         <?php else: ?>
 
+                                            <div class="hh-product-placeholder">
 
-                                            <i class="bi bi-image"></i>
+                                                <i class="bi bi-image"></i>
 
+                                            </div>
 
                                         <?php endif; ?>
-
 
                                     </div>
 
 
+                                    <div class="hh-product-info">
 
-                                    <div class="hh-checkout-item-info">
-
-
-                                        <h3>
+                                        <strong>
 
                                             <?= checkoutEscape(
                                                 $item[
@@ -4085,8 +3654,7 @@ require_once __DIR__ .
                                                 ]
                                             ) ?>
 
-                                        </h3>
-
+                                        </strong>
 
                                         <span>
 
@@ -4096,10 +3664,7 @@ require_once __DIR__ .
                                                 ]
                                             ) ?>
 
-                                        </span>
-
-
-                                        <small>
+                                            &nbsp;•&nbsp;
 
                                             Qty:
                                             <?= (int)
@@ -4107,234 +3672,236 @@ require_once __DIR__ .
                                                     'quantity'
                                                 ] ?>
 
+                                        </span>
+
+                                    </div>
+
+
+                                    <div class="hh-product-price">
+
+                                        <strong>
+
+                                            RM <?= checkoutEscape(
+                                                checkoutMoney(
+                                                    $lineSubtotal
+                                                )
+                                            ) ?>
+
+                                        </strong>
+
+                                        <small>
+
+                                            RM <?= checkoutEscape(
+                                                checkoutMoney(
+                                                    $item[
+                                                        'price'
+                                                    ]
+                                                )
+                                            ) ?>
+                                            each
+
                                         </small>
 
-
                                     </div>
-
-
-
-                                    <div class="hh-checkout-item-price">
-
-                                        RM
-                                        <?= number_format(
-                                            $lineTotal,
-                                            2
-                                        ) ?>
-
-                                    </div>
-
 
                                 </div>
-
 
                             <?php endforeach; ?>
 
-
                         </div>
 
+                    </div>
 
-
-                        <!-- TOTALS -->
-
-                        <div class="hh-summary-totals">
-
-
-                            <div class="hh-summary-row">
-
-                                <span>
-                                    Items
-                                </span>
-
-                                <strong>
-
-                                    <?= number_format(
-                                        $totalItems
-                                    ) ?>
-
-                                </strong>
-
-                            </div>
-
-
-                            <div class="hh-summary-row">
-
-                                <span>
-                                    Sellers
-                                </span>
-
-                                <strong>
-
-                                    <?= number_format(
-                                        $vendorCount
-                                    ) ?>
-
-                                </strong>
-
-                            </div>
-
-
-                            <div class="hh-summary-row">
-
-                                <span>
-                                    Subtotal
-                                </span>
-
-                                <strong>
-
-                                    RM
-                                    <?= number_format(
-                                        $subtotal,
-                                        2
-                                    ) ?>
-
-                                </strong>
-
-                            </div>
-
-
-                            <div class="hh-summary-row">
-
-                                <span>
-                                    Delivery
-                                </span>
-
-                                <strong>
-                                    RM 0.00
-                                </strong>
-
-                            </div>
-
-
-                            <div class="hh-summary-divider"></div>
-
-
-                            <div class="hh-summary-grand">
-
-
-                                <div>
-
-                                    <span>
-                                        TOTAL
-                                    </span>
-
-                                    <small>
-                                        Final order amount
-                                    </small>
-
-                                </div>
-
-
-                                <strong>
-
-                                    RM
-                                    <?= number_format(
-                                        $grandTotal,
-                                        2
-                                    ) ?>
-
-                                </strong>
-
-
-                            </div>
-
-
-
-                            <!-- PLACE ORDER -->
-
-                            <button
-                                type="submit"
-                                class="hh-place-order"
-                                id="placeOrderButton"
-                            >
-
-
-                                <span>
-
-                                    <i class="bi bi-lock-fill"></i>
-
-                                    Place Order
-
-                                </span>
-
-
-                                <i class="bi bi-arrow-right"></i>
-
-
-                            </button>
-
-
-                        </div>
-
-
-                    </section>
-
-
-
-                    <!-- =============================================
-                         SECURITY
-                    ============================================== -->
-
-                    <section class="hh-security-card">
-
-
-                        <div class="hh-security-icon">
-
-                            <i class="bi bi-shield-check"></i>
-
-                        </div>
-
-
-                        <div>
-
-                            <strong>
-                                Secure checkout
-                            </strong>
-
-
-                            <p>
-
-                                Review your delivery,
-                                payment and order details
-                                carefully before confirming.
-
-                            </p>
-
-                        </div>
-
-
-                    </section>
-
-
-
-                    <!-- BACK CART -->
-
-                    <a
-                        href="cart.php"
-                        class="hh-back-cart"
-                    >
-
-                        <i class="bi bi-arrow-left"></i>
-
-                        Back to Cart
-
-                    </a>
-
-
-                </aside>
-
+                </section>
 
             </div>
 
 
-        </form>
+            <!-- =================================================
+                 RIGHT
+            ================================================== -->
+
+            <aside>
+
+                <div class="hh-summary-card">
+
+                    <div class="hh-summary-header">
+
+                        <h2>
+                            Order Summary
+                        </h2>
+
+                    </div>
 
 
-    </div>
+                    <div class="hh-summary-body">
+
+                        <div class="hh-summary-row">
+
+                            <span>
+                                Items
+                            </span>
+
+                            <strong>
+                                <?= (int) $totalItems ?>
+                            </strong>
+
+                        </div>
 
 
-</main>
+                        <div class="hh-summary-row">
 
+                            <span>
+                                Subtotal
+                            </span>
+
+                            <strong>
+
+                                RM <?= checkoutEscape(
+                                    checkoutMoney(
+                                        $subtotal
+                                    )
+                                ) ?>
+
+                            </strong>
+
+                        </div>
+
+
+                        <div class="hh-summary-row">
+
+                            <span>
+                                Delivery Fee
+                            </span>
+
+                            <strong
+                                id="deliveryFeeDisplay"
+                            >
+
+                                RM <?= checkoutEscape(
+                                    checkoutMoney(
+                                        $currentDeliveryFee
+                                    )
+                                ) ?>
+
+                            </strong>
+
+                        </div>
+
+
+                        <div
+                            class="hh-fee-breakdown"
+                            id="feeBreakdown"
+                        >
+
+                            <h4>
+                                Seller Delivery Fees
+                            </h4>
+
+                            <?php foreach (
+                                $vendors
+                                as $vendor
+                            ): ?>
+
+                                <div
+                                    class="hh-vendor-fee-row"
+                                    data-vendor-postage="<?= checkoutEscape(
+                                        checkoutMoney(
+                                            $vendor[
+                                                'postage_fee'
+                                            ]
+                                        )
+                                    ) ?>"
+                                    data-vendor-delivery="<?= checkoutEscape(
+                                        checkoutMoney(
+                                            $vendor[
+                                                'vendor_delivery_fee'
+                                            ]
+                                        )
+                                    ) ?>"
+                                >
+
+                                    <span>
+
+                                        <?= checkoutEscape(
+                                            $vendor[
+                                                'business_name'
+                                            ]
+                                        ) ?>
+
+                                    </span>
+
+                                    <span class="vendorFeeValue">
+                                        -
+                                    </span>
+
+                                </div>
+
+                            <?php endforeach; ?>
+
+                        </div>
+
+
+                        <div class="hh-summary-divider"></div>
+
+
+                        <div class="hh-summary-total">
+
+                            <span>
+                                Total
+                            </span>
+
+                            <strong
+                                id="grandTotalDisplay"
+                            >
+
+                                RM <?= checkoutEscape(
+                                    checkoutMoney(
+                                        $grandTotal
+                                    )
+                                ) ?>
+
+                            </strong>
+
+                        </div>
+
+
+                        <button
+                            type="submit"
+                            class="hh-place-order"
+                            id="placeOrderButton"
+                        >
+
+                            <span id="placeOrderText">
+                                Place Order
+                            </span>
+
+                            <i class="bi bi-arrow-right"></i>
+
+                        </button>
+
+
+                        <div class="hh-secure-note">
+
+                            <i class="bi bi-shield-check"></i>
+
+                            Secure checkout powered by HochipoHub
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </aside>
+
+        </div>
+
+    </form>
+
+</div>
+
+</div>
 
 
 <script>
@@ -4343,16 +3910,45 @@ document.addEventListener(
     'DOMContentLoaded',
     function () {
 
-
         /*
         |--------------------------------------------------------------------------
-        | DELIVERY
+        | VALUES FROM PHP
         |--------------------------------------------------------------------------
         */
 
-        const deliveryInputs =
-            document.querySelectorAll(
-                'input[name="delivery_method"]'
+        const subtotal =
+            <?= json_encode(
+                (float) $subtotal
+            ) ?>;
+
+
+        const postageFee =
+            <?= json_encode(
+                (float) $postageFee
+            ) ?>;
+
+
+        const vendorDeliveryFee =
+            <?= json_encode(
+                (float) $vendorDeliveryFee
+            ) ?>;
+
+
+        const vendorDeliveryCodAvailable =
+            <?= $vendorDeliveryCodAvailable
+                ? 'true'
+                : 'false' ?>;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ELEMENTS
+        |--------------------------------------------------------------------------
+        */
+
+        const checkoutForm =
+            document.getElementById(
+                'checkoutForm'
             );
 
 
@@ -4362,122 +3958,755 @@ document.addEventListener(
             );
 
 
-        const address =
+        const addressInput =
             document.getElementById(
                 'delivery_address'
             );
 
 
-        function updateAddressField() {
-
-            const selected =
-                document.querySelector(
-                    'input[name="delivery_method"]:checked'
-                );
-
-
-            if (
-                selected &&
-                selected.value === 'Postage'
-            ) {
-
-                addressField.style.display =
-                    'block';
-
-
-                address.required =
-                    true;
-
-
-            } else {
-
-                addressField.style.display =
-                    'none';
-
-
-                address.required =
-                    false;
-
-            }
-        }
-
-
-        deliveryInputs.forEach(
-            function (input) {
-
-                input.addEventListener(
-                    'change',
-                    updateAddressField
-                );
-
-            }
-        );
-
-
-        updateAddressField();
-
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | PLACE ORDER LOADING
-        |--------------------------------------------------------------------------
-        */
-
-        const form =
+        const pickupLocations =
             document.getElementById(
-                'checkoutForm'
+                'pickupLocations'
             );
 
 
-        const button =
+        const deliveryFeeDisplay =
+            document.getElementById(
+                'deliveryFeeDisplay'
+            );
+
+
+        const grandTotalDisplay =
+            document.getElementById(
+                'grandTotalDisplay'
+            );
+
+
+        const cashOption =
+            document.getElementById(
+                'cashOption'
+            );
+
+
+        const cashPayment =
+            document.getElementById(
+                'cashPayment'
+            );
+
+
+        const cashTitle =
+            document.getElementById(
+                'cashTitle'
+            );
+
+
+        const cashText =
+            document.getElementById(
+                'cashText'
+            );
+
+
+        const paymentNote =
+            document.getElementById(
+                'paymentNote'
+            );
+
+
+        const placeOrderButton =
             document.getElementById(
                 'placeOrderButton'
             );
 
 
-        if (
-            form &&
-            button
-        ) {
-
-            form.addEventListener(
-                'submit',
-                function () {
+        const placeOrderText =
+            document.getElementById(
+                'placeOrderText'
+            );
 
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | LET BROWSER VALIDATE FIRST
-                    |--------------------------------------------------------------------------
-                    */
+        const vendorFeeRows =
+            document.querySelectorAll(
+                '.hh-vendor-fee-row'
+            );
 
-                    if (
-                        !form.checkValidity()
-                    ) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | MONEY
+        |--------------------------------------------------------------------------
+        */
+
+        function money(value) {
+
+            return (
+                'RM ' +
+                Number(value).toFixed(2)
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | GET DELIVERY
+        |--------------------------------------------------------------------------
+        */
+
+        function selectedDelivery() {
+
+            return document.querySelector(
+                'input[name="delivery_method"]:checked'
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | GET PAYMENT
+        |--------------------------------------------------------------------------
+        */
+
+        function selectedPayment() {
+
+            return document.querySelector(
+                'input[name="payment_method"]:checked'
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | DELIVERY FEE
+        |--------------------------------------------------------------------------
+        */
+
+        function getDeliveryFee() {
+
+            const delivery =
+                selectedDelivery();
+
+
+            if (!delivery) {
+                return 0;
+            }
+
+
+            if (
+                delivery.value ===
+                'Postage'
+            ) {
+
+                return postageFee;
+            }
+
+
+            if (
+                delivery.value ===
+                'Vendor Delivery'
+            ) {
+
+                return vendorDeliveryFee;
+            }
+
+
+            return 0;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE VENDOR FEE BREAKDOWN
+        |--------------------------------------------------------------------------
+        */
+
+        function updateVendorFeeBreakdown() {
+
+            const delivery =
+                selectedDelivery();
+
+
+            vendorFeeRows.forEach(
+                function (row) {
+
+                    const output =
+                        row.querySelector(
+                            '.vendorFeeValue'
+                        );
+
+
+                    if (!output) {
+                        return;
+                    }
+
+
+                    if (!delivery) {
+
+                        output.textContent =
+                            '-';
 
                         return;
                     }
 
 
-                    button.disabled =
+                    if (
+                        delivery.value ===
+                        'Postage'
+                    ) {
+
+                        output.textContent =
+                            money(
+                                Number(
+                                    row.dataset
+                                        .vendorPostage
+                                    || 0
+                                )
+                            );
+
+
+                    } else if (
+                        delivery.value ===
+                        'Vendor Delivery'
+                    ) {
+
+                        output.textContent =
+                            money(
+                                Number(
+                                    row.dataset
+                                        .vendorDelivery
+                                    || 0
+                                )
+                            );
+
+
+                    } else {
+
+                        output.textContent =
+                            'FREE';
+                    }
+                }
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PAYMENT MESSAGE
+        |--------------------------------------------------------------------------
+        */
+
+        function updatePaymentMessage() {
+
+            const payment =
+                selectedPayment();
+
+
+            if (!payment) {
+
+                paymentNote.innerHTML =
+                    '<i class="bi bi-shield-lock-fill"></i>' +
+                    '<div>' +
+                    'Select a payment method. FPX, Credit Card ' +
+                    'and Debit Card are processed securely through Fiuu.' +
+                    '</div>';
+
+
+                placeOrderText.textContent =
+                    'Place Order';
+
+                return;
+            }
+
+
+            if (
+                payment.value ===
+                'FPX'
+            ) {
+
+                paymentNote.innerHTML =
+                    '<i class="bi bi-bank"></i>' +
+                    '<div>' +
+                    '<strong>FPX via Fiuu</strong><br>' +
+                    'You will be redirected to Fiuu to complete online banking payment.' +
+                    '</div>';
+
+
+                placeOrderText.textContent =
+                    'Proceed to Fiuu';
+
+
+            } else if (
+                payment.value ===
+                'Credit Card'
+            ) {
+
+                paymentNote.innerHTML =
+                    '<i class="bi bi-credit-card"></i>' +
+                    '<div>' +
+                    '<strong>Credit Card via Fiuu</strong><br>' +
+                    'You will be redirected to Fiuu to complete your card payment.' +
+                    '</div>';
+
+
+                placeOrderText.textContent =
+                    'Proceed to Fiuu';
+
+
+            } else if (
+                payment.value ===
+                'Debit Card'
+            ) {
+
+                paymentNote.innerHTML =
+                    '<i class="bi bi-credit-card-2-front"></i>' +
+                    '<div>' +
+                    '<strong>Debit Card via Fiuu</strong><br>' +
+                    'You will be redirected to Fiuu to complete your debit card payment.' +
+                    '</div>';
+
+
+                placeOrderText.textContent =
+                    'Proceed to Fiuu';
+
+
+            } else if (
+                payment.value ===
+                'Cash'
+            ) {
+
+                paymentNote.innerHTML =
+                    '<i class="bi bi-cash-stack"></i>' +
+                    '<div>' +
+                    '<strong>Cash Payment</strong><br>' +
+                    'Cash is collected by the seller and does not go through Fiuu.' +
+                    '</div>';
+
+
+                placeOrderText.textContent =
+                    'Place Order';
+            }
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE DELIVERY UI
+        |--------------------------------------------------------------------------
+        */
+
+        function updateDeliveryUI() {
+
+            const delivery =
+                selectedDelivery();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | PICKUP LOCATION
+            |--------------------------------------------------------------------------
+            */
+
+            if (pickupLocations) {
+
+                pickupLocations.style.display =
+                    (
+                        delivery &&
+                        delivery.value ===
+                        'Pickup'
+                    )
+
+                        ? 'block'
+
+                        : 'none';
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | DELIVERY ADDRESS
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                addressField &&
+                addressInput
+            ) {
+
+                const needsAddress =
+                    delivery &&
+                    (
+                        delivery.value ===
+                        'Postage' ||
+
+                        delivery.value ===
+                        'Vendor Delivery'
+                    );
+
+
+                addressField.style.display =
+                    needsAddress
+                        ? 'block'
+                        : 'none';
+
+
+                addressInput.required =
+                    Boolean(
+                        needsAddress
+                    );
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | DELIVERY FEE
+            |--------------------------------------------------------------------------
+            */
+
+            const fee =
+                getDeliveryFee();
+
+
+            deliveryFeeDisplay.textContent =
+                money(fee);
+
+
+            grandTotalDisplay.textContent =
+                money(
+                    subtotal +
+                    fee
+                );
+
+
+            updateVendorFeeBreakdown();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CASH RULES
+            |--------------------------------------------------------------------------
+            */
+
+            cashOption.classList.remove(
+                'disabled'
+            );
+
+
+            cashPayment.disabled =
+                false;
+
+
+            if (!delivery) {
+
+                cashTitle.textContent =
+                    'Cash';
+
+
+                cashText.textContent =
+                    'Select a delivery method first.';
+
+
+                cashPayment.disabled =
+                    true;
+
+
+                cashOption.classList.add(
+                    'disabled'
+                );
+
+
+            } else if (
+                delivery.value ===
+                'Pickup'
+            ) {
+
+                cashTitle.textContent =
+                    'Cash at Pickup';
+
+
+                cashText.textContent =
+                    'Pay seller when collecting your order.';
+
+
+            } else if (
+                delivery.value ===
+                'Postage'
+            ) {
+
+                cashTitle.textContent =
+                    'Cash';
+
+
+                cashText.textContent =
+                    'Not available for Postage.';
+
+
+                cashPayment.disabled =
+                    true;
+
+
+                cashOption.classList.add(
+                    'disabled'
+                );
+
+
+                if (
+                    cashPayment.checked
+                ) {
+
+                    cashPayment.checked =
+                        false;
+                }
+
+
+            } else if (
+                delivery.value ===
+                'Vendor Delivery'
+            ) {
+
+                cashTitle.textContent =
+                    'Cash on Delivery';
+
+
+                if (
+                    vendorDeliveryCodAvailable
+                ) {
+
+                    cashText.textContent =
+                        'Pay seller when your order is delivered.';
+
+
+                } else {
+
+                    cashText.textContent =
+                        'COD is not available for all sellers.';
+
+
+                    cashPayment.disabled =
                         true;
 
 
-                    button.innerHTML = `
+                    cashOption.classList.add(
+                        'disabled'
+                    );
 
-                        <span>
 
-                            <i class="bi bi-hourglass-split"></i>
+                    if (
+                        cashPayment.checked
+                    ) {
 
-                            Processing Order...
+                        cashPayment.checked =
+                            false;
+                    }
+                }
+            }
 
-                        </span>
 
-                        <i class="bi bi-arrow-right"></i>
+            updatePaymentMessage();
+        }
 
-                    `;
 
+        /*
+        |--------------------------------------------------------------------------
+        | DELIVERY EVENT
+        |--------------------------------------------------------------------------
+        */
+
+        document
+            .querySelectorAll(
+                'input[name="delivery_method"]'
+            )
+            .forEach(
+                function (input) {
+
+                    input.addEventListener(
+                        'change',
+                        updateDeliveryUI
+                    );
+                }
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PAYMENT EVENT
+        |--------------------------------------------------------------------------
+        */
+
+        document
+            .querySelectorAll(
+                'input[name="payment_method"]'
+            )
+            .forEach(
+                function (input) {
+
+                    input.addEventListener(
+                        'change',
+                        updatePaymentMessage
+                    );
+                }
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | INITIAL
+        |--------------------------------------------------------------------------
+        */
+
+        updateDeliveryUI();
+
+        updatePaymentMessage();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUBMIT VALIDATION
+        |--------------------------------------------------------------------------
+        */
+
+        if (checkoutForm) {
+
+            checkoutForm.addEventListener(
+                'submit',
+                function (event) {
+
+                    const delivery =
+                        selectedDelivery();
+
+
+                    const payment =
+                        selectedPayment();
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | DELIVERY REQUIRED
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (!delivery) {
+
+                        event.preventDefault();
+
+                        alert(
+                            'Please select a delivery method.'
+                        );
+
+                        return;
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | ADDRESS REQUIRED
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        (
+                            delivery.value ===
+                            'Postage' ||
+
+                            delivery.value ===
+                            'Vendor Delivery'
+                        ) &&
+                        addressInput &&
+                        addressInput
+                            .value
+                            .trim() === ''
+                    ) {
+
+                        event.preventDefault();
+
+                        alert(
+                            'Please enter your delivery address.'
+                        );
+
+                        addressInput.focus();
+
+                        return;
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | PAYMENT REQUIRED
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (!payment) {
+
+                        event.preventDefault();
+
+                        alert(
+                            'Please select a payment method.'
+                        );
+
+                        return;
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | NO CASH FOR POSTAGE
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        delivery.value ===
+                        'Postage' &&
+                        payment.value ===
+                        'Cash'
+                    ) {
+
+                        event.preventDefault();
+
+                        alert(
+                            'Cash payment is not available for Postage.'
+                        );
+
+                        return;
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | COD CHECK
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        delivery.value ===
+                        'Vendor Delivery' &&
+                        payment.value ===
+                        'Cash' &&
+                        !vendorDeliveryCodAvailable
+                    ) {
+
+                        event.preventDefault();
+
+                        alert(
+                            'COD is not available for all sellers in your cart.'
+                        );
+
+                        return;
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | DISABLE BUTTON
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (placeOrderButton) {
+
+                        placeOrderButton.disabled =
+                            true;
+
+
+                        placeOrderButton.innerHTML =
+                            '<span>Processing Order...</span>' +
+                            '<i class="bi bi-hourglass-split"></i>';
+                    }
                 }
             );
         }
@@ -4489,12 +4718,6 @@ document.addEventListener(
 
 
 <?php
-
-/*
-|--------------------------------------------------------------------------
-| FOOTER
-|--------------------------------------------------------------------------
-*/
 
 require_once __DIR__ .
     '/includes/footer.php';
