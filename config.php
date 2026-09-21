@@ -55,34 +55,55 @@ define(
 |--------------------------------------------------------------------------
 | DYNAMIC BASE URL
 |--------------------------------------------------------------------------
-| Automatically works with:
 |
-| Local:
+| IMPORTANT:
+| Use a relative BASE_URL so the same code works on:
+|
+| Laptop / Laragon:
+| http://hochipohub.test/
+|
+| Phone / Cloudflare:
+| https://xxxxx.trycloudflare.com/
+|
+| Normal localhost:
 | http://localhost/hochipoHub/
 |
-| Cloudflare Tunnel:
-| https://xxxxx.trycloudflare.com/hochipoHub/
 |--------------------------------------------------------------------------
 */
 
-$protocol = 'http';
+$host = strtolower($_SERVER['HTTP_HOST'] ?? 'localhost');
 
 if (
-    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-    (
-        isset($_SERVER['HTTP_X_FORWARDED_PROTO']) &&
-        strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https'
-    )
+    $host === 'localhost' ||
+    str_starts_with($host, 'localhost:') ||
+    $host === '127.0.0.1' ||
+    str_starts_with($host, '127.0.0.1:')
 ) {
-    $protocol = 'https';
+    /*
+    |--------------------------------------------------------------------------
+    | Normal localhost
+    |--------------------------------------------------------------------------
+    */
+    define(
+        'BASE_URL',
+        '/hochipoHub/'
+    );
+} else {
+    /*
+    |--------------------------------------------------------------------------
+    | Laragon .test / Cloudflare Tunnel
+    |--------------------------------------------------------------------------
+    |
+    | Relative root URL is used intentionally.
+    | This makes CSS, JS, images, forms, redirects and navigation use
+    | whichever public hostname is currently open in the browser.
+    |
+    */
+    define(
+        'BASE_URL',
+        '/'
+    );
 }
-
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-
-define(
-    'BASE_URL',
-    $protocol . '://' . $host . '/hochipoHub/'
-);
 
 
 /*
