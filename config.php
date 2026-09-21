@@ -2,21 +2,410 @@
 
 /*
 |--------------------------------------------------------------------------
-| hochipohub - GLOBAL CONFIGURATION
+| HOCHIPOHUB - GLOBAL CONFIGURATION
 |--------------------------------------------------------------------------
 | File:
 | config.php
+|
+| Supported access:
+|
+| 1. Localhost
+|    http://localhost/hochipohub/
+|
+| 2. Ngrok
+|    https://xxxxx.ngrok-free.dev/hochipohub/
+|
+| 3. Laragon Virtual Host
+|    http://hochipohub.test/
+|
+| 4. Cloudflare Tunnel
+|    https://xxxxx.trycloudflare.com/
+|
+| 5. Bitly
+|    https://bit.ly/4jggF1v
+|    -> redirects to Cloudflare Tunnel
 |--------------------------------------------------------------------------
 */
 
 
 /*
 |--------------------------------------------------------------------------
+| DETECT CURRENT HOST
+|--------------------------------------------------------------------------
+*/
+
+$currentHost = strtolower(
+    trim(
+        (string) (
+            $_SERVER['HTTP_HOST']
+            ?? 'localhost'
+        )
+    )
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| REMOVE PORT FOR HOST DETECTION
+|--------------------------------------------------------------------------
+|
+| Example:
+|
+| localhost:80
+| becomes:
+| localhost
+|
+|--------------------------------------------------------------------------
+*/
+
+$hostWithoutPort = preg_replace(
+    '/:\d+$/',
+    '',
+    $currentHost
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| DETECT HTTPS
+|--------------------------------------------------------------------------
+*/
+
+$isHttps = false;
+
+
+/*
+|--------------------------------------------------------------------------
+| DIRECT HTTPS
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !empty($_SERVER['HTTPS']) &&
+    strtolower(
+        (string) $_SERVER['HTTPS']
+    ) !== 'off'
+) {
+    $isHttps = true;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| REVERSE PROXY HTTPS
+|--------------------------------------------------------------------------
+|
+| Ngrok / Cloudflare can terminate HTTPS before forwarding
+| the request to Apache.
+|
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !empty(
+        $_SERVER['HTTP_X_FORWARDED_PROTO']
+    )
+) {
+
+    $forwardedProto =
+        strtolower(
+            trim(
+                explode(
+                    ',',
+                    (string)
+                    $_SERVER['HTTP_X_FORWARDED_PROTO']
+                )[0]
+            )
+        );
+
+    if ($forwardedProto === 'https') {
+        $isHttps = true;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CURRENT SCHEME
+|--------------------------------------------------------------------------
+*/
+
+$currentScheme =
+    $isHttps
+        ? 'https'
+        : 'http';
+
+
+/*
+|--------------------------------------------------------------------------
+| DETECT ACCESS TYPE
+|--------------------------------------------------------------------------
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| LOCALHOST
+|--------------------------------------------------------------------------
+*/
+
+$isLocalhost =
+    $hostWithoutPort === 'localhost'
+    ||
+    $hostWithoutPort === '127.0.0.1';
+
+
+/*
+|--------------------------------------------------------------------------
+| LARAGON VIRTUAL HOST
+|--------------------------------------------------------------------------
+*/
+
+$isLaragonVirtualHost =
+    $hostWithoutPort === 'hochipohub.test';
+
+
+/*
+|--------------------------------------------------------------------------
+| NGROK
+|--------------------------------------------------------------------------
+*/
+
+$isNgrok =
+    str_contains(
+        $hostWithoutPort,
+        'ngrok-free.dev'
+    )
+    ||
+    str_contains(
+        $hostWithoutPort,
+        'ngrok.io'
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| CLOUDFLARE
+|--------------------------------------------------------------------------
+*/
+
+$isCloudflare =
+    str_contains(
+        $hostWithoutPort,
+        'trycloudflare.com'
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| PROJECT BASE PATH
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+|
+| Localhost:
+| http://localhost/hochipohub/
+|
+| BASE_URL:
+| /hochipohub/
+|
+|
+| Ngrok:
+| https://xxxxx.ngrok-free.dev/hochipohub/
+|
+| BASE_URL:
+| /hochipohub/
+|
+|
+| Laragon:
+| http://hochipohub.test/
+|
+| BASE_URL:
+| /
+|
+|
+| Cloudflare:
+| https://xxxxx.trycloudflare.com/
+|
+| BASE_URL:
+| /
+|
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $isLaragonVirtualHost ||
+    $isCloudflare
+) {
+
+    /*
+    |--------------------------------------------------------------------------
+    | ROOT-BASED ACCESS
+    |--------------------------------------------------------------------------
+    |
+    | hochipohub.test
+    | trycloudflare.com
+    |
+    */
+
+    $basePath = '/';
+
+} else {
+
+    /*
+    |--------------------------------------------------------------------------
+    | SUBFOLDER-BASED ACCESS
+    |--------------------------------------------------------------------------
+    |
+    | localhost
+    | 127.0.0.1
+    | ngrok
+    |
+    */
+
+    $basePath = '/hochipohub/';
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| BASE URL
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'BASE_URL',
+    $basePath
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| ABSOLUTE BASE URL
+|--------------------------------------------------------------------------
+|
+| Examples:
+|
+| http://localhost/hochipohub/
+|
+| https://xxxxx.ngrok-free.dev/hochipohub/
+|
+| http://hochipohub.test/
+|
+| https://xxxxx.trycloudflare.com/
+|
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'ABSOLUTE_BASE_URL',
+    $currentScheme
+    . '://'
+    . $currentHost
+    . BASE_URL
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| HOST TYPE CONSTANTS
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'IS_LOCALHOST',
+    $isLocalhost
+);
+
+define(
+    'IS_LARAGON_VIRTUAL_HOST',
+    $isLaragonVirtualHost
+);
+
+define(
+    'IS_NGROK',
+    $isNgrok
+);
+
+define(
+    'IS_CLOUDFLARE',
+    $isCloudflare
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| PUBLIC SHORT URL
+|--------------------------------------------------------------------------
+|
+| Bitly is only a redirect.
+|
+| It is NOT used as BASE_URL.
+|
+|--------------------------------------------------------------------------
+*/
+
+define(
+    'PUBLIC_SHORT_URL',
+    'https://bit.ly/4jggF1v'
+);
+
+
+/*
+|--------------------------------------------------------------------------
 | SESSION
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+|
+| Cookie domain is intentionally empty.
+|
+| This allows PHP to create a separate valid session for:
+|
+| localhost
+| ngrok
+| hochipohub.test
+| trycloudflare.com
+|
 |--------------------------------------------------------------------------
 */
 
 if (session_status() === PHP_SESSION_NONE) {
+
+    ini_set(
+        'session.use_only_cookies',
+        '1'
+    );
+
+    ini_set(
+        'session.use_strict_mode',
+        '1'
+    );
+
+
+    session_set_cookie_params([
+        'lifetime' => 0,
+
+        'path' => '/',
+
+        'domain' => '',
+
+        /*
+        |--------------------------------------------------------------------------
+        | Keep false for compatibility with localhost HTTP.
+        |
+        | HTTPS traffic through ngrok / Cloudflare is still supported.
+        |--------------------------------------------------------------------------
+        */
+
+        'secure' => false,
+
+        'httponly' => true,
+
+        'samesite' => 'Lax'
+    ]);
+
+
     session_start();
 }
 
@@ -27,11 +416,34 @@ if (session_status() === PHP_SESSION_NONE) {
 |--------------------------------------------------------------------------
 */
 
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'hochipohub');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_CHARSET', 'utf8mb4');
+define(
+    'DB_HOST',
+    'localhost'
+);
+
+
+define(
+    'DB_NAME',
+    'hochipohub'
+);
+
+
+define(
+    'DB_USER',
+    'root'
+);
+
+
+define(
+    'DB_PASS',
+    ''
+);
+
+
+define(
+    'DB_CHARSET',
+    'utf8mb4'
+);
 
 
 /*
@@ -45,6 +457,7 @@ define(
     'HochipoHub'
 );
 
+
 define(
     'APP_NAME',
     'HochipoHub'
@@ -53,72 +466,7 @@ define(
 
 /*
 |--------------------------------------------------------------------------
-| DYNAMIC BASE URL
-|--------------------------------------------------------------------------
-|
-| IMPORTANT:
-| Use a relative BASE_URL so the same code works on:
-|
-| Laptop / Laragon:
-| http://hochipohub.test/
-|
-| Phone / Cloudflare:
-| https://xxxxx.trycloudflare.com/
-|
-| Normal localhost:
-| http://localhost/hochipoHub/
-|
-|--------------------------------------------------------------------------
-*/
-
-$host = strtolower($_SERVER['HTTP_HOST'] ?? 'localhost');
-
-if (
-    $host === 'localhost' ||
-    str_starts_with($host, 'localhost:') ||
-    $host === '127.0.0.1' ||
-    str_starts_with($host, '127.0.0.1:')
-) {
-    /*
-    |--------------------------------------------------------------------------
-    | Normal localhost
-    |--------------------------------------------------------------------------
-    */
-    define(
-        'BASE_URL',
-        '/hochipoHub/'
-    );
-} else {
-    /*
-    |--------------------------------------------------------------------------
-    | Laragon .test / Cloudflare Tunnel
-    |--------------------------------------------------------------------------
-    |
-    | Relative root URL is used intentionally.
-    | This makes CSS, JS, images, forms, redirects and navigation use
-    | whichever public hostname is currently open in the browser.
-    |
-    */
-    define(
-        'BASE_URL',
-        '/'
-    );
-}
-
-
-/*
-|--------------------------------------------------------------------------
 | SMTP CONFIGURATION
-|--------------------------------------------------------------------------
-|
-| SMTP_USERNAME
-| = Gmail account used by HochipoHub to SEND emails.
-|
-| SMTP_PASSWORD
-| = Gmail APP PASSWORD.
-|
-| It is NOT the normal Gmail password.
-|
 |--------------------------------------------------------------------------
 */
 
@@ -127,25 +475,46 @@ define(
     'smtp.gmail.com'
 );
 
+
 define(
     'SMTP_PORT',
     587
 );
+
 
 define(
     'SMTP_USERNAME',
     'hochipohub941@gmail.com'
 );
 
+
+/*
+|--------------------------------------------------------------------------
+| GMAIL APP PASSWORD
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+|
+| Put your existing Gmail App Password here.
+|
+| DO NOT use your normal Gmail password.
+|
+| If GitHub repository is public, do NOT commit the real password.
+|
+|--------------------------------------------------------------------------
+*/
+
 define(
     'SMTP_PASSWORD',
     'lhgellhkvzappujl'
 );
 
+
 define(
     'SMTP_FROM_EMAIL',
     'hochipohub941@gmail.com'
 );
+
 
 define(
     'SMTP_FROM_NAME',
@@ -185,12 +554,15 @@ define(
 
 define(
     'PRODUCT_UPLOAD_PATH',
-    __DIR__ . '/uploads/products/'
+    __DIR__
+    . '/uploads/products/'
 );
+
 
 define(
     'VENDOR_UPLOAD_PATH',
-    __DIR__ . '/uploads/vendors/'
+    __DIR__
+    . '/uploads/vendors/'
 );
 
 
@@ -198,16 +570,35 @@ define(
 |--------------------------------------------------------------------------
 | UPLOAD URL
 |--------------------------------------------------------------------------
+|
+| Automatically becomes:
+|
+| localhost:
+| /hochipohub/uploads/products/
+|
+| ngrok:
+| /hochipohub/uploads/products/
+|
+| Cloudflare:
+| /uploads/products/
+|
+| hochipohub.test:
+| /uploads/products/
+|
+|--------------------------------------------------------------------------
 */
 
 define(
     'PRODUCT_UPLOAD_URL',
-    BASE_URL . 'uploads/products/'
+    BASE_URL
+    . 'uploads/products/'
 );
+
 
 define(
     'VENDOR_UPLOAD_URL',
-    BASE_URL . 'uploads/vendors/'
+    BASE_URL
+    . 'uploads/vendors/'
 );
 
 
@@ -233,9 +624,23 @@ function getDB()
 {
     static $db = null;
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | REUSE CONNECTION
+    |--------------------------------------------------------------------------
+    */
+
     if ($db instanceof PDO) {
         return $db;
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DSN
+    |--------------------------------------------------------------------------
+    */
 
     $dsn =
         'mysql:host='
@@ -244,6 +649,13 @@ function getDB()
         . DB_NAME
         . ';charset='
         . DB_CHARSET;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CONNECT
+    |--------------------------------------------------------------------------
+    */
 
     try {
 
@@ -263,11 +675,23 @@ function getDB()
             ]
         );
 
+
         return $db;
+
 
     } catch (PDOException $e) {
 
-        if (APP_DEBUG) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | DEVELOPMENT ERROR
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            defined('APP_DEBUG') &&
+            APP_DEBUG
+        ) {
 
             die(
                 'Database connection failed: '
@@ -278,6 +702,13 @@ function getDB()
                 )
             );
         }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCTION ERROR
+        |--------------------------------------------------------------------------
+        */
 
         die(
             'Database connection failed.'
@@ -316,7 +747,8 @@ if (!function_exists('redirect')) {
     function redirect($url)
     {
         header(
-            'Location: ' . $url
+            'Location: '
+            . $url
         );
 
         exit;
@@ -326,13 +758,17 @@ if (!function_exists('redirect')) {
 
 /*
 |--------------------------------------------------------------------------
-| LOGIN
+| LOGIN STATUS
 |--------------------------------------------------------------------------
 */
 
 function isLoggedIn()
 {
     return isset(
+        $_SESSION['user_id']
+    )
+    &&
+    !empty(
         $_SESSION['user_id']
     );
 }
@@ -372,47 +808,77 @@ function currentUserRole()
 
 function hasRole($role)
 {
-    return (
-        isset($_SESSION['role'])
-        &&
-        $_SESSION['role'] === $role
+    if (
+        !isset(
+            $_SESSION['role']
+        )
+    ) {
+        return false;
+    }
+
+
+    $currentRole =
+        strtolower(
+            trim(
+                (string)
+                $_SESSION['role']
+            )
+        );
+
+
+    $requiredRole =
+        strtolower(
+            trim(
+                (string)
+                $role
+            )
+        );
+
+
+    return $currentRole
+        === $requiredRole;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ADMIN CHECK
+|--------------------------------------------------------------------------
+*/
+
+function isAdmin()
+{
+    return hasRole(
+        'admin'
     );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| ADMIN
-|--------------------------------------------------------------------------
-*/
-
-function isAdmin()
-{
-    return hasRole('admin');
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| VENDOR
+| VENDOR CHECK
 |--------------------------------------------------------------------------
 */
 
 function isVendor()
 {
-    return hasRole('vendor');
+    return hasRole(
+        'vendor'
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CUSTOMER
+| CUSTOMER CHECK
 |--------------------------------------------------------------------------
 */
 
 function isCustomer()
 {
-    return hasRole('customer');
+    return hasRole(
+        'customer'
+    );
 }
 
 
@@ -429,8 +895,10 @@ function requireLogin()
         $_SESSION['error'] =
             'Please login to continue.';
 
+
         redirect(
-            BASE_URL . 'index.php'
+            BASE_URL
+            . 'index.php'
         );
     }
 }
@@ -446,13 +914,16 @@ function requireAdmin()
 {
     requireLogin();
 
+
     if (!isAdmin()) {
 
         $_SESSION['error'] =
             'Access denied.';
 
+
         redirect(
-            BASE_URL . 'index.php'
+            BASE_URL
+            . 'index.php'
         );
     }
 }
@@ -468,13 +939,16 @@ function requireVendor()
 {
     requireLogin();
 
+
     if (!isVendor()) {
 
         $_SESSION['error'] =
             'Vendor access required.';
 
+
         redirect(
-            BASE_URL . 'index.php'
+            BASE_URL
+            . 'index.php'
         );
     }
 }
@@ -490,13 +964,16 @@ function requireCustomer()
 {
     requireLogin();
 
+
     if (!isCustomer()) {
 
         $_SESSION['error'] =
             'Customer access required.';
 
+
         redirect(
-            BASE_URL . 'index.php'
+            BASE_URL
+            . 'index.php'
         );
     }
 }
@@ -529,7 +1006,9 @@ if (
 
 function csrfToken()
 {
-    return $_SESSION['csrf_token'];
+    return $_SESSION[
+        'csrf_token'
+    ];
 }
 
 
@@ -546,7 +1025,9 @@ function verifyCsrfToken($token)
             $_SESSION['csrf_token']
         )
         &&
-        is_string($token)
+        is_string(
+            $token
+        )
         &&
         hash_equals(
             $_SESSION['csrf_token'],
@@ -558,7 +1039,7 @@ function verifyCsrfToken($token)
 
 /*
 |--------------------------------------------------------------------------
-| FLASH
+| SET FLASH MESSAGE
 |--------------------------------------------------------------------------
 */
 
@@ -577,6 +1058,12 @@ function setFlash(
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| GET FLASH MESSAGE
+|--------------------------------------------------------------------------
+*/
+
 function getFlash()
 {
     if (
@@ -588,12 +1075,15 @@ function getFlash()
         return null;
     }
 
+
     $flash =
         $_SESSION['flash'];
+
 
     unset(
         $_SESSION['flash']
     );
+
 
     return $flash;
 }
@@ -601,7 +1091,7 @@ function getFlash()
 
 /*
 |--------------------------------------------------------------------------
-| UPLOAD DIRECTORIES
+| CREATE PRODUCT UPLOAD DIRECTORY
 |--------------------------------------------------------------------------
 */
 
@@ -618,6 +1108,12 @@ if (
     );
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| CREATE VENDOR UPLOAD DIRECTORY
+|--------------------------------------------------------------------------
+*/
 
 if (
     !is_dir(
