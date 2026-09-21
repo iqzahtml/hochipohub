@@ -2,7 +2,9 @@
 -- HOCHIPOHUB DATABASE
 -- FULL FINAL UPDATED DATABASE STRUCTURE
 -- VERIFIED PURCHASE REVIEW SYSTEM INCLUDED
+-- OFFICIAL ADMIN EMAIL UPDATED
 -- =========================================================
+
 
 CREATE DATABASE IF NOT EXISTS hochipohub
     CHARACTER SET utf8mb4
@@ -658,23 +660,18 @@ CREATE TABLE IF NOT EXISTS reviews (
 
     product_id INT NOT NULL,
 
-    -- Order yang customer buat
     order_id INT NULL,
 
-    -- Item spesifik dalam order tersebut
     order_detail_id INT NULL,
 
     rating INT NOT NULL,
 
-    -- Tajuk review
     review_title VARCHAR(150) NULL,
 
     review TEXT NULL,
 
-    -- Gambar review customer
     image VARCHAR(255) NULL,
 
-    -- Bilangan orang tekan helpful
     helpful_count INT
         NOT NULL
         DEFAULT 0,
@@ -690,28 +687,24 @@ CREATE TABLE IF NOT EXISTS reviews (
         DEFAULT CURRENT_TIMESTAMP,
 
 
-    -- Customer yang menulis review
     CONSTRAINT fk_reviews_customer
         FOREIGN KEY (customer_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
 
 
-    -- Product yang direview
     CONSTRAINT fk_reviews_product
         FOREIGN KEY (product_id)
         REFERENCES products(product_id)
         ON DELETE CASCADE,
 
 
-    -- Order asal pembelian
     CONSTRAINT fk_reviews_order
         FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
         ON DELETE CASCADE,
 
 
-    -- Item spesifik dalam order
     CONSTRAINT fk_reviews_order_detail
         FOREIGN KEY (order_detail_id)
         REFERENCES order_details(order_detail_id)
@@ -730,7 +723,6 @@ CREATE TABLE IF NOT EXISTS reviews (
         ),
 
 
-    -- Satu purchased item hanya boleh direview sekali
     UNIQUE KEY unique_review_order_detail (
         order_detail_id
     ),
@@ -1213,7 +1205,33 @@ COLLATE=utf8mb4_unicode_ci;
 
 
 -- =========================================================
+-- UPDATE EXISTING OLD ADMIN EMAIL
+-- =========================================================
+--
+-- This updates an existing installation where the admin
+-- account is still using admin@hochipohub.com.
+--
+-- Password is intentionally NOT changed here.
+--
+-- =========================================================
+
+UPDATE users
+SET
+    email = 'hochipohub941@gmail.com',
+    name = 'HochipoHub Admin',
+    role = 'admin',
+    status = 'active',
+    mfa_enabled = FALSE
+WHERE email = 'admin@hochipohub.com';
+
+
+-- =========================================================
 -- DEFAULT ADMIN ACCOUNT
+-- =========================================================
+--
+-- This creates the admin only if the official admin email
+-- does not already exist.
+--
 -- =========================================================
 
 INSERT INTO users
@@ -1229,7 +1247,7 @@ INSERT INTO users
 
 SELECT
     'HochipoHub Admin',
-    'admin@hochipohub.com',
+    'hochipohub941@gmail.com',
     NULL,
     '$2y$10$zMKREp2yfLOMrxor8D72Aeg/iWHUQ0CqDChUegjPiDhnujEPaPqre',
     'admin',
@@ -1240,20 +1258,21 @@ WHERE NOT EXISTS
 (
     SELECT 1
     FROM users
-    WHERE email = 'admin@hochipohub.com'
+    WHERE email = 'hochipohub941@gmail.com'
 );
 
 
 -- =========================================================
--- FORCE ADMIN ROLE / STATUS
+-- FORCE OFFICIAL ADMIN ROLE / STATUS
 -- =========================================================
 
 UPDATE users
 SET
+    name = 'HochipoHub Admin',
     role = 'admin',
     status = 'active',
     mfa_enabled = FALSE
-WHERE email = 'admin@hochipohub.com';
+WHERE email = 'hochipohub941@gmail.com';
 
 
 -- =========================================================
@@ -1355,7 +1374,7 @@ SELECT
     status,
     mfa_enabled
 FROM users
-WHERE email = 'admin@hochipohub.com';
+WHERE email = 'hochipohub941@gmail.com';
 
 
 -- =========================================================
@@ -1395,4 +1414,4 @@ DESCRIBE reviews;
 
 -- =========================================================
 -- DONE
--- =========================================================hochipohubreviewsusers
+-- =========================================================hochipohub
