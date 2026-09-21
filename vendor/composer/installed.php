@@ -1,20 +1,20 @@
 <?php return array(
     'root' => array(
-        'name' => '__root__',
+        'name' => 'hochipo/hochipo-hub',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => 'c7112f03b8c059593b2b6efaef6033615377f27c',
-        'type' => 'library',
+        'reference' => 'b62088cfe04cea6ee68da4a18d4d49917b60a000',
+        'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
         'dev' => true,
     ),
     'versions' => array(
-        '__root__' => array(
+        'hochipo/hochipo-hub' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => 'c7112f03b8c059593b2b6efaef6033615377f27c',
-            'type' => 'library',
+            'reference' => 'b62088cfe04cea6ee68da4a18d4d49917b60a000',
+            'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
             'dev_requirement' => false,
