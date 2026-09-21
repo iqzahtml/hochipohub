@@ -170,7 +170,7 @@ if (!empty($userName)) {
 
             <img
                 src="<?= htmlspecialchars(
-                    navUrl('image/logo.jpeg'),
+                    navUrl('image/logo.jpg'),
                     ENT_QUOTES,
                     'UTF-8'
                 ) ?>"
