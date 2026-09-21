@@ -2,7 +2,7 @@
 
 /*
 |--------------------------------------------------------------------------
-| HOCHIPOHUB - GLOBAL CONFIGURATION
+| hochipohub - GLOBAL CONFIGURATION
 |--------------------------------------------------------------------------
 | File:
 | config.php
@@ -17,7 +17,6 @@
 */
 
 if (session_status() === PHP_SESSION_NONE) {
-
     session_start();
 }
 
@@ -29,13 +28,9 @@ if (session_status() === PHP_SESSION_NONE) {
 */
 
 define('DB_HOST', 'localhost');
-
 define('DB_NAME', 'hochipohub');
-
 define('DB_USER', 'root');
-
 define('DB_PASS', '');
-
 define('DB_CHARSET', 'utf8mb4');
 
 
@@ -55,9 +50,38 @@ define(
     'HochipoHub'
 );
 
+
+/*
+|--------------------------------------------------------------------------
+| DYNAMIC BASE URL
+|--------------------------------------------------------------------------
+| Automatically works with:
+|
+| Local:
+| http://localhost/hochipoHub/
+|
+| Cloudflare Tunnel:
+| https://xxxxx.trycloudflare.com/hochipoHub/
+|--------------------------------------------------------------------------
+*/
+
+$protocol = 'http';
+
+if (
+    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+    (
+        isset($_SERVER['HTTP_X_FORWARDED_PROTO']) &&
+        strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https'
+    )
+) {
+    $protocol = 'https';
+}
+
+$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+
 define(
     'BASE_URL',
-    'http://localhost/hochipoHub/'
+    $protocol . '://' . $host . '/hochipoHub/'
 );
 
 
@@ -65,8 +89,6 @@ define(
 |--------------------------------------------------------------------------
 | SMTP CONFIGURATION
 |--------------------------------------------------------------------------
-|
-| IMPORTANT:
 |
 | SMTP_USERNAME
 | = Gmail account used by HochipoHub to SEND emails.
@@ -191,10 +213,8 @@ function getDB()
     static $db = null;
 
     if ($db instanceof PDO) {
-
         return $db;
     }
-
 
     $dsn =
         'mysql:host='
@@ -203,7 +223,6 @@ function getDB()
         . DB_NAME
         . ';charset='
         . DB_CHARSET;
-
 
     try {
 
@@ -223,9 +242,7 @@ function getDB()
             ]
         );
 
-
         return $db;
-
 
     } catch (PDOException $e) {
 
@@ -240,7 +257,6 @@ function getDB()
                 )
             );
         }
-
 
         die(
             'Database connection failed.'
@@ -551,15 +567,12 @@ function getFlash()
         return null;
     }
 
-
     $flash =
         $_SESSION['flash'];
-
 
     unset(
         $_SESSION['flash']
     );
-
 
     return $flash;
 }
