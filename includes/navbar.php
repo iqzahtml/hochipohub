@@ -1355,7 +1355,7 @@ if (!empty($userName)) {
 
             <img
                 src="<?= navE(
-                    navUrl('image/logo.jpg')
+                    navUrl('image/logo.jpeg')
                 ) ?>"
                 alt="HochipoHub"
                 class="header-logo"
