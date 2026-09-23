@@ -1,5 +1,5 @@
 <?php
-echo '<h1 style="background:red;color:white;padding:30px;position:relative;z-index:999999;">SERVER TEST 987654</h1>';
+
 /*
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - HOME PAGE
