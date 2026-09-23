@@ -4,8 +4,6 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - GLOBAL CONFIGURATION
 |--------------------------------------------------------------------------
-| File:
-| config.php
 |
 | Supported access:
 |
@@ -21,9 +19,9 @@
 | 4. Cloudflare Tunnel
 |    https://xxxxx.trycloudflare.com/
 |
-| 5. Bitly
-|    https://bit.ly/4jggF1v
-|    -> redirects to Cloudflare Tunnel
+| 5. Public Domain
+|    https://hochipohub.jtmkpmj.com/
+|
 |--------------------------------------------------------------------------
 */
 
@@ -47,14 +45,6 @@ $currentHost = strtolower(
 /*
 |--------------------------------------------------------------------------
 | REMOVE PORT FOR HOST DETECTION
-|--------------------------------------------------------------------------
-|
-| Example:
-|
-| localhost:80
-| becomes:
-| localhost
-|
 |--------------------------------------------------------------------------
 */
 
@@ -95,7 +85,7 @@ if (
 | REVERSE PROXY HTTPS
 |--------------------------------------------------------------------------
 |
-| Ngrok / Cloudflare can terminate HTTPS before forwarding
+| Ngrok / Cloudflare may terminate HTTPS before forwarding
 | the request to Apache.
 |
 |--------------------------------------------------------------------------
@@ -167,6 +157,16 @@ $isLaragonVirtualHost =
 
 /*
 |--------------------------------------------------------------------------
+| PUBLIC DOMAIN
+|--------------------------------------------------------------------------
+*/
+
+$isPublicDomain =
+    $hostWithoutPort === 'hochipohub.jtmkpmj.com';
+
+
+/*
+|--------------------------------------------------------------------------
 | NGROK
 |--------------------------------------------------------------------------
 */
@@ -198,70 +198,87 @@ $isCloudflare =
 
 /*
 |--------------------------------------------------------------------------
+| DETECT DOCUMENT ROOT
+|--------------------------------------------------------------------------
+|
+| Public domain Apache VirtualHost points directly to:
+|
+| C:\laragon\www\hochipohub
+|
+| Therefore assets must use:
+|
+| /css/style.css
+| /css/modal.css
+| /js/modal.js
+| /image/logo.jpeg
+|
+| NOT:
+|
+| /hochipohub/css/style.css
+|
+|--------------------------------------------------------------------------
+*/
+
+$documentRoot = isset($_SERVER['DOCUMENT_ROOT'])
+    ? str_replace(
+        '\\',
+        '/',
+        rtrim(
+            (string) $_SERVER['DOCUMENT_ROOT'],
+            '/\\'
+        )
+    )
+    : '';
+
+$projectRoot = str_replace(
+    '\\',
+    '/',
+    rtrim(
+        __DIR__,
+        '/\\'
+    )
+);
+
+$isProjectDocumentRoot =
+    $documentRoot !== ''
+    &&
+    strtolower($documentRoot)
+        === strtolower($projectRoot);
+
+
+/*
+|--------------------------------------------------------------------------
 | PROJECT BASE PATH
 |--------------------------------------------------------------------------
 |
-| IMPORTANT:
-|
-| Localhost:
-| http://localhost/hochipohub/
-|
-| BASE_URL:
+| localhost:
 | /hochipohub/
 |
-|
-| Ngrok:
-| https://xxxxx.ngrok-free.dev/hochipohub/
-|
-| BASE_URL:
+| ngrok:
 | /hochipohub/
 |
-|
-| Laragon:
-| http://hochipohub.test/
-|
-| BASE_URL:
+| hochipohub.test:
 | /
 |
+| trycloudflare.com:
+| /
 |
-| Cloudflare:
-| https://xxxxx.trycloudflare.com/
-|
-| BASE_URL:
+| hochipohub.jtmkpmj.com:
 | /
 |
 |--------------------------------------------------------------------------
 */
 
 if (
+    $isPublicDomain ||
     $isLaragonVirtualHost ||
-    $isCloudflare
+    $isCloudflare ||
+    $isProjectDocumentRoot
 ) {
-
-    /*
-    |--------------------------------------------------------------------------
-    | ROOT-BASED ACCESS
-    |--------------------------------------------------------------------------
-    |
-    | hochipohub.test
-    | trycloudflare.com
-    |
-    */
 
     $basePath = '/';
 
 } else {
-
-    /*
-    |--------------------------------------------------------------------------
-    | SUBFOLDER-BASED ACCESS
-    |--------------------------------------------------------------------------
-    |
-    | localhost
-    | 127.0.0.1
-    | ngrok
-    |
-    */
 
     $basePath = '/hochipohub/';
 }
@@ -282,18 +299,6 @@ define(
 /*
 |--------------------------------------------------------------------------
 | ABSOLUTE BASE URL
-|--------------------------------------------------------------------------
-|
-| Examples:
-|
-| http://localhost/hochipohub/
-|
-| https://xxxxx.ngrok-free.dev/hochipohub/
-|
-| http://hochipohub.test/
-|
-| https://xxxxx.trycloudflare.com/
-|
 |--------------------------------------------------------------------------
 */
 
@@ -323,6 +328,11 @@ define(
 );
 
 define(
+    'IS_PUBLIC_DOMAIN',
+    $isPublicDomain
+);
+
+define(
     'IS_NGROK',
     $isNgrok
 );
@@ -337,12 +347,6 @@ define(
 |--------------------------------------------------------------------------
 | PUBLIC SHORT URL
 |--------------------------------------------------------------------------
-|
-| Bitly is only a redirect.
-|
-| It is NOT used as BASE_URL.
-|
-|--------------------------------------------------------------------------
 */
 
 define(
@@ -354,19 +358,6 @@ define(
 /*
 |--------------------------------------------------------------------------
 | SESSION
-|--------------------------------------------------------------------------
-|
-| IMPORTANT:
-|
-| Cookie domain is intentionally empty.
-|
-| This allows PHP to create a separate valid session for:
-|
-| localhost
-| ngrok
-| hochipohub.test
-| trycloudflare.com
-|
 |--------------------------------------------------------------------------
 */
 
@@ -382,7 +373,6 @@ if (session_status() === PHP_SESSION_NONE) {
         '1'
     );
 
-
     session_set_cookie_params([
         'lifetime' => 0,
 
@@ -392,9 +382,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
         /*
         |--------------------------------------------------------------------------
-        | Keep false for compatibility with localhost HTTP.
-        |
-        | HTTPS traffic through ngrok / Cloudflare is still supported.
+        | Keep false for localhost HTTP compatibility.
         |--------------------------------------------------------------------------
         */
 
@@ -404,7 +392,6 @@ if (session_status() === PHP_SESSION_NONE) {
 
         'samesite' => 'Lax'
     ]);
-
 
     session_start();
 }
@@ -421,24 +408,20 @@ define(
     'localhost'
 );
 
-
 define(
     'DB_NAME',
     'hochipohub'
 );
-
 
 define(
     'DB_USER',
     'root'
 );
 
-
 define(
     'DB_PASS',
     ''
 );
-
 
 define(
     'DB_CHARSET',
@@ -457,7 +440,6 @@ define(
     'HochipoHub'
 );
 
-
 define(
     'APP_NAME',
     'HochipoHub'
@@ -475,12 +457,10 @@ define(
     'smtp.gmail.com'
 );
 
-
 define(
     'SMTP_PORT',
     587
 );
-
 
 define(
     'SMTP_USERNAME',
@@ -490,23 +470,18 @@ define(
 
 /*
 |--------------------------------------------------------------------------
-| GMAIL APP PASSWORD
+| SMTP PASSWORD
 |--------------------------------------------------------------------------
 |
-| IMPORTANT:
-|
-| Put your existing Gmail App Password here.
-|
-| DO NOT use your normal Gmail password.
-|
-| If GitHub repository is public, do NOT commit the real password.
+| Password is read from the server environment.
+| Do not store the Gmail App Password directly in this file.
 |
 |--------------------------------------------------------------------------
 */
 
 define(
     'SMTP_PASSWORD',
-    'lhgellhkvzappujl'
+    getenv('lhgellhkvzappujl') ?: ''
 );
 
 
@@ -514,7 +489,6 @@ define(
     'SMTP_FROM_EMAIL',
     'hochipohub941@gmail.com'
 );
-
 
 define(
     'SMTP_FROM_NAME',
@@ -558,7 +532,6 @@ define(
     . '/uploads/products/'
 );
 
-
 define(
     'VENDOR_UPLOAD_PATH',
     __DIR__
@@ -570,22 +543,6 @@ define(
 |--------------------------------------------------------------------------
 | UPLOAD URL
 |--------------------------------------------------------------------------
-|
-| Automatically becomes:
-|
-| localhost:
-| /hochipohub/uploads/products/
-|
-| ngrok:
-| /hochipohub/uploads/products/
-|
-| Cloudflare:
-| /uploads/products/
-|
-| hochipohub.test:
-| /uploads/products/
-|
-|--------------------------------------------------------------------------
 */
 
 define(
@@ -593,7 +550,6 @@ define(
     BASE_URL
     . 'uploads/products/'
 );
-
 
 define(
     'VENDOR_UPLOAD_URL',
@@ -675,9 +631,7 @@ function getDB()
             ]
         );
 
-
         return $db;
-
 
     } catch (PDOException $e) {
 
@@ -816,7 +770,6 @@ function hasRole($role)
         return false;
     }
 
-
     $currentRole =
         strtolower(
             trim(
@@ -825,7 +778,6 @@ function hasRole($role)
             )
         );
 
-
     $requiredRole =
         strtolower(
             trim(
@@ -833,7 +785,6 @@ function hasRole($role)
                 $role
             )
         );
-
 
     return $currentRole
         === $requiredRole;
@@ -895,7 +846,6 @@ function requireLogin()
         $_SESSION['error'] =
             'Please login to continue.';
 
-
         redirect(
             BASE_URL
             . 'index.php'
@@ -914,12 +864,10 @@ function requireAdmin()
 {
     requireLogin();
 
-
     if (!isAdmin()) {
 
         $_SESSION['error'] =
             'Access denied.';
-
 
         redirect(
             BASE_URL
@@ -939,12 +887,10 @@ function requireVendor()
 {
     requireLogin();
 
-
     if (!isVendor()) {
 
         $_SESSION['error'] =
             'Vendor access required.';
-
 
         redirect(
             BASE_URL
@@ -964,12 +910,10 @@ function requireCustomer()
 {
     requireLogin();
 
-
     if (!isCustomer()) {
 
         $_SESSION['error'] =
             'Customer access required.';
-
 
         redirect(
             BASE_URL
@@ -1075,15 +1019,12 @@ function getFlash()
         return null;
     }
 
-
     $flash =
         $_SESSION['flash'];
-
 
     unset(
         $_SESSION['flash']
     );
-
 
     return $flash;
 }
