@@ -269,11 +269,26 @@ $isProjectDocumentRoot =
 |--------------------------------------------------------------------------
 */
 
-if (
-    $isPublicDomain ||
-    $isLaragonVirtualHost ||
-    $isCloudflare ||
-    $isProjectDocumentRoot
+/*
+|--------------------------------------------------------------------------
+| IMPORTANT BASE PATH RULE
+|--------------------------------------------------------------------------
+| Public domain and Laragon virtual hosts point directly to the project
+| directory, so their URLs must start from "/".
+|--------------------------------------------------------------------------
+*/
+
+if ($hostWithoutPort === 'hochipohub.jtmkpmj.com') {
+
+    $basePath = '/';
+
+} elseif ($hostWithoutPort === 'hochipohub.test') {
+
+    $basePath = '/';
+
+} elseif (
+    str_contains($hostWithoutPort, 'trycloudflare.com')
+    || $isProjectDocumentRoot
 ) {
 
     $basePath = '/';
