@@ -18,9 +18,81 @@
 |--------------------------------------------------------------------------
 */
 
-$navBaseUrl = defined('BASE_URL')
-    ? rtrim(BASE_URL, '/') . '/'
-    : '/hochipohub/';
+/*
+|--------------------------------------------------------------------------
+| NAVBAR BASE URL
+|--------------------------------------------------------------------------
+|
+| BASE_URL should normally already be defined by config.php/header.php.
+| If it is unavailable, detect whether the current request is using
+| the public domain / Laragon virtual host / project DocumentRoot.
+|
+|--------------------------------------------------------------------------
+*/
+
+if (defined('BASE_URL')) {
+
+    $navBaseUrl = rtrim(BASE_URL, '/') . '/';
+
+} else {
+
+    $navFallbackHost = strtolower(
+        trim(
+            (string) (
+                $_SERVER['HTTP_HOST']
+                ?? 'localhost'
+            )
+        )
+    );
+
+    $navFallbackHost = preg_replace(
+        '/:\\d+$/',
+        '',
+        $navFallbackHost
+    );
+
+    $navFallbackDocumentRoot = isset($_SERVER['DOCUMENT_ROOT'])
+        ? str_replace(
+            '\\\\',
+            '/',
+            rtrim(
+                (string) $_SERVER['DOCUMENT_ROOT'],
+                '/\\\\'
+            )
+        )
+        : '';
+
+    $navFallbackProjectRoot = str_replace(
+        '\\\\',
+        '/',
+        rtrim(
+            dirname(__DIR__),
+            '/\\\\'
+        )
+    );
+
+    $navProjectIsDocumentRoot =
+        $navFallbackDocumentRoot !== ''
+        &&
+        strtolower($navFallbackDocumentRoot)
+            === strtolower($navFallbackProjectRoot);
+
+    $navUsesRootPath =
+        $navFallbackHost === 'hochipohub.jtmkpmj.com'
+        ||
+        $navFallbackHost === 'hochipohub.test'
+        ||
+        str_contains(
+            $navFallbackHost,
+            'trycloudflare.com'
+        )
+        ||
+        $navProjectIsDocumentRoot;
+
+    $navBaseUrl = $navUsesRootPath
+        ? '/'
+        : '/hochipohub/';
+}
 
 
 /*
@@ -2234,17 +2306,3 @@ document.addEventListener(
 );
 
 </script>
-
-
-<!-- =========================================================
-     AUTH MODAL JAVASCRIPT
-========================================================= -->
-
-<script
-    src="<?= navE(
-        navUrl(
-            'js/modal.js'
-        )
-    ) ?>"
-    defer
-></script>

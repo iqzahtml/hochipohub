@@ -50,10 +50,84 @@ if (file_exists($configPath)) {
 |--------------------------------------------------------------------------
 | BASE URL FALLBACK
 |--------------------------------------------------------------------------
+|
+| Normally BASE_URL comes from config.php.
+|
+| This fallback is only used if config.php did not define BASE_URL.
+|--------------------------------------------------------------------------
 */
 
 if (!defined('BASE_URL')) {
-    define('BASE_URL', '/hochipohub/');
+
+    $fallbackHost = strtolower(
+        trim(
+            (string) (
+                $_SERVER['HTTP_HOST']
+                ?? 'localhost'
+            )
+        )
+    );
+
+    $fallbackHost = preg_replace(
+        '/:\d+$/',
+        '',
+        $fallbackHost
+    );
+
+    $fallbackDocumentRoot = isset($_SERVER['DOCUMENT_ROOT'])
+        ? str_replace(
+            '\\',
+            '/',
+            rtrim(
+                (string) $_SERVER['DOCUMENT_ROOT'],
+                '/\\'
+            )
+        )
+        : '';
+
+    $fallbackProjectRoot = str_replace(
+        '\\',
+        '/',
+        rtrim(
+            dirname(__DIR__),
+            '/\\'
+        )
+    );
+
+    $fallbackProjectIsDocumentRoot =
+        $fallbackDocumentRoot !== ''
+        &&
+        strtolower($fallbackDocumentRoot)
+            === strtolower($fallbackProjectRoot);
+
+    $fallbackRootHost =
+        $fallbackHost === 'hochipohub.jtmkpmj.com'
+        ||
+        $fallbackHost === 'hochipohub.test'
+        ||
+        str_contains(
+            $fallbackHost,
+            'trycloudflare.com'
+        );
+
+    if (
+        $fallbackRootHost
+        ||
+        $fallbackProjectIsDocumentRoot
+    ) {
+
+        define(
+            'BASE_URL',
+            '/'
+        );
+
+    } else {
+
+        define(
+            'BASE_URL',
+            '/hochipohub/'
+        );
+    }
 }
 
 
