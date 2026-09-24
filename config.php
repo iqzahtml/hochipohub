@@ -496,7 +496,7 @@ define(
 
 define(
     'SMTP_PASSWORD',
-    getenv('lhgellhkvzappujl') ?: ''
+    getenv('nmbkjcvzqdpcelat') ?: ''
 );
 
 
