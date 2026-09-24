@@ -81,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'Thank you for contacting HochipoHub. '
             . 'Our support team will get back to you soon.';
 
+
         /*
         |--------------------------------------------------------------------------
         | CLEAR FORM
@@ -91,9 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email = '';
         $subject = '';
         $message = '';
-
     }
-
 }
 
 
@@ -627,7 +626,6 @@ $pageTitle = 'Contact Us';
     .contact-info-card {
         min-height: auto;
     }
-
 }
 
 
@@ -667,7 +665,6 @@ $pageTitle = 'Contact Us';
     .contact-submit {
         width: 100%;
     }
-
 }
 
 </style>
@@ -749,8 +746,8 @@ $pageTitle = 'Contact Us';
                                     Email
                                 </strong>
 
-                                <a href="mailto:support@hochipohub.com">
-                                    support@hochipohub.com
+                                <a href="mailto:hochipohub@gmail.com">
+                                    hochipohub@gmail.com
                                 </a>
 
                             </div>
@@ -772,8 +769,8 @@ $pageTitle = 'Contact Us';
                                     Phone
                                 </strong>
 
-                                <a href="tel:+6071234567">
-                                    +60 7-123 4567
+                                <a href="tel:+60177884495">
+                                    017-788 4495
                                 </a>
 
                             </div>
@@ -796,6 +793,9 @@ $pageTitle = 'Contact Us';
                                 </strong>
 
                                 <span>
+                                    No. 1, Jalan Pengkalan 6,<br>
+                                    Kampung Pasir Putih,<br>
+                                    81700 Pasir Gudang,<br>
                                     Johor, Malaysia
                                 </span>
 
@@ -819,8 +819,8 @@ $pageTitle = 'Contact Us';
                                 </strong>
 
                                 <span>
-                                    Monday – Friday<br>
-                                    9:00 AM – 6:00 PM
+                                    Monday – Sunday<br>
+                                    3:00 PM – 9:00 PM
                                 </span>
 
                             </div>
