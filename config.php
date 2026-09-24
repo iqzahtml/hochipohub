@@ -8,19 +8,10 @@
 | Supported access:
 |
 | 1. Localhost
-|    http://localhost/hochipohub/
-|
 | 2. Ngrok
-|    https://xxxxx.ngrok-free.dev/hochipohub/
-|
 | 3. Laragon Virtual Host
-|    http://hochipohub.test/
-|
 | 4. Cloudflare Tunnel
-|    https://xxxxx.trycloudflare.com/
-|
 | 5. Public Domain
-|    https://hochipohub.jtmkpmj.com/
 |
 |--------------------------------------------------------------------------
 */
@@ -200,23 +191,6 @@ $isCloudflare =
 |--------------------------------------------------------------------------
 | DETECT DOCUMENT ROOT
 |--------------------------------------------------------------------------
-|
-| Public domain Apache VirtualHost points directly to:
-|
-| C:\laragon\www\hochipohub
-|
-| Therefore assets must use:
-|
-| /css/style.css
-| /css/modal.css
-| /js/modal.js
-| /image/logo.jpeg
-|
-| NOT:
-|
-| /hochipohub/css/style.css
-|
-|--------------------------------------------------------------------------
 */
 
 $documentRoot = isset($_SERVER['DOCUMENT_ROOT'])
@@ -251,44 +225,35 @@ $isProjectDocumentRoot =
 | PROJECT BASE PATH
 |--------------------------------------------------------------------------
 |
-| localhost:
-| /hochipohub/
+| IMPORTANT:
 |
-| ngrok:
-| /hochipohub/
+| If Apache DocumentRoot already points directly to the hochipohub
+| project folder, BASE_URL must be "/".
 |
-| hochipohub.test:
-| /
-|
-| trycloudflare.com:
-| /
-|
-| hochipohub.jtmkpmj.com:
-| /
+| Otherwise localhost/ngrok subfolder access uses "/hochipohub/".
 |
 |--------------------------------------------------------------------------
 */
 
-/*
-|--------------------------------------------------------------------------
-| IMPORTANT BASE PATH RULE
-|--------------------------------------------------------------------------
-| Public domain and Laragon virtual hosts point directly to the project
-| directory, so their URLs must start from "/".
-|--------------------------------------------------------------------------
-*/
-
-if ($hostWithoutPort === 'hochipohub.jtmkpmj.com') {
-
-    $basePath = '/';
-
-} elseif ($hostWithoutPort === 'hochipohub.test') {
+if (
+    $hostWithoutPort === 'hochipohub.jtmkpmj.com'
+) {
 
     $basePath = '/';
 
 } elseif (
-    str_contains($hostWithoutPort, 'trycloudflare.com')
-    || $isProjectDocumentRoot
+    $hostWithoutPort === 'hochipohub.test'
+) {
+
+    $basePath = '/';
+
+} elseif (
+    str_contains(
+        $hostWithoutPort,
+        'trycloudflare.com'
+    )
+    ||
+    $isProjectDocumentRoot
 ) {
 
     $basePath = '/';
@@ -376,7 +341,9 @@ define(
 |--------------------------------------------------------------------------
 */
 
-if (session_status() === PHP_SESSION_NONE) {
+if (
+    session_status() === PHP_SESSION_NONE
+) {
 
     ini_set(
         'session.use_only_cookies',
@@ -390,21 +357,10 @@ if (session_status() === PHP_SESSION_NONE) {
 
     session_set_cookie_params([
         'lifetime' => 0,
-
         'path' => '/',
-
         'domain' => '',
-
-        /*
-        |--------------------------------------------------------------------------
-        | Keep false for localhost HTTP compatibility.
-        |--------------------------------------------------------------------------
-        */
-
         'secure' => false,
-
         'httponly' => true,
-
         'samesite' => 'Lax'
     ]);
 
@@ -465,6 +421,18 @@ define(
 |--------------------------------------------------------------------------
 | SMTP CONFIGURATION
 |--------------------------------------------------------------------------
+|
+| Gmail account:
+| hochipohub941@gmail.com
+|
+| Google App Password name:
+| HochipoHub SMTP
+|
+| IMPORTANT:
+| The name "HochipoHub SMTP" is only the label shown inside
+| Google Account. It is NOT used as SMTP_USERNAME or SMTP_PASSWORD.
+|
+|--------------------------------------------------------------------------
 */
 
 define(
@@ -485,20 +453,33 @@ define(
 
 /*
 |--------------------------------------------------------------------------
-| SMTP PASSWORD
+| SMTP APP PASSWORD
 |--------------------------------------------------------------------------
 |
-| Password is read from the server environment.
-| Do not store the Gmail App Password directly in this file.
+| PASTE THE 16-CHARACTER GOOGLE APP PASSWORD BELOW.
+|
+| Example only:
+| abcd efgh ijkl mnop
+|
+| Write it WITHOUT spaces:
+| abcdefghijklmnop
+|
+| DO NOT put "HochipoHub SMTP" here.
 |
 |--------------------------------------------------------------------------
 */
 
 define(
     'SMTP_PASSWORD',
-    getenv('nmbkjcvzqdpcelat') ?: ''
+    'nmbkjcvzqdpcelat'
 );
 
+
+/*
+|--------------------------------------------------------------------------
+| SMTP SENDER
+|--------------------------------------------------------------------------
+*/
 
 define(
     'SMTP_FROM_EMAIL',
@@ -658,7 +639,8 @@ function getDB()
         */
 
         if (
-            defined('APP_DEBUG') &&
+            defined('APP_DEBUG')
+            &&
             APP_DEBUG
         ) {
 
