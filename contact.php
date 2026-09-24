@@ -6,20 +6,16 @@
 |--------------------------------------------------------------------------
 | File:
 | contact.php
-|
-| Purpose:
-| - Display HochipoHub contact/support page
-| - Contact information
-| - Customer enquiry form
 |--------------------------------------------------------------------------
 */
 
 require_once __DIR__ . '/includes/header.php';
+require_once __DIR__ . '/includes/email.php';
 
 
 /*
 |--------------------------------------------------------------------------
-| CONTACT FORM
+| FORM VARIABLES
 |--------------------------------------------------------------------------
 */
 
@@ -31,6 +27,56 @@ $email = '';
 $subject = '';
 $message = '';
 
+
+/*
+|--------------------------------------------------------------------------
+| PRE-FILL LOGGED IN USER
+|--------------------------------------------------------------------------
+*/
+
+if (
+    isset($_SESSION['user_id']) &&
+    (int) $_SESSION['user_id'] > 0
+) {
+
+    try {
+
+        $userStmt = $pdo->prepare("
+            SELECT
+                name,
+                email
+            FROM users
+            WHERE user_id = ?
+            LIMIT 1
+        ");
+
+        $userStmt->execute([
+            (int) $_SESSION['user_id']
+        ]);
+
+        $loggedUser = $userStmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($loggedUser) {
+
+            $name = (string) ($loggedUser['name'] ?? '');
+            $email = (string) ($loggedUser['email'] ?? '');
+        }
+
+    } catch (Throwable $e) {
+
+        error_log(
+            'Contact prefill error: ' .
+            $e->getMessage()
+        );
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CONTACT FORM SUBMISSION
+|--------------------------------------------------------------------------
+*/
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
@@ -50,6 +96,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $formError = 'Please enter your name.';
 
+    } elseif (mb_strlen($name) > 100) {
+
+        $formError = 'Name must not exceed 100 characters.';
+
     } elseif ($email === '') {
 
         $formError = 'Please enter your email address.';
@@ -58,42 +108,494 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $formError = 'Please enter a valid email address.';
 
+    } elseif (mb_strlen($email) > 150) {
+
+        $formError = 'Email address is too long.';
+
     } elseif ($subject === '') {
 
         $formError = 'Please enter a subject.';
+
+    } elseif (mb_strlen($subject) > 200) {
+
+        $formError = 'Subject must not exceed 200 characters.';
 
     } elseif ($message === '') {
 
         $formError = 'Please enter your message.';
 
+    } elseif (mb_strlen($message) > 2000) {
+
+        $formError = 'Message must not exceed 2000 characters.';
+
     } else {
 
-        /*
-        |--------------------------------------------------------------------------
-        | FORM ACCEPTED
-        |--------------------------------------------------------------------------
-        |
-        | Backend email/database processing can be connected here later.
-        |
-        */
+        try {
 
-        $formSuccess =
-            'Thank you for contacting HochipoHub. '
-            . 'Our support team will get back to you soon.';
+            /*
+            |--------------------------------------------------------------------------
+            | LOGGED IN USER ID
+            |--------------------------------------------------------------------------
+            */
 
-        /*
-        |--------------------------------------------------------------------------
-        | CLEAR FORM
-        |--------------------------------------------------------------------------
-        */
+            $userId = null;
 
-        $name = '';
-        $email = '';
-        $subject = '';
-        $message = '';
+            if (
+                isset($_SESSION['user_id']) &&
+                (int) $_SESSION['user_id'] > 0
+            ) {
 
+                $userId = (int) $_SESSION['user_id'];
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | SAVE MESSAGE
+            |--------------------------------------------------------------------------
+            */
+
+            $insertStmt = $pdo->prepare("
+                INSERT INTO contact_messages
+                (
+                    user_id,
+                    name,
+                    email,
+                    subject,
+                    message,
+                    status,
+                    created_at
+                )
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    'New',
+                    NOW()
+                )
+            ");
+
+            $insertStmt->execute([
+                $userId,
+                $name,
+                $email,
+                $subject,
+                $message
+            ]);
+
+            $contactMessageId =
+                (int) $pdo->lastInsertId();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ADMIN EMAIL
+            |--------------------------------------------------------------------------
+            |
+            | Use SMTP_FROM_EMAIL because this is already the official
+            | HochipoHub SMTP account configured in config.php.
+            |
+            */
+
+            $adminEmail =
+                defined('SMTP_FROM_EMAIL')
+                    ? (string) SMTP_FROM_EMAIL
+                    : 'hochipohub941@gmail.com';
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | SAFE EMAIL VALUES
+            |--------------------------------------------------------------------------
+            */
+
+            $safeName =
+                htmlspecialchars(
+                    $name,
+                    ENT_QUOTES,
+                    'UTF-8'
+                );
+
+            $safeEmail =
+                htmlspecialchars(
+                    $email,
+                    ENT_QUOTES,
+                    'UTF-8'
+                );
+
+            $safeSubject =
+                htmlspecialchars(
+                    $subject,
+                    ENT_QUOTES,
+                    'UTF-8'
+                );
+
+            $safeMessage =
+                nl2br(
+                    htmlspecialchars(
+                        $message,
+                        ENT_QUOTES,
+                        'UTF-8'
+                    )
+                );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ADMIN PAGE URL
+            |--------------------------------------------------------------------------
+            */
+
+            $adminMessageUrl =
+                defined('ABSOLUTE_BASE_URL')
+                    ? ABSOLUTE_BASE_URL .
+                      'admin/contact_messages.php?id=' .
+                      $contactMessageId
+                    : BASE_URL .
+                      'admin/contact_messages.php?id=' .
+                      $contactMessageId;
+
+            $safeAdminMessageUrl =
+                htmlspecialchars(
+                    $adminMessageUrl,
+                    ENT_QUOTES,
+                    'UTF-8'
+                );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | EMAIL SUBJECT
+            |--------------------------------------------------------------------------
+            */
+
+            $emailSubject =
+                'New HochipoHub Contact Message - ' .
+                $subject;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | HTML EMAIL
+            |--------------------------------------------------------------------------
+            */
+
+            $htmlBody = '
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+</head>
+
+<body style="
+    margin:0;
+    padding:0;
+    background:#f3f6fb;
+    font-family:Arial,Helvetica,sans-serif;
+    color:#172033;
+">
+
+<table
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    role="presentation"
+    style="
+        width:100%;
+        background:#f3f6fb;
+        padding:35px 15px;
+    "
+>
+
+<tr>
+<td align="center">
+
+<table
+    width="600"
+    cellpadding="0"
+    cellspacing="0"
+    role="presentation"
+    style="
+        width:100%;
+        max-width:600px;
+        background:#ffffff;
+        border-radius:18px;
+        overflow:hidden;
+        box-shadow:0 12px 35px rgba(31,65,120,.10);
+    "
+>
+
+<tr>
+
+<td style="
+    padding:34px;
+    text-align:center;
+    background:linear-gradient(
+        135deg,
+        #123d89,
+        #287de4
+    );
+    color:#ffffff;
+">
+
+<div style="
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:1.5px;
+    opacity:.80;
+">
+    HOCHIPOHUB
+</div>
+
+<h1 style="
+    margin:12px 0 8px;
+    font-size:27px;
+    line-height:1.3;
+">
+    New Contact Message
+</h1>
+
+<p style="
+    margin:0;
+    font-size:14px;
+    line-height:1.7;
+    color:#dbeafe;
+">
+    A new enquiry has been submitted through
+    the HochipoHub contact page.
+</p>
+
+</td>
+
+</tr>
+
+
+<tr>
+
+<td style="padding:35px;">
+
+<p style="
+    margin:0 0 18px;
+    font-size:14px;
+    line-height:1.7;
+">
+
+<strong>Message ID:</strong>
+#' . $contactMessageId . '
+
+</p>
+
+<p style="
+    margin:0 0 12px;
+    font-size:14px;
+    line-height:1.7;
+">
+
+<strong>Name:</strong>
+' . $safeName . '
+
+</p>
+
+<p style="
+    margin:0 0 12px;
+    font-size:14px;
+    line-height:1.7;
+">
+
+<strong>Email:</strong>
+' . $safeEmail . '
+
+</p>
+
+<p style="
+    margin:0 0 22px;
+    font-size:14px;
+    line-height:1.7;
+">
+
+<strong>Subject:</strong>
+' . $safeSubject . '
+
+</p>
+
+
+<div style="
+    padding:20px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:12px;
+    color:#475569;
+    font-size:14px;
+    line-height:1.8;
+">
+
+' . $safeMessage . '
+
+</div>
+
+
+<div style="
+    text-align:center;
+    margin:30px 0 5px;
+">
+
+<a
+    href="' . $safeAdminMessageUrl . '"
+    style="
+        display:inline-block;
+        padding:14px 25px;
+        color:#ffffff;
+        background:#2563eb;
+        border-radius:10px;
+        font-size:14px;
+        font-weight:700;
+        text-decoration:none;
+    "
+>
+    View Message
+</a>
+
+</div>
+
+</td>
+
+</tr>
+
+
+<tr>
+
+<td style="
+    padding:20px 35px 30px;
+    color:#94a3b8;
+    font-size:11px;
+    text-align:center;
+">
+
+HochipoHub Contact System
+
+</td>
+
+</tr>
+
+</table>
+
+</td>
+</tr>
+
+</table>
+
+</body>
+</html>
+';
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | PLAIN EMAIL
+            |--------------------------------------------------------------------------
+            */
+
+            $plainBody =
+                "New HochipoHub Contact Message\n\n" .
+                "Message ID: #" .
+                $contactMessageId .
+                "\n\n" .
+
+                "Name: " .
+                $name .
+                "\n" .
+
+                "Email: " .
+                $email .
+                "\n" .
+
+                "Subject: " .
+                $subject .
+                "\n\n" .
+
+                "Message:\n" .
+                $message .
+                "\n\n" .
+
+                "View message:\n" .
+                $adminMessageUrl;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | SEND ADMIN NOTIFICATION
+            |--------------------------------------------------------------------------
+            */
+
+            $emailSent =
+                sendHochipoEmail(
+                    $adminEmail,
+                    'HochipoHub Admin',
+                    $emailSubject,
+                    $htmlBody,
+                    $plainBody
+                );
+
+
+            if (!$emailSent) {
+
+                error_log(
+                    'Contact message #' .
+                    $contactMessageId .
+                    ' saved, but admin email notification failed.'
+                );
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | SUCCESS
+            |--------------------------------------------------------------------------
+            */
+
+            $formSuccess =
+                'Your message has been sent successfully. '
+                . 'Our support team will get back to you soon.';
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CLEAR FORM
+            |--------------------------------------------------------------------------
+            */
+
+            $subject = '';
+            $message = '';
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | KEEP LOGGED-IN USER INFORMATION
+            |--------------------------------------------------------------------------
+            */
+
+            if ($userId === null) {
+
+                $name = '';
+                $email = '';
+            }
+
+
+        } catch (Throwable $e) {
+
+            error_log(
+                'Contact message error: ' .
+                $e->getMessage()
+            );
+
+            $formError =
+                'We could not send your message right now. '
+                . 'Please try again later.';
+        }
     }
-
 }
 
 
@@ -102,12 +604,6 @@ $pageTitle = 'Contact Us';
 ?>
 
 <style>
-
-/*
-|--------------------------------------------------------------------------
-| CONTACT PAGE
-|--------------------------------------------------------------------------
-*/
 
 .contact-page {
     background:
@@ -122,24 +618,10 @@ $pageTitle = 'Contact Us';
     padding: 70px 20px 90px;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| CONTAINER
-|--------------------------------------------------------------------------
-*/
-
 .contact-container {
     width: min(1180px, 100%);
     margin: 0 auto;
 }
-
-
-/*
-|--------------------------------------------------------------------------
-| HERO
-|--------------------------------------------------------------------------
-*/
 
 .contact-hero {
     text-align: center;
@@ -157,13 +639,10 @@ $pageTitle = 'Contact Us';
     letter-spacing: 0.12em;
 
     color: #2563eb;
-
     background: rgba(37, 99, 235, 0.08);
 
     padding: 8px 14px;
-
     border-radius: 999px;
-
     margin-bottom: 18px;
 }
 
@@ -171,23 +650,16 @@ $pageTitle = 'Contact Us';
     content: "";
     width: 7px;
     height: 7px;
-
     background: #2563eb;
-
     border-radius: 50%;
 }
 
 .contact-hero h1 {
     margin: 0 0 16px;
-
     font-size: clamp(36px, 5vw, 56px);
-
     line-height: 1.05;
-
     color: #0f172a;
-
     font-weight: 800;
-
     letter-spacing: -0.04em;
 }
 
@@ -197,20 +669,10 @@ $pageTitle = 'Contact Us';
 
 .contact-hero p {
     margin: 0;
-
     color: #64748b;
-
     font-size: 17px;
-
     line-height: 1.8;
 }
-
-
-/*
-|--------------------------------------------------------------------------
-| MAIN GRID
-|--------------------------------------------------------------------------
-*/
 
 .contact-grid {
     display: grid;
@@ -220,28 +682,15 @@ $pageTitle = 'Contact Us';
         minmax(400px, 1.15fr);
 
     gap: 30px;
-
     align-items: stretch;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| CONTACT INFO
-|--------------------------------------------------------------------------
-*/
-
 .contact-info-card {
     position: relative;
-
     overflow: hidden;
-
     background: #0f1f3d;
-
     border-radius: 24px;
-
     padding: 38px;
-
     color: white;
 
     box-shadow:
@@ -250,33 +699,23 @@ $pageTitle = 'Contact Us';
 
 .contact-info-card::before {
     content: "";
-
     position: absolute;
-
     width: 240px;
     height: 240px;
-
     right: -100px;
     top: -100px;
-
     background: rgba(37, 99, 235, 0.25);
-
     border-radius: 50%;
 }
 
 .contact-info-card::after {
     content: "";
-
     position: absolute;
-
     width: 180px;
     height: 180px;
-
     left: -90px;
     bottom: -90px;
-
     background: rgba(59, 130, 246, 0.12);
-
     border-radius: 50%;
 }
 
@@ -287,53 +726,35 @@ $pageTitle = 'Contact Us';
 
 .contact-info-card h2 {
     margin: 0 0 14px;
-
     font-size: 28px;
-
     font-weight: 800;
 }
 
 .contact-info-description {
     margin: 0 0 35px;
-
     color: #cbd5e1;
-
     line-height: 1.7;
-
     font-size: 15px;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| INFO ITEMS
-|--------------------------------------------------------------------------
-*/
-
 .contact-info-list {
     display: flex;
-
     flex-direction: column;
-
     gap: 22px;
 }
 
 .contact-info-item {
     display: flex;
-
     align-items: flex-start;
-
     gap: 15px;
 }
 
 .contact-info-icon {
     flex: 0 0 46px;
-
     width: 46px;
     height: 46px;
 
     display: flex;
-
     align-items: center;
     justify-content: center;
 
@@ -348,22 +769,16 @@ $pageTitle = 'Contact Us';
 
 .contact-info-item strong {
     display: block;
-
     margin-bottom: 5px;
-
     font-size: 14px;
-
     color: white;
 }
 
 .contact-info-item span,
 .contact-info-item a {
     color: #cbd5e1;
-
     font-size: 14px;
-
     line-height: 1.6;
-
     text-decoration: none;
 }
 
@@ -371,20 +786,10 @@ $pageTitle = 'Contact Us';
     color: white;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| FORM CARD
-|--------------------------------------------------------------------------
-*/
-
 .contact-form-card {
     background: white;
-
     border: 1px solid #e2e8f0;
-
     border-radius: 24px;
-
     padding: 38px;
 
     box-shadow:
@@ -397,77 +802,46 @@ $pageTitle = 'Contact Us';
 
 .contact-form-header h2 {
     margin: 0 0 8px;
-
     color: #0f172a;
-
     font-size: 28px;
-
     font-weight: 800;
 }
 
 .contact-form-header p {
     margin: 0;
-
     color: #64748b;
-
     font-size: 14px;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| ALERT
-|--------------------------------------------------------------------------
-*/
-
 .contact-alert {
     padding: 14px 16px;
-
     border-radius: 12px;
-
     margin-bottom: 22px;
-
     font-size: 14px;
-
     line-height: 1.5;
 }
 
 .contact-alert-error {
     color: #991b1b;
-
     background: #fef2f2;
-
     border: 1px solid #fecaca;
 }
 
 .contact-alert-success {
     color: #166534;
-
     background: #f0fdf4;
-
     border: 1px solid #bbf7d0;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| FORM GRID
-|--------------------------------------------------------------------------
-*/
-
 .contact-form-grid {
     display: grid;
-
     grid-template-columns: 1fr 1fr;
-
     gap: 20px;
 }
 
 .contact-field {
     display: flex;
-
     flex-direction: column;
-
     gap: 8px;
 }
 
@@ -477,30 +851,23 @@ $pageTitle = 'Contact Us';
 
 .contact-field label {
     color: #334155;
-
     font-size: 13px;
-
     font-weight: 700;
 }
 
 .contact-field input,
 .contact-field textarea {
     width: 100%;
-
     box-sizing: border-box;
 
     border: 1px solid #dbe3ef;
-
     background: #f8fafc;
-
     border-radius: 12px;
 
     padding: 13px 14px;
 
     font-family: inherit;
-
     font-size: 14px;
-
     color: #0f172a;
 
     outline: none;
@@ -517,16 +884,13 @@ $pageTitle = 'Contact Us';
 
 .contact-field textarea {
     min-height: 150px;
-
     resize: vertical;
-
     line-height: 1.6;
 }
 
 .contact-field input:focus,
 .contact-field textarea:focus {
     background: white;
-
     border-color: #2563eb;
 
     box-shadow:
@@ -538,39 +902,25 @@ $pageTitle = 'Contact Us';
     color: #94a3b8;
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| SUBMIT BUTTON
-|--------------------------------------------------------------------------
-*/
-
 .contact-submit {
     display: inline-flex;
-
     align-items: center;
     justify-content: center;
 
     gap: 9px;
-
     margin-top: 5px;
 
     min-height: 48px;
-
     padding: 0 24px;
 
     border: none;
-
     border-radius: 12px;
 
     background: #2563eb;
-
     color: white;
 
     font-family: inherit;
-
     font-size: 14px;
-
     font-weight: 700;
 
     cursor: pointer;
@@ -583,7 +933,6 @@ $pageTitle = 'Contact Us';
 
 .contact-submit:hover {
     background: #1d4ed8;
-
     transform: translateY(-1px);
 
     box-shadow:
@@ -594,29 +943,12 @@ $pageTitle = 'Contact Us';
     transform: translateY(0);
 }
 
-
-/*
-|--------------------------------------------------------------------------
-| BOTTOM NOTE
-|--------------------------------------------------------------------------
-*/
-
 .contact-note {
     margin-top: 18px;
-
     color: #94a3b8;
-
     font-size: 12px;
-
     line-height: 1.6;
 }
-
-
-/*
-|--------------------------------------------------------------------------
-| RESPONSIVE
-|--------------------------------------------------------------------------
-*/
 
 @media (max-width: 900px) {
 
@@ -627,9 +959,7 @@ $pageTitle = 'Contact Us';
     .contact-info-card {
         min-height: auto;
     }
-
 }
-
 
 @media (max-width: 600px) {
 
@@ -667,24 +997,14 @@ $pageTitle = 'Contact Us';
     .contact-submit {
         width: 100%;
     }
-
 }
 
 </style>
 
 
-<!-- =========================================================
-     CONTACT PAGE
-     ========================================================= -->
-
 <section class="contact-page">
 
     <div class="contact-container">
-
-
-        <!-- =====================================================
-             HERO
-        ====================================================== -->
 
         <div class="contact-hero">
 
@@ -706,16 +1026,8 @@ $pageTitle = 'Contact Us';
         </div>
 
 
-        <!-- =====================================================
-             CONTENT GRID
-        ====================================================== -->
-
         <div class="contact-grid">
 
-
-            <!-- =================================================
-                 CONTACT INFORMATION
-            ================================================== -->
 
             <div class="contact-info-card">
 
@@ -735,8 +1047,6 @@ $pageTitle = 'Contact Us';
                     <div class="contact-info-list">
 
 
-                        <!-- EMAIL -->
-
                         <div class="contact-info-item">
 
                             <div class="contact-info-icon">
@@ -749,16 +1059,14 @@ $pageTitle = 'Contact Us';
                                     Email
                                 </strong>
 
-                                <a href="mailto:support@hochipohub.com">
-                                    support@hochipohub.com
+                                <a href="mailto:hochipohub@gmail.com">
+                                    hochipohub@gmail.com
                                 </a>
 
                             </div>
 
                         </div>
 
-
-                        <!-- PHONE -->
 
                         <div class="contact-info-item">
 
@@ -772,16 +1080,14 @@ $pageTitle = 'Contact Us';
                                     Phone
                                 </strong>
 
-                                <a href="tel:+6071234567">
-                                    +60 7-123 4567
+                                <a href="tel:+60177884495">
+                                    017-788 4495
                                 </a>
 
                             </div>
 
                         </div>
 
-
-                        <!-- LOCATION -->
 
                         <div class="contact-info-item">
 
@@ -796,6 +1102,9 @@ $pageTitle = 'Contact Us';
                                 </strong>
 
                                 <span>
+                                    No. 1, Jalan Pengkalan 6,<br>
+                                    Kampung Pasir Putih,<br>
+                                    81700 Pasir Gudang,<br>
                                     Johor, Malaysia
                                 </span>
 
@@ -803,8 +1112,6 @@ $pageTitle = 'Contact Us';
 
                         </div>
 
-
-                        <!-- SUPPORT HOURS -->
 
                         <div class="contact-info-item">
 
@@ -819,8 +1126,8 @@ $pageTitle = 'Contact Us';
                                 </strong>
 
                                 <span>
-                                    Monday – Friday<br>
-                                    9:00 AM – 6:00 PM
+                                    Monday – Sunday<br>
+                                    3:00 PM – 9:00 PM
                                 </span>
 
                             </div>
@@ -834,10 +1141,6 @@ $pageTitle = 'Contact Us';
 
             </div>
 
-
-            <!-- =================================================
-                 CONTACT FORM
-            ================================================== -->
 
             <div class="contact-form-card">
 
@@ -855,8 +1158,6 @@ $pageTitle = 'Contact Us';
                 </div>
 
 
-                <!-- ERROR -->
-
                 <?php if ($formError !== ''): ?>
 
                     <div class="contact-alert contact-alert-error">
@@ -873,8 +1174,6 @@ $pageTitle = 'Contact Us';
 
                 <?php endif; ?>
 
-
-                <!-- SUCCESS -->
 
                 <?php if ($formSuccess !== ''): ?>
 
@@ -905,8 +1204,6 @@ $pageTitle = 'Contact Us';
                     <div class="contact-form-grid">
 
 
-                        <!-- NAME -->
-
                         <div class="contact-field">
 
                             <label for="contact-name">
@@ -929,8 +1226,6 @@ $pageTitle = 'Contact Us';
 
                         </div>
 
-
-                        <!-- EMAIL -->
 
                         <div class="contact-field">
 
@@ -955,8 +1250,6 @@ $pageTitle = 'Contact Us';
                         </div>
 
 
-                        <!-- SUBJECT -->
-
                         <div class="contact-field contact-field-full">
 
                             <label for="contact-subject">
@@ -980,8 +1273,6 @@ $pageTitle = 'Contact Us';
                         </div>
 
 
-                        <!-- MESSAGE -->
-
                         <div class="contact-field contact-field-full">
 
                             <label for="contact-message">
@@ -1002,8 +1293,6 @@ $pageTitle = 'Contact Us';
 
                         </div>
 
-
-                        <!-- SUBMIT -->
 
                         <div class="contact-field contact-field-full">
 
@@ -1036,7 +1325,6 @@ $pageTitle = 'Contact Us';
 
             </div>
 
-
         </div>
 
     </div>
@@ -1045,12 +1333,6 @@ $pageTitle = 'Contact Us';
 
 
 <?php
-
-/*
-|--------------------------------------------------------------------------
-| FOOTER
-|--------------------------------------------------------------------------
-*/
 
 $footerPath = __DIR__ . '/includes/footer.php';
 
