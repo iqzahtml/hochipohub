@@ -57,20 +57,19 @@ if (
             (int) $_SESSION['user_id']
         ]);
 
-        $loggedUser =
-            $userStmt->fetch(PDO::FETCH_ASSOC);
+        $loggedUser = $userStmt->fetch(
+            PDO::FETCH_ASSOC
+        );
 
         if ($loggedUser) {
 
-            $name =
-                (string) (
-                    $loggedUser['name'] ?? ''
-                );
+            $name = (string) (
+                $loggedUser['name'] ?? ''
+            );
 
-            $email =
-                (string) (
-                    $loggedUser['email'] ?? ''
-                );
+            $email = (string) (
+                $loggedUser['email'] ?? ''
+            );
         }
 
     } catch (Throwable $e) {
@@ -97,33 +96,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     |--------------------------------------------------------------------------
     */
 
-    $name =
-        trim(
-            (string) (
-                $_POST['name'] ?? ''
-            )
-        );
+    $name = trim(
+        (string) ($_POST['name'] ?? '')
+    );
 
-    $email =
-        trim(
-            (string) (
-                $_POST['email'] ?? ''
-            )
-        );
+    $email = trim(
+        (string) ($_POST['email'] ?? '')
+    );
 
-    $subject =
-        trim(
-            (string) (
-                $_POST['subject'] ?? ''
-            )
-        );
+    $subject = trim(
+        (string) ($_POST['subject'] ?? '')
+    );
 
-    $message =
-        trim(
-            (string) (
-                $_POST['message'] ?? ''
-            )
-        );
+    $message = trim(
+        (string) ($_POST['message'] ?? '')
+    );
 
 
     /*
@@ -188,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             /*
             |--------------------------------------------------------------------------
-            | LOGGED-IN USER
+            | USER ID
             |--------------------------------------------------------------------------
             */
 
@@ -206,46 +193,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             /*
             |--------------------------------------------------------------------------
-            | SAVE CONTACT MESSAGE
+            | INSERT CONTACT MESSAGE
             |--------------------------------------------------------------------------
             */
 
-            $insertStmt =
-                $db->prepare("
-                    INSERT INTO contact_messages
-                    (
-                        user_id,
-                        name,
-                        email,
-                        subject,
-                        message,
-                        status,
-                        created_at
-                    )
-                    VALUES
-                    (
-                        ?,
-                        ?,
-                        ?,
-                        ?,
-                        ?,
-                        'New',
-                        NOW()
-                    )
-                ");
-
-            $insertStmt->execute([
-                $userId,
-                $name,
-                $email,
-                $subject,
-                $message
-            ]);
+            $insertStmt = $db->prepare("
+                INSERT INTO contact_messages
+                (
+                    user_id,
+                    name,
+                    email,
+                    subject,
+                    message,
+                    status,
+                    created_at
+                )
+                VALUES
+                (
+                    :user_id,
+                    :name,
+                    :email,
+                    :subject,
+                    :message,
+                    'New',
+                    NOW()
+                )
+            ");
 
 
             /*
             |--------------------------------------------------------------------------
-            | GET MESSAGE ID
+            | BIND VALUES
+            |--------------------------------------------------------------------------
+            */
+
+            if ($userId === null) {
+
+                $insertStmt->bindValue(
+                    ':user_id',
+                    null,
+                    PDO::PARAM_NULL
+                );
+
+            } else {
+
+                $insertStmt->bindValue(
+                    ':user_id',
+                    $userId,
+                    PDO::PARAM_INT
+                );
+            }
+
+
+            $insertStmt->bindValue(
+                ':name',
+                $name,
+                PDO::PARAM_STR
+            );
+
+            $insertStmt->bindValue(
+                ':email',
+                $email,
+                PDO::PARAM_STR
+            );
+
+            $insertStmt->bindValue(
+                ':subject',
+                $subject,
+                PDO::PARAM_STR
+            );
+
+            $insertStmt->bindValue(
+                ':message',
+                $message,
+                PDO::PARAM_STR
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | EXECUTE
+            |--------------------------------------------------------------------------
+            */
+
+            $insertStmt->execute();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | MESSAGE ID
             |--------------------------------------------------------------------------
             */
 
@@ -257,9 +293,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             |--------------------------------------------------------------------------
             | ADMIN EMAIL
             |--------------------------------------------------------------------------
-            |
-            | Notification goes to the configured official SMTP account.
-            |
             */
 
             $adminEmail =
@@ -270,50 +303,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             /*
             |--------------------------------------------------------------------------
-            | ESCAPE EMAIL CONTENT
+            | ESCAPE VALUES FOR EMAIL
             |--------------------------------------------------------------------------
             */
 
-            $safeName =
+            $safeName = htmlspecialchars(
+                $name,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+            $safeEmail = htmlspecialchars(
+                $email,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+            $safeSubject = htmlspecialchars(
+                $subject,
+                ENT_QUOTES,
+                'UTF-8'
+            );
+
+            $safeMessage = nl2br(
                 htmlspecialchars(
-                    $name,
+                    $message,
                     ENT_QUOTES,
                     'UTF-8'
-                );
-
-            $safeEmail =
-                htmlspecialchars(
-                    $email,
-                    ENT_QUOTES,
-                    'UTF-8'
-                );
-
-            $safeSubject =
-                htmlspecialchars(
-                    $subject,
-                    ENT_QUOTES,
-                    'UTF-8'
-                );
-
-            $safeMessage =
-                nl2br(
-                    htmlspecialchars(
-                        $message,
-                        ENT_QUOTES,
-                        'UTF-8'
-                    )
-                );
+                )
+            );
 
 
             /*
             |--------------------------------------------------------------------------
-            | ADMIN MESSAGE URL
+            | ADMIN PAGE URL
             |--------------------------------------------------------------------------
             */
 
             if (
                 defined('ABSOLUTE_BASE_URL') &&
-                ABSOLUTE_BASE_URL !== ''
+                trim((string) ABSOLUTE_BASE_URL) !== ''
             ) {
 
                 $adminMessageUrl =
@@ -357,7 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             /*
             |--------------------------------------------------------------------------
-            | ADMIN EMAIL - HTML
+            | HTML EMAIL
             |--------------------------------------------------------------------------
             */
 
@@ -367,13 +396,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html>
 
 <head>
-
-<meta charset="UTF-8">
-
-<title>New HochipoHub Contact Message</title>
-
+    <meta charset="UTF-8">
+    <title>New Contact Message</title>
 </head>
-
 
 <body style="
     margin:0;
@@ -382,7 +407,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     font-family:Arial,Helvetica,sans-serif;
     color:#172033;
 ">
-
 
 <table
     width="100%"
@@ -400,7 +424,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <td align="center">
 
-
 <table
     width="600"
     cellpadding="0"
@@ -412,60 +435,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         background:#ffffff;
         border-radius:18px;
         overflow:hidden;
-        box-shadow:
-            0 12px 35px
-            rgba(31,65,120,.10);
+        box-shadow:0 12px 35px rgba(31,65,120,.10);
     "
 >
-
 
 <tr>
 
-<td
-    style="
-        padding:34px;
-        text-align:center;
-        background:
-            linear-gradient(
-                135deg,
-                #123d89,
-                #287de4
-            );
-        color:#ffffff;
-    "
->
+<td style="
+    padding:34px;
+    text-align:center;
+    background:linear-gradient(
+        135deg,
+        #123d89,
+        #287de4
+    );
+    color:#ffffff;
+">
 
-<div
-    style="
-        font-size:13px;
-        font-weight:700;
-        letter-spacing:1.5px;
-        opacity:.80;
-    "
->
+<div style="
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:1.5px;
+    opacity:.80;
+">
     HOCHIPOHUB
 </div>
 
-
-<h1
-    style="
-        margin:12px 0 8px;
-        font-size:27px;
-        line-height:1.3;
-    "
->
+<h1 style="
+    margin:12px 0 8px;
+    font-size:27px;
+    line-height:1.3;
+">
     New Contact Message
 </h1>
 
-
-<p
-    style="
-        margin:0;
-        font-size:14px;
-        line-height:1.7;
-        color:#dbeafe;
-    "
->
+<p style="
+    margin:0;
+    font-size:14px;
+    line-height:1.7;
+    color:#dbeafe;
+">
     A new enquiry has been submitted
     through the HochipoHub contact page.
 </p>
@@ -479,14 +488,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <td style="padding:35px;">
 
-
-<p
-    style="
-        margin:0 0 18px;
-        font-size:14px;
-        line-height:1.7;
-    "
->
+<p style="
+    margin:0 0 18px;
+    font-size:14px;
+    line-height:1.7;
+">
 
 <strong>Message ID:</strong>
 #' . $contactMessageId . '
@@ -494,13 +500,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </p>
 
 
-<p
-    style="
-        margin:0 0 12px;
-        font-size:14px;
-        line-height:1.7;
-    "
->
+<p style="
+    margin:0 0 12px;
+    font-size:14px;
+    line-height:1.7;
+">
 
 <strong>Name:</strong>
 ' . $safeName . '
@@ -508,13 +512,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </p>
 
 
-<p
-    style="
-        margin:0 0 12px;
-        font-size:14px;
-        line-height:1.7;
-    "
->
+<p style="
+    margin:0 0 12px;
+    font-size:14px;
+    line-height:1.7;
+">
 
 <strong>Email:</strong>
 ' . $safeEmail . '
@@ -522,13 +524,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </p>
 
 
-<p
-    style="
-        margin:0 0 22px;
-        font-size:14px;
-        line-height:1.7;
-    "
->
+<p style="
+    margin:0 0 22px;
+    font-size:14px;
+    line-height:1.7;
+">
 
 <strong>Subject:</strong>
 ' . $safeSubject . '
@@ -536,29 +536,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </p>
 
 
-<div
-    style="
-        padding:20px;
-        background:#f8fafc;
-        border:1px solid #e2e8f0;
-        border-radius:12px;
-        color:#475569;
-        font-size:14px;
-        line-height:1.8;
-    "
->
+<div style="
+    padding:20px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:12px;
+    color:#475569;
+    font-size:14px;
+    line-height:1.8;
+">
 
 ' . $safeMessage . '
 
 </div>
 
 
-<div
-    style="
-        text-align:center;
-        margin:30px 0 5px;
-    "
->
+<div style="
+    text-align:center;
+    margin:30px 0 5px;
+">
 
 <a
     href="' . $safeAdminMessageUrl . '"
@@ -573,13 +569,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         text-decoration:none;
     "
 >
-
     View Message
-
 </a>
 
 </div>
-
 
 </td>
 
@@ -588,14 +581,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <tr>
 
-<td
-    style="
-        padding:20px 35px 30px;
-        color:#94a3b8;
-        font-size:11px;
-        text-align:center;
-    "
->
+<td style="
+    padding:20px 35px 30px;
+    color:#94a3b8;
+    font-size:11px;
+    text-align:center;
+">
 
     HochipoHub Contact System
 
@@ -603,16 +594,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 </tr>
 
-
 </table>
-
 
 </td>
 
 </tr>
 
 </table>
-
 
 </body>
 
@@ -622,7 +610,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             /*
             |--------------------------------------------------------------------------
-            | ADMIN EMAIL - PLAIN TEXT
+            | PLAIN TEXT EMAIL
             |--------------------------------------------------------------------------
             */
 
@@ -649,46 +637,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message .
                 "\n\n" .
 
-                "View message:\n" .
+                "View Message:\n" .
                 $adminMessageUrl;
 
 
             /*
             |--------------------------------------------------------------------------
-            | SEND ADMIN EMAIL NOTIFICATION
+            | SEND ADMIN NOTIFICATION
             |--------------------------------------------------------------------------
+            |
+            | Email failure will NOT remove the database message.
+            |
             */
 
-            $emailSent =
-                sendHochipoEmail(
-                    $adminEmail,
-                    'HochipoHub Admin',
-                    $emailSubject,
-                    $htmlBody,
-                    $plainBody
-                );
+            try {
 
+                $emailSent =
+                    sendHochipoEmail(
+                        $adminEmail,
+                        'HochipoHub Admin',
+                        $emailSubject,
+                        $htmlBody,
+                        $plainBody
+                    );
 
-            /*
-            |--------------------------------------------------------------------------
-            | EMAIL FAILURE DOES NOT DELETE MESSAGE
-            |--------------------------------------------------------------------------
-            */
+                if (!$emailSent) {
 
-            if (!$emailSent) {
+                    error_log(
+                        'Contact message #' .
+                        $contactMessageId .
+                        ' saved successfully, but email notification failed.'
+                    );
+                }
+
+            } catch (Throwable $emailException) {
 
                 error_log(
-                    'Contact message #' .
-                    $contactMessageId .
-                    ' was saved successfully, ' .
-                    'but the admin email notification failed.'
+                    'Contact email notification error: ' .
+                    $emailException->getMessage()
                 );
             }
 
 
             /*
             |--------------------------------------------------------------------------
-            | SUCCESS MESSAGE
+            | SUCCESS
             |--------------------------------------------------------------------------
             */
 
@@ -699,7 +692,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             /*
             |--------------------------------------------------------------------------
-            | CLEAR SUBJECT / MESSAGE
+            | CLEAR FORM
             |--------------------------------------------------------------------------
             */
 
@@ -709,11 +702,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             /*
             |--------------------------------------------------------------------------
-            | CLEAR VISITOR DETAILS
+            | CLEAR VISITOR NAME / EMAIL
             |--------------------------------------------------------------------------
-            |
-            | Logged-in customer name/email remain filled.
-            |
             */
 
             if ($userId === null) {
@@ -725,14 +715,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } catch (Throwable $e) {
 
-            error_log(
-                'DEBUG ERROR: ' .
-                $e->getMessage()
-            );
+            /*
+            |--------------------------------------------------------------------------
+            | TEMPORARY DEBUG
+            |--------------------------------------------------------------------------
+            |
+            | Keep this temporarily so we can see the REAL database error.
+            |
+            */
 
             $formError =
-                'We could not send your message right now. '
-                . 'Please try again later.';
+                'DEBUG ERROR: ' .
+                $e->getMessage();
         }
     }
 }
@@ -740,7 +734,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 /*
 |--------------------------------------------------------------------------
-| LOAD HEADER AFTER PROCESSING FORM
+| HEADER
 |--------------------------------------------------------------------------
 */
 
@@ -1202,7 +1196,7 @@ require_once __DIR__ . '/includes/header.php';
         14px;
 
     line-height:
-        1.5;
+        1.6;
 }
 
 
@@ -1216,6 +1210,9 @@ require_once __DIR__ . '/includes/header.php';
 
     border:
         1px solid #fecaca;
+
+    overflow-wrap:
+        anywhere;
 }
 
 
@@ -1459,7 +1456,6 @@ require_once __DIR__ . '/includes/header.php';
         grid-template-columns:
             1fr;
     }
-
 }
 
 
@@ -1526,7 +1522,6 @@ require_once __DIR__ . '/includes/header.php';
         width:
             100%;
     }
-
 }
 
 </style>
@@ -1540,19 +1535,30 @@ require_once __DIR__ . '/includes/header.php';
     <div class="contact-hero">
 
         <span class="contact-eyebrow">
+
             HOCHIPOHUB SUPPORT
+
         </span>
 
+
         <h1>
-            Let's Talk.
-            <span>We're Here.</span>
+
+            Let\'s Talk.
+
+            <span>
+                We\'re Here.
+            </span>
+
         </h1>
 
+
         <p>
+
             Have a question about products, orders,
             vendors, or your HochipoHub account?
             Send us a message and our team will
             be happy to help.
+
         </p>
 
     </div>
@@ -1587,6 +1593,8 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="contact-info-list">
 
 
+                    <!-- EMAIL -->
+
                     <div class="contact-info-item">
 
                         <div class="contact-info-icon">
@@ -1613,6 +1621,8 @@ require_once __DIR__ . '/includes/header.php';
                     </div>
 
 
+                    <!-- PHONE -->
+
                     <div class="contact-info-item">
 
                         <div class="contact-info-icon">
@@ -1638,6 +1648,8 @@ require_once __DIR__ . '/includes/header.php';
 
                     </div>
 
+
+                    <!-- LOCATION -->
 
                     <div class="contact-info-item">
 
@@ -1673,6 +1685,8 @@ require_once __DIR__ . '/includes/header.php';
 
                     </div>
 
+
+                    <!-- SUPPORT HOURS -->
 
                     <div class="contact-info-item">
 
@@ -1733,6 +1747,8 @@ require_once __DIR__ . '/includes/header.php';
             </div>
 
 
+            <!-- ERROR -->
+
             <?php if ($formError !== ''): ?>
 
                 <div
@@ -1759,6 +1775,8 @@ require_once __DIR__ . '/includes/header.php';
 
             <?php endif; ?>
 
+
+            <!-- SUCCESS -->
 
             <?php if ($formSuccess !== ''): ?>
 
@@ -1787,10 +1805,11 @@ require_once __DIR__ . '/includes/header.php';
             <?php endif; ?>
 
 
+            <!-- FORM -->
+
             <form
                 action="<?= htmlspecialchars(
-                    BASE_URL .
-                    'contact.php',
+                    BASE_URL . 'contact.php',
                     ENT_QUOTES,
                     'UTF-8'
                 ) ?>"
@@ -1801,11 +1820,16 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="contact-form-grid">
 
 
+                    <!-- NAME -->
+
                     <div class="contact-field">
 
                         <label for="contact-name">
+
                             Name
+
                         </label>
+
 
                         <input
                             type="text"
@@ -1824,11 +1848,16 @@ require_once __DIR__ . '/includes/header.php';
                     </div>
 
 
+                    <!-- EMAIL -->
+
                     <div class="contact-field">
 
                         <label for="contact-email">
+
                             Email
+
                         </label>
+
 
                         <input
                             type="email"
@@ -1847,6 +1876,8 @@ require_once __DIR__ . '/includes/header.php';
                     </div>
 
 
+                    <!-- SUBJECT -->
+
                     <div
                         class="
                             contact-field
@@ -1855,16 +1886,17 @@ require_once __DIR__ . '/includes/header.php';
                     >
 
                         <label for="contact-subject">
+
                             Subject
+
                         </label>
+
 
                         <input
                             type="text"
                             id="contact-subject"
                             name="subject"
-                            placeholder="
-                                What can we help you with?
-                            "
+                            placeholder="What can we help you with?"
                             value="<?= htmlspecialchars(
                                 $subject,
                                 ENT_QUOTES,
@@ -1877,6 +1909,8 @@ require_once __DIR__ . '/includes/header.php';
                     </div>
 
 
+                    <!-- MESSAGE -->
+
                     <div
                         class="
                             contact-field
@@ -1885,8 +1919,11 @@ require_once __DIR__ . '/includes/header.php';
                     >
 
                         <label for="contact-message">
+
                             Message
+
                         </label>
+
 
                         <textarea
                             id="contact-message"
@@ -1902,6 +1939,8 @@ require_once __DIR__ . '/includes/header.php';
 
                     </div>
 
+
+                    <!-- SUBMIT -->
 
                     <div
                         class="
@@ -1931,8 +1970,8 @@ require_once __DIR__ . '/includes/header.php';
 
                     <i class="bi bi-shield-check"></i>
 
-                    Your information will only be
-                    used to respond to your enquiry.
+                    Your information will only be used
+                    to respond to your enquiry.
 
                 </p>
 
