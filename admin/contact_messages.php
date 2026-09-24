@@ -573,15 +573,36 @@ if (
         |--------------------------------------------------------------------------
         */
 
+        $plainBody =
+            "Hi " . $customerName . ",\n\n" .
+            "Thank you for contacting HochipoHub.\n\n" .
+            "Our administrator has replied to your enquiry.\n\n" .
+            "OUR REPLY:\n" .
+            $adminReply . "\n\n" .
+            "YOUR ORIGINAL ENQUIRY\n" .
+            "Subject: " .
+            (
+                trim((string) $contact['subject']) !== ''
+                    ? $contact['subject']
+                    : 'Your HochipoHub Enquiry'
+            ) .
+            "\n\n" .
+            $contact['message'] .
+            "\n\n" .
+            "Thank you,\n" .
+            "HochipoHub Customer Support";
+
         $emailSent = false;
 
         try {
 
             $emailSent =
                 sendHochipoEmail(
-                    $contact['email'],
+                    (string) $contact['email'],
+                    $customerName,
                     $replySubject,
-                    $emailBody
+                    $emailBody,
+                    $plainBody
                 );
 
         }
