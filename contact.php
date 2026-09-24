@@ -726,7 +726,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) {
 
             error_log(
-                'Contact message submission error: ' .
+                'DEBUG ERROR: ' .
                 $e->getMessage()
             );
 
