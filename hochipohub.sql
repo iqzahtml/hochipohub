@@ -1,12 +1,9 @@
 -- =========================================================
 -- HOCHIPOHUB DATABASE
--- FULL FINAL UPDATED DATABASE STRUCTURE
--- 20 TABLES
--- VERIFIED PURCHASE REVIEW SYSTEM
--- OFFICIAL ADMIN EMAIL
--- CONTACT MESSAGE SYSTEM
+-- FULL MASTER DATABASE QUERY
+-- LATEST VERSION
+-- TOTAL TABLES: 20
 -- =========================================================
-
 
 CREATE DATABASE IF NOT EXISTS hochipohub
     CHARACTER SET utf8mb4
@@ -68,7 +65,6 @@ DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
 
 
-
 -- =========================================================
 -- 2. VENDORS
 -- =========================================================
@@ -89,66 +85,31 @@ CREATE TABLE IF NOT EXISTS vendors (
 
     category VARCHAR(100) NULL,
 
-
-    -- =====================================================
-    -- BASIC DELIVERY
-    -- =====================================================
-
     delivery_method ENUM(
         'Pickup',
         'Postage',
         'Both'
     ) NOT NULL DEFAULT 'Both',
 
-
-    -- =====================================================
-    -- POSTAGE FEE
-    -- =====================================================
-
     postage_fee DECIMAL(10,2)
         NOT NULL
         DEFAULT 0.00,
-
-
-    -- =====================================================
-    -- VENDOR DELIVERY
-    -- =====================================================
 
     allow_vendor_delivery TINYINT(1)
         NOT NULL
         DEFAULT 0,
 
-
-    -- =====================================================
-    -- COD
-    -- =====================================================
-
     cod_enabled TINYINT(1)
         NOT NULL
         DEFAULT 0,
-
-
-    -- =====================================================
-    -- VENDOR DELIVERY FEE
-    -- =====================================================
 
     vendor_delivery_fee DECIMAL(10,2)
         NOT NULL
         DEFAULT 0.00,
 
-
-    -- =====================================================
-    -- COMMISSION
-    -- =====================================================
-
     commission_rate DECIMAL(5,2)
         NOT NULL
         DEFAULT 5.00,
-
-
-    -- =====================================================
-    -- APPROVAL
-    -- =====================================================
 
     approval_status ENUM(
         'Pending',
@@ -157,7 +118,6 @@ CREATE TABLE IF NOT EXISTS vendors (
         'Suspended'
     ) NOT NULL DEFAULT 'Pending',
 
-
     created_at DATETIME NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
 
@@ -165,24 +125,16 @@ CREATE TABLE IF NOT EXISTS vendors (
         DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-
     CONSTRAINT fk_vendors_user
         FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT chk_vendor_postage_fee
-        CHECK (
-            postage_fee >= 0
-        ),
-
+        CHECK (postage_fee >= 0),
 
     CONSTRAINT chk_vendor_delivery_fee
-        CHECK (
-            vendor_delivery_fee >= 0
-        ),
-
+        CHECK (vendor_delivery_fee >= 0),
 
     CONSTRAINT chk_vendor_commission_rate
         CHECK (
@@ -193,7 +145,6 @@ CREATE TABLE IF NOT EXISTS vendors (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -218,7 +169,6 @@ DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
 
 
-
 -- =========================================================
 -- 4. PRODUCTS
 -- =========================================================
@@ -231,8 +181,7 @@ CREATE TABLE IF NOT EXISTS products (
 
     category_id INT NOT NULL,
 
-    product_name VARCHAR(150)
-        NOT NULL,
+    product_name VARCHAR(150) NOT NULL,
 
     description TEXT NULL,
 
@@ -259,46 +208,30 @@ CREATE TABLE IF NOT EXISTS products (
         DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-
     CONSTRAINT fk_products_vendor
         FOREIGN KEY (vendor_id)
         REFERENCES vendors(vendor_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT fk_products_category
         FOREIGN KEY (category_id)
         REFERENCES categories(category_id),
 
-
     CONSTRAINT chk_product_price
-        CHECK (
-            price >= 0
-        ),
-
+        CHECK (price >= 0),
 
     CONSTRAINT chk_product_stock
-        CHECK (
-            stock_quantity >= 0
-        ),
+        CHECK (stock_quantity >= 0),
 
+    INDEX idx_products_vendor (vendor_id),
 
-    INDEX idx_products_vendor (
-        vendor_id
-    ),
+    INDEX idx_products_category (category_id),
 
-    INDEX idx_products_category (
-        category_id
-    ),
-
-    INDEX idx_products_status (
-        status
-    )
+    INDEX idx_products_status (status)
 
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -324,30 +257,23 @@ CREATE TABLE IF NOT EXISTS cart (
         DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-
     CONSTRAINT fk_cart_customer
         FOREIGN KEY (customer_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
-
 
     CONSTRAINT fk_cart_product
         FOREIGN KEY (product_id)
         REFERENCES products(product_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT chk_cart_quantity
-        CHECK (
-            quantity > 0
-        ),
-
+        CHECK (quantity > 0),
 
     UNIQUE KEY unique_customer_product (
         customer_id,
         product_id
     ),
-
 
     INDEX idx_cart_customer (
         customer_id
@@ -356,7 +282,6 @@ CREATE TABLE IF NOT EXISTS cart (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -376,18 +301,15 @@ CREATE TABLE IF NOT EXISTS orders (
         NOT NULL
         DEFAULT 0.00,
 
-
     delivery_method ENUM(
         'Pickup',
         'Postage',
         'Vendor Delivery'
     ) NULL,
 
-
     delivery_address TEXT NULL,
 
     tracking_number VARCHAR(100) NULL,
-
 
     order_status ENUM(
         'Pending',
@@ -396,20 +318,14 @@ CREATE TABLE IF NOT EXISTS orders (
         'Cancelled'
     ) NOT NULL DEFAULT 'Pending',
 
-
     completed_date DATETIME NULL,
-
 
     CONSTRAINT fk_orders_customer
         FOREIGN KEY (customer_id)
         REFERENCES users(user_id),
 
-
     CONSTRAINT chk_order_total
-        CHECK (
-            total_amount >= 0
-        ),
-
+        CHECK (total_amount >= 0),
 
     INDEX idx_orders_customer (
         customer_id
@@ -426,7 +342,6 @@ CREATE TABLE IF NOT EXISTS orders (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -451,29 +366,20 @@ CREATE TABLE IF NOT EXISTS order_details (
     subtotal DECIMAL(10,2)
         NOT NULL,
 
-
     CONSTRAINT fk_order_details_order
         FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT fk_order_details_product
         FOREIGN KEY (product_id)
         REFERENCES products(product_id),
 
-
     CONSTRAINT chk_order_detail_quantity
-        CHECK (
-            quantity > 0
-        ),
-
+        CHECK (quantity > 0),
 
     CONSTRAINT chk_order_detail_price
-        CHECK (
-            unit_price >= 0
-        ),
-
+        CHECK (unit_price >= 0),
 
     INDEX idx_order_details_order (
         order_id
@@ -486,7 +392,6 @@ CREATE TABLE IF NOT EXISTS order_details (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -511,7 +416,6 @@ CREATE TABLE IF NOT EXISTS vendor_orders (
         NOT NULL
         DEFAULT 0.00,
 
-
     vendor_status ENUM(
         'Pending',
         'Processing',
@@ -521,7 +425,6 @@ CREATE TABLE IF NOT EXISTS vendor_orders (
         'Cancelled'
     ) NOT NULL DEFAULT 'Pending',
 
-
     tracking_number VARCHAR(100) NULL,
 
     created_at DATETIME NOT NULL
@@ -529,35 +432,25 @@ CREATE TABLE IF NOT EXISTS vendor_orders (
 
     completed_at DATETIME NULL,
 
-
     CONSTRAINT fk_vendor_orders_order
         FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT fk_vendor_orders_vendor
         FOREIGN KEY (vendor_id)
         REFERENCES vendors(vendor_id),
 
-
     CONSTRAINT chk_vendor_order_subtotal
-        CHECK (
-            subtotal >= 0
-        ),
-
+        CHECK (subtotal >= 0),
 
     CONSTRAINT chk_vendor_order_delivery_fee
-        CHECK (
-            delivery_fee >= 0
-        ),
-
+        CHECK (delivery_fee >= 0),
 
     UNIQUE KEY unique_order_vendor (
         order_id,
         vendor_id
     ),
-
 
     INDEX idx_vendor_orders_vendor (
         vendor_id
@@ -572,7 +465,6 @@ DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
 
 
-
 -- =========================================================
 -- 9. PAYMENTS
 -- =========================================================
@@ -585,14 +477,12 @@ CREATE TABLE IF NOT EXISTS payments (
 
     order_id INT NOT NULL,
 
-
     payment_method ENUM(
         'FPX',
         'Credit Card',
         'Debit Card',
         'Cash'
     ) NULL,
-
 
     payment_status ENUM(
         'Pending',
@@ -601,20 +491,17 @@ CREATE TABLE IF NOT EXISTS payments (
         'Refunded'
     ) NOT NULL DEFAULT 'Pending',
 
-
     payment_date DATETIME NULL,
 
     amount DECIMAL(10,2)
         NOT NULL
         DEFAULT 0.00,
 
-
     transaction_reference VARCHAR(150) NULL,
 
     payment_gateway VARCHAR(50) NULL,
 
     gateway_order_reference VARCHAR(150) NULL,
-
 
     created_at DATETIME NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
@@ -623,18 +510,13 @@ CREATE TABLE IF NOT EXISTS payments (
         DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-
     CONSTRAINT fk_payments_order
         FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT chk_payment_amount
-        CHECK (
-            amount >= 0
-        ),
-
+        CHECK (amount >= 0),
 
     INDEX idx_payments_order (
         order_id
@@ -655,7 +537,6 @@ CREATE TABLE IF NOT EXISTS payments (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -687,57 +568,43 @@ CREATE TABLE IF NOT EXISTS reviews (
         NOT NULL
         DEFAULT 0,
 
-
     status ENUM(
         'Visible',
         'Hidden'
     ) NOT NULL DEFAULT 'Visible',
 
-
     review_date DATETIME NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
-
 
     CONSTRAINT fk_reviews_customer
         FOREIGN KEY (customer_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT fk_reviews_product
         FOREIGN KEY (product_id)
         REFERENCES products(product_id)
         ON DELETE CASCADE,
-
 
     CONSTRAINT fk_reviews_order
         FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT fk_reviews_order_detail
         FOREIGN KEY (order_detail_id)
         REFERENCES order_details(order_detail_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT chk_reviews_rating
-        CHECK (
-            rating BETWEEN 1 AND 5
-        ),
-
+        CHECK (rating BETWEEN 1 AND 5),
 
     CONSTRAINT chk_reviews_helpful_count
-        CHECK (
-            helpful_count >= 0
-        ),
-
+        CHECK (helpful_count >= 0),
 
     UNIQUE KEY unique_review_order_detail (
         order_detail_id
     ),
-
 
     INDEX idx_reviews_product (
         product_id
@@ -758,7 +625,6 @@ CREATE TABLE IF NOT EXISTS reviews (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -783,22 +649,17 @@ CREATE TABLE IF NOT EXISTS inventory (
         DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-
     CONSTRAINT fk_inventory_product
         FOREIGN KEY (product_id)
         REFERENCES products(product_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT chk_inventory_quantity
-        CHECK (
-            quantity >= 0
-        )
+        CHECK (quantity >= 0)
 
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -825,12 +686,10 @@ CREATE TABLE IF NOT EXISTS commission (
         NOT NULL
         DEFAULT 0.00,
 
-
     status ENUM(
         'Pending',
         'Paid'
     ) NOT NULL DEFAULT 'Pending',
-
 
     created_at DATETIME NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
@@ -839,23 +698,19 @@ CREATE TABLE IF NOT EXISTS commission (
         DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-
     CONSTRAINT fk_commission_vendor
         FOREIGN KEY (vendor_id)
         REFERENCES vendors(vendor_id),
-
 
     CONSTRAINT fk_commission_order
         FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT fk_commission_vendor_order
         FOREIGN KEY (vendor_order_id)
         REFERENCES vendor_orders(vendor_order_id)
         ON DELETE SET NULL,
-
 
     CONSTRAINT chk_commission_rate
         CHECK (
@@ -863,12 +718,8 @@ CREATE TABLE IF NOT EXISTS commission (
             AND commission_rate <= 100
         ),
 
-
     CONSTRAINT chk_commission_amount
-        CHECK (
-            commission_amount >= 0
-        ),
-
+        CHECK (commission_amount >= 0),
 
     INDEX idx_commission_vendor (
         vendor_id
@@ -887,9 +738,8 @@ DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
 
 
-
 -- =========================================================
--- 13. MFA CODE HISTORY
+-- 13. MFA CODES
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS mfa_codes (
@@ -907,12 +757,10 @@ CREATE TABLE IF NOT EXISTS mfa_codes (
 
     used_at DATETIME NULL,
 
-
     CONSTRAINT fk_mfa_codes_user
         FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
-
 
     INDEX idx_mfa_user (
         user_id
@@ -923,9 +771,8 @@ DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
 
 
-
 -- =========================================================
--- 14. PASSWORD RESET HISTORY
+-- 14. PASSWORD RESETS
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS password_resets (
@@ -943,12 +790,10 @@ CREATE TABLE IF NOT EXISTS password_resets (
 
     used_at DATETIME NULL,
 
-
     CONSTRAINT fk_password_resets_user
         FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
-
 
     INDEX idx_password_reset_user (
         user_id
@@ -957,7 +802,6 @@ CREATE TABLE IF NOT EXISTS password_resets (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -977,24 +821,20 @@ CREATE TABLE IF NOT EXISTS wishlist (
     created_at DATETIME NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
 
-
     CONSTRAINT fk_wishlist_user
         FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
-
 
     CONSTRAINT fk_wishlist_product
         FOREIGN KEY (product_id)
         REFERENCES products(product_id)
         ON DELETE CASCADE,
 
-
     UNIQUE KEY unique_wishlist_product (
         user_id,
         product_id
     ),
-
 
     INDEX idx_wishlist_user (
         user_id
@@ -1003,7 +843,6 @@ CREATE TABLE IF NOT EXISTS wishlist (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -1025,11 +864,9 @@ CREATE TABLE IF NOT EXISTS admin_logs (
     created_at DATETIME NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
 
-
     CONSTRAINT fk_admin_logs_admin
         FOREIGN KEY (admin_id)
         REFERENCES users(user_id),
-
 
     INDEX idx_admin_logs_admin (
         admin_id
@@ -1042,7 +879,6 @@ CREATE TABLE IF NOT EXISTS admin_logs (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -1061,13 +897,11 @@ CREATE TABLE IF NOT EXISTS vendor_applications (
 
     reason TEXT NULL,
 
-
     status ENUM(
         'Pending',
         'Approved',
         'Rejected'
     ) NOT NULL DEFAULT 'Pending',
-
 
     created_at DATETIME NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
@@ -1076,18 +910,15 @@ CREATE TABLE IF NOT EXISTS vendor_applications (
 
     reviewed_by INT NULL,
 
-
     CONSTRAINT fk_vendor_applications_user
         FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT fk_vendor_applications_reviewer
         FOREIGN KEY (reviewed_by)
         REFERENCES users(user_id)
         ON DELETE SET NULL,
-
 
     INDEX idx_vendor_application_user (
         user_id
@@ -1100,7 +931,6 @@ CREATE TABLE IF NOT EXISTS vendor_applications (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
-
 
 
 -- =========================================================
@@ -1126,24 +956,20 @@ CREATE TABLE IF NOT EXISTS conversations (
         DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
-
     CONSTRAINT fk_conversations_customer
         FOREIGN KEY (customer_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
-
 
     CONSTRAINT fk_conversations_vendor
         FOREIGN KEY (vendor_id)
         REFERENCES vendors(vendor_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT fk_conversations_order
         FOREIGN KEY (order_id)
         REFERENCES orders(order_id)
         ON DELETE SET NULL,
-
 
     INDEX idx_conversations_customer (
         customer_id
@@ -1166,10 +992,9 @@ DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
 
 
-
 -- =========================================================
 -- 19. MESSAGES
--- CUSTOMER <-> VENDOR CHAT
+-- CUSTOMER <-> VENDOR
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -1191,18 +1016,15 @@ CREATE TABLE IF NOT EXISTS messages (
     created_at DATETIME NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
 
-
     CONSTRAINT fk_messages_conversation
         FOREIGN KEY (conversation_id)
         REFERENCES conversations(conversation_id)
         ON DELETE CASCADE,
 
-
     CONSTRAINT fk_messages_sender
         FOREIGN KEY (sender_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE,
-
 
     INDEX idx_messages_conversation (
         conversation_id
@@ -1225,10 +1047,9 @@ DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
 
 
-
 -- =========================================================
 -- 20. CONTACT MESSAGES
--- CUSTOMER / VISITOR -> ADMIN SUPPORT
+-- CUSTOMER / VISITOR -> ADMIN
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS contact_messages (
@@ -1239,52 +1060,40 @@ CREATE TABLE IF NOT EXISTS contact_messages (
 
     user_id INT NULL,
 
-    name VARCHAR(100)
-        NOT NULL,
+    name VARCHAR(100) NOT NULL,
 
-    email VARCHAR(150)
-        NOT NULL,
+    email VARCHAR(150) NOT NULL,
 
-    subject VARCHAR(200)
-        NOT NULL,
+    subject VARCHAR(200) NOT NULL,
 
-    message TEXT
-        NOT NULL,
-
+    message TEXT NOT NULL,
 
     status ENUM(
         'New',
         'Read',
         'Replied'
-    ) NOT NULL
-        DEFAULT 'New',
-
+    ) NOT NULL DEFAULT 'New',
 
     admin_reply TEXT NULL,
 
     replied_by INT NULL,
 
-
-    created_at DATETIME
-        NOT NULL
+    created_at DATETIME NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
 
     read_at DATETIME NULL,
 
     replied_at DATETIME NULL,
 
-
     CONSTRAINT fk_contact_messages_user
         FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE SET NULL,
 
-
     CONSTRAINT fk_contact_messages_admin
         FOREIGN KEY (replied_by)
         REFERENCES users(user_id)
         ON DELETE SET NULL,
-
 
     INDEX idx_contact_messages_user (
         user_id
@@ -1311,13 +1120,8 @@ DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
 
 
-
 -- =========================================================
--- UPDATE EXISTING OLD ADMIN EMAIL
--- =========================================================
---
--- Password is intentionally NOT changed here.
---
+-- OFFICIAL ADMIN ACCOUNT
 -- =========================================================
 
 UPDATE users
@@ -1334,14 +1138,10 @@ AND NOT EXISTS (
         SELECT email
         FROM users
     ) AS existing_admin
-    WHERE existing_admin.email = 'hochipohub941@gmail.com'
+    WHERE existing_admin.email =
+        'hochipohub941@gmail.com'
 );
 
-
-
--- =========================================================
--- DEFAULT ADMIN ACCOUNT
--- =========================================================
 
 INSERT INTO users
 (
@@ -1353,7 +1153,6 @@ INSERT INTO users
     status,
     mfa_enabled
 )
-
 SELECT
     'HochipoHub Admin',
     'hochipohub941@gmail.com',
@@ -1362,19 +1161,13 @@ SELECT
     'admin',
     'active',
     FALSE
-
-WHERE NOT EXISTS
-(
+WHERE NOT EXISTS (
     SELECT 1
     FROM users
-    WHERE email = 'hochipohub941@gmail.com'
+    WHERE email =
+        'hochipohub941@gmail.com'
 );
 
-
-
--- =========================================================
--- FORCE OFFICIAL ADMIN ROLE / STATUS
--- =========================================================
 
 UPDATE users
 SET
@@ -1382,92 +1175,55 @@ SET
     role = 'admin',
     status = 'active',
     mfa_enabled = FALSE
-WHERE email = 'hochipohub941@gmail.com';
-
+WHERE email =
+    'hochipohub941@gmail.com';
 
 
 -- =========================================================
--- DEFAULT CATEGORY - FOOD
+-- DEFAULT CATEGORIES
 -- =========================================================
 
-INSERT INTO categories
-(
-    category_name
-)
-
-SELECT
-    'Food'
-
-WHERE NOT EXISTS
-(
+INSERT INTO categories (category_name)
+SELECT 'Food'
+WHERE NOT EXISTS (
     SELECT 1
     FROM categories
     WHERE category_name = 'Food'
 );
 
 
-
--- =========================================================
--- DEFAULT CATEGORY - BEVERAGES
--- =========================================================
-
-INSERT INTO categories
-(
-    category_name
-)
-
-SELECT
-    'Beverages'
-
-WHERE NOT EXISTS
-(
+INSERT INTO categories (category_name)
+SELECT 'Beverages'
+WHERE NOT EXISTS (
     SELECT 1
     FROM categories
     WHERE category_name = 'Beverages'
 );
 
 
-
--- =========================================================
--- DEFAULT CATEGORY - DESSERTS
--- =========================================================
-
-INSERT INTO categories
-(
-    category_name
-)
-
-SELECT
-    'Desserts'
-
-WHERE NOT EXISTS
-(
+INSERT INTO categories (category_name)
+SELECT 'Desserts'
+WHERE NOT EXISTS (
     SELECT 1
     FROM categories
     WHERE category_name = 'Desserts'
 );
 
 
-
--- =========================================================
--- DEFAULT CATEGORY - SNACKS
--- =========================================================
-
-INSERT INTO categories
-(
-    category_name
-)
-
-SELECT
-    'Snacks'
-
-WHERE NOT EXISTS
-(
+INSERT INTO categories (category_name)
+SELECT 'Snacks'
+WHERE NOT EXISTS (
     SELECT 1
     FROM categories
     WHERE category_name = 'Snacks'
 );
 
+
+-- =========================================================
+-- VERIFY CURRENT DATABASE
+-- =========================================================
+
+SELECT DATABASE() AS current_database;
 
 
 -- =========================================================
@@ -1476,6 +1232,19 @@ WHERE NOT EXISTS
 
 SHOW TABLES;
 
+
+-- =========================================================
+-- VERIFY CONTACT_MESSAGES EXISTS
+-- =========================================================
+
+SHOW TABLES LIKE 'contact_messages';
+
+
+-- =========================================================
+-- VERIFY CONTACT_MESSAGES STRUCTURE
+-- =========================================================
+
+DESCRIBE contact_messages;
 
 
 -- =========================================================
@@ -1490,61 +1259,13 @@ SELECT
     status,
     mfa_enabled
 FROM users
-WHERE email = 'hochipohub941@gmail.com';
-
-
-
--- =========================================================
--- VERIFY VENDOR SETTINGS
--- =========================================================
-
-DESCRIBE vendors;
-
+WHERE email =
+    'hochipohub941@gmail.com';
 
 
 -- =========================================================
--- VERIFY ORDERS
--- =========================================================
-
-DESCRIBE orders;
-
-
-
--- =========================================================
--- VERIFY VENDOR ORDERS
--- =========================================================
-
-DESCRIBE vendor_orders;
-
-
-
--- =========================================================
--- VERIFY PAYMENT
--- =========================================================
-
-DESCRIBE payments;
-
-
-
--- =========================================================
--- VERIFY REVIEW SYSTEM
--- =========================================================
-
-DESCRIBE reviews;
-
-
-
--- =========================================================
--- VERIFY CONTACT MESSAGE SYSTEM
--- =========================================================
-
-DESCRIBE contact_messages;
-
-
-
--- =========================================================
--- VERIFY NUMBER OF TABLES
--- EXPECTED: 20
+-- VERIFY TOTAL TABLES
+-- EXPECTED RESULT: 20
 -- =========================================================
 
 SELECT
@@ -1553,7 +1274,29 @@ FROM information_schema.tables
 WHERE table_schema = 'hochipohub';
 
 
+-- =========================================================
+-- VERIFY CONTACT MESSAGES
+-- =========================================================
+
+SELECT
+    contact_message_id,
+    user_id,
+    name,
+    email,
+    subject,
+    message,
+    status,
+    admin_reply,
+    replied_by,
+    created_at,
+    read_at,
+    replied_at
+FROM contact_messages
+ORDER BY contact_message_id DESC;
+
 
 -- =========================================================
--- DONE
--- =========================================================
+-- END
+-- HOCHIPOHUB FULL MASTER DATABASE
+-- TOTAL TABLES: 20
+-- =========================================================hochipohub
