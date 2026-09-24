@@ -21,6 +21,7 @@
 |     Payments
 |     Commission
 |     Reviews
+|     Contact Messages
 |     Settings
 |
 |--------------------------------------------------------------------------
@@ -148,7 +149,6 @@ if (!function_exists('adminSidebarEscape')) {
     id="adminSidebar"
 >
 
-
     <div class="admin-sidebar-inner">
 
 
@@ -200,7 +200,6 @@ if (!function_exists('adminSidebarEscape')) {
 
         <div class="admin-sidebar-profile">
 
-
             <div class="admin-avatar">
 
                 <?= adminSidebarEscape(
@@ -242,7 +241,6 @@ if (!function_exists('adminSidebarEscape')) {
 
             </div>
 
-
         </div>
 
 
@@ -256,7 +254,9 @@ if (!function_exists('adminSidebarEscape')) {
         >
 
 
-            <!-- MAIN MENU -->
+            <!-- =================================================
+                 MAIN MENU
+            ================================================== -->
 
             <div class="admin-nav-label">
                 MAIN MENU
@@ -606,11 +606,12 @@ if (!function_exists('adminSidebarEscape')) {
 
                 </li>
 
-
             </ul>
 
 
-            <!-- TRANSACTIONS -->
+            <!-- =================================================
+                 TRANSACTIONS
+            ================================================== -->
 
             <div
                 class="admin-nav-label admin-nav-label-spaced"
@@ -823,11 +824,12 @@ if (!function_exists('adminSidebarEscape')) {
 
                 </li>
 
-
             </ul>
 
 
-            <!-- SYSTEM -->
+            <!-- =================================================
+                 SYSTEM
+            ================================================== -->
 
             <div
                 class="admin-nav-label admin-nav-label-spaced"
@@ -837,6 +839,56 @@ if (!function_exists('adminSidebarEscape')) {
 
 
             <ul>
+
+
+                <!-- CONTACT MESSAGES -->
+
+                <li>
+
+                    <a
+                        href="contact_messages.php"
+                        class="admin-nav-link <?= adminNavActive('contact_messages.php') ?>"
+                    >
+
+                        <span class="admin-nav-icon">
+
+                            <svg viewBox="0 0 24 24">
+
+                                <path
+                                    d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"
+                                ></path>
+
+                                <path
+                                    d="M8 9h8"
+                                ></path>
+
+                                <path
+                                    d="M8 13h5"
+                                ></path>
+
+                            </svg>
+
+                        </span>
+
+
+                        <span class="admin-nav-text">
+                            Contact Messages
+                        </span>
+
+
+                        <?php if (
+                            adminNavActive('contact_messages.php')
+                        ): ?>
+
+                            <span
+                                class="admin-nav-active-dot"
+                            ></span>
+
+                        <?php endif; ?>
+
+                    </a>
+
+                </li>
 
 
                 <!-- SETTINGS -->
@@ -883,7 +935,6 @@ if (!function_exists('adminSidebarEscape')) {
                     </a>
 
                 </li>
-
 
             </ul>
 
@@ -996,123 +1047,3 @@ if (!function_exists('adminSidebarEscape')) {
     </div>
 
 </aside>
-
-
-<!-- =========================================================
-     MOBILE ADMIN BAR
-========================================================= -->
-
-<div class="admin-mobile-bar">
-
-    <button
-        type="button"
-        class="admin-mobile-toggle"
-        onclick="openAdminSidebar()"
-        aria-label="Open admin menu"
-    >
-
-        <span></span>
-        <span></span>
-        <span></span>
-
-    </button>
-
-
-    <div class="admin-mobile-brand">
-
-        <strong>
-            HochipoHub Admin
-        </strong>
-
-        <small>
-            Control Center
-        </small>
-
-    </div>
-
-</div>
-
-
-<script>
-
-(function () {
-
-    window.openAdminSidebar = function () {
-
-        const sidebar =
-            document.getElementById(
-                'adminSidebar'
-            );
-
-        const overlay =
-            document.getElementById(
-                'adminSidebarOverlay'
-            );
-
-        if (sidebar) {
-            sidebar.classList.add(
-                'is-open'
-            );
-        }
-
-        if (overlay) {
-            overlay.classList.add(
-                'is-visible'
-            );
-        }
-
-        document.body.classList.add(
-            'admin-sidebar-open'
-        );
-
-    };
-
-
-    window.closeAdminSidebar = function () {
-
-        const sidebar =
-            document.getElementById(
-                'adminSidebar'
-            );
-
-        const overlay =
-            document.getElementById(
-                'adminSidebarOverlay'
-            );
-
-        if (sidebar) {
-            sidebar.classList.remove(
-                'is-open'
-            );
-        }
-
-        if (overlay) {
-            overlay.classList.remove(
-                'is-visible'
-            );
-        }
-
-        document.body.classList.remove(
-            'admin-sidebar-open'
-        );
-
-    };
-
-
-    document.addEventListener(
-        'keydown',
-        function (event) {
-
-            if (
-                event.key === 'Escape'
-            ) {
-                closeAdminSidebar();
-            }
-
-        }
-    );
-
-
-})();
-
-</script>
