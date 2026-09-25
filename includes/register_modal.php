@@ -339,7 +339,7 @@ $registerModalClass =
                         name="password"
                         placeholder="Create a password"
                         autocomplete="new-password"
-                        minlength="6"
+                        minlength="8"
                         required
                     >
 
@@ -354,6 +354,10 @@ $registerModalClass =
                     </button>
 
                 </div>
+
+                <small class="form-hint">
+                    Minimum 8 characters with at least 1 special character.
+                </small>
 
             </div>
 
@@ -376,7 +380,7 @@ $registerModalClass =
                         name="confirm_password"
                         placeholder="Repeat your password"
                         autocomplete="new-password"
-                        minlength="6"
+                        minlength="8"
                         required
                     >
 
