@@ -6,7 +6,7 @@
 | - Required fields
 | - Email validation
 | - Malaysian phone validation
-| - Password validation
+| - Register password security validation
 | - Password confirmation
 | - Register form
 | - Login form
@@ -144,15 +144,6 @@ document.addEventListener("DOMContentLoaded", function () {
             |--------------------------------------------------------------------------
             | PHONE VALIDATION
             |--------------------------------------------------------------------------
-            |
-            | Register phone examples:
-            |
-            | 0123456789
-            | 012-3456789
-            | 01112345678
-            | 011-12345678
-            |
-            |--------------------------------------------------------------------------
             */
 
             const phoneFields =
@@ -191,12 +182,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
             /*
             |--------------------------------------------------------------------------
-            | PASSWORD VALIDATION
+            | GENERIC PASSWORD VALIDATION
             |--------------------------------------------------------------------------
             |
-            | Problem 6 will add the special-character requirement.
-            | For now this keeps the existing generic validation behaviour.
+            | This only applies to password fields that specifically use
+            | data-password.
             |
+            | Register password security is handled separately below.
             |--------------------------------------------------------------------------
             */
 
@@ -236,6 +228,87 @@ document.addEventListener("DOMContentLoaded", function () {
 
             /*
             |--------------------------------------------------------------------------
+            | REGISTER PASSWORD SECURITY
+            |--------------------------------------------------------------------------
+            |
+            | REGISTER FORM ONLY.
+            |
+            | Requirements:
+            |
+            | - Minimum 8 characters
+            | - At least 1 special character
+            |
+            | This DOES NOT apply to the login form.
+            |--------------------------------------------------------------------------
+            */
+
+            if (form.id === "registerForm") {
+
+
+                const registerPassword =
+                    form.querySelector(
+                        "#registerPassword"
+                    );
+
+
+                if (
+                    registerPassword &&
+                    registerPassword.value !== ""
+                ) {
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | MINIMUM 8 CHARACTERS
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        registerPassword.value.length < 8
+                    ) {
+
+
+                        showFieldError(
+                            registerPassword,
+                            "Password must contain at least 8 characters."
+                        );
+
+
+                        valid = false;
+
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | SPECIAL CHARACTER
+                    |--------------------------------------------------------------------------
+                    */
+
+                    else if (
+                        !hasSpecialCharacter(
+                            registerPassword.value
+                        )
+                    ) {
+
+
+                        showFieldError(
+                            registerPassword,
+                            "Password must contain at least 1 special character."
+                        );
+
+
+                        valid = false;
+
+                    }
+
+                }
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
             | CONFIRM PASSWORD
             |--------------------------------------------------------------------------
             */
@@ -244,7 +317,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 form.querySelector(
                     'input[name="confirm_password"], ' +
                     'input[name="password_confirmation"], ' +
-                    'input[id="confirmPassword"]'
+                    'input[id="confirmPassword"], ' +
+                    'input[id="registerConfirmPassword"]'
                 );
 
 
@@ -443,9 +517,6 @@ document.addEventListener("DOMContentLoaded", function () {
     |--------------------------------------------------------------------------
     | LIVE VALIDATION
     |--------------------------------------------------------------------------
-    |
-    | Remove an error when the user starts correcting the field.
-    |--------------------------------------------------------------------------
     */
 
     document.addEventListener(
@@ -554,21 +625,13 @@ function isValidEmail(email) {
 | MALAYSIAN PHONE VALIDATION
 |--------------------------------------------------------------------------
 |
-| Accepted input:
+| Accepted:
 |
 | 0123456789
 | 012-3456789
 | 01112345678
 | 011-12345678
 | 012 3456789
-|
-| Spaces, dashes and brackets are removed before validation.
-|
-| After cleaning:
-|
-| - Must begin with 01
-| - Must contain only numbers
-| - Must contain 10 or 11 digits in total
 |
 |--------------------------------------------------------------------------
 */
@@ -594,12 +657,7 @@ function isValidPhone(phone) {
 
 /*
 |--------------------------------------------------------------------------
-| PASSWORD VALIDATION
-|--------------------------------------------------------------------------
-|
-| Generic password validation.
-|
-| Problem 6 will make the REGISTER password require a special character.
+| GENERIC PASSWORD VALIDATION
 |--------------------------------------------------------------------------
 */
 
@@ -607,6 +665,41 @@ function isValidPassword(password) {
 
 
     return password.length >= 8;
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| SPECIAL CHARACTER VALIDATION
+|--------------------------------------------------------------------------
+|
+| Used for REGISTER password.
+|
+| Returns true when the password contains at least one
+| non-letter and non-number character.
+|
+| Examples:
+|
+| @
+| #
+| $
+| %
+| !
+| &
+| *
+| _
+| -
+|
+|--------------------------------------------------------------------------
+*/
+
+function hasSpecialCharacter(password) {
+
+
+    return /[^A-Za-z0-9]/.test(
+        password
+    );
 
 }
 
@@ -927,11 +1020,6 @@ document.addEventListener(
         /*
         |--------------------------------------------------------------------------
         | ONLY DISABLE AFTER VALIDATION HAS PASSED
-        |--------------------------------------------------------------------------
-        |
-        | setTimeout allows the main validation handler to call
-        | preventDefault() first if the form contains an error.
-        |
         |--------------------------------------------------------------------------
         */
 
