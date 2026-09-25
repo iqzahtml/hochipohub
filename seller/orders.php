@@ -251,7 +251,7 @@ if (isset($_GET['success'])) {
         case 'tracking':
 
             $success =
-                'Tracking number updated successfully.';
+                'Courier and tracking information updated successfully.';
 
             break;
     }
@@ -382,6 +382,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     vo.vendor_id,
                     vo.vendor_status,
                     vo.tracking_number,
+                    vo.courier_name,
 
                     o.delivery_method,
                     o.delivery_address,
@@ -853,7 +854,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /*
         |--------------------------------------------------------------------------
-        | TRACKING
+        | COURIER + TRACKING
         |--------------------------------------------------------------------------
         */
 
@@ -861,6 +862,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $action ===
             'update_tracking'
         ) {
+
+            $courierName =
+                trim(
+                    (string) (
+                        $_POST['courier_name']
+                        ?? ''
+                    )
+                );
+
 
             $trackingNumber =
                 trim(
@@ -871,13 +881,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
 
 
+            $allowedCouriers = [
+                'J&T Express',
+                'Pos Laju',
+                'Ninja Van',
+                'DHL eCommerce',
+                'Shopee Express',
+                'Flash Express',
+                'Others'
+            ];
+
+
             if (
                 $ownedOrder['delivery_method']
                 !== 'Postage'
             ) {
 
                 $error =
-                    'Tracking number is only used for Postage orders.';
+                    'Courier and tracking information are only used for Postage orders.';
+
+
+            } elseif (
+                $courierName === ''
+            ) {
+
+                $error =
+                    'Please select a courier.';
+
+
+            } elseif (
+                !in_array(
+                    $courierName,
+                    $allowedCouriers,
+                    true
+                )
+            ) {
+
+                $error =
+                    'Invalid courier selected.';
+
+
+            } elseif (
+                $trackingNumber === ''
+            ) {
+
+                $error =
+                    'Please enter the tracking number.';
+
+
+            } elseif (
+                mb_strlen(
+                    $courierName
+                ) > 100
+            ) {
+
+                $error =
+                    'Courier name is too long.';
 
 
             } elseif (
@@ -899,6 +958,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             UPDATE vendor_orders
 
                             SET
+                                courier_name = ?,
                                 tracking_number = ?
 
                             WHERE
@@ -910,13 +970,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
                     $trackingStmt->execute([
-
-                        $trackingNumber !== ''
-                            ? $trackingNumber
-                            : null,
-
+                        $courierName,
+                        $trackingNumber,
                         $vendorOrderId,
-
                         $vendorId
                     ]);
 
@@ -931,7 +987,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } catch (Throwable $e) {
 
                     $error =
-                        'Unable to update tracking number. ' .
+                        'Unable to update courier and tracking information. ' .
                         $e->getMessage();
                 }
             }
@@ -1076,6 +1132,7 @@ $sql = "
         vo.delivery_fee,
         vo.vendor_status,
         vo.tracking_number,
+        vo.courier_name,
         vo.created_at
             AS vendor_order_created,
         vo.completed_at,
@@ -2958,6 +3015,66 @@ body.seller-orders-body {
 
 
 /* =========================================================
+   TRACKING SAVED INFO
+========================================================= */
+
+.seller-tracking-current {
+
+    margin-bottom: 12px;
+
+    padding: 11px 12px;
+
+    color: #1e4d8d;
+
+    background: #eff6ff;
+
+    border:
+        1px solid
+        #d5e6ff;
+
+    border-radius: 10px;
+
+    font-size: 8px;
+
+    line-height: 1.65;
+}
+
+
+.seller-tracking-current-row {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    gap: 12px;
+
+    margin-bottom: 5px;
+}
+
+
+.seller-tracking-current-row:last-child {
+
+    margin-bottom: 0;
+}
+
+
+.seller-tracking-current-row span {
+
+    color: #6b7f99;
+}
+
+
+.seller-tracking-current-row strong {
+
+    color: #173b73;
+
+    text-align: right;
+
+    word-break: break-all;
+}
+
+
+/* =========================================================
    LOCKED
 ========================================================= */
 
@@ -3763,6 +3880,24 @@ require_once __DIR__ .
                             )
                         );
 
+
+                    $savedCourier =
+                        trim(
+                            (string) (
+                                $order['courier_name']
+                                ?? ''
+                            )
+                        );
+
+
+                    $savedTracking =
+                        trim(
+                            (string) (
+                                $order['tracking_number']
+                                ?? ''
+                            )
+                        );
+
                     ?>
 
 
@@ -4026,6 +4161,52 @@ require_once __DIR__ .
                                         </strong>
 
                                     </div>
+
+
+                                    <?php if (
+                                        $deliveryMethod ===
+                                        'Postage' &&
+                                        $savedCourier !== ''
+                                    ): ?>
+
+                                        <div class="seller-delivery-row">
+
+                                            <span>
+                                                Courier
+                                            </span>
+
+                                            <strong>
+                                                <?= sellerOrderEscape(
+                                                    $savedCourier
+                                                ) ?>
+                                            </strong>
+
+                                        </div>
+
+                                    <?php endif; ?>
+
+
+                                    <?php if (
+                                        $deliveryMethod ===
+                                        'Postage' &&
+                                        $savedTracking !== ''
+                                    ): ?>
+
+                                        <div class="seller-delivery-row">
+
+                                            <span>
+                                                Tracking Number
+                                            </span>
+
+                                            <strong>
+                                                <?= sellerOrderEscape(
+                                                    $savedTracking
+                                                ) ?>
+                                            </strong>
+
+                                        </div>
+
+                                    <?php endif; ?>
 
 
                                     <?php if (
@@ -4741,7 +4922,9 @@ require_once __DIR__ .
                                 </div>
 
 
-                                <!-- TRACKING -->
+                                <!-- =================================================
+                                     POSTAGE COURIER + TRACKING
+                                ================================================== -->
 
                                 <?php if (
                                     $deliveryMethod ===
@@ -4759,6 +4942,53 @@ require_once __DIR__ .
                                             Postage Tracking
 
                                         </div>
+
+
+                                        <?php if (
+                                            $savedCourier !== '' ||
+                                            $savedTracking !== ''
+                                        ): ?>
+
+                                            <div class="seller-tracking-current">
+
+
+                                                <div class="seller-tracking-current-row">
+
+                                                    <span>
+                                                        Courier
+                                                    </span>
+
+                                                    <strong>
+                                                        <?= sellerOrderEscape(
+                                                            $savedCourier !== ''
+                                                                ? $savedCourier
+                                                                : '-'
+                                                        ) ?>
+                                                    </strong>
+
+                                                </div>
+
+
+                                                <div class="seller-tracking-current-row">
+
+                                                    <span>
+                                                        Tracking No.
+                                                    </span>
+
+                                                    <strong>
+                                                        <?= sellerOrderEscape(
+                                                            $savedTracking !== ''
+                                                                ? $savedTracking
+                                                                : '-'
+                                                        ) ?>
+                                                    </strong>
+
+                                                </div>
+
+
+                                            </div>
+
+                                        <?php endif; ?>
 
 
                                         <form
@@ -4783,6 +5013,100 @@ require_once __DIR__ .
 
 
                                             <label>
+                                                Courier
+                                            </label>
+
+
+                                            <select
+                                                name="courier_name"
+                                                required
+                                            >
+
+                                                <option value="">
+                                                    Select Courier
+                                                </option>
+
+
+                                                <option
+                                                    value="J&T Express"
+                                                    <?= $savedCourier ===
+                                                        'J&T Express'
+                                                            ? 'selected'
+                                                            : '' ?>
+                                                >
+                                                    J&T Express
+                                                </option>
+
+
+                                                <option
+                                                    value="Pos Laju"
+                                                    <?= $savedCourier ===
+                                                        'Pos Laju'
+                                                            ? 'selected'
+                                                            : '' ?>
+                                                >
+                                                    Pos Laju
+                                                </option>
+
+
+                                                <option
+                                                    value="Ninja Van"
+                                                    <?= $savedCourier ===
+                                                        'Ninja Van'
+                                                            ? 'selected'
+                                                            : '' ?>
+                                                >
+                                                    Ninja Van
+                                                </option>
+
+
+                                                <option
+                                                    value="DHL eCommerce"
+                                                    <?= $savedCourier ===
+                                                        'DHL eCommerce'
+                                                            ? 'selected'
+                                                            : '' ?>
+                                                >
+                                                    DHL eCommerce
+                                                </option>
+
+
+                                                <option
+                                                    value="Shopee Express"
+                                                    <?= $savedCourier ===
+                                                        'Shopee Express'
+                                                            ? 'selected'
+                                                            : '' ?>
+                                                >
+                                                    Shopee Express
+                                                </option>
+
+
+                                                <option
+                                                    value="Flash Express"
+                                                    <?= $savedCourier ===
+                                                        'Flash Express'
+                                                            ? 'selected'
+                                                            : '' ?>
+                                                >
+                                                    Flash Express
+                                                </option>
+
+
+                                                <option
+                                                    value="Others"
+                                                    <?= $savedCourier ===
+                                                        'Others'
+                                                            ? 'selected'
+                                                            : '' ?>
+                                                >
+                                                    Others
+                                                </option>
+
+                                            </select>
+
+
+                                            <label>
                                                 Tracking Number
                                             </label>
 
@@ -4791,13 +5115,12 @@ require_once __DIR__ .
                                                 type="text"
                                                 name="tracking_number"
                                                 value="<?= sellerOrderEscape(
-                                                    $order[
-                                                        'tracking_number'
-                                                    ]
-                                                    ?? ''
+                                                    $savedTracking
                                                 ) ?>"
                                                 maxlength="100"
-                                                placeholder="Example: MY123456789"
+                                                placeholder="Example: 630123456789"
+                                                autocomplete="off"
+                                                required
                                             >
 
 
