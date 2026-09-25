@@ -67,6 +67,7 @@ COLLATE=utf8mb4_unicode_ci;
 
 -- =========================================================
 -- 2. VENDORS
+-- NEARBY STORES LOCATION SUPPORT ADDED
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS vendors (
@@ -82,6 +83,10 @@ CREATE TABLE IF NOT EXISTS vendors (
     business_description TEXT NULL,
 
     business_address TEXT NULL,
+
+    latitude DECIMAL(10,8) NULL,
+
+    longitude DECIMAL(11,8) NULL,
 
     category VARCHAR(100) NULL,
 
@@ -140,7 +145,12 @@ CREATE TABLE IF NOT EXISTS vendors (
         CHECK (
             commission_rate >= 0
             AND commission_rate <= 100
-        )
+        ),
+
+    INDEX idx_vendors_location (
+        latitude,
+        longitude
+    )
 
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
@@ -223,11 +233,17 @@ CREATE TABLE IF NOT EXISTS products (
     CONSTRAINT chk_product_stock
         CHECK (stock_quantity >= 0),
 
-    INDEX idx_products_vendor (vendor_id),
+    INDEX idx_products_vendor (
+        vendor_id
+    ),
 
-    INDEX idx_products_category (category_id),
+    INDEX idx_products_category (
+        category_id
+    ),
 
-    INDEX idx_products_status (status)
+    INDEX idx_products_status (
+        status
+    )
 
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
@@ -1248,6 +1264,29 @@ DESCRIBE contact_messages;
 
 
 -- =========================================================
+-- VERIFY VENDORS STRUCTURE
+-- NEARBY STORES
+-- =========================================================
+
+DESCRIBE vendors;
+
+
+-- =========================================================
+-- VERIFY VENDOR LOCATION
+-- =========================================================
+
+SELECT
+    vendor_id,
+    business_name,
+    business_address,
+    latitude,
+    longitude,
+    approval_status
+FROM vendors
+ORDER BY vendor_id ASC;
+
+
+-- =========================================================
 -- VERIFY ADMIN
 -- =========================================================
 
@@ -1299,4 +1338,4 @@ ORDER BY contact_message_id DESC;
 -- END
 -- HOCHIPOHUB FULL MASTER DATABASE
 -- TOTAL TABLES: 20
--- =========================================================
+-- =========================================================hochipohub
