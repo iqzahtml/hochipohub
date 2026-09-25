@@ -281,6 +281,17 @@ if (!function_exists('odVendorStatusMessage')) {
 }
 
 
+if (!function_exists('odTrackingUrl')) {
+    function odTrackingUrl($courierName, $trackingNumber): string
+    {
+        $courierName = trim((string) $courierName);
+        $trackingNumber = trim((string) $trackingNumber);
+        if ($courierName === '' || $trackingNumber === '') { return ''; }
+        return 'https://www.google.com/search?q=' . rawurlencode($courierName . ' ' . $trackingNumber . ' tracking');
+    }
+}
+
+
 if (!function_exists('odMapsUrl')) {
 
     function odMapsUrl($address): string
@@ -425,6 +436,7 @@ $stmt = $db->prepare("
         vo.vendor_order_id,
         vo.vendor_status,
         vo.tracking_number AS vendor_tracking_number,
+        vo.courier_name AS vendor_courier_name,
         vo.delivery_fee,
         vo.completed_at,
 
@@ -492,6 +504,7 @@ $stmt = $db->prepare("
         vo.delivery_fee,
         vo.vendor_status,
         vo.tracking_number,
+        vo.courier_name,
         vo.created_at,
         vo.completed_at,
 
@@ -827,6 +840,10 @@ foreach ($items as $item) {
 
             'tracking_number' =>
                 $item['vendor_tracking_number']
+                ?? '',
+
+            'courier_name' =>
+                $item['vendor_courier_name']
                 ?? '',
 
             'delivery_fee' =>
@@ -3857,15 +3874,22 @@ require_once __DIR__ .
                                     Tracking information provided
                                     by seller.
 
+                                    <?php if (!empty($seller['courier_name'])): ?>
+                                        <div style="margin-top:8px;"><strong>Courier:</strong> <?= odEscape($seller['courier_name']) ?></div>
+                                    <?php endif; ?>
+
                                     <div class="hh-tracking-number">
-
-                                        <?= odEscape(
-                                            $seller[
-                                                'tracking_number'
-                                            ]
-                                        ) ?>
-
+                                        <?= odEscape($seller['tracking_number']) ?>
                                     </div>
+
+                                    <?php $trackingUrl = odTrackingUrl($seller['courier_name'] ?? '', $seller['tracking_number'] ?? ''); ?>
+                                    <?php if ($trackingUrl !== ''): ?>
+                                        <div style="margin-top:10px;">
+                                            <a href="<?= odEscape($trackingUrl) ?>" target="_blank" rel="noopener noreferrer" class="hh-btn hh-btn-primary">
+                                                <i class="bi bi-box-arrow-up-right"></i> Track Parcel
+                                            </a>
+                                        </div>
+                                    <?php endif; ?>
 
                                 </div>
 
