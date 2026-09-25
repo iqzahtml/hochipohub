@@ -97,10 +97,7 @@ if (!$currentUser) {
 |--------------------------------------------------------------------------
 */
 
-if (
-    strtolower((string) $currentUser['role'])
-    !== 'vendor'
-) {
+if (strtolower((string) $currentUser['role']) !== 'vendor') {
     header('Location: ' . BASE_URL . 'dashboard.php');
     exit;
 }
@@ -1293,9 +1290,7 @@ body.seller-dashboard-page {
     gap: 20px;
 
     background: rgba(255, 255, 255, .97);
-
-    border-bottom:
-        1px solid #e8edf5;
+    border-bottom: 1px solid #e8edf5;
 }
 
 .seller-store-topbar-label {
@@ -1313,13 +1308,11 @@ body.seller-dashboard-page {
 .seller-store-topbar-avatar {
     width: 39px;
     height: 39px;
-
     overflow: hidden;
 
     display: flex;
     align-items: center;
     justify-content: center;
-
     flex-shrink: 0;
 
     color: #ffffff;
@@ -1332,7 +1325,6 @@ body.seller-dashboard-page {
         );
 
     border-radius: 50%;
-
     font-size: 12px;
     font-weight: 900;
 }
@@ -1345,20 +1337,15 @@ body.seller-dashboard-page {
 
 .seller-store-topbar-user strong {
     display: block;
-
     color: #14213d;
-
     font-size: 11px;
     font-weight: 800;
 }
 
 .seller-store-topbar-user small {
     display: block;
-
     margin-top: 2px;
-
     color: #94a3b8;
-
     font-size: 8px;
 }
 
@@ -1370,13 +1357,8 @@ body.seller-dashboard-page {
 .seller-store-content {
     width: 100%;
     max-width: 1450px;
-
     margin: 0 auto;
-
-    padding:
-        29px
-        32px
-        65px;
+    padding: 29px 32px 65px;
 }
 
 
@@ -1395,50 +1377,31 @@ body.seller-dashboard-page {
 
 .seller-store-eyebrow {
     display: block;
-
     margin-bottom: 7px;
-
     color: #2563eb;
-
     font-size: 8px;
     font-weight: 900;
     letter-spacing: 1.4px;
-
     text-transform: uppercase;
 }
 
 .seller-store-heading h1 {
     margin: 0;
-
     color: #10213f;
-
-    font-family:
-        Poppins,
-        Inter,
-        sans-serif;
-
-    font-size:
-        clamp(
-            28px,
-            3vw,
-            35px
-        );
-
+    font-family: Poppins, Inter, sans-serif;
+    font-size: clamp(28px, 3vw, 35px);
     line-height: 1.15;
     letter-spacing: -1px;
 }
 
 .seller-store-heading p {
     margin: 8px 0 0;
-
     color: #8492a8;
-
     font-size: 11px;
 }
 
 .seller-store-dashboard-link {
     min-height: 42px;
-
     padding: 0 15px;
 
     display: inline-flex;
@@ -1448,24 +1411,15 @@ body.seller-dashboard-page {
 
     color: #2c496d;
     background: #ffffff;
-
-    border:
-        1px solid #dfe7f2;
-
+    border: 1px solid #dfe7f2;
     border-radius: 13px;
 
     box-shadow:
         0 9px 24px
-        rgba(
-            32,
-            60,
-            104,
-            .06
-        );
+        rgba(32, 60, 104, .06);
 
     font-size: 9px;
     font-weight: 800;
-
     text-decoration: none;
 }
 
@@ -1476,19 +1430,15 @@ body.seller-dashboard-page {
 
 .seller-store-hero {
     position: relative;
-
     overflow: hidden;
 
     min-height: 176px;
-
     margin-bottom: 22px;
-
     padding: 31px;
 
     display: flex;
     align-items: center;
     justify-content: space-between;
-
     gap: 35px;
 
     color: #ffffff;
@@ -1505,17 +1455,11 @@ body.seller-dashboard-page {
 
     box-shadow:
         0 18px 44px
-        rgba(
-            33,
-            94,
-            186,
-            .17
-        );
+        rgba(33, 94, 186, .17);
 }
 
 .seller-store-hero::before {
     content: "";
-
     position: absolute;
 
     width: 250px;
@@ -1525,19 +1469,11 @@ body.seller-dashboard-page {
     top: -140px;
 
     border-radius: 50%;
-
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            .07
-        );
+    background: rgba(255, 255, 255, .07);
 }
 
 .seller-store-hero::after {
     content: "";
-
     position: absolute;
 
     width: 185px;
@@ -1547,14 +1483,7 @@ body.seller-dashboard-page {
     bottom: -135px;
 
     border-radius: 50%;
-
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            .045
-        );
+    background: rgba(255, 255, 255, .045);
 }
 
 .seller-store-hero-copy {
@@ -1564,92 +1493,51 @@ body.seller-dashboard-page {
 
 .seller-store-hero-label {
     display: block;
-
     margin-bottom: 9px;
-
     color: #b9d7ff;
-
     font-size: 8px;
     font-weight: 900;
     letter-spacing: 1.3px;
-
     text-transform: uppercase;
 }
 
 .seller-store-hero h2 {
     margin: 0 0 9px;
-
-    font-family:
-        Poppins,
-        Inter,
-        sans-serif;
-
-    font-size:
-        clamp(
-            21px,
-            3vw,
-            29px
-        );
-
+    font-family: Poppins, Inter, sans-serif;
+    font-size: clamp(21px, 3vw, 29px);
     letter-spacing: -.7px;
 }
 
 .seller-store-hero p {
     max-width: 670px;
-
     margin: 0;
-
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            .78
-        );
-
+    color: rgba(255, 255, 255, .78);
     font-size: 10px;
     line-height: 1.75;
 }
 
 .seller-store-hero-status {
     position: relative;
-
     z-index: 2;
 
     min-width: 140px;
     min-height: 50px;
-
     padding: 0 17px;
 
     display: inline-flex;
     align-items: center;
     justify-content: center;
-
     gap: 8px;
 
     color: #ffffff;
-
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            .12
-        );
+    background: rgba(255, 255, 255, .12);
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            .20
-        );
+        rgba(255, 255, 255, .20);
 
     border-radius: 15px;
-
-    backdrop-filter:
-        blur(8px);
+    backdrop-filter: blur(8px);
 
     font-size: 10px;
     font-weight: 850;
@@ -1662,16 +1550,13 @@ body.seller-dashboard-page {
 
 .seller-store-alert {
     margin-bottom: 18px;
-
     padding: 14px 17px;
 
     display: flex;
     align-items: center;
-
     gap: 9px;
 
     border-radius: 14px;
-
     font-size: 10px;
     font-weight: 750;
 }
@@ -1679,17 +1564,13 @@ body.seller-dashboard-page {
 .seller-store-alert.success {
     color: #087443;
     background: #ecfdf3;
-
-    border:
-        1px solid #a7f3d0;
+    border: 1px solid #a7f3d0;
 }
 
 .seller-store-alert.error {
     color: #b42318;
     background: #fff2f1;
-
-    border:
-        1px solid #fecaca;
+    border: 1px solid #fecaca;
 }
 
 
@@ -1699,16 +1580,8 @@ body.seller-dashboard-page {
 
 .seller-store-layout {
     display: grid;
-
-    grid-template-columns:
-        minmax(
-            0,
-            1fr
-        )
-        320px;
-
+    grid-template-columns: minmax(0, 1fr) 320px;
     align-items: start;
-
     gap: 22px;
 }
 
@@ -1719,24 +1592,15 @@ body.seller-dashboard-page {
 
 .seller-store-form-card {
     width: 100%;
-
     overflow: hidden;
 
     background: #ffffff;
-
-    border:
-        1px solid #e1e8f2;
-
+    border: 1px solid #e1e8f2;
     border-radius: 22px;
 
     box-shadow:
         0 12px 34px
-        rgba(
-            28,
-            59,
-            103,
-            .055
-        );
+        rgba(28, 59, 103, .055);
 }
 
 .seller-store-form-header {
@@ -1744,11 +1608,9 @@ body.seller-dashboard-page {
 
     display: flex;
     align-items: center;
-
     gap: 12px;
 
-    border-bottom:
-        1px solid #edf1f6;
+    border-bottom: 1px solid #edf1f6;
 }
 
 .seller-store-form-icon {
@@ -1772,29 +1634,20 @@ body.seller-dashboard-page {
 
     box-shadow:
         0 10px 20px
-        rgba(
-            37,
-            99,
-            235,
-            .18
-        );
+        rgba(37, 99, 235, .18);
 
     font-size: 16px;
 }
 
 .seller-store-form-header h3 {
     margin: 0 0 4px;
-
     color: #11213e;
-
     font-size: 16px;
 }
 
 .seller-store-form-header p {
     margin: 0;
-
     color: #8896aa;
-
     font-size: 9px;
 }
 
@@ -1805,11 +1658,8 @@ body.seller-dashboard-page {
 
 .store-form-section {
     width: 100%;
-
     padding: 25px;
-
-    border-bottom:
-        1px solid #edf1f6;
+    border-bottom: 1px solid #edf1f6;
 }
 
 .store-form-section:last-of-type {
@@ -1821,7 +1671,6 @@ body.seller-dashboard-page {
 
     display: flex;
     align-items: center;
-
     gap: 11px;
 }
 
@@ -1832,15 +1681,12 @@ body.seller-dashboard-page {
     display: flex;
     align-items: center;
     justify-content: center;
-
     flex-shrink: 0;
 
     color: #2563eb;
     background: #edf5ff;
 
-    border:
-        1px solid #dceaff;
-
+    border: 1px solid #dceaff;
     border-radius: 11px;
 
     font-size: 14px;
@@ -1848,17 +1694,13 @@ body.seller-dashboard-page {
 
 .store-section-title h4 {
     margin: 0 0 3px;
-
     color: #18365e;
-
     font-size: 14px;
 }
 
 .store-section-title p {
     margin: 0;
-
     color: #8c9aaf;
-
     font-size: 8px;
 }
 
@@ -1869,16 +1711,7 @@ body.seller-dashboard-page {
 
 .seller-store-field-grid {
     display: grid;
-
-    grid-template-columns:
-        repeat(
-            2,
-            minmax(
-                0,
-                1fr
-            )
-        );
-
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
 }
 
@@ -1891,11 +1724,9 @@ body.seller-dashboard-page {
 
     display: flex;
     align-items: center;
-
     gap: 6px;
 
     color: #2d405e;
-
     font-size: 9px;
     font-weight: 800;
 }
@@ -1912,15 +1743,12 @@ body.seller-dashboard-page {
 .seller-store-field select,
 .seller-store-field textarea {
     width: 100%;
-
     outline: none;
 
     color: #1a3559;
     background: #fbfdff;
 
-    border:
-        1px solid #dce5f0;
-
+    border: 1px solid #dce5f0;
     border-radius: 12px;
 
     font-family: inherit;
@@ -1932,17 +1760,13 @@ body.seller-dashboard-page {
 .seller-store-field input,
 .seller-store-field select {
     height: 45px;
-
     padding: 0 13px;
 }
 
 .seller-store-field textarea {
     min-height: 115px;
-
     padding: 13px;
-
     line-height: 1.65;
-
     resize: vertical;
 }
 
@@ -1950,26 +1774,17 @@ body.seller-dashboard-page {
 .seller-store-field select:focus,
 .seller-store-field textarea:focus {
     border-color: #4d8cf8;
-
     background: #ffffff;
 
     box-shadow:
         0 0 0 4px
-        rgba(
-            37,
-            99,
-            235,
-            .07
-        );
+        rgba(37, 99, 235, .07);
 }
 
 .seller-store-field small {
     display: block;
-
     margin-top: 6px;
-
     color: #95a2b5;
-
     font-size: 8px;
     line-height: 1.55;
 }
@@ -1981,7 +1796,6 @@ body.seller-dashboard-page {
 
 .store-file-input {
     height: auto !important;
-
     padding: 10px !important;
 }
 
@@ -1992,7 +1806,6 @@ body.seller-dashboard-page {
 
 .store-location-box {
     width: 100%;
-
     padding: 20px;
 
     background:
@@ -2002,59 +1815,74 @@ body.seller-dashboard-page {
             #f9fbff
         );
 
-    border:
-        1px solid #dce9fb;
-
+    border: 1px solid #dce9fb;
     border-radius: 16px;
-}
-
-.store-location-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-
-    gap: 20px;
-}
-
-.store-location-copy {
-    min-width: 0;
-    flex: 1;
 }
 
 .store-location-copy strong {
     display: block;
-
     margin-bottom: 5px;
-
     color: #173b69;
-
     font-size: 11px;
 }
 
 .store-location-copy p {
     margin: 0;
-
-    max-width: 560px;
-
+    max-width: 700px;
     color: #7f90a8;
-
     font-size: 9px;
     line-height: 1.65;
 }
 
+.store-location-actions {
+    margin-top: 17px;
+
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
 .store-location-button {
-    min-height: 42px;
-
+    min-height: 44px;
     padding: 0 16px;
-
-    flex-shrink: 0;
 
     display: inline-flex;
     align-items: center;
     justify-content: center;
-
     gap: 8px;
 
+    border: none;
+    border-radius: 12px;
+
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 850;
+
+    cursor: pointer;
+    transition: .18s ease;
+}
+
+.store-location-button:hover {
+    transform: translateY(-1px);
+}
+
+.store-location-button:disabled {
+    opacity: .65;
+    cursor: wait;
+    transform: none;
+}
+
+.store-location-button.address {
+    color: #1d4ed8;
+    background: #ffffff;
+    border: 1px solid #bfd7ff;
+
+    box-shadow:
+        0 7px 18px
+        rgba(37, 99, 235, .08);
+}
+
+.store-location-button.current {
     color: #ffffff;
 
     background:
@@ -2064,50 +1892,44 @@ body.seller-dashboard-page {
             #4f46e5
         );
 
-    border: none;
-
-    border-radius: 12px;
-
     box-shadow:
         0 8px 20px
-        rgba(
-            37,
-            99,
-            235,
-            .18
-        );
-
-    font-family: inherit;
-
-    font-size: 9px;
-    font-weight: 850;
-
-    cursor: pointer;
+        rgba(37, 99, 235, .18);
 }
 
-.store-location-button:disabled {
-    opacity: .65;
-    cursor: wait;
+.store-location-or {
+    margin: 14px 0 0;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    color: #9aa8ba;
+    font-size: 8px;
+    font-weight: 800;
+}
+
+.store-location-or::before,
+.store-location-or::after {
+    content: "";
+    height: 1px;
+    flex: 1;
+    background: #e1e9f4;
 }
 
 .store-location-status {
     width: 100%;
-
     margin-top: 16px;
-
     padding: 12px 14px;
 
     display: flex;
     align-items: flex-start;
-
     gap: 9px;
 
     color: #536780;
     background: #ffffff;
 
-    border:
-        1px solid #e0e8f3;
-
+    border: 1px solid #e0e8f3;
     border-radius: 12px;
 
     font-size: 9px;
@@ -2134,54 +1956,34 @@ body.seller-dashboard-page {
 
 .store-coordinate-grid {
     width: 100%;
-
     margin-top: 16px;
 
     display: grid;
-
-    grid-template-columns:
-        repeat(
-            2,
-            minmax(
-                0,
-                1fr
-            )
-        );
-
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
 }
 
 .store-coordinate {
     min-width: 0;
-
     padding: 12px 14px;
 
     background: #ffffff;
-
-    border:
-        1px solid #e1e8f2;
-
+    border: 1px solid #e1e8f2;
     border-radius: 12px;
 }
 
 .store-coordinate span {
     display: block;
-
     margin-bottom: 5px;
-
     color: #8b98aa;
-
     font-size: 8px;
     font-weight: 700;
 }
 
 .store-coordinate strong {
     display: block;
-
     overflow-wrap: anywhere;
-
     color: #18365e;
-
     font-size: 10px;
 }
 
@@ -2190,18 +1992,15 @@ body.seller-dashboard-page {
 
     display: flex;
     align-items: flex-start;
-
     gap: 7px;
 
     color: #71839b;
-
     font-size: 8px;
     line-height: 1.55;
 }
 
 .store-location-note i {
     margin-top: 2px;
-
     color: #2563eb;
 }
 
@@ -2216,19 +2015,13 @@ body.seller-dashboard-page {
 
 .store-money span {
     position: absolute;
-
     left: 13px;
     top: 50%;
-
     z-index: 2;
 
-    transform:
-        translateY(
-            -50%
-        );
+    transform: translateY(-50%);
 
     color: #65768e;
-
     font-size: 9px;
     font-weight: 850;
 
@@ -2254,17 +2047,12 @@ body.seller-dashboard-page {
 
 .store-percent span {
     position: absolute;
-
     top: 50%;
     right: 14px;
 
-    transform:
-        translateY(
-            -50%
-        );
+    transform: translateY(-50%);
 
     color: #2563eb;
-
     font-size: 10px;
     font-weight: 900;
 
@@ -2273,28 +2061,17 @@ body.seller-dashboard-page {
 
 
 /* =========================================================
-   DELIVERY CARDS - FIXED
+   DELIVERY CARDS
 ========================================================= */
 
 .store-delivery-grid {
     width: 100%;
 
     display: grid;
-
-    grid-template-columns:
-        repeat(
-            3,
-            minmax(
-                0,
-                1fr
-            )
-        );
-
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: stretch;
-
     gap: 14px;
 }
-
 
 .store-delivery-choice {
     position: relative;
@@ -2306,10 +2083,8 @@ body.seller-dashboard-page {
     margin: 0;
 
     display: block;
-
     cursor: pointer;
 }
-
 
 .store-delivery-choice input {
     position: absolute;
@@ -2321,10 +2096,8 @@ body.seller-dashboard-page {
     padding: 0;
 
     opacity: 0;
-
     pointer-events: none;
 }
-
 
 .store-delivery-card {
     width: 100%;
@@ -2333,7 +2106,6 @@ body.seller-dashboard-page {
     height: 100%;
 
     margin: 0;
-
     padding: 18px;
 
     display: flex;
@@ -2342,12 +2114,9 @@ body.seller-dashboard-page {
     justify-content: flex-start;
 
     color: #203c64;
-
     background: #fbfdff;
 
-    border:
-        1.5px solid #dfe7f1;
-
+    border: 1.5px solid #dfe7f1;
     border-radius: 15px;
 
     transition:
@@ -2356,7 +2125,6 @@ body.seller-dashboard-page {
         box-shadow .18s ease,
         transform .18s ease;
 }
-
 
 .store-delivery-card i {
     width: 34px;
@@ -2371,86 +2139,53 @@ body.seller-dashboard-page {
     flex-shrink: 0;
 
     color: #2563eb;
-
     background: #edf5ff;
 
     border-radius: 10px;
-
     font-size: 15px;
 }
 
-
 .store-delivery-card strong {
     width: 100%;
-
     margin: 0 0 6px;
-
     display: block;
 
     color: #203c64;
 
     font-size: 10px;
     font-weight: 800;
-
     line-height: 1.4;
 }
 
-
 .store-delivery-card small {
     width: 100%;
-
     margin: 0;
-
     display: block;
 
     color: #8998ad;
 
     font-size: 8px;
     font-weight: 500;
-
     line-height: 1.55;
 }
 
-
-.store-delivery-choice:hover
-.store-delivery-card {
+.store-delivery-choice:hover .store-delivery-card {
     border-color: #9ec5ff;
-
-    transform:
-        translateY(
-            -1px
-        );
+    transform: translateY(-1px);
 }
 
-
-.store-delivery-choice
-input:checked
-+
-.store-delivery-card {
+.store-delivery-choice input:checked + .store-delivery-card {
     color: #1d4ed8;
-
     border-color: #3b82f6;
-
     background: #f0f6ff;
 
     box-shadow:
         0 0 0 3px
-        rgba(
-            59,
-            130,
-            246,
-            .08
-        );
+        rgba(59, 130, 246, .08);
 }
 
-
-.store-delivery-choice
-input:checked
-+
-.store-delivery-card
-i {
+.store-delivery-choice input:checked + .store-delivery-card i {
     color: #ffffff;
-
     background: #3b82f6;
 }
 
@@ -2461,16 +2196,11 @@ i {
 
 .store-conditional {
     width: 100%;
-
     margin-top: 16px;
-
     padding: 18px;
 
     background: #f8fbff;
-
-    border:
-        1px solid #e0e8f3;
-
+    border: 1px solid #e0e8f3;
     border-radius: 14px;
 }
 
@@ -2481,20 +2211,15 @@ i {
 
 .store-toggle-row {
     width: 100%;
-
     padding: 16px;
 
     display: flex;
     align-items: center;
     justify-content: space-between;
-
     gap: 20px;
 
     background: #fbfcfe;
-
-    border:
-        1px solid #e3e9f2;
-
+    border: 1px solid #e3e9f2;
     border-radius: 14px;
 }
 
@@ -2504,17 +2229,13 @@ i {
 
 .store-toggle-copy strong {
     display: block;
-
     margin-bottom: 4px;
-
     color: #213e67;
-
     font-size: 10px;
 }
 
 .store-toggle-copy small {
     color: #8c9bae;
-
     font-size: 8px;
     line-height: 1.5;
 }
@@ -2526,9 +2247,7 @@ i {
     height: 25px;
 
     margin: 0;
-
     display: block;
-
     flex-shrink: 0;
 }
 
@@ -2543,15 +2262,12 @@ i {
 
 .store-switch-slider {
     position: absolute;
-
     inset: 0;
 
     display: block;
-
     cursor: pointer;
 
     background: #cbd4e1;
-
     border-radius: 999px;
 
     transition: .2s;
@@ -2569,36 +2285,21 @@ i {
     top: 3px;
 
     background: #ffffff;
-
     border-radius: 50%;
 
     box-shadow:
         0 2px 6px
-        rgba(
-            0,
-            0,
-            0,
-            .17
-        );
+        rgba(0, 0, 0, .17);
 
     transition: .2s;
 }
 
-.store-switch
-input:checked
-+
-.store-switch-slider {
+.store-switch input:checked + .store-switch-slider {
     background: #2563eb;
 }
 
-.store-switch
-input:checked
-+
-.store-switch-slider::before {
-    transform:
-        translateX(
-            21px
-        );
+.store-switch input:checked + .store-switch-slider::before {
+    transform: translateX(21px);
 }
 
 
@@ -2608,7 +2309,6 @@ input:checked
 
 .store-commission-box {
     width: 100%;
-
     padding: 18px;
 
     background:
@@ -2618,35 +2318,22 @@ input:checked
             #eef5ff
         );
 
-    border:
-        1px solid #d9e8fb;
-
+    border: 1px solid #d9e8fb;
     border-radius: 14px;
 }
 
 .store-commission-notice {
     margin-top: 12px;
-
     padding: 11px 13px;
 
     display: flex;
     align-items: flex-start;
-
     gap: 8px;
 
     color: #315987;
+    background: rgba(255, 255, 255, .65);
 
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            .65
-        );
-
-    border:
-        1px solid #dae8fa;
-
+    border: 1px solid #dae8fa;
     border-radius: 10px;
 
     font-size: 8px;
@@ -2655,7 +2342,6 @@ input:checked
 
 .store-commission-notice i {
     margin-top: 2px;
-
     color: #2563eb;
 }
 
@@ -2671,20 +2357,16 @@ input:checked
     justify-content: flex-end;
 
     background: #fafcff;
-
-    border-top:
-        1px solid #edf1f6;
+    border-top: 1px solid #edf1f6;
 }
 
 .seller-store-save {
     min-height: 45px;
-
     padding: 0 19px;
 
     display: inline-flex;
     align-items: center;
     justify-content: center;
-
     gap: 7px;
 
     color: #ffffff;
@@ -2697,20 +2379,13 @@ input:checked
         );
 
     border: none;
-
     border-radius: 12px;
 
     box-shadow:
         0 9px 21px
-        rgba(
-            37,
-            99,
-            235,
-            .20
-        );
+        rgba(37, 99, 235, .20);
 
     font-family: inherit;
-
     font-size: 9px;
     font-weight: 850;
 
@@ -2724,7 +2399,6 @@ input:checked
 
 .seller-store-side {
     display: grid;
-
     gap: 17px;
 }
 
@@ -2732,20 +2406,12 @@ input:checked
     padding: 22px;
 
     background: #ffffff;
-
-    border:
-        1px solid #e0e7f1;
-
+    border: 1px solid #e0e7f1;
     border-radius: 21px;
 
     box-shadow:
         0 12px 31px
-        rgba(
-            29,
-            58,
-            100,
-            .055
-        );
+        rgba(29, 58, 100, .055);
 }
 
 .seller-store-logo {
@@ -2753,7 +2419,6 @@ input:checked
     height: 103px;
 
     margin: 0 auto 15px;
-
     overflow: hidden;
 
     display: flex;
@@ -2769,9 +2434,7 @@ input:checked
             #f4efff
         );
 
-    border:
-        1px solid #e0e5ef;
-
+    border: 1px solid #e0e5ef;
     border-radius: 22px;
 
     font-size: 34px;
@@ -2780,27 +2443,20 @@ input:checked
 .seller-store-logo img {
     width: 100%;
     height: 100%;
-
     object-fit: cover;
 }
 
 .seller-store-summary h3 {
     margin: 0 0 4px;
-
     text-align: center;
-
     color: #152d53;
-
     font-size: 17px;
 }
 
 .seller-store-category {
     margin: 0 0 18px;
-
     text-align: center;
-
     color: #8b98ab;
-
     font-size: 9px;
 }
 
@@ -2810,12 +2466,9 @@ input:checked
     display: flex;
     align-items: center;
     justify-content: space-between;
-
     gap: 15px;
 
-    border-top:
-        1px solid #edf1f6;
-
+    border-top: 1px solid #edf1f6;
     font-size: 9px;
 }
 
@@ -2825,7 +2478,6 @@ input:checked
 
 .seller-store-info-row strong {
     color: #213b62;
-
     text-align: right;
 }
 
@@ -2878,12 +2530,7 @@ input:checked
 
     box-shadow:
         0 14px 35px
-        rgba(
-            25,
-            76,
-            154,
-            .14
-        );
+        rgba(25, 76, 154, .14);
 }
 
 .seller-store-guide-icon {
@@ -2896,14 +2543,7 @@ input:checked
     align-items: center;
     justify-content: center;
 
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            .12
-        );
-
+    background: rgba(255, 255, 255, .12);
     border-radius: 12px;
 
     font-size: 16px;
@@ -2911,21 +2551,12 @@ input:checked
 
 .seller-store-guide h3 {
     margin: 0 0 7px;
-
     font-size: 13px;
 }
 
 .seller-store-guide p {
     margin: 0;
-
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            .76
-        );
-
+    color: rgba(255, 255, 255, .76);
     font-size: 9px;
     line-height: 1.7;
 }
@@ -2958,7 +2589,6 @@ input:checked
 
     .seller-store-main {
         width: 100%;
-
         margin-left: 0;
     }
 
@@ -2967,31 +2597,23 @@ input:checked
     }
 
     .seller-store-content {
-        padding:
-            24px
-            20px
-            50px;
+        padding: 24px 20px 50px;
     }
 }
 
 
 @media (max-width: 650px) {
 
-    .seller-store-topbar-user
-    > div:last-child {
+    .seller-store-topbar-user > div:last-child {
         display: none;
     }
 
     .seller-store-content {
-        padding:
-            20px
-            14px
-            45px;
+        padding: 20px 14px 45px;
     }
 
     .seller-store-heading {
         align-items: flex-start;
-
         flex-direction: column;
     }
 
@@ -3001,11 +2623,9 @@ input:checked
 
     .seller-store-hero {
         min-height: auto;
-
         padding: 24px;
 
         align-items: flex-start;
-
         flex-direction: column;
     }
 
@@ -3016,16 +2636,9 @@ input:checked
     .seller-store-field-grid,
     .store-delivery-grid,
     .seller-store-side,
-    .store-coordinate-grid {
+    .store-coordinate-grid,
+    .store-location-actions {
         grid-template-columns: 1fr;
-    }
-
-    .store-location-top {
-        flex-direction: column;
-    }
-
-    .store-location-button {
-        width: 100%;
     }
 
     .store-form-section {
@@ -3192,10 +2805,7 @@ require_once __DIR__ .
 
 <?php if ($successMessage !== ''): ?>
 
-<div class="
-    seller-store-alert
-    success
-">
+<div class="seller-store-alert success">
 
     <i class="fa-solid fa-circle-check"></i>
 
@@ -3212,10 +2822,7 @@ require_once __DIR__ .
 
 <?php if ($errorMessage !== ''): ?>
 
-<div class="
-    seller-store-alert
-    error
-">
+<div class="seller-store-alert error">
 
     <i class="fa-solid fa-circle-exclamation"></i>
 
@@ -3359,10 +2966,7 @@ require_once __DIR__ .
 </div>
 
 
-<div class="
-    seller-store-field
-    full
-">
+<div class="seller-store-field full">
 
     <label for="business_description">
 
@@ -3384,10 +2988,7 @@ require_once __DIR__ .
 </div>
 
 
-<div class="
-    seller-store-field
-    full
-">
+<div class="seller-store-field full">
 
     <label for="business_address">
 
@@ -3401,23 +3002,22 @@ require_once __DIR__ .
     <textarea
         id="business_address"
         name="business_address"
-        placeholder="Enter your full business or pickup address..."
+        placeholder="Example: No. 10, Jalan ABC, Kuching, Sarawak, Malaysia"
     ><?= storeProfileEscape(
         $currentBusinessAddress
     ) ?></textarea>
 
 
     <small>
-        Required when Pickup is enabled.
+        Enter the complete address of your store.
+        This same address can be used by
+        "Find This Address" below.
     </small>
 
 </div>
 
 
-<div class="
-    seller-store-field
-    full
-">
+<div class="seller-store-field full">
 
     <label for="business_logo">
 
@@ -3473,8 +3073,8 @@ require_once __DIR__ .
         </h4>
 
         <p>
-            Used to show your store
-            to nearby customers.
+            Set the exact store location
+            for Nearby Stores.
         </p>
 
     </div>
@@ -3485,9 +3085,6 @@ require_once __DIR__ .
 <div class="store-location-box">
 
 
-<div class="store-location-top">
-
-
 <div class="store-location-copy">
 
     <strong>
@@ -3495,19 +3092,35 @@ require_once __DIR__ .
     </strong>
 
     <p>
-        Go to your physical store location
-        and press the button. Your browser
-        will request permission to access
-        your current location.
+        You can find the location using the
+        Business / Pickup Address entered above,
+        or use your device's current location
+        if you are currently at your store.
     </p>
 
 </div>
 
 
+<div class="store-location-actions">
+
+
+<button
+    type="button"
+    id="findStoreAddress"
+    class="store-location-button address"
+>
+
+    <i class="fa-solid fa-magnifying-glass-location"></i>
+
+    Find This Address
+
+</button>
+
+
 <button
     type="button"
     id="getStoreLocation"
-    class="store-location-button"
+    class="store-location-button current"
 >
 
     <i class="fa-solid fa-location-crosshairs"></i>
@@ -3517,6 +3130,11 @@ require_once __DIR__ .
 </button>
 
 
+</div>
+
+
+<div class="store-location-or">
+    CHOOSE ONE METHOD
 </div>
 
 
@@ -3563,12 +3181,14 @@ require_once __DIR__ .
         <?php if ($hasStoreLocation): ?>
 
             Store location is saved.
-            Press "Use My Current Location"
-            again if you want to update it.
+            You can search the address again
+            or use your current location
+            if you want to update it.
 
         <?php else: ?>
 
             Store location has not been set yet.
+            Use one of the methods above.
 
         <?php endif; ?>
 
@@ -3623,15 +3243,15 @@ require_once __DIR__ .
 
 <div class="store-location-note">
 
-    <i class="fa-solid fa-shield-halved"></i>
+    <i class="fa-solid fa-circle-info"></i>
 
     <span>
-        Location is only captured after
-        you allow browser location access.
-        The saved coordinates will be used
-        by HochipoHub's Nearby Stores feature
-        to calculate distance between customers
-        and your store.
+        <strong>Find This Address</strong>
+        uses the Business / Pickup Address you entered above.
+        <strong>Use My Current Location</strong>
+        should only be used when you are physically at your store.
+        After the location is detected, click
+        <strong>Save Store Profile</strong>.
     </span>
 
 </div>
@@ -4330,12 +3950,10 @@ require_once __DIR__ .
 
 
 <p>
-    Keep your store information,
-    pickup address and location accurate
-    so customers can discover your store
-    through Nearby Stores. You may also
-    set your preferred commission rate,
-    but HochipoHub requires at least 5%.
+    Enter your full business address
+    and set the exact store location.
+    Customers will later use Nearby Stores
+    to discover stores closest to them.
 </p>
 
 
@@ -4418,6 +4036,18 @@ document.addEventListener(
         | LOCATION ELEMENTS
         |--------------------------------------------------------------------------
         */
+
+        const businessAddress =
+            document.getElementById(
+                'business_address'
+            );
+
+
+        const findStoreAddressButton =
+            document.getElementById(
+                'findStoreAddress'
+            );
+
 
         const getStoreLocationButton =
             document.getElementById(
@@ -4676,7 +4306,244 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | GEOLOCATION
+        | APPLY COORDINATES
+        |--------------------------------------------------------------------------
+        */
+
+        function applyStoreCoordinates(
+            latitude,
+            longitude,
+            successMessage
+        ) {
+
+            const lat =
+                Number(latitude).toFixed(8);
+
+
+            const lng =
+                Number(longitude).toFixed(8);
+
+
+            if (latitudeInput) {
+                latitudeInput.value = lat;
+            }
+
+
+            if (longitudeInput) {
+                longitudeInput.value = lng;
+            }
+
+
+            if (latitudeDisplay) {
+                latitudeDisplay.textContent = lat;
+            }
+
+
+            if (longitudeDisplay) {
+                longitudeDisplay.textContent = lng;
+            }
+
+
+            if (summaryLocation) {
+                summaryLocation.textContent =
+                    'Ready to Save';
+            }
+
+
+            setLocationStatus(
+                'success',
+                successMessage,
+                'fa-solid fa-circle-check'
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FIND THIS ADDRESS
+        |--------------------------------------------------------------------------
+        |
+        | This uses the existing Business / Pickup Address.
+        | It converts the address into latitude + longitude.
+        |
+        |--------------------------------------------------------------------------
+        */
+
+        if (findStoreAddressButton) {
+
+            findStoreAddressButton.addEventListener(
+                'click',
+                async function () {
+
+
+                    const address =
+                        businessAddress
+                            ? businessAddress.value.trim()
+                            : '';
+
+
+                    if (address === '') {
+
+                        setLocationStatus(
+                            'error',
+                            'Please enter your Business / Pickup Address first.',
+                            'fa-solid fa-circle-exclamation'
+                        );
+
+
+                        if (businessAddress) {
+                            businessAddress.focus();
+                        }
+
+
+                        return;
+                    }
+
+
+                    findStoreAddressButton.disabled =
+                        true;
+
+
+                    if (getStoreLocationButton) {
+
+                        getStoreLocationButton.disabled =
+                            true;
+                    }
+
+
+                    findStoreAddressButton.innerHTML =
+                        '<i class="fa-solid fa-spinner fa-spin"></i> Finding Address...';
+
+
+                    setLocationStatus(
+                        'loading',
+                        'Searching for your store address...',
+                        'fa-solid fa-magnifying-glass-location'
+                    );
+
+
+                    try {
+
+                        const searchUrl =
+                            'https://nominatim.openstreetmap.org/search' +
+                            '?format=jsonv2' +
+                            '&limit=1' +
+                            '&countrycodes=my' +
+                            '&addressdetails=1' +
+                            '&q=' +
+                            encodeURIComponent(address);
+
+
+                        const response =
+                            await fetch(
+                                searchUrl,
+                                {
+                                    method: 'GET',
+                                    headers: {
+                                        'Accept':
+                                            'application/json'
+                                    }
+                                }
+                            );
+
+
+                        if (!response.ok) {
+
+                            throw new Error(
+                                'Location search service returned an error.'
+                            );
+                        }
+
+
+                        const results =
+                            await response.json();
+
+
+                        if (
+                            !Array.isArray(results) ||
+                            results.length === 0
+                        ) {
+
+                            setLocationStatus(
+                                'error',
+                                'Address could not be found. Try entering a more complete address including city, state and Malaysia.',
+                                'fa-solid fa-circle-exclamation'
+                            );
+
+                        } else {
+
+                            const result =
+                                results[0];
+
+
+                            const latitude =
+                                parseFloat(
+                                    result.lat
+                                );
+
+
+                            const longitude =
+                                parseFloat(
+                                    result.lon
+                                );
+
+
+                            if (
+                                Number.isNaN(latitude) ||
+                                Number.isNaN(longitude)
+                            ) {
+
+                                throw new Error(
+                                    'Invalid coordinates returned.'
+                                );
+                            }
+
+
+                            applyStoreCoordinates(
+                                latitude,
+                                longitude,
+                                'Address found successfully. The store coordinates are ready. Click "Save Store Profile" to save this location.'
+                            );
+                        }
+
+                    } catch (error) {
+
+                        console.error(
+                            'Address search error:',
+                            error
+                        );
+
+
+                        setLocationStatus(
+                            'error',
+                            'Unable to search the address right now. Check your internet connection or use "Use My Current Location".',
+                            'fa-solid fa-circle-exclamation'
+                        );
+
+                    } finally {
+
+                        findStoreAddressButton.disabled =
+                            false;
+
+
+                        findStoreAddressButton.innerHTML =
+                            '<i class="fa-solid fa-magnifying-glass-location"></i> Find This Address';
+
+
+                        if (getStoreLocationButton) {
+
+                            getStoreLocationButton.disabled =
+                                false;
+                        }
+                    }
+                }
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | USE MY CURRENT LOCATION
         |--------------------------------------------------------------------------
         */
 
@@ -4703,6 +4570,13 @@ document.addEventListener(
                         true;
 
 
+                    if (findStoreAddressButton) {
+
+                        findStoreAddressButton.disabled =
+                            true;
+                    }
+
+
                     getStoreLocationButton.innerHTML =
                         '<i class="fa-solid fa-spinner fa-spin"></i> Detecting Location...';
 
@@ -4718,57 +4592,11 @@ document.addEventListener(
 
                         function (position) {
 
-                            const latitude =
-                                Number(
-                                    position.coords.latitude
-                                ).toFixed(8);
 
-
-                            const longitude =
-                                Number(
-                                    position.coords.longitude
-                                ).toFixed(8);
-
-
-                            if (latitudeInput) {
-
-                                latitudeInput.value =
-                                    latitude;
-                            }
-
-
-                            if (longitudeInput) {
-
-                                longitudeInput.value =
-                                    longitude;
-                            }
-
-
-                            if (latitudeDisplay) {
-
-                                latitudeDisplay.textContent =
-                                    latitude;
-                            }
-
-
-                            if (longitudeDisplay) {
-
-                                longitudeDisplay.textContent =
-                                    longitude;
-                            }
-
-
-                            if (summaryLocation) {
-
-                                summaryLocation.textContent =
-                                    'Ready to Save';
-                            }
-
-
-                            setLocationStatus(
-                                'success',
-                                'Location detected successfully. Click "Save Store Profile" to save this location.',
-                                'fa-solid fa-circle-check'
+                            applyStoreCoordinates(
+                                position.coords.latitude,
+                                position.coords.longitude,
+                                'Current location detected successfully. Click "Save Store Profile" to save this location.'
                             );
 
 
@@ -4778,6 +4606,13 @@ document.addEventListener(
 
                             getStoreLocationButton.innerHTML =
                                 '<i class="fa-solid fa-location-crosshairs"></i> Update Current Location';
+
+
+                            if (findStoreAddressButton) {
+
+                                findStoreAddressButton.disabled =
+                                    false;
+                            }
                         },
 
 
@@ -4821,6 +4656,13 @@ document.addEventListener(
 
                             getStoreLocationButton.innerHTML =
                                 '<i class="fa-solid fa-location-crosshairs"></i> Use My Current Location';
+
+
+                            if (findStoreAddressButton) {
+
+                                findStoreAddressButton.disabled =
+                                    false;
+                            }
                         },
 
 
@@ -4830,6 +4672,59 @@ document.addEventListener(
                             maximumAge: 0
                         }
                     );
+                }
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ADDRESS CHANGED AFTER LOCATION WAS SELECTED
+        |--------------------------------------------------------------------------
+        |
+        | We do NOT automatically delete the saved coordinates.
+        | We only tell the seller to search the address again.
+        |
+        |--------------------------------------------------------------------------
+        */
+
+        let originalAddress =
+            businessAddress
+                ? businessAddress.value.trim()
+                : '';
+
+
+        if (businessAddress) {
+
+            businessAddress.addEventListener(
+                'input',
+                function () {
+
+                    const newAddress =
+                        businessAddress.value.trim();
+
+
+                    if (
+                        newAddress !== originalAddress &&
+                        latitudeInput &&
+                        longitudeInput &&
+                        latitudeInput.value !== '' &&
+                        longitudeInput.value !== ''
+                    ) {
+
+                        setLocationStatus(
+                            '',
+                            'The address has been changed. Press "Find This Address" again if the store location should follow the new address.',
+                            'fa-solid fa-circle-info'
+                        );
+
+
+                        if (summaryLocation) {
+
+                            summaryLocation.textContent =
+                                'Check Location';
+                        }
+                    }
                 }
             );
         }
