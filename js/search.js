@@ -2,171 +2,1460 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - SEARCH.JS
 |--------------------------------------------------------------------------
+| File:
+| js/search.js
+|
 | Handles:
-| - Live product search
+| - AJAX live product search
+| - Desktop navbar search
+| - Mobile navbar search
 | - Search suggestions
-| - Search form
-| - Clear search
+| - Debounce
+| - Request cancellation
+| - Loading state
+| - Empty state
+| - Error state
 | - Keyboard navigation
+| - Search form submit
+| - Clear search
 |--------------------------------------------------------------------------
 */
 
 document.addEventListener("DOMContentLoaded", function () {
 
-    const searchForms = document.querySelectorAll(".search-form");
+    /*
+    |--------------------------------------------------------------------------
+    | CONFIGURATION
+    |--------------------------------------------------------------------------
+    */
+
+    const baseUrl =
+        typeof window.HOCHIPOHUB_BASE_URL === "string"
+            ? window.HOCHIPOHUB_BASE_URL
+            : "/";
+
+    const ajaxSearchUrl =
+        baseUrl +
+        "ajax/search_product.php";
+
+    const searchPageUrl =
+        baseUrl +
+        "search.php";
+
+    const productPageUrl =
+        baseUrl +
+        "product_details.php";
+
+    const minimumCharacters = 1;
+
+    const debounceDelay = 350;
+
+    const suggestionLimit = 8;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SEARCH FORMS
+    |--------------------------------------------------------------------------
+    |
+    | Desktop:
+    | .navbar-search
+    |
+    | Mobile:
+    | .mobile-search
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    const searchForms =
+        document.querySelectorAll(
+            ".navbar-search, .mobile-search, .search-form"
+        );
+
 
     searchForms.forEach(function (form) {
 
-        const input = form.querySelector(
-            'input[name="search"], input[type="search"]'
-        );
+        initializeSearchForm(form);
+
+    });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | INITIALIZE SEARCH FORM
+    |--------------------------------------------------------------------------
+    */
+
+    function initializeSearchForm(form) {
+
+        const input =
+            form.querySelector(
+                'input[name="q"], input[name="search"], input[type="search"]'
+            );
+
 
         if (!input) {
             return;
         }
 
+
+        let suggestionContainer =
+            form.querySelector(
+                ".search-suggestions"
+            );
+
+
         /*
         |--------------------------------------------------------------------------
-        | SEARCH FORM SUBMIT
+        | CREATE SUGGESTION CONTAINER IF MISSING
         |--------------------------------------------------------------------------
         */
 
-        form.addEventListener("submit", function (event) {
+        if (!suggestionContainer) {
 
-            const keyword = input.value.trim();
+            suggestionContainer =
+                document.createElement("div");
 
-            if (keyword === "") {
+            suggestionContainer.className =
+                "search-suggestions";
 
-                event.preventDefault();
+            suggestionContainer.setAttribute(
+                "role",
+                "listbox"
+            );
 
-                input.focus();
+            suggestionContainer.setAttribute(
+                "aria-label",
+                "Product search suggestions"
+            );
+
+            form.appendChild(
+                suggestionContainer
+            );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FORM STATE
+        |--------------------------------------------------------------------------
+        */
+
+        let debounceTimer = null;
+
+        let currentController = null;
+
+        let currentKeyword = "";
+
+        let activeSuggestionIndex = -1;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | INPUT EVENT
+        |--------------------------------------------------------------------------
+        */
+
+        input.addEventListener(
+            "input",
+            function () {
+
+                const keyword =
+                    input.value.trim();
+
+
+                currentKeyword =
+                    keyword;
+
+
+                activeSuggestionIndex = -1;
+
+
+                toggleClearButton(
+                    input,
+                    keyword
+                );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CANCEL DEBOUNCE
+                |--------------------------------------------------------------------------
+                */
+
+                if (debounceTimer) {
+
+                    clearTimeout(
+                        debounceTimer
+                    );
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CANCEL PREVIOUS AJAX REQUEST
+                |--------------------------------------------------------------------------
+                */
+
+                if (currentController) {
+
+                    currentController.abort();
+
+                    currentController = null;
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | EMPTY SEARCH
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    keyword.length <
+                    minimumCharacters
+                ) {
+
+                    hideSuggestions(
+                        form
+                    );
+
+                    suggestionContainer.innerHTML =
+                        "";
+
+                    return;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | LOADING
+                |--------------------------------------------------------------------------
+                */
+
+                showLoading(
+                    suggestionContainer
+                );
+
+
+                showSuggestions(
+                    suggestionContainer
+                );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | DEBOUNCE
+                |--------------------------------------------------------------------------
+                */
+
+                debounceTimer =
+                    setTimeout(
+                        function () {
+
+                            performAjaxSearch(
+                                keyword,
+                                form,
+                                input,
+                                suggestionContainer
+                            );
+
+                        },
+                        debounceDelay
+                    );
+
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | INPUT FOCUS
+        |--------------------------------------------------------------------------
+        */
+
+        input.addEventListener(
+            "focus",
+            function () {
+
+                const keyword =
+                    input.value.trim();
+
+
+                if (
+                    keyword !== ""
+                    &&
+                    suggestionContainer.innerHTML.trim() !== ""
+                ) {
+
+                    showSuggestions(
+                        suggestionContainer
+                    );
+
+                }
+
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | KEYBOARD NAVIGATION
+        |--------------------------------------------------------------------------
+        */
+
+        input.addEventListener(
+            "keydown",
+            function (event) {
+
+                const suggestions =
+                    suggestionContainer.querySelectorAll(
+                        ".search-suggestion"
+                    );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | ESCAPE
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    event.key === "Escape"
+                ) {
+
+                    hideSuggestions(
+                        form
+                    );
+
+                    activeSuggestionIndex = -1;
+
+                    return;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | ARROW DOWN
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    event.key === "ArrowDown"
+                    &&
+                    suggestions.length > 0
+                ) {
+
+                    event.preventDefault();
+
+
+                    activeSuggestionIndex++;
+
+
+                    if (
+                        activeSuggestionIndex >=
+                        suggestions.length
+                    ) {
+
+                        activeSuggestionIndex = 0;
+
+                    }
+
+
+                    updateKeyboardSelection(
+                        suggestions,
+                        activeSuggestionIndex
+                    );
+
+
+                    return;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | ARROW UP
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    event.key === "ArrowUp"
+                    &&
+                    suggestions.length > 0
+                ) {
+
+                    event.preventDefault();
+
+
+                    activeSuggestionIndex--;
+
+
+                    if (
+                        activeSuggestionIndex < 0
+                    ) {
+
+                        activeSuggestionIndex =
+                            suggestions.length - 1;
+
+                    }
+
+
+                    updateKeyboardSelection(
+                        suggestions,
+                        activeSuggestionIndex
+                    );
+
+
+                    return;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | ENTER ON SELECTED PRODUCT
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    event.key === "Enter"
+                    &&
+                    activeSuggestionIndex >= 0
+                    &&
+                    suggestions[
+                        activeSuggestionIndex
+                    ]
+                ) {
+
+                    event.preventDefault();
+
+
+                    const selectedSuggestion =
+                        suggestions[
+                            activeSuggestionIndex
+                        ];
+
+
+                    const productUrl =
+                        selectedSuggestion.dataset.url;
+
+
+                    if (productUrl) {
+
+                        window.location.href =
+                            productUrl;
+
+                    }
+
+
+                    return;
+                }
+
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | NORMAL SEARCH FORM SUBMIT
+        |--------------------------------------------------------------------------
+        |
+        | AJAX is only used for live suggestions.
+        |
+        | Pressing Search / Enter normally still opens:
+        |
+        | search.php?q=keyword
+        |
+        |--------------------------------------------------------------------------
+        */
+
+        form.addEventListener(
+            "submit",
+            function (event) {
+
+                const keyword =
+                    input.value.trim();
+
+
+                if (keyword === "") {
+
+                    event.preventDefault();
+
+                    input.focus();
+
+                    hideSuggestions(
+                        form
+                    );
+
+                    return;
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | PREVENT OLD "search" PARAMETER
+                |--------------------------------------------------------------------------
+                */
+
+                input.name = "q";
+
+                input.value =
+                    keyword;
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | ENSURE CORRECT SEARCH PAGE
+                |--------------------------------------------------------------------------
+                */
+
+                form.action =
+                    searchPageUrl;
+
+                form.method =
+                    "GET";
+
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUGGESTION CLICK
+        |--------------------------------------------------------------------------
+        */
+
+        suggestionContainer.addEventListener(
+            "click",
+            function (event) {
+
+                const suggestion =
+                    event.target.closest(
+                        ".search-suggestion"
+                    );
+
+
+                if (!suggestion) {
+                    return;
+                }
+
+
+                const productUrl =
+                    suggestion.dataset.url;
+
+
+                if (!productUrl) {
+                    return;
+                }
+
+
+                window.location.href =
+                    productUrl;
+
+            }
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | AJAX SEARCH
+    |--------------------------------------------------------------------------
+    */
+
+    async function performAjaxSearch(
+        keyword,
+        form,
+        input,
+        suggestionContainer
+    ) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | CREATE NEW REQUEST CONTROLLER
+        |--------------------------------------------------------------------------
+        */
+
+        const controller =
+            new AbortController();
+
+
+        form._searchController =
+            controller;
+
+
+        const requestKeyword =
+            keyword;
+
+
+        try {
+
+            const url =
+                ajaxSearchUrl +
+                "?keyword=" +
+                encodeURIComponent(
+                    requestKeyword
+                ) +
+                "&limit=" +
+                encodeURIComponent(
+                    suggestionLimit
+                );
+
+
+            const response =
+                await fetch(
+                    url,
+                    {
+                        method: "GET",
+
+                        headers: {
+                            "Accept":
+                                "application/json",
+
+                            "X-Requested-With":
+                                "XMLHttpRequest"
+                        },
+
+                        cache:
+                            "no-store",
+
+                        signal:
+                            controller.signal
+                    }
+                );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | HTTP ERROR
+            |--------------------------------------------------------------------------
+            */
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "Search request failed."
+                );
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | JSON RESPONSE
+            |--------------------------------------------------------------------------
+            */
+
+            const data =
+                await response.json();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | IGNORE OLD RESULT
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                input.value.trim()
+                    !== requestKeyword
+            ) {
+
+                return;
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | API ERROR
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                !data
+                ||
+                data.success !== true
+            ) {
+
+                showError(
+                    suggestionContainer,
+                    data &&
+                    data.message
+                        ? data.message
+                        : "Unable to search products."
+                );
 
                 return;
             }
 
-            input.value = keyword;
 
-        });
+            /*
+            |--------------------------------------------------------------------------
+            | PRODUCTS
+            |--------------------------------------------------------------------------
+            */
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | SEARCH INPUT
-        |--------------------------------------------------------------------------
-        */
-
-        input.addEventListener("input", function () {
-
-            const keyword = this.value.trim();
-
-            toggleClearButton(input, keyword);
-
-        });
+            const products =
+                Array.isArray(
+                    data.products
+                )
+                    ? data.products
+                    : [];
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | ESCAPE KEY
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | NO RESULTS
+            |--------------------------------------------------------------------------
+            */
 
-        input.addEventListener("keydown", function (event) {
+            if (
+                products.length === 0
+            ) {
 
-            if (event.key === "Escape") {
+                showNoResults(
+                    suggestionContainer,
+                    requestKeyword
+                );
 
-                this.value = "";
+                return;
+            }
 
-                toggleClearButton(this, "");
 
-                hideSuggestions(form);
+            /*
+            |--------------------------------------------------------------------------
+            | DISPLAY RESULTS
+            |--------------------------------------------------------------------------
+            */
+
+            renderSuggestions(
+                products,
+                suggestionContainer
+            );
+
+
+        } catch (error) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | ABORTED REQUEST
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                error.name ===
+                "AbortError"
+            ) {
+
+                return;
 
             }
 
-        });
 
-        toggleClearButton(input, input.value.trim());
+            console.error(
+                "HochipoHub AJAX Search Error:",
+                error
+            );
 
-    });
+
+            showError(
+                suggestionContainer,
+                "Unable to load search suggestions."
+            );
+
+        }
+
+    }
 
 
     /*
     |--------------------------------------------------------------------------
-    | SEARCH CLEAR BUTTON
+    | RENDER SEARCH SUGGESTIONS
     |--------------------------------------------------------------------------
     */
 
-    document.addEventListener("click", function (event) {
+    function renderSuggestions(
+        products,
+        suggestionContainer
+    ) {
 
-        const clearButton =
-            event.target.closest(".search-clear");
+        suggestionContainer.innerHTML =
+            "";
 
-        if (!clearButton) {
+
+        products.forEach(
+            function (product) {
+
+                const productId =
+                    parseInt(
+                        product.product_id,
+                        10
+                    );
+
+
+                if (
+                    !productId
+                    ||
+                    productId <= 0
+                ) {
+
+                    return;
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | PRODUCT URL
+                |--------------------------------------------------------------------------
+                */
+
+                const productUrl =
+                    productPageUrl +
+                    "?id=" +
+                    encodeURIComponent(
+                        productId
+                    );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | PRODUCT IMAGE
+                |--------------------------------------------------------------------------
+                */
+
+                let imageUrl =
+                    String(
+                        product.image_url
+                        || ""
+                    ).trim();
+
+
+                if (
+                    imageUrl === ""
+                ) {
+
+                    imageUrl =
+                        baseUrl +
+                        "image/logo.jpeg";
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | PRODUCT DETAILS
+                |--------------------------------------------------------------------------
+                */
+
+                const productName =
+                    String(
+                        product.product_name
+                        || "Product"
+                    );
+
+
+                const businessName =
+                    String(
+                        product.business_name
+                        || ""
+                    );
+
+
+                const categoryName =
+                    String(
+                        product.category_name
+                        || ""
+                    );
+
+
+                let price =
+                    String(
+                        product.formatted_price
+                        || ""
+                    );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | NORMALIZE PRICE
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    price !== ""
+                    &&
+                    !price
+                        .toUpperCase()
+                        .startsWith("RM")
+                ) {
+
+                    price =
+                        "RM " +
+                        price;
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | CREATE ITEM
+                |--------------------------------------------------------------------------
+                */
+
+                const suggestion =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                suggestion.className =
+                    "search-suggestion";
+
+
+                suggestion.setAttribute(
+                    "role",
+                    "option"
+                );
+
+
+                suggestion.setAttribute(
+                    "tabindex",
+                    "-1"
+                );
+
+
+                suggestion.dataset.url =
+                    productUrl;
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | IMAGE
+                |--------------------------------------------------------------------------
+                */
+
+                const image =
+                    document.createElement(
+                        "img"
+                    );
+
+
+                image.className =
+                    "search-suggestion-image";
+
+
+                image.src =
+                    imageUrl;
+
+
+                image.alt =
+                    productName;
+
+
+                image.loading =
+                    "lazy";
+
+
+                image.addEventListener(
+                    "error",
+                    function () {
+
+                        this.onerror =
+                            null;
+
+                        this.src =
+                            baseUrl +
+                            "image/logo.jpeg";
+
+                    }
+                );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | INFO
+                |--------------------------------------------------------------------------
+                */
+
+                const info =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                info.className =
+                    "search-suggestion-info";
+
+
+                const name =
+                    document.createElement(
+                        "span"
+                    );
+
+
+                name.className =
+                    "search-suggestion-name";
+
+
+                name.textContent =
+                    productName;
+
+
+                const meta =
+                    document.createElement(
+                        "span"
+                    );
+
+
+                meta.className =
+                    "search-suggestion-meta";
+
+
+                const metaParts = [];
+
+
+                if (
+                    businessName !== ""
+                ) {
+
+                    metaParts.push(
+                        businessName
+                    );
+
+                }
+
+
+                if (
+                    categoryName !== ""
+                ) {
+
+                    metaParts.push(
+                        categoryName
+                    );
+
+                }
+
+
+                meta.textContent =
+                    metaParts.join(
+                        " • "
+                    );
+
+
+                info.appendChild(
+                    name
+                );
+
+
+                if (
+                    metaParts.length > 0
+                ) {
+
+                    info.appendChild(
+                        meta
+                    );
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | PRICE
+                |--------------------------------------------------------------------------
+                */
+
+                const priceElement =
+                    document.createElement(
+                        "span"
+                    );
+
+
+                priceElement.className =
+                    "search-suggestion-price";
+
+
+                priceElement.textContent =
+                    price;
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | APPEND
+                |--------------------------------------------------------------------------
+                */
+
+                suggestion.appendChild(
+                    image
+                );
+
+
+                suggestion.appendChild(
+                    info
+                );
+
+
+                if (
+                    price !== ""
+                ) {
+
+                    suggestion.appendChild(
+                        priceElement
+                    );
+
+                }
+
+
+                suggestionContainer.appendChild(
+                    suggestion
+                );
+
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FALLBACK IF ALL PRODUCTS INVALID
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            suggestionContainer.children.length
+            === 0
+        ) {
+
+            showNoResults(
+                suggestionContainer,
+                ""
+            );
+
+            return;
+
+        }
+
+
+        showSuggestions(
+            suggestionContainer
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOADING STATE
+    |--------------------------------------------------------------------------
+    */
+
+    function showLoading(
+        suggestionContainer
+    ) {
+
+        suggestionContainer.innerHTML =
+            "";
+
+
+        const state =
+            document.createElement(
+                "div"
+            );
+
+
+        state.className =
+            "search-suggestion-state";
+
+
+        state.textContent =
+            "Searching products...";
+
+
+        suggestionContainer.appendChild(
+            state
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | NO RESULT STATE
+    |--------------------------------------------------------------------------
+    */
+
+    function showNoResults(
+        suggestionContainer,
+        keyword
+    ) {
+
+        suggestionContainer.innerHTML =
+            "";
+
+
+        const state =
+            document.createElement(
+                "div"
+            );
+
+
+        state.className =
+            "search-suggestion-state";
+
+
+        if (
+            keyword &&
+            keyword.trim() !== ""
+        ) {
+
+            state.textContent =
+                'No products found for "' +
+                keyword +
+                '".';
+
+        } else {
+
+            state.textContent =
+                "No products found.";
+
+        }
+
+
+        suggestionContainer.appendChild(
+            state
+        );
+
+
+        showSuggestions(
+            suggestionContainer
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ERROR STATE
+    |--------------------------------------------------------------------------
+    */
+
+    function showError(
+        suggestionContainer,
+        message
+    ) {
+
+        suggestionContainer.innerHTML =
+            "";
+
+
+        const state =
+            document.createElement(
+                "div"
+            );
+
+
+        state.className =
+            "search-suggestion-state";
+
+
+        state.textContent =
+            message ||
+            "Unable to search products.";
+
+
+        suggestionContainer.appendChild(
+            state
+        );
+
+
+        showSuggestions(
+            suggestionContainer
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SHOW SUGGESTIONS
+    |--------------------------------------------------------------------------
+    */
+
+    function showSuggestions(
+        suggestionContainer
+    ) {
+
+        if (!suggestionContainer) {
             return;
         }
 
-        const form =
-            clearButton.closest("form");
+
+        suggestionContainer.classList.add(
+            "active"
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | HIDE SUGGESTIONS
+    |--------------------------------------------------------------------------
+    */
+
+    function hideSuggestions(
+        form
+    ) {
 
         if (!form) {
             return;
         }
 
-        const input = form.querySelector(
-            'input[name="search"], input[type="search"]'
-        );
 
-        if (!input) {
+        const suggestionContainer =
+            form.querySelector(
+                ".search-suggestions"
+            );
+
+
+        if (!suggestionContainer) {
             return;
         }
 
-        input.value = "";
 
-        input.focus();
+        suggestionContainer.classList.remove(
+            "active"
+        );
 
-        toggleClearButton(input, "");
 
-        hideSuggestions(form);
+        suggestionContainer
+            .querySelectorAll(
+                ".search-suggestion.keyboard-active"
+            )
+            .forEach(
+                function (item) {
 
-    });
+                    item.classList.remove(
+                        "keyboard-active"
+                    );
+
+                }
+            );
+
+    }
 
 
     /*
     |--------------------------------------------------------------------------
-    | SEARCH SUGGESTIONS
+    | KEYBOARD SELECTION
     |--------------------------------------------------------------------------
     */
 
-    const suggestionContainers =
-        document.querySelectorAll(
-            ".search-suggestions"
+    function updateKeyboardSelection(
+        suggestions,
+        activeIndex
+    ) {
+
+        suggestions.forEach(
+            function (
+                suggestion,
+                index
+            ) {
+
+                if (
+                    index ===
+                    activeIndex
+                ) {
+
+                    suggestion.classList.add(
+                        "keyboard-active"
+                    );
+
+
+                    suggestion.scrollIntoView({
+                        block:
+                            "nearest"
+                    });
+
+                } else {
+
+                    suggestion.classList.remove(
+                        "keyboard-active"
+                    );
+
+                }
+
+            }
         );
 
-    suggestionContainers.forEach(function (container) {
+    }
 
-        const form =
-            container.closest("form");
 
-        if (!form) {
-            return;
-        }
+    /*
+    |--------------------------------------------------------------------------
+    | CLEAR BUTTON
+    |--------------------------------------------------------------------------
+    */
 
-        const input = form.querySelector(
-            'input[name="search"], input[type="search"]'
-        );
+    document.addEventListener(
+        "click",
+        function (event) {
 
-        if (!input) {
-            return;
-        }
+            const clearButton =
+                event.target.closest(
+                    ".search-clear"
+                );
 
-        input.addEventListener("focus", function () {
 
-            if (this.value.trim() !== "") {
-                container.classList.add("active");
+            if (!clearButton) {
+                return;
             }
 
-        });
 
-    });
+            const form =
+                clearButton.closest(
+                    "form"
+                );
+
+
+            if (!form) {
+                return;
+            }
+
+
+            const input =
+                form.querySelector(
+                    'input[name="q"], input[name="search"], input[type="search"]'
+                );
+
+
+            if (!input) {
+                return;
+            }
+
+
+            input.value =
+                "";
+
+
+            input.focus();
+
+
+            toggleClearButton(
+                input,
+                ""
+            );
+
+
+            hideSuggestions(
+                form
+            );
+
+        }
+    );
 
 
     /*
@@ -175,69 +1464,116 @@ document.addEventListener("DOMContentLoaded", function () {
     |--------------------------------------------------------------------------
     */
 
-    document.addEventListener("click", function (event) {
+    document.addEventListener(
+        "click",
+        function (event) {
 
-        const searchArea =
-            event.target.closest(
-                ".search-wrapper, .search-container, .search-box"
-            );
+            const searchArea =
+                event.target.closest(
+                    ".navbar-search, .mobile-search, .search-form, .search-wrapper, .search-container, .search-box"
+                );
 
-        if (searchArea) {
-            return;
+
+            if (searchArea) {
+                return;
+            }
+
+
+            document
+                .querySelectorAll(
+                    ".search-suggestions.active"
+                )
+                .forEach(
+                    function (
+                        suggestionContainer
+                    ) {
+
+                        suggestionContainer
+                            .classList
+                            .remove(
+                                "active"
+                            );
+
+                    }
+                );
+
         }
-
-        document
-            .querySelectorAll(".search-suggestions.active")
-            .forEach(function (element) {
-
-                element.classList.remove("active");
-
-            });
-
-    });
+    );
 
 
     /*
     |--------------------------------------------------------------------------
-    | SUGGESTION CLICK
+    | GLOBAL HELPER
     |--------------------------------------------------------------------------
     */
 
-    document.addEventListener("click", function (event) {
+    window.submitSearch =
+        function (keyword) {
 
-        const suggestion =
-            event.target.closest(
-                ".search-suggestion"
+            keyword =
+                String(
+                    keyword || ""
+                ).trim();
+
+
+            if (
+                keyword === ""
+            ) {
+
+                return;
+
+            }
+
+
+            window.location.href =
+                searchPageUrl +
+                "?q=" +
+                encodeURIComponent(
+                    keyword
+                );
+
+        };
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SEARCH BUTTON HELPER
+    |--------------------------------------------------------------------------
+    */
+
+    window.performSearch =
+        function (inputSelector) {
+
+            const input =
+                document.querySelector(
+                    inputSelector
+                );
+
+
+            if (!input) {
+                return;
+            }
+
+
+            const keyword =
+                input.value.trim();
+
+
+            if (
+                keyword === ""
+            ) {
+
+                input.focus();
+
+                return;
+            }
+
+
+            window.submitSearch(
+                keyword
             );
 
-        if (!suggestion) {
-            return;
-        }
-
-        const keyword =
-            suggestion.dataset.search ||
-            suggestion.textContent.trim();
-
-        const form =
-            suggestion.closest("form");
-
-        if (!form) {
-            return;
-        }
-
-        const input = form.querySelector(
-            'input[name="search"], input[type="search"]'
-        );
-
-        if (!input) {
-            return;
-        }
-
-        input.value = keyword;
-
-        form.submit();
-
-    });
+        };
 
 });
 
@@ -248,145 +1584,62 @@ document.addEventListener("DOMContentLoaded", function () {
 |--------------------------------------------------------------------------
 */
 
-function toggleClearButton(input, keyword) {
-
-    const form =
-        input.closest("form");
-
-    if (!form) {
-        return;
-    }
-
-    const clearButton =
-        form.querySelector(".search-clear");
-
-    if (!clearButton) {
-        return;
-    }
-
-    if (keyword !== "") {
-
-        clearButton.classList.add("active");
-
-        clearButton.style.display = "flex";
-
-    } else {
-
-        clearButton.classList.remove("active");
-
-        clearButton.style.display = "none";
-
-    }
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| HIDE SUGGESTIONS
-|--------------------------------------------------------------------------
-*/
-
-function hideSuggestions(form) {
-
-    const suggestions =
-        form.querySelector(
-            ".search-suggestions"
-        );
-
-    if (!suggestions) {
-        return;
-    }
-
-    suggestions.classList.remove("active");
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| GLOBAL SEARCH HELPER
-|--------------------------------------------------------------------------
-*/
-
-function submitSearch(keyword) {
-
-    keyword = String(keyword || "").trim();
-
-    if (keyword === "") {
-        return;
-    }
-
-    const encodedKeyword =
-        encodeURIComponent(keyword);
-
-    window.location.href =
-        "search.php?search=" +
-        encodedKeyword;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| SEARCH WITH ENTER
-|--------------------------------------------------------------------------
-*/
-
-document.addEventListener("keydown", function (event) {
-
-    if (
-        event.key !== "Enter" ||
-        event.target.tagName !== "INPUT"
-    ) {
-        return;
-    }
-
-    const input = event.target;
-
-    if (
-        !input.matches(
-            'input[name="search"], input[type="search"]'
-        )
-    ) {
-        return;
-    }
-
-    const keyword =
-        input.value.trim();
-
-    if (keyword === "") {
-        return;
-    }
-
-});
-
-
-/*
-|--------------------------------------------------------------------------
-| SEARCH BUTTON HELPER
-|--------------------------------------------------------------------------
-*/
-
-function performSearch(inputSelector) {
-
-    const input =
-        document.querySelector(inputSelector);
+function toggleClearButton(
+    input,
+    keyword
+) {
 
     if (!input) {
         return;
     }
 
-    const keyword =
-        input.value.trim();
 
-    if (keyword === "") {
+    const form =
+        input.closest(
+            "form"
+        );
 
-        input.focus();
 
+    if (!form) {
         return;
     }
 
-    submitSearch(keyword);
+
+    const clearButton =
+        form.querySelector(
+            ".search-clear"
+        );
+
+
+    if (!clearButton) {
+        return;
+    }
+
+
+    if (
+        String(
+            keyword || ""
+        ).trim() !== ""
+    ) {
+
+        clearButton.classList.add(
+            "active"
+        );
+
+
+        clearButton.style.display =
+            "flex";
+
+    } else {
+
+        clearButton.classList.remove(
+            "active"
+        );
+
+
+        clearButton.style.display =
+            "none";
+
+    }
 
 }
