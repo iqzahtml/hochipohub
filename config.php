@@ -471,7 +471,7 @@ define(
 
 define(
     'SMTP_PASSWORD',
-    'nmbkjcvzqdpcelat'
+    'abc'
 );
 
 
