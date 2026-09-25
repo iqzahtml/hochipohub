@@ -1844,6 +1844,118 @@ if (!empty($userName)) {
 
     }
 
+
+    /* =========================================================
+       AJAX SEARCH SUGGESTIONS
+    ========================================================= */
+
+    .navbar-search,
+    .mobile-search {
+        position: relative;
+    }
+
+    .search-suggestions {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(100% + 10px);
+        display: none;
+        max-height: 430px;
+        overflow-y: auto;
+        background: #ffffff;
+        border: 1px solid #e1e8f3;
+        border-radius: 16px;
+        box-shadow: 0 20px 50px rgba(20, 48, 95, .16);
+        z-index: 2000;
+    }
+
+    .search-suggestions.active {
+        display: block;
+    }
+
+    .search-suggestion-state {
+        padding: 18px;
+        color: #74839a;
+        font-size: 13px;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .search-suggestion {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        color: #243b61;
+        text-decoration: none;
+        border-bottom: 1px solid #eef2f7;
+        cursor: pointer;
+        transition: background .18s ease;
+    }
+
+    .search-suggestion:last-child {
+        border-bottom: none;
+    }
+
+    .search-suggestion:hover,
+    .search-suggestion.keyboard-active {
+        background: #f3f7ff;
+    }
+
+    .search-suggestion-image {
+        width: 52px;
+        height: 52px;
+        flex: 0 0 52px;
+        object-fit: cover;
+        border-radius: 11px;
+        border: 1px solid #edf1f6;
+        background: #f7f9fd;
+    }
+
+    .search-suggestion-info {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .search-suggestion-name {
+        display: block;
+        overflow: hidden;
+        color: #173568;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 13px;
+        font-weight: 900;
+    }
+
+    .search-suggestion-meta {
+        display: block;
+        margin-top: 3px;
+        overflow: hidden;
+        color: #8290a5;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .search-suggestion-price {
+        flex-shrink: 0;
+        color: #2468ed;
+        font-size: 12px;
+        font-weight: 900;
+    }
+
+    .mobile-search .search-suggestions {
+        top: calc(100% + 7px);
+        max-height: 340px;
+    }
+
+    @media (max-width: 980px) {
+        .mobile-search {
+            z-index: 1300;
+        }
+    }
+
 </style>
 
 <!-- =========================================================
@@ -2052,6 +2164,13 @@ if (!empty($userName)) {
                 Search
 
             </button>
+
+            <div
+                class="search-suggestions"
+                id="navbarSearchSuggestions"
+                role="listbox"
+                aria-label="Product search suggestions"
+            ></div>
 
         </form>
 
@@ -2576,6 +2695,13 @@ if (!empty($userName)) {
                     🔍
 
                 </button>
+
+                <div
+                    class="search-suggestions"
+                    id="mobileSearchSuggestions"
+                    role="listbox"
+                    aria-label="Product search suggestions"
+                ></div>
 
             </form>
 
