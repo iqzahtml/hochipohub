@@ -3,17 +3,17 @@
 |--------------------------------------------------------------------------
 | HOCHIPOHUB - NEARBY STORES
 |--------------------------------------------------------------------------
-| File:
-| nearby_stores.php
+| File: nearby_stores.php
 |
-| Function:
-| - Use original HochipoHub customer navbar
-| - Customer can use current browser location
-| - Customer can search/select location manually
-| - Send latitude / longitude to AJAX
-| - Load approved nearby vendors
-| - Filter 5 KM / 10 KM / 20 KM / All
-| - Display nearest stores first
+| Features:
+| - Original HochipoHub navbar
+| - Catalog-style interface
+| - Browser current location
+| - Manual location search
+| - Location accuracy warning
+| - 5 KM / 10 KM / 20 KM / ALL filters
+| - AJAX nearby store loading
+| - Nearest store first
 |--------------------------------------------------------------------------
 */
 
@@ -114,7 +114,7 @@ if ($userId > 0) {
 
 /*
 |--------------------------------------------------------------------------
-| NAVBAR VALUES
+| NAVBAR DATA
 |--------------------------------------------------------------------------
 */
 
@@ -147,7 +147,7 @@ $wishlistCount = 0;
 
 /*
 |--------------------------------------------------------------------------
-| CUSTOMER CART / WISHLIST COUNT
+| CUSTOMER COUNTS
 |--------------------------------------------------------------------------
 */
 
@@ -248,7 +248,7 @@ $currentPage =
 >
 
 <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@600;700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@500;600;700;800&display=swap"
     rel="stylesheet"
 >
 
@@ -281,7 +281,7 @@ $currentPage =
 <style>
 
 /* =========================================================
-   RESET
+   PAGE RESET
 ========================================================= */
 
 * {
@@ -294,10 +294,18 @@ html {
 
 body.nearby-page {
     margin: 0;
+
     min-height: 100vh;
 
-    color: #14213d;
-    background: #f6f8fc;
+    color: #17233c;
+
+    background:
+        linear-gradient(
+            180deg,
+            #f0f5ff 0%,
+            #f7f9fd 52%,
+            #f8fafc 100%
+        );
 
     font-family:
         Inter,
@@ -305,34 +313,29 @@ body.nearby-page {
         sans-serif;
 }
 
+button,
+input {
+    font-family: inherit;
+}
+
 
 /* =========================================================
-   PAGE
+   MAIN
 ========================================================= */
 
 .nearby-main {
-    min-height: calc(100vh - 96px);
+    min-height: calc(100vh - 80px);
 
-    padding-top: 1px;
-    padding-bottom: 70px;
-
-    background:
-        radial-gradient(
-            circle at 90% 5%,
-            rgba(37, 99, 235, .08),
-            transparent 24%
-        ),
-        radial-gradient(
-            circle at 5% 30%,
-            rgba(99, 102, 241, .05),
-            transparent 22%
-        ),
-        #f6f8fc;
+    padding:
+        42px
+        0
+        80px;
 }
 
 .nearby-container {
-    width: calc(100% - 40px);
-    max-width: 1280px;
+    width: calc(100% - 48px);
+
+    max-width: 1390px;
 
     margin: 0 auto;
 }
@@ -344,44 +347,52 @@ body.nearby-page {
 
 .nearby-hero {
     position: relative;
+
+    min-height: 390px;
+
     overflow: hidden;
 
-    margin-top: 30px;
-    padding: 40px;
+    padding:
+        52px
+        54px;
 
     display: flex;
     align-items: center;
     justify-content: space-between;
 
-    gap: 35px;
+    gap: 45px;
 
     color: #ffffff;
 
     background:
         linear-gradient(
             115deg,
-            #123c7c 0%,
-            #2466c6 48%,
-            #398cf0 100%
+            #123777 0%,
+            #194d9d 42%,
+            #2676dc 75%,
+            #328cf1 100%
         );
 
-    border-radius: 25px;
+    border-radius: 29px;
 
     box-shadow:
-        0 20px 50px
-        rgba(35, 91, 180, .18);
+        0 24px 60px
+        rgba(22, 73, 154, .15);
 }
+
+
+/* decorative circles */
 
 .nearby-hero::before {
     content: "";
 
     position: absolute;
 
-    width: 290px;
-    height: 290px;
+    width: 360px;
+    height: 360px;
 
-    right: -85px;
-    top: -165px;
+    right: -95px;
+    top: -190px;
 
     border-radius: 50%;
 
@@ -390,7 +401,7 @@ body.nearby-page {
             255,
             255,
             255,
-            .08
+            .07
         );
 }
 
@@ -399,11 +410,11 @@ body.nearby-page {
 
     position: absolute;
 
-    width: 200px;
-    height: 200px;
+    width: 230px;
+    height: 230px;
 
-    right: 220px;
-    bottom: -155px;
+    right: 230px;
+    bottom: -165px;
 
     border-radius: 50%;
 
@@ -412,79 +423,37 @@ body.nearby-page {
             255,
             255,
             255,
-            .05
+            .045
         );
 }
 
-.nearby-hero-content {
+
+/* =========================================================
+   HERO LEFT
+========================================================= */
+
+.nearby-hero-left {
     position: relative;
-    z-index: 2;
 
-    max-width: 670px;
+    z-index: 3;
+
+    width: 100%;
+    max-width: 770px;
 }
 
-.nearby-eyebrow {
-    display: block;
+.nearby-hero-badge {
+    width: fit-content;
 
-    margin-bottom: 10px;
+    margin-bottom: 20px;
 
-    color: #bfdbfe;
+    padding:
+        8px
+        14px;
 
-    font-size: 9px;
-    font-weight: 900;
-    letter-spacing: 1.5px;
-
-    text-transform: uppercase;
-}
-
-.nearby-hero h1 {
-    margin: 0 0 12px;
-
-    font-family:
-        Poppins,
-        Inter,
-        sans-serif;
-
-    font-size:
-        clamp(
-            29px,
-            4vw,
-            42px
-        );
-
-    line-height: 1.15;
-    letter-spacing: -1.2px;
-}
-
-.nearby-hero p {
-    max-width: 620px;
-
-    margin: 0;
-
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            .80
-        );
-
-    font-size: 11px;
-    line-height: 1.75;
-}
-
-.nearby-hero-icon {
-    position: relative;
-    z-index: 2;
-
-    width: 112px;
-    height: 112px;
-
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
 
-    flex-shrink: 0;
+    gap: 7px;
 
     color: #ffffff;
 
@@ -493,7 +462,297 @@ body.nearby-page {
             255,
             255,
             255,
-            .12
+            .10
+        );
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            .24
+        );
+
+    border-radius: 999px;
+
+    font-size: 8px;
+    font-weight: 850;
+
+    letter-spacing: .2px;
+}
+
+.nearby-hero-badge i {
+    color: #dbeafe;
+}
+
+.nearby-hero h1 {
+    max-width: 720px;
+
+    margin:
+        0
+        0
+        15px;
+
+    font-family:
+        Poppins,
+        Inter,
+        sans-serif;
+
+    font-size:
+        clamp(
+            37px,
+            4.8vw,
+            61px
+        );
+
+    font-weight: 800;
+
+    line-height: 1.04;
+
+    letter-spacing: -2.5px;
+}
+
+.nearby-highlight {
+    color: #59dbe7;
+}
+
+.nearby-hero-description {
+    max-width: 680px;
+
+    margin:
+        0
+        0
+        25px;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .78
+        );
+
+    font-size: 11px;
+
+    line-height: 1.75;
+}
+
+
+/* =========================================================
+   HERO LOCATION SEARCH
+========================================================= */
+
+.hero-location-search {
+    max-width: 720px;
+
+    display: flex;
+    align-items: stretch;
+
+    gap: 9px;
+}
+
+.hero-location-input-wrap {
+    position: relative;
+
+    min-width: 0;
+
+    flex: 1;
+}
+
+.hero-location-input-wrap > i {
+    position: absolute;
+
+    left: 18px;
+    top: 50%;
+
+    transform:
+        translateY(-50%);
+
+    color: #2563eb;
+
+    font-size: 13px;
+
+    pointer-events: none;
+}
+
+.hero-location-input {
+    width: 100%;
+    height: 52px;
+
+    padding:
+        0
+        17px
+        0
+        45px;
+
+    color: #314764;
+
+    background: #ffffff;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            .8
+        );
+
+    border-radius: 13px;
+
+    outline: none;
+
+    font-size: 9px;
+    font-weight: 600;
+
+    box-shadow:
+        0 9px 22px
+        rgba(7, 32, 77, .09);
+}
+
+.hero-location-input::placeholder {
+    color: #9ca8ba;
+}
+
+.hero-location-input:focus {
+    border-color: #93c5fd;
+
+    box-shadow:
+        0 0 0 4px
+        rgba(255, 255, 255, .10);
+}
+
+.hero-search-button {
+    min-width: 112px;
+    height: 52px;
+
+    padding: 0 20px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 7px;
+
+    color: #153b76;
+    background: #ffffff;
+
+    border: none;
+    border-radius: 13px;
+
+    font-size: 9px;
+    font-weight: 900;
+
+    cursor: pointer;
+
+    transition:
+        transform .18s ease,
+        box-shadow .18s ease;
+
+    box-shadow:
+        0 9px 22px
+        rgba(7, 32, 77, .10);
+}
+
+.hero-search-button:hover {
+    transform:
+        translateY(-1px);
+
+    box-shadow:
+        0 12px 27px
+        rgba(7, 32, 77, .16);
+}
+
+.hero-search-button:disabled {
+    opacity: .65;
+
+    cursor: wait;
+
+    transform: none;
+}
+
+
+/* =========================================================
+   HERO CURRENT LOCATION
+========================================================= */
+
+.hero-current-location {
+    margin-top: 11px;
+
+    display: inline-flex;
+    align-items: center;
+
+    gap: 7px;
+
+    padding: 0;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .88
+        );
+
+    background: transparent;
+
+    border: none;
+
+    font-size: 8px;
+    font-weight: 750;
+
+    cursor: pointer;
+}
+
+.hero-current-location:hover {
+    color: #ffffff;
+    text-decoration: underline;
+}
+
+.hero-current-location:disabled {
+    opacity: .6;
+
+    cursor: wait;
+}
+
+
+/* =========================================================
+   HERO VISUAL
+========================================================= */
+
+.nearby-hero-visual {
+    position: relative;
+
+    z-index: 2;
+
+    width: 330px;
+    min-width: 330px;
+
+    height: 260px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nearby-map-card {
+    position: relative;
+
+    width: 165px;
+    height: 165px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    color: #ffffff;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255, 255, 255, .14),
+            rgba(255, 255, 255, .08)
         );
 
     border:
@@ -505,102 +764,272 @@ body.nearby-page {
             .20
         );
 
-    border-radius: 27px;
+    border-radius: 36px;
+
+    transform:
+        rotate(-4deg);
 
     backdrop-filter:
-        blur(10px);
-
-    font-size: 43px;
-}
-
-
-/* =========================================================
-   LOCATION CONTROL
-========================================================= */
-
-.nearby-control {
-    position: relative;
-    z-index: 5;
-
-    margin-top: -20px;
-    padding: 24px;
-
-    background: #ffffff;
-
-    border:
-        1px solid #e2e8f2;
-
-    border-radius: 20px;
+        blur(12px);
 
     box-shadow:
-        0 16px 38px
-        rgba(28, 58, 103, .09);
+        0 24px 50px
+        rgba(8, 44, 104, .17);
 }
 
-.nearby-location-heading {
-    margin-bottom: 18px;
+.nearby-map-card i {
+    font-size: 64px;
+
+    transform:
+        rotate(4deg);
 }
 
-.nearby-location-heading h2 {
-    margin: 0 0 5px;
 
-    color: #17365f;
+/* floating info */
 
-    font-size: 15px;
+.nearby-floating {
+    position: absolute;
+
+    min-width: 142px;
+
+    padding:
+        11px
+        14px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 7px;
+
+    color: #173b73;
+    background: #ffffff;
+
+    border-radius: 12px;
+
+    box-shadow:
+        0 14px 35px
+        rgba(5, 34, 82, .16);
+
+    font-size: 8px;
+    font-weight: 850;
 }
 
-.nearby-location-heading p {
-    margin: 0;
+.nearby-floating i {
+    color: #2563eb;
+}
 
-    color: #8a98ab;
+.nearby-floating-one {
+    top: 20px;
+    left: -5px;
+}
 
-    font-size: 9px;
-    line-height: 1.6;
+.nearby-floating-two {
+    right: -4px;
+    bottom: 21px;
 }
 
 
 /* =========================================================
-   LOCATION OPTIONS
+   LOCATION STATUS PANEL
 ========================================================= */
 
-.nearby-location-options {
+.nearby-location-panel {
+    margin-top: 22px;
+
+    padding:
+        20px
+        22px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 18px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .94
+        );
+
+    border:
+        1px solid #dce5f2;
+
+    border-radius: 17px;
+
+    box-shadow:
+        0 9px 28px
+        rgba(37, 65, 110, .055);
+}
+
+.location-panel-left {
+    min-width: 0;
+
+    display: flex;
+    align-items: center;
+
+    gap: 13px;
+}
+
+.location-panel-icon {
+    width: 44px;
+    height: 44px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    color: #2563eb;
+    background: #eaf2ff;
+
+    border-radius: 13px;
+
+    font-size: 16px;
+}
+
+.location-panel-content {
+    min-width: 0;
+}
+
+.location-panel-content small {
+    display: block;
+
+    margin-bottom: 4px;
+
+    color: #8493a9;
+
+    font-size: 7px;
+    font-weight: 850;
+
+    letter-spacing: .5px;
+    text-transform: uppercase;
+}
+
+.location-panel-content strong {
+    display: block;
+
+    overflow: hidden;
+
+    color: #1b365d;
+
+    font-size: 10px;
+    font-weight: 800;
+
+    line-height: 1.5;
+
+    text-overflow: ellipsis;
+}
+
+.location-status {
+    max-width: 480px;
+
+    padding:
+        9px
+        12px;
+
+    display: flex;
+    align-items: flex-start;
+
+    gap: 7px;
+
+    color: #52667f;
+    background: #f8fafc;
+
+    border:
+        1px solid #e2e8f0;
+
+    border-radius: 10px;
+
+    font-size: 8px;
+
+    line-height: 1.5;
+}
+
+.location-status.success {
+    color: #087443;
+    background: #ecfdf3;
+
+    border-color: #a7f3d0;
+}
+
+.location-status.error {
+    color: #b42318;
+    background: #fff2f1;
+
+    border-color: #fecaca;
+}
+
+.location-status.loading {
+    color: #1d4ed8;
+    background: #eff6ff;
+
+    border-color: #bfdbfe;
+}
+
+.location-status.warning {
+    color: #92400e;
+    background: #fffbeb;
+
+    border-color: #fde68a;
+}
+
+
+/* =========================================================
+   STATS
+========================================================= */
+
+.nearby-stats {
+    margin-top: 22px;
+
     display: grid;
 
     grid-template-columns:
         repeat(
-            2,
+            3,
             minmax(
                 0,
                 1fr
             )
         );
 
-    gap: 14px;
+    gap: 16px;
 }
 
-.nearby-location-option {
-    min-width: 0;
+.nearby-stat-card {
+    min-height: 92px;
 
-    padding: 18px;
-
-    background: #f8fafc;
-
-    border:
-        1px solid #e2e8f0;
-
-    border-radius: 16px;
-}
-
-.nearby-location-option-top {
-    margin-bottom: 14px;
+    padding:
+        17px
+        19px;
 
     display: flex;
     align-items: center;
 
-    gap: 11px;
+    gap: 14px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .94
+        );
+
+    border:
+        1px solid #dce5f2;
+
+    border-radius: 17px;
+
+    box-shadow:
+        0 8px 25px
+        rgba(37, 65, 110, .04);
 }
 
-.nearby-control-icon {
+.nearby-stat-icon {
     width: 43px;
     height: 43px;
 
@@ -611,335 +1040,103 @@ body.nearby-page {
     flex-shrink: 0;
 
     color: #2563eb;
-    background: #edf5ff;
-
-    border:
-        1px solid #dbeafe;
+    background: #edf4ff;
 
     border-radius: 12px;
 
-    font-size: 15px;
+    font-size: 14px;
 }
 
-.nearby-location-option-title {
-    min-width: 0;
-}
-
-.nearby-location-option-title strong {
+.nearby-stat-info small {
     display: block;
 
-    margin-bottom: 3px;
+    margin-bottom: 5px;
 
-    color: #17365f;
-
-    font-size: 11px;
-}
-
-.nearby-location-option-title span {
-    display: block;
-
-    color: #8a98ab;
-
-    font-size: 8px;
-    line-height: 1.5;
-}
-
-
-/* =========================================================
-   CURRENT LOCATION BUTTON
-========================================================= */
-
-.nearby-location-button {
-    min-height: 44px;
-    width: 100%;
-
-    padding: 0 17px;
-
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-
-    gap: 8px;
-
-    color: #ffffff;
-
-    background:
-        linear-gradient(
-            135deg,
-            #2563eb,
-            #4f46e5
-        );
-
-    border: none;
-    border-radius: 12px;
-
-    box-shadow:
-        0 9px 22px
-        rgba(37, 99, 235, .16);
-
-    font-family: inherit;
-    font-size: 9px;
-    font-weight: 850;
-
-    cursor: pointer;
-
-    transition: .18s ease;
-}
-
-.nearby-location-button:hover {
-    transform:
-        translateY(-1px);
-}
-
-.nearby-location-button:disabled {
-    opacity: .65;
-
-    cursor: wait;
-
-    transform: none;
-}
-
-
-/* =========================================================
-   MANUAL LOCATION
-========================================================= */
-
-.nearby-manual-search {
-    display: flex;
-    align-items: stretch;
-
-    gap: 8px;
-}
-
-.nearby-manual-input-wrap {
-    min-width: 0;
-    flex: 1;
-
-    position: relative;
-}
-
-.nearby-manual-input-wrap i {
-    position: absolute;
-
-    left: 14px;
-    top: 50%;
-
-    transform:
-        translateY(-50%);
-
-    color: #8292aa;
-
-    font-size: 12px;
-
-    pointer-events: none;
-}
-
-.nearby-manual-input {
-    width: 100%;
-    height: 44px;
-
-    padding:
-        0 13px
-        0 37px;
-
-    color: #253b5e;
-    background: #ffffff;
-
-    border:
-        1px solid #dbe3ee;
-
-    border-radius: 12px;
-
-    outline: none;
-
-    font-family: inherit;
-    font-size: 9px;
-    font-weight: 600;
-
-    transition:
-        border-color .18s ease,
-        box-shadow .18s ease;
-}
-
-.nearby-manual-input::placeholder {
-    color: #a1adbd;
-}
-
-.nearby-manual-input:focus {
-    border-color: #93baf7;
-
-    box-shadow:
-        0 0 0 4px
-        rgba(37, 99, 235, .07);
-}
-
-.nearby-search-location-button {
-    min-height: 44px;
-
-    padding: 0 15px;
-
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-
-    gap: 6px;
-
-    flex-shrink: 0;
-
-    color: #2563eb;
-    background: #edf5ff;
-
-    border:
-        1px solid #cfe1ff;
-
-    border-radius: 12px;
-
-    font-family: inherit;
-    font-size: 9px;
-    font-weight: 850;
-
-    cursor: pointer;
-
-    transition: .18s ease;
-}
-
-.nearby-search-location-button:hover {
-    color: #ffffff;
-    background: #2563eb;
-
-    border-color: #2563eb;
-}
-
-.nearby-search-location-button:disabled {
-    opacity: .65;
-
-    cursor: wait;
-}
-
-
-/* =========================================================
-   LOCATION STATUS
-========================================================= */
-
-.nearby-location-status {
-    margin-top: 16px;
-    padding: 12px 14px;
-
-    display: flex;
-    align-items: flex-start;
-
-    gap: 9px;
-
-    color: #52667f;
-    background: #f8fafc;
-
-    border:
-        1px solid #e2e8f0;
-
-    border-radius: 12px;
-
-    font-size: 9px;
-    line-height: 1.55;
-}
-
-.nearby-location-status.success {
-    color: #087443;
-    background: #ecfdf3;
-
-    border-color: #a7f3d0;
-}
-
-.nearby-location-status.error {
-    color: #b42318;
-    background: #fff2f1;
-
-    border-color: #fecaca;
-}
-
-.nearby-location-status.loading {
-    color: #1d4ed8;
-    background: #eff6ff;
-
-    border-color: #bfdbfe;
-}
-
-.nearby-location-status.warning {
-    color: #92400e;
-    background: #fffbeb;
-
-    border-color: #fde68a;
-}
-
-
-/* =========================================================
-   SELECTED LOCATION
-========================================================= */
-
-.nearby-selected-location {
-    margin-top: 12px;
-    padding: 13px 14px;
-
-    display: none;
-    align-items: flex-start;
-
-    gap: 10px;
-
-    color: #38516f;
-    background: #f7faff;
-
-    border:
-        1px solid #dce8fa;
-
-    border-radius: 12px;
-}
-
-.nearby-selected-location.show {
-    display: flex;
-}
-
-.nearby-selected-location-icon {
-    width: 30px;
-    height: 30px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    flex-shrink: 0;
-
-    color: #2563eb;
-    background: #e8f1ff;
-
-    border-radius: 9px;
-
-    font-size: 11px;
-}
-
-.nearby-selected-location-content {
-    min-width: 0;
-}
-
-.nearby-selected-location-content small {
-    display: block;
-
-    margin-bottom: 3px;
-
-    color: #8a98ab;
+    color: #8090a7;
 
     font-size: 7px;
-    font-weight: 800;
+    font-weight: 850;
 
     letter-spacing: .4px;
+
     text-transform: uppercase;
 }
 
-.nearby-selected-location-content strong {
+.nearby-stat-info strong {
     display: block;
 
-    color: #29476f;
+    color: #132b50;
 
-    font-size: 9px;
-    line-height: 1.55;
+    font-size: 17px;
+    font-weight: 900;
+}
+
+
+/* =========================================================
+   STORE SECTION
+========================================================= */
+
+.nearby-store-section {
+    margin-top: 22px;
+
+    padding: 23px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .95
+        );
+
+    border:
+        1px solid #dce5f2;
+
+    border-radius: 19px;
+
+    box-shadow:
+        0 8px 28px
+        rgba(37, 65, 110, .045);
+}
+
+
+/* =========================================================
+   SECTION HEADER
+========================================================= */
+
+.nearby-section-header {
+    margin-bottom: 20px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 20px;
+}
+
+.nearby-section-title h2 {
+    margin:
+        0
+        0
+        5px;
+
+    color: #132a4d;
+
+    font-family:
+        Poppins,
+        Inter,
+        sans-serif;
+
+    font-size: 19px;
+    font-weight: 800;
+}
+
+.nearby-section-title p {
+    margin: 0;
+
+    color: #8997aa;
+
+    font-size: 8px;
 }
 
 
@@ -948,48 +1145,28 @@ body.nearby-page {
 ========================================================= */
 
 .nearby-filter-area {
-    margin-top: 20px;
-
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    gap: 20px;
-
-    flex-wrap: wrap;
-}
-
-.nearby-filter-label {
-    color: #718198;
-
-    font-size: 9px;
-    font-weight: 800;
-}
-
-.nearby-filter-buttons {
     display: flex;
     align-items: center;
 
-    gap: 8px;
+    gap: 7px;
 
     flex-wrap: wrap;
 }
 
 .nearby-filter {
-    min-width: 67px;
-    min-height: 35px;
+    min-width: 63px;
+    height: 35px;
 
     padding: 0 12px;
 
-    color: #63758d;
-    background: #ffffff;
+    color: #60728c;
+    background: #f8fafc;
 
     border:
         1px solid #dfe7f1;
 
-    border-radius: 10px;
+    border-radius: 9px;
 
-    font-family: inherit;
     font-size: 8px;
     font-weight: 850;
 
@@ -1001,7 +1178,7 @@ body.nearby-page {
 .nearby-filter:hover {
     color: #2563eb;
 
-    border-color: #93baf7;
+    border-color: #a9c7f5;
 }
 
 .nearby-filter.active {
@@ -1012,84 +1189,7 @@ body.nearby-page {
 
     box-shadow:
         0 7px 16px
-        rgba(37, 99, 235, .16);
-}
-
-
-/* =========================================================
-   PRIVACY NOTE
-========================================================= */
-
-.nearby-privacy-note {
-    margin-top: 15px;
-
-    display: flex;
-    align-items: flex-start;
-
-    gap: 7px;
-
-    color: #8493a7;
-
-    font-size: 8px;
-    line-height: 1.55;
-}
-
-.nearby-privacy-note i {
-    margin-top: 2px;
-
-    color: #2563eb;
-}
-
-
-/* =========================================================
-   RESULT HEADER
-========================================================= */
-
-.nearby-result-header {
-    margin-top: 30px;
-    margin-bottom: 17px;
-
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-
-    gap: 20px;
-}
-
-.nearby-result-header h2 {
-    margin: 0 0 5px;
-
-    color: #142f55;
-
-    font-family:
-        Poppins,
-        Inter,
-        sans-serif;
-
-    font-size: 20px;
-}
-
-.nearby-result-header p {
-    margin: 0;
-
-    color: #8a98ab;
-
-    font-size: 9px;
-}
-
-.nearby-result-count {
-    padding: 8px 12px;
-
-    color: #2563eb;
-    background: #edf5ff;
-
-    border:
-        1px solid #dbeafe;
-
-    border-radius: 999px;
-
-    font-size: 8px;
-    font-weight: 850;
+        rgba(37, 99, 235, .14);
 }
 
 
@@ -1109,7 +1209,7 @@ body.nearby-page {
             )
         );
 
-    gap: 18px;
+    gap: 17px;
 }
 
 
@@ -1118,9 +1218,8 @@ body.nearby-page {
 ========================================================= */
 
 .nearby-store-card {
-    position: relative;
-
     min-width: 0;
+
     overflow: hidden;
 
     display: flex;
@@ -1131,36 +1230,27 @@ body.nearby-page {
     border:
         1px solid #e0e7f1;
 
-    border-radius: 20px;
-
-    box-shadow:
-        0 10px 30px
-        rgba(28, 59, 102, .055);
+    border-radius: 17px;
 
     transition:
         transform .18s ease,
-        box-shadow .18s ease,
-        border-color .18s ease;
+        border-color .18s ease,
+        box-shadow .18s ease;
 }
 
 .nearby-store-card:hover {
     transform:
         translateY(-3px);
 
-    border-color: #c6daf8;
+    border-color: #bfd3f2;
 
     box-shadow:
-        0 17px 38px
-        rgba(28, 59, 102, .10);
+        0 16px 35px
+        rgba(30, 67, 120, .09);
 }
 
-
-/* =========================================================
-   CARD TOP
-========================================================= */
-
-.nearby-store-top {
-    padding: 19px;
+.nearby-store-card-top {
+    padding: 18px;
 
     display: flex;
     align-items: flex-start;
@@ -1169,8 +1259,8 @@ body.nearby-page {
 }
 
 .nearby-store-logo {
-    width: 65px;
-    height: 65px;
+    width: 63px;
+    height: 63px;
 
     overflow: hidden;
 
@@ -1185,16 +1275,16 @@ body.nearby-page {
     background:
         linear-gradient(
             135deg,
-            #eef5ff,
+            #edf4ff,
             #f3f0ff
         );
 
     border:
-        1px solid #dfe7f2;
+        1px solid #dfe8f5;
 
-    border-radius: 16px;
+    border-radius: 15px;
 
-    font-size: 23px;
+    font-size: 22px;
 }
 
 .nearby-store-logo img {
@@ -1204,7 +1294,7 @@ body.nearby-page {
     object-fit: cover;
 }
 
-.nearby-store-main-info {
+.nearby-store-heading {
     min-width: 0;
 
     flex: 1;
@@ -1217,21 +1307,24 @@ body.nearby-page {
 
     color: #2563eb;
 
-    font-size: 8px;
-    font-weight: 850;
+    font-size: 7px;
+    font-weight: 900;
 
+    letter-spacing: .5px;
     text-transform: uppercase;
-    letter-spacing: .6px;
 }
 
 .nearby-store-name {
-    margin: 0 0 7px;
+    margin:
+        0
+        0
+        7px;
 
     overflow: hidden;
 
-    color: #18365e;
+    color: #17345c;
 
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 850;
 
     line-height: 1.35;
@@ -1246,24 +1339,29 @@ body.nearby-page {
 
     gap: 5px;
 
-    padding: 5px 8px;
+    padding:
+        5px
+        8px;
 
     color: #087443;
     background: #ecfdf3;
 
     border-radius: 999px;
 
-    font-size: 8px;
+    font-size: 7px;
     font-weight: 850;
 }
 
 
 /* =========================================================
-   CARD BODY
+   STORE BODY
 ========================================================= */
 
 .nearby-store-body {
-    padding: 0 19px 19px;
+    padding:
+        0
+        18px
+        18px;
 
     display: flex;
     flex: 1;
@@ -1271,9 +1369,12 @@ body.nearby-page {
 }
 
 .nearby-store-address {
-    min-height: 42px;
+    min-height: 39px;
 
-    margin: 0 0 13px;
+    margin:
+        0
+        0
+        11px;
 
     display: flex;
     align-items: flex-start;
@@ -1282,23 +1383,28 @@ body.nearby-page {
 
     color: #718198;
 
-    font-size: 9px;
-    line-height: 1.6;
+    font-size: 8px;
+
+    line-height: 1.55;
 }
 
 .nearby-store-address i {
-    margin-top: 3px;
+    margin-top: 2px;
 
     color: #ef4444;
 }
 
 .nearby-store-description {
-    margin: 0 0 15px;
+    margin:
+        0
+        0
+        14px;
 
-    color: #7c8da4;
+    color: #8190a5;
 
-    font-size: 9px;
-    line-height: 1.65;
+    font-size: 8px;
+
+    line-height: 1.6;
 
     display: -webkit-box;
 
@@ -1315,7 +1421,7 @@ body.nearby-page {
 
 .nearby-store-meta {
     margin-top: auto;
-    padding-top: 14px;
+    padding-top: 13px;
 
     display: grid;
 
@@ -1328,31 +1434,31 @@ body.nearby-page {
             )
         );
 
-    gap: 9px;
+    gap: 8px;
 
     border-top:
         1px solid #edf1f6;
 }
 
 .nearby-meta-box {
-    min-width: 0;
-
     padding: 9px;
 
     background: #f8fafc;
 
-    border-radius: 10px;
+    border-radius: 9px;
 }
 
 .nearby-meta-box span {
     display: block;
 
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 
-    color: #93a0b2;
+    color: #94a1b2;
 
-    font-size: 7px;
-    font-weight: 750;
+    font-size: 6px;
+    font-weight: 850;
+
+    letter-spacing: .3px;
 }
 
 .nearby-meta-box strong {
@@ -1375,23 +1481,25 @@ body.nearby-page {
 ========================================================= */
 
 .nearby-delivery-tags {
-    margin-top: 13px;
+    margin-top: 11px;
 
     display: flex;
     flex-wrap: wrap;
 
-    gap: 6px;
+    gap: 5px;
 }
 
 .nearby-delivery-tag {
-    padding: 5px 7px;
+    padding:
+        5px
+        7px;
 
     color: #506681;
     background: #f1f5f9;
 
     border-radius: 7px;
 
-    font-size: 7px;
+    font-size: 6px;
     font-weight: 750;
 }
 
@@ -1403,16 +1511,19 @@ body.nearby-page {
 
 
 /* =========================================================
-   VISIT BUTTON
+   STORE ACTION
 ========================================================= */
 
 .nearby-store-action {
-    padding: 0 19px 19px;
+    padding:
+        0
+        18px
+        18px;
 }
 
 .nearby-visit-store {
-    min-height: 40px;
     width: 100%;
+    min-height: 39px;
 
     display: flex;
     align-items: center;
@@ -1426,17 +1537,14 @@ body.nearby-page {
         linear-gradient(
             135deg,
             #2563eb,
-            #4f46e5
+            #347cf0
         );
 
-    border-radius: 11px;
-
-    box-shadow:
-        0 8px 18px
-        rgba(37, 99, 235, .16);
+    border-radius: 10px;
 
     font-size: 8px;
     font-weight: 850;
+
     text-decoration: none;
 
     transition: .18s ease;
@@ -1445,18 +1553,25 @@ body.nearby-page {
 .nearby-visit-store:hover {
     transform:
         translateY(-1px);
+
+    box-shadow:
+        0 8px 18px
+        rgba(37, 99, 235, .17);
 }
 
 
 /* =========================================================
-   EMPTY / INITIAL / LOADING
+   STATE
 ========================================================= */
 
 .nearby-state {
     grid-column: 1 / -1;
 
-    min-height: 320px;
-    padding: 45px 25px;
+    min-height: 300px;
+
+    padding:
+        45px
+        25px;
 
     display: flex;
     align-items: center;
@@ -1464,12 +1579,12 @@ body.nearby-page {
 
     text-align: center;
 
-    background: #ffffff;
+    background: #f9fbfe;
 
     border:
-        1px solid #e1e8f2;
+        1px dashed #d8e2ef;
 
-    border-radius: 21px;
+    border-radius: 16px;
 }
 
 .nearby-state-inner {
@@ -1477,21 +1592,24 @@ body.nearby-page {
 }
 
 .nearby-state-icon {
-    width: 76px;
-    height: 76px;
+    width: 68px;
+    height: 68px;
 
-    margin: 0 auto 17px;
+    margin:
+        0
+        auto
+        16px;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
     color: #2563eb;
-    background: #edf5ff;
+    background: #eaf2ff;
 
-    border-radius: 22px;
+    border-radius: 19px;
 
-    font-size: 27px;
+    font-size: 24px;
 }
 
 .nearby-state-icon.error {
@@ -1505,11 +1623,14 @@ body.nearby-page {
 }
 
 .nearby-state h3 {
-    margin: 0 0 8px;
+    margin:
+        0
+        0
+        7px;
 
     color: #17365f;
 
-    font-size: 16px;
+    font-size: 15px;
 }
 
 .nearby-state p {
@@ -1517,7 +1638,8 @@ body.nearby-page {
 
     color: #8493a8;
 
-    font-size: 9px;
+    font-size: 8px;
+
     line-height: 1.7;
 }
 
@@ -1527,16 +1649,18 @@ body.nearby-page {
 ========================================================= */
 
 .nearby-loader {
-    width: 35px;
-    height: 35px;
+    width: 34px;
+    height: 34px;
 
-    margin: 0 auto 17px;
+    margin:
+        0
+        auto
+        17px;
 
     border:
         4px solid #e5edfa;
 
-    border-top-color:
-        #2563eb;
+    border-top-color: #2563eb;
 
     border-radius: 50%;
 
@@ -1556,10 +1680,45 @@ body.nearby-page {
 
 
 /* =========================================================
+   PRIVACY NOTE
+========================================================= */
+
+.nearby-privacy {
+    margin-top: 14px;
+
+    display: flex;
+    align-items: flex-start;
+
+    gap: 7px;
+
+    color: #8795a8;
+
+    font-size: 7px;
+
+    line-height: 1.55;
+}
+
+.nearby-privacy i {
+    margin-top: 2px;
+
+    color: #2563eb;
+}
+
+
+/* =========================================================
    RESPONSIVE
 ========================================================= */
 
 @media (max-width: 1050px) {
+
+    .nearby-hero {
+        min-height: auto;
+    }
+
+    .nearby-hero-visual {
+        width: 260px;
+        min-width: 260px;
+    }
 
     .nearby-store-grid {
         grid-template-columns:
@@ -1574,66 +1733,110 @@ body.nearby-page {
 }
 
 
-@media (max-width: 780px) {
+@media (max-width: 850px) {
+
+    .nearby-main {
+        padding-top: 25px;
+    }
 
     .nearby-hero {
-        padding: 30px;
+        padding: 38px;
 
+        flex-direction: column;
         align-items: flex-start;
+    }
+
+    .nearby-hero-left {
+        max-width: none;
+    }
+
+    .nearby-hero-visual {
+        width: 100%;
+        height: 190px;
+    }
+
+    .nearby-location-panel {
+        align-items: flex-start;
+
         flex-direction: column;
     }
 
-    .nearby-hero-icon {
-        width: 80px;
-        height: 80px;
+    .location-status {
+        max-width: none;
 
-        font-size: 30px;
+        width: 100%;
     }
 
-    .nearby-location-options {
-        grid-template-columns: 1fr;
+    .nearby-section-header {
+        align-items: flex-start;
+
+        flex-direction: column;
     }
 }
 
 
-@media (max-width: 620px) {
+@media (max-width: 650px) {
 
     .nearby-container {
         width: calc(100% - 28px);
     }
 
-    .nearby-hero {
-        margin-top: 18px;
-        padding: 25px 21px;
+    .nearby-main {
+        padding:
+            18px
+            0
+            55px;
+    }
 
-        border-radius: 20px;
+    .nearby-hero {
+        padding:
+            28px
+            22px;
+
+        border-radius: 21px;
     }
 
     .nearby-hero h1 {
-        font-size: 27px;
+        font-size: 35px;
+
+        letter-spacing: -1.6px;
     }
 
-    .nearby-control {
-        margin-top: -12px;
-        padding: 18px;
-
-        border-radius: 17px;
+    .nearby-hero-description {
+        font-size: 9px;
     }
 
-    .nearby-manual-search {
+    .hero-location-search {
         flex-direction: column;
     }
 
-    .nearby-search-location-button {
+    .hero-search-button {
         width: 100%;
     }
 
-    .nearby-filter-area {
-        align-items: flex-start;
-        flex-direction: column;
+    .nearby-hero-visual {
+        display: none;
     }
 
-    .nearby-filter-buttons {
+    .nearby-location-panel {
+        padding: 17px;
+    }
+
+    .nearby-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .nearby-stat-card {
+        min-height: 78px;
+    }
+
+    .nearby-store-section {
+        padding: 17px;
+
+        border-radius: 16px;
+    }
+
+    .nearby-filter-area {
         width: 100%;
     }
 
@@ -1641,17 +1844,8 @@ body.nearby-page {
         flex: 1;
     }
 
-    .nearby-result-header {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
     .nearby-store-grid {
         grid-template-columns: 1fr;
-    }
-
-    .nearby-store-card {
-        border-radius: 17px;
     }
 }
 
@@ -1664,7 +1858,7 @@ body.nearby-page {
 
 
 <!-- =========================================================
-     ORIGINAL CUSTOMER NAVBAR
+     ORIGINAL NAVBAR
 ========================================================== -->
 
 <?php
@@ -1673,7 +1867,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
 
 <!-- =========================================================
-     PAGE
+     MAIN PAGE
 ========================================================== -->
 
 <main class="nearby-main">
@@ -1687,142 +1881,56 @@ require_once __DIR__ . '/includes/navbar.php';
 
 <section class="nearby-hero">
 
-<div class="nearby-hero-content">
 
-    <span class="nearby-eyebrow">
-        DISCOVER LOCAL SELLERS
-    </span>
+<!-- LEFT -->
+
+<div class="nearby-hero-left">
+
+
+    <div class="nearby-hero-badge">
+
+        <i class="fa-solid fa-location-dot"></i>
+
+        DISCOVER • NEARBY • SUPPORT LOCAL
+
+    </div>
+
 
     <h1>
-        Find stores near you.
+
+        Find Stores
+
+        <span class="nearby-highlight">
+            Near You.
+        </span>
+
     </h1>
 
-    <p>
-        Discover HochipoHub sellers based on your location.
-        Choose your current location or search for a location
-        manually, then browse stores arranged from nearest
-        to furthest.
+
+    <p class="nearby-hero-description">
+
+        Discover approved HochipoHub sellers near your
+        selected location. Search an area manually or
+        use your current location and find stores
+        arranged from nearest to furthest.
+
     </p>
 
-</div>
+
+    <!-- MANUAL SEARCH -->
+
+    <div class="hero-location-search">
 
 
-<div class="nearby-hero-icon">
-
-    <i class="fa-solid fa-map-location-dot"></i>
-
-</div>
-
-</section>
-
-
-<!-- =========================================================
-     LOCATION CONTROL
-========================================================== -->
-
-<section class="nearby-control">
-
-
-<div class="nearby-location-heading">
-
-    <h2>
-        Choose Your Location
-    </h2>
-
-    <p>
-        Use your device location or search for a location manually.
-    </p>
-
-</div>
-
-
-<div class="nearby-location-options">
-
-
-<!-- =========================================================
-     CURRENT LOCATION
-========================================================== -->
-
-<div class="nearby-location-option">
-
-    <div class="nearby-location-option-top">
-
-        <div class="nearby-control-icon">
-
-            <i class="fa-solid fa-location-crosshairs"></i>
-
-        </div>
-
-        <div class="nearby-location-option-title">
-
-            <strong>
-                Use Current Location
-            </strong>
-
-            <span>
-                Detect your location using your browser.
-            </span>
-
-        </div>
-
-    </div>
-
-
-    <button
-        type="button"
-        id="useLocationButton"
-        class="nearby-location-button"
-    >
-
-        <i class="fa-solid fa-location-crosshairs"></i>
-
-        Use My Current Location
-
-    </button>
-
-</div>
-
-
-<!-- =========================================================
-     MANUAL LOCATION
-========================================================== -->
-
-<div class="nearby-location-option">
-
-    <div class="nearby-location-option-top">
-
-        <div class="nearby-control-icon">
-
-            <i class="fa-solid fa-magnifying-glass-location"></i>
-
-        </div>
-
-        <div class="nearby-location-option-title">
-
-            <strong>
-                Search Location Manually
-            </strong>
-
-            <span>
-                Search a place, area, campus or address.
-            </span>
-
-        </div>
-
-    </div>
-
-
-    <div class="nearby-manual-search">
-
-        <div class="nearby-manual-input-wrap">
+        <div class="hero-location-input-wrap">
 
             <i class="fa-solid fa-location-dot"></i>
 
             <input
                 type="text"
                 id="manualLocationInput"
-                class="nearby-manual-input"
-                placeholder="Example: Politeknik Mersing Johor"
+                class="hero-location-input"
+                placeholder="Search your location, area or address..."
                 autocomplete="off"
             >
 
@@ -1832,7 +1940,7 @@ require_once __DIR__ . '/includes/navbar.php';
         <button
             type="button"
             id="searchLocationButton"
-            class="nearby-search-location-button"
+            class="hero-search-button"
         >
 
             <i class="fa-solid fa-magnifying-glass"></i>
@@ -1841,85 +1949,242 @@ require_once __DIR__ . '/includes/navbar.php';
 
         </button>
 
+
     </div>
 
-</div>
+
+    <!-- CURRENT LOCATION -->
+
+    <button
+        type="button"
+        id="useLocationButton"
+        class="hero-current-location"
+    >
+
+        <i class="fa-solid fa-location-crosshairs"></i>
+
+        Use My Current Location
+
+    </button>
 
 
 </div>
+
+
+<!-- RIGHT -->
+
+<div class="nearby-hero-visual">
+
+
+    <div class="nearby-floating nearby-floating-one">
+
+        <i class="fa-solid fa-store"></i>
+
+        Local Sellers
+
+    </div>
+
+
+    <div class="nearby-map-card">
+
+        <i class="fa-solid fa-map-location-dot"></i>
+
+    </div>
+
+
+    <div class="nearby-floating nearby-floating-two">
+
+        <i class="fa-solid fa-location-arrow"></i>
+
+        Nearest First
+
+    </div>
+
+
+</div>
+
+
+</section>
 
 
 <!-- =========================================================
-     STATUS
+     LOCATION STATUS
 ========================================================== -->
 
-<div
-    id="locationStatus"
-    class="nearby-location-status"
->
-
-    <i
-        id="locationStatusIcon"
-        class="fa-solid fa-circle-info"
-    ></i>
-
-    <span id="locationStatusText">
-
-        Choose your location to begin finding nearby stores.
-
-    </span>
-
-</div>
+<section class="nearby-location-panel">
 
 
-<!-- =========================================================
-     SELECTED LOCATION
-========================================================== -->
+<div class="location-panel-left">
 
-<div
-    id="selectedLocation"
-    class="nearby-selected-location"
->
 
-    <div class="nearby-selected-location-icon">
+    <div class="location-panel-icon">
 
         <i class="fa-solid fa-location-dot"></i>
 
     </div>
 
 
-    <div class="nearby-selected-location-content">
+    <div class="location-panel-content">
 
         <small>
             SELECTED LOCATION
         </small>
 
         <strong id="selectedLocationText">
-            -
+
+            No location selected yet
+
         </strong>
 
     </div>
 
+
 </div>
+
+
+<div
+    id="locationStatus"
+    class="location-status"
+>
+
+
+    <i
+        id="locationStatusIcon"
+        class="fa-solid fa-circle-info"
+    ></i>
+
+
+    <span id="locationStatusText">
+
+        Search a location or use your current location to begin.
+
+    </span>
+
+
+</div>
+
+
+</section>
 
 
 <!-- =========================================================
-     FILTER
+     STATS
 ========================================================== -->
 
-<div class="nearby-filter-area">
+<section class="nearby-stats">
 
 
-<div class="nearby-filter-label">
+<div class="nearby-stat-card">
 
-    <i class="fa-solid fa-filter"></i>
 
-    Show stores within:
+    <div class="nearby-stat-icon">
+
+        <i class="fa-solid fa-store"></i>
+
+    </div>
+
+
+    <div class="nearby-stat-info">
+
+        <small>
+            STORES FOUND
+        </small>
+
+        <strong id="storeCountNumber">
+            0
+        </strong>
+
+    </div>
+
 
 </div>
 
 
-<div class="nearby-filter-buttons">
+<div class="nearby-stat-card">
+
+
+    <div class="nearby-stat-icon">
+
+        <i class="fa-solid fa-location-arrow"></i>
+
+    </div>
+
+
+    <div class="nearby-stat-info">
+
+        <small>
+            SEARCH RADIUS
+        </small>
+
+        <strong id="radiusStat">
+            20 KM
+        </strong>
+
+    </div>
+
+
+</div>
+
+
+<div class="nearby-stat-card">
+
+
+    <div class="nearby-stat-icon">
+
+        <i class="fa-solid fa-arrow-down-short-wide"></i>
+
+    </div>
+
+
+    <div class="nearby-stat-info">
+
+        <small>
+            STORE ORDER
+        </small>
+
+        <strong>
+            Nearest
+        </strong>
+
+    </div>
+
+
+</div>
+
+
+</section>
+
+
+<!-- =========================================================
+     STORE SECTION
+========================================================== -->
+
+<section class="nearby-store-section">
+
+
+<!-- HEADER -->
+
+<div class="nearby-section-header">
+
+
+<div class="nearby-section-title">
+
+    <h2>
+        Nearby Stores
+    </h2>
+
+    <p id="resultDescription">
+
+        Choose your location to discover nearby stores.
+
+    </p>
+
+</div>
+
+
+<!-- FILTER -->
+
+<div class="nearby-filter-area">
 
 
 <button
@@ -1960,72 +2225,25 @@ require_once __DIR__ . '/includes/navbar.php';
 
 </div>
 
+
 </div>
 
 
 <!-- =========================================================
-     PRIVACY NOTE
+     STORE GRID
 ========================================================== -->
-
-<div class="nearby-privacy-note">
-
-    <i class="fa-solid fa-shield-halved"></i>
-
-    <span>
-        Your location is used to calculate the distance
-        between you and stores. Some computers and laptops
-        may provide an approximate location instead of an
-        exact GPS location. You can use manual search if
-        your detected location is inaccurate.
-    </span>
-
-</div>
-
-
-</section>
-
-
-<!-- =========================================================
-     RESULTS HEADER
-========================================================== -->
-
-<section class="nearby-result-header">
-
-<div>
-
-    <h2>
-        Nearby Stores
-    </h2>
-
-    <p id="resultDescription">
-        Choose your location to discover stores near you.
-    </p>
-
-</div>
-
 
 <div
-    id="storeCount"
-    class="nearby-result-count"
->
-    0 STORES
-</div>
-
-</section>
-
-
-<!-- =========================================================
-     STORE RESULTS
-========================================================== -->
-
-<section
     id="storeGrid"
     class="nearby-store-grid"
 >
 
+
 <div class="nearby-state">
 
+
     <div class="nearby-state-inner">
+
 
         <div class="nearby-state-icon">
 
@@ -2033,19 +2251,47 @@ require_once __DIR__ . '/includes/navbar.php';
 
         </div>
 
+
         <h3>
             Find stores around you
         </h3>
 
+
         <p>
-            Use your current location or search for a location
-            manually. HochipoHub will show approved stores
-            closest to your selected location.
+
+            Search for your location above or use your
+            current location. HochipoHub will display
+            approved stores closest to you.
+
         </p>
+
 
     </div>
 
+
 </div>
+
+
+</div>
+
+
+<!-- PRIVACY -->
+
+<div class="nearby-privacy">
+
+    <i class="fa-solid fa-shield-halved"></i>
+
+    <span>
+
+        Your location is only used to calculate the
+        distance between you and available stores.
+        Laptop location may be approximate, so manual
+        location search can provide a better result.
+
+    </span>
+
+</div>
+
 
 </section>
 
@@ -2104,21 +2350,27 @@ document.addEventListener(
             );
 
 
-        const selectedLocation =
-            document.getElementById(
-                'selectedLocation'
-            );
-
-
         const selectedLocationText =
             document.getElementById(
                 'selectedLocationText'
             );
 
 
-        const filterButtons =
-            document.querySelectorAll(
-                '.nearby-filter'
+        const storeCountNumber =
+            document.getElementById(
+                'storeCountNumber'
+            );
+
+
+        const radiusStat =
+            document.getElementById(
+                'radiusStat'
+            );
+
+
+        const resultDescription =
+            document.getElementById(
+                'resultDescription'
             );
 
 
@@ -2128,15 +2380,9 @@ document.addEventListener(
             );
 
 
-        const storeCount =
-            document.getElementById(
-                'storeCount'
-            );
-
-
-        const resultDescription =
-            document.getElementById(
-                'resultDescription'
+        const filterButtons =
+            document.querySelectorAll(
+                '.nearby-filter'
             );
 
 
@@ -2168,11 +2414,13 @@ document.addEventListener(
                     'div'
                 );
 
+
             div.textContent =
                 value === null ||
                 value === undefined
                     ? ''
                     : String(value);
+
 
             return div.innerHTML;
         }
@@ -2180,7 +2428,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | STATUS
+        | LOCATION STATUS
         |--------------------------------------------------------------------------
         */
 
@@ -2217,39 +2465,33 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | SELECTED LOCATION
+        | STORE COUNT
         |--------------------------------------------------------------------------
         */
 
-        function showSelectedLocation(
-            name
-        ) {
-
-            selectedLocationName =
-                String(
-                    name || ''
-                ).trim();
+        function updateStoreCount(count)
+        {
+            const total =
+                Number(count) || 0;
 
 
-            if (
-                selectedLocationName === ''
-            ) {
-
-                selectedLocation.classList.remove(
-                    'show'
-                );
-
-                return;
-            }
+            storeCountNumber.textContent =
+                total;
+        }
 
 
-            selectedLocationText.textContent =
-                selectedLocationName;
+        /*
+        |--------------------------------------------------------------------------
+        | RADIUS STAT
+        |--------------------------------------------------------------------------
+        */
 
-
-            selectedLocation.classList.add(
-                'show'
-            );
+        function updateRadiusStat()
+        {
+            radiusStat.textContent =
+                selectedRadius === 'all'
+                    ? 'ALL'
+                    : selectedRadius + ' KM';
         }
 
 
@@ -2290,6 +2532,7 @@ document.addEventListener(
                     'fa-solid fa-circle-exclamation'
                 );
 
+
                 return;
             }
 
@@ -2302,15 +2545,21 @@ document.addEventListener(
                 lng.toFixed(8);
 
 
-            showSelectedLocation(
-                locationName
-            );
+            selectedLocationName =
+                String(
+                    locationName ||
+                    'Selected Location'
+                ).trim();
+
+
+            selectedLocationText.textContent =
+                selectedLocationName;
 
 
             setLocationStatus(
                 statusType || 'success',
                 statusMessage ||
-                    'Location selected successfully. Nearby stores are being loaded.',
+                    'Location selected successfully.',
                 statusType === 'warning'
                     ? 'fa-solid fa-triangle-exclamation'
                     : 'fa-solid fa-circle-check'
@@ -2318,28 +2567,6 @@ document.addEventListener(
 
 
             loadNearbyStores();
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | RESULT COUNT
-        |--------------------------------------------------------------------------
-        */
-
-        function updateStoreCount(count)
-        {
-            const total =
-                Number(count) || 0;
-
-
-            storeCount.textContent =
-                total +
-                (
-                    total === 1
-                        ? ' STORE'
-                        : ' STORES'
-                );
         }
 
 
@@ -2355,7 +2582,7 @@ document.addEventListener(
 
 
             resultDescription.textContent =
-                'Choose your location to discover stores near you.';
+                'Choose your location to discover nearby stores.';
 
 
             storeGrid.innerHTML = `
@@ -2375,10 +2602,10 @@ document.addEventListener(
                         </h3>
 
                         <p>
-                            Use your current location or search
-                            for a location manually. HochipoHub
-                            will show approved stores closest
-                            to your selected location.
+                            Search for your location above or
+                            use your current location.
+                            HochipoHub will display approved
+                            stores closest to you.
                         </p>
 
                     </div>
@@ -2390,7 +2617,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | LOADING STATE
+        | LOADING
         |--------------------------------------------------------------------------
         */
 
@@ -2424,7 +2651,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | ERROR STATE
+        | ERROR
         |--------------------------------------------------------------------------
         */
 
@@ -2462,7 +2689,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | EMPTY STATE
+        | EMPTY
         |--------------------------------------------------------------------------
         */
 
@@ -2581,7 +2808,35 @@ document.addEventListener(
                 );
 
 
-            let distanceText = 'Distance unavailable';
+            const productCount =
+                Number(
+                    store.product_count ||
+                    0
+                );
+
+
+            const deliveryMethod =
+                escapeHtml(
+                    store.delivery_method ||
+                    '-'
+                );
+
+
+            const storeUrl =
+                escapeHtml(
+                    store.store_url ||
+                    '#'
+                );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | DISTANCE
+            |--------------------------------------------------------------------------
+            */
+
+            let distanceText =
+                'Distance unavailable';
 
 
             if (
@@ -2618,27 +2873,6 @@ document.addEventListener(
             distanceText =
                 escapeHtml(
                     distanceText
-                );
-
-
-            const productCount =
-                Number(
-                    store.product_count ||
-                    0
-                );
-
-
-            const deliveryMethod =
-                escapeHtml(
-                    store.delivery_method ||
-                    '-'
-                );
-
-
-            const storeUrl =
-                escapeHtml(
-                    store.store_url ||
-                    '#'
                 );
 
 
@@ -2755,7 +2989,7 @@ document.addEventListener(
 
             /*
             |--------------------------------------------------------------------------
-            | CARD
+            | HTML
             |--------------------------------------------------------------------------
             */
 
@@ -2764,7 +2998,7 @@ document.addEventListener(
                 <article class="nearby-store-card">
 
 
-                    <div class="nearby-store-top">
+                    <div class="nearby-store-card-top">
 
 
                         <div class="nearby-store-logo">
@@ -2774,7 +3008,7 @@ document.addEventListener(
                         </div>
 
 
-                        <div class="nearby-store-main-info">
+                        <div class="nearby-store-heading">
 
 
                             <span class="nearby-store-category">
@@ -2896,7 +3130,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | RENDER STORES
+        | RENDER
         |--------------------------------------------------------------------------
         */
 
@@ -2925,9 +3159,16 @@ document.addEventListener(
 
 
             resultDescription.textContent =
-                'Showing stores within ' +
+                'Showing ' +
+                stores.length +
+                (
+                    stores.length === 1
+                        ? ' store'
+                        : ' stores'
+                ) +
+                ' within ' +
                 radiusText +
-                ', sorted from nearest to furthest.';
+                ', nearest first.';
 
 
             let html = '';
@@ -2951,7 +3192,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | LOAD NEARBY STORES
+        | AJAX LOAD STORES
         |--------------------------------------------------------------------------
         */
 
@@ -3028,7 +3269,7 @@ document.addEventListener(
 
 
                     throw new Error(
-                        'The server returned an invalid response. Check ajax/load_nearby_stores.php for PHP or database errors.'
+                        'The server returned an invalid response. Check ajax/load_nearby_stores.php.'
                     );
                 }
 
@@ -3093,7 +3334,7 @@ document.addEventListener(
 
                         setLocationStatus(
                             'error',
-                            'Geolocation is not supported by this browser. Please use manual location search.',
+                            'Geolocation is not supported by this browser. Please search your location manually.',
                             'fa-solid fa-circle-exclamation'
                         );
 
@@ -3110,13 +3351,13 @@ document.addEventListener(
 
                         <i class="fa-solid fa-spinner fa-spin"></i>
 
-                        Detecting Location...
+                        Detecting location...
                     `;
 
 
                     setLocationStatus(
                         'loading',
-                        'Detecting your current location. Please allow location access when your browser asks for permission.',
+                        'Detecting your current location...',
                         'fa-solid fa-location-crosshairs'
                     );
 
@@ -3159,13 +3400,13 @@ document.addEventListener(
 
                                 <i class="fa-solid fa-location-crosshairs"></i>
 
-                                Update My Location
+                                Update My Current Location
                             `;
 
 
                             /*
                             |--------------------------------------------------------------------------
-                            | POOR ACCURACY WARNING
+                            | LOW ACCURACY
                             |--------------------------------------------------------------------------
                             */
 
@@ -3184,9 +3425,9 @@ document.addEventListener(
                                     latitude,
                                     longitude,
                                     'Current browser location (approximate)',
-                                    'Your browser detected an approximate location with about ' +
+                                    'Browser location accuracy is approximately ' +
                                         approximateKm +
-                                        ' KM accuracy. The distance shown may be inaccurate. Use manual location search for a more accurate result.',
+                                        ' KM. Search your location manually if the distance looks incorrect.',
                                     'warning'
                                 );
 
@@ -3195,11 +3436,17 @@ document.addEventListener(
                             }
 
 
+                            /*
+                            |--------------------------------------------------------------------------
+                            | GOOD LOCATION
+                            |--------------------------------------------------------------------------
+                            */
+
                             applyLocation(
                                 latitude,
                                 longitude,
                                 'Current device location',
-                                'Location detected successfully. Nearby stores are being loaded.',
+                                'Current location detected successfully.',
                                 'success'
                             );
                         },
@@ -3222,21 +3469,21 @@ document.addEventListener(
                             ) {
 
                                 message =
-                                    'Location permission was denied. Please allow location access or use manual location search.';
+                                    'Location permission was denied. Please allow location access or search manually.';
 
                             } else if (
                                 error.code === 2
                             ) {
 
                                 message =
-                                    'Your current location is unavailable. Please use manual location search.';
+                                    'Your current location is unavailable. Please search manually.';
 
                             } else if (
                                 error.code === 3
                             ) {
 
                                 message =
-                                    'Location request timed out. Please try again or use manual location search.';
+                                    'Location request timed out. Please try again or search manually.';
                             }
 
 
@@ -3323,7 +3570,7 @@ document.addEventListener(
 
                 <i class="fa-solid fa-spinner fa-spin"></i>
 
-                Searching...
+                Searching
             `;
 
 
@@ -3337,6 +3584,12 @@ document.addEventListener(
 
 
             try {
+
+                /*
+                |--------------------------------------------------------------------------
+                | OPENSTREETMAP NOMINATIM
+                |--------------------------------------------------------------------------
+                */
 
                 const searchUrl =
                     'https://nominatim.openstreetmap.org/search' +
@@ -3381,7 +3634,7 @@ document.addEventListener(
                 ) {
 
                     throw new Error(
-                        'Location not found. Try entering a more specific location, for example "Politeknik Mersing Johor".'
+                        'Location not found. Try entering a more specific location.'
                     );
                 }
 
@@ -3410,13 +3663,13 @@ document.addEventListener(
 
 
                 if (
-                    displayName.length > 160
+                    displayName.length > 170
                 ) {
 
                     displayName =
                         displayName.substring(
                             0,
-                            157
+                            167
                         ) +
                         '...';
                 }
@@ -3426,7 +3679,7 @@ document.addEventListener(
                     latitude,
                     longitude,
                     displayName,
-                    'Location selected successfully. Nearby stores are being loaded.',
+                    'Location selected successfully.',
                     'success'
                 );
 
@@ -3446,6 +3699,7 @@ document.addEventListener(
                     'fa-solid fa-circle-exclamation'
                 );
 
+
             } finally {
 
                 searchLocationButton.disabled =
@@ -3464,7 +3718,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | MANUAL SEARCH BUTTON
+        | SEARCH BUTTON
         |--------------------------------------------------------------------------
         */
 
@@ -3482,7 +3736,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | PRESS ENTER TO SEARCH
+        | ENTER KEY
         |--------------------------------------------------------------------------
         */
 
@@ -3507,7 +3761,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | RADIUS FILTER
+        | FILTER
         |--------------------------------------------------------------------------
         */
 
@@ -3540,6 +3794,9 @@ document.addEventListener(
                             '20';
 
 
+                        updateRadiusStat();
+
+
                         if (
                             customerLatitude !== null &&
                             customerLongitude !== null
@@ -3563,6 +3820,8 @@ document.addEventListener(
         | INITIAL
         |--------------------------------------------------------------------------
         */
+
+        updateRadiusStat();
 
         showInitialState();
 
