@@ -89,7 +89,7 @@ if (!function_exists('hhSmtpReadResponse')) {
 
                 $code =
                     (int)
-                    $matches[1];
+                        $matches[1];
 
 
                 if (
@@ -242,6 +242,7 @@ if (!function_exists('sendHochipoEmail')) {
             'SMTP_FROM_EMAIL',
 
             'SMTP_FROM_NAME'
+
         ];
 
 
@@ -341,35 +342,35 @@ if (!function_exists('sendHochipoEmail')) {
 
         $smtpHost =
             (string)
-            SMTP_HOST;
+                SMTP_HOST;
 
 
         $smtpPort =
             (int)
-            SMTP_PORT;
+                SMTP_PORT;
 
 
         $smtpUsername =
             (string)
-            SMTP_USERNAME;
+                SMTP_USERNAME;
 
 
         $smtpPassword =
             (string)
-            SMTP_PASSWORD;
+                SMTP_PASSWORD;
 
 
         $fromEmail =
             hhEmailCleanHeader(
                 (string)
-                SMTP_FROM_EMAIL
+                    SMTP_FROM_EMAIL
             );
 
 
         $fromName =
             hhEmailCleanHeader(
                 (string)
-                SMTP_FROM_NAME
+                    SMTP_FROM_NAME
             );
 
 
@@ -664,6 +665,7 @@ if (!function_exists('sendHochipoEmail')) {
                 'Content-Type: multipart/alternative; boundary="' .
                 $boundary .
                 '"'
+
             ];
 
 
@@ -881,13 +883,18 @@ if (!function_exists('sendSellerApprovalEmail')) {
             );
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | PUBLIC LOGIN URL
+        |--------------------------------------------------------------------------
+        |
+        | Email links must use the complete public URL.
+        | Relative BASE_URL cannot be used by Gmail.
+        |--------------------------------------------------------------------------
+        */
+
         $loginUrl =
-            defined(
-                'BASE_URL'
-            )
-                ? BASE_URL .
-                  'index.php?login=1'
-                : '#';
+            'https://hochipohub.jtmkpmj.com/index.php?login=1';
 
 
         $safeLoginUrl =
