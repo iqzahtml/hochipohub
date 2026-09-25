@@ -43,12 +43,8 @@ requireLogin();
 
 $db = getDB();
 
-
 if (!($db instanceof PDO)) {
-
-    die(
-        'Database connection is not available.'
-    );
+    die('Database connection is not available.');
 }
 
 
@@ -58,21 +54,10 @@ if (!($db instanceof PDO)) {
 |--------------------------------------------------------------------------
 */
 
-$userId =
-    (int) (
-        $_SESSION['user_id']
-        ?? 0
-    );
-
+$userId = (int) ($_SESSION['user_id'] ?? 0);
 
 if ($userId <= 0) {
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php'
-    );
-
+    header('Location: ' . BASE_URL . 'index.php');
     exit;
 }
 
@@ -83,43 +68,25 @@ if ($userId <= 0) {
 |--------------------------------------------------------------------------
 */
 
-$userStmt =
-    $db->prepare("
-        SELECT
-            user_id,
-            name,
-            email,
-            phone,
-            role,
-            status
+$userStmt = $db->prepare("
+    SELECT
+        user_id,
+        name,
+        email,
+        phone,
+        role,
+        status
+    FROM users
+    WHERE user_id = ?
+    LIMIT 1
+");
 
-        FROM users
+$userStmt->execute([$userId]);
 
-        WHERE user_id = ?
-
-        LIMIT 1
-    ");
-
-
-$userStmt->execute([
-    $userId
-]);
-
-
-$currentUser =
-    $userStmt->fetch(
-        PDO::FETCH_ASSOC
-    );
-
+$currentUser = $userStmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$currentUser) {
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php'
-    );
-
+    header('Location: ' . BASE_URL . 'index.php');
     exit;
 }
 
@@ -132,17 +99,10 @@ if (!$currentUser) {
 
 if (
     strtolower(
-        (string)
-        $currentUser['role']
+        (string) $currentUser['role']
     ) !== 'vendor'
 ) {
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'dashboard.php'
-    );
-
+    header('Location: ' . BASE_URL . 'dashboard.php');
     exit;
 }
 
@@ -154,7 +114,6 @@ if (
 */
 
 if (!function_exists('storeProfileEscape')) {
-
     function storeProfileEscape($value): string
     {
         return htmlspecialchars(
@@ -167,7 +126,6 @@ if (!function_exists('storeProfileEscape')) {
 
 
 if (!function_exists('storeProfileMoney')) {
-
     function storeProfileMoney($value): string
     {
         return number_format(
@@ -181,16 +139,13 @@ if (!function_exists('storeProfileMoney')) {
 
 
 if (!function_exists('storeProfileStatusClass')) {
-
     function storeProfileStatusClass($status): string
     {
         return strtolower(
             preg_replace(
                 '/[^a-zA-Z0-9]+/',
                 '-',
-                trim(
-                    (string) $status
-                )
+                trim((string) $status)
             )
         );
     }
@@ -203,52 +158,46 @@ if (!function_exists('storeProfileStatusClass')) {
 |--------------------------------------------------------------------------
 */
 
-$vendorStmt =
-    $db->prepare("
-        SELECT
+$vendorStmt = $db->prepare("
+    SELECT
+        v.vendor_id,
+        v.user_id,
+        v.business_name,
+        v.business_logo,
+        v.business_description,
+        v.business_address,
 
-            v.vendor_id,
-            v.user_id,
-            v.business_name,
-            v.business_logo,
-            v.business_description,
-            v.business_address,
-            v.category,
-            v.delivery_method,
-            v.postage_fee,
-            v.allow_vendor_delivery,
-            v.cod_enabled,
-            v.vendor_delivery_fee,
-            v.commission_rate,
-            v.approval_status,
-            v.created_at,
-            v.updated_at,
+        v.latitude,
+        v.longitude,
 
-            u.name,
-            u.email,
-            u.phone
+        v.category,
+        v.delivery_method,
+        v.postage_fee,
+        v.allow_vendor_delivery,
+        v.cod_enabled,
+        v.vendor_delivery_fee,
+        v.commission_rate,
+        v.approval_status,
+        v.created_at,
+        v.updated_at,
 
-        FROM vendors v
+        u.name,
+        u.email,
+        u.phone
 
-        INNER JOIN users u
-            ON v.user_id =
-               u.user_id
+    FROM vendors v
 
-        WHERE v.user_id = ?
+    INNER JOIN users u
+        ON v.user_id = u.user_id
 
-        LIMIT 1
-    ");
+    WHERE v.user_id = ?
 
+    LIMIT 1
+");
 
-$vendorStmt->execute([
-    $userId
-]);
+$vendorStmt->execute([$userId]);
 
-
-$vendor =
-    $vendorStmt->fetch(
-        PDO::FETCH_ASSOC
-    );
+$vendor = $vendorStmt->fetch(PDO::FETCH_ASSOC);
 
 
 /*
@@ -260,62 +209,45 @@ $vendor =
 if (!$vendor) {
 
     $defaultBusinessName =
-        trim(
-            (string)
-            $currentUser['name']
-        ) !== ''
-            ? trim(
-                (string)
-                $currentUser['name']
-            )
+        trim((string) $currentUser['name']) !== ''
+            ? trim((string) $currentUser['name'])
             : 'My Store';
 
-
-    $createVendor =
-        $db->prepare("
-            INSERT INTO vendors
-            (
-                user_id,
-                business_name,
-                delivery_method,
-                postage_fee,
-                allow_vendor_delivery,
-                cod_enabled,
-                vendor_delivery_fee,
-                commission_rate,
-                approval_status
-            )
-
-            VALUES
-            (
-                ?,
-                ?,
-                'Both',
-                0.00,
-                0,
-                0,
-                0.00,
-                5.00,
-                'Pending'
-            )
-        ");
-
+    $createVendor = $db->prepare("
+        INSERT INTO vendors
+        (
+            user_id,
+            business_name,
+            delivery_method,
+            postage_fee,
+            allow_vendor_delivery,
+            cod_enabled,
+            vendor_delivery_fee,
+            commission_rate,
+            approval_status
+        )
+        VALUES
+        (
+            ?,
+            ?,
+            'Both',
+            0.00,
+            0,
+            0,
+            0.00,
+            5.00,
+            'Pending'
+        )
+    ");
 
     $createVendor->execute([
         $userId,
         $defaultBusinessName
     ]);
 
+    $vendorStmt->execute([$userId]);
 
-    $vendorStmt->execute([
-        $userId
-    ]);
-
-
-    $vendor =
-        $vendorStmt->fetch(
-            PDO::FETCH_ASSOC
-        );
+    $vendor = $vendorStmt->fetch(PDO::FETCH_ASSOC);
 }
 
 
@@ -325,112 +257,75 @@ if (!$vendor) {
 |--------------------------------------------------------------------------
 */
 
-$vendorId =
-    (int) (
-        $vendor['vendor_id']
-        ?? 0
-    );
-
+$vendorId = (int) ($vendor['vendor_id'] ?? 0);
 
 $currentBusinessName =
-    (string) (
-        $vendor['business_name']
-        ?? ''
-    );
-
+    (string) ($vendor['business_name'] ?? '');
 
 $currentBusinessLogo =
-    (string) (
-        $vendor['business_logo']
-        ?? ''
-    );
-
+    (string) ($vendor['business_logo'] ?? '');
 
 $currentBusinessDescription =
-    (string) (
-        $vendor['business_description']
-        ?? ''
-    );
-
+    (string) ($vendor['business_description'] ?? '');
 
 $currentBusinessAddress =
-    (string) (
-        $vendor['business_address']
-        ?? ''
-    );
+    (string) ($vendor['business_address'] ?? '');
+
+
+/*
+|--------------------------------------------------------------------------
+| CURRENT LOCATION
+|--------------------------------------------------------------------------
+*/
+
+$currentLatitude =
+    isset($vendor['latitude']) &&
+    $vendor['latitude'] !== null
+        ? (string) $vendor['latitude']
+        : '';
+
+$currentLongitude =
+    isset($vendor['longitude']) &&
+    $vendor['longitude'] !== null
+        ? (string) $vendor['longitude']
+        : '';
 
 
 $currentCategory =
-    (string) (
-        $vendor['category']
-        ?? ''
-    );
-
+    (string) ($vendor['category'] ?? '');
 
 $currentDeliveryMethod =
-    (string) (
-        $vendor['delivery_method']
-        ?? 'Both'
-    );
-
+    (string) ($vendor['delivery_method'] ?? 'Both');
 
 $currentPostageFee =
-    (float) (
-        $vendor['postage_fee']
-        ?? 0
-    );
-
+    (float) ($vendor['postage_fee'] ?? 0);
 
 $currentAllowVendorDelivery =
-    (int) (
-        $vendor['allow_vendor_delivery']
-        ?? 0
-    );
-
+    (int) ($vendor['allow_vendor_delivery'] ?? 0);
 
 $currentCodEnabled =
-    (int) (
-        $vendor['cod_enabled']
-        ?? 0
-    );
-
+    (int) ($vendor['cod_enabled'] ?? 0);
 
 $currentVendorDeliveryFee =
-    (float) (
-        $vendor['vendor_delivery_fee']
-        ?? 0
-    );
-
+    (float) ($vendor['vendor_delivery_fee'] ?? 0);
 
 $currentCommissionRate =
-    (float) (
-        $vendor['commission_rate']
-        ?? 5
-    );
+    (float) ($vendor['commission_rate'] ?? 5);
 
 
 /*
 |--------------------------------------------------------------------------
 | SAFETY FOR OLD DATA
 |--------------------------------------------------------------------------
-|
-| Commission minimum is 5%.
-| If old vendor data contains less than 5, show 5.
-|--------------------------------------------------------------------------
 */
 
 if ($currentCommissionRate < 5) {
-
-    $currentCommissionRate =
-        5.00;
+    $currentCommissionRate = 5.00;
 }
 
 
 $currentApprovalStatus =
-    (string) (
-        $vendor['approval_status']
-        ?? 'Pending'
-    );
+    (string) ($vendor['approval_status'] ?? 'Pending');
 
 
 /*
@@ -440,29 +335,19 @@ $currentApprovalStatus =
 */
 
 $successMessage = '';
-
 $errorMessage = '';
-
 
 if (
     isset(
-        $_SESSION[
-            'store_profile_success'
-        ]
+        $_SESSION['store_profile_success']
     )
 ) {
-
     $successMessage =
         (string)
-        $_SESSION[
-            'store_profile_success'
-        ];
-
+        $_SESSION['store_profile_success'];
 
     unset(
-        $_SESSION[
-            'store_profile_success'
-        ]
+        $_SESSION['store_profile_success']
     );
 }
 
@@ -473,10 +358,7 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if (
-    $_SERVER['REQUEST_METHOD'] ===
-    'POST'
-) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /*
     |--------------------------------------------------------------------------
@@ -487,45 +369,104 @@ if (
     $businessName =
         trim(
             (string) (
-                $_POST[
-                    'business_name'
-                ]
+                $_POST['business_name']
                 ?? ''
             )
         );
-
 
     $businessDescription =
         trim(
             (string) (
-                $_POST[
-                    'business_description'
-                ]
+                $_POST['business_description']
                 ?? ''
             )
         );
-
 
     $businessAddress =
         trim(
             (string) (
-                $_POST[
-                    'business_address'
-                ]
+                $_POST['business_address']
                 ?? ''
             )
         );
-
 
     $category =
         trim(
             (string) (
-                $_POST[
-                    'category'
-                ]
+                $_POST['category']
                 ?? ''
             )
         );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STORE LOCATION
+    |--------------------------------------------------------------------------
+    */
+
+    $latitudeInput =
+        trim(
+            (string) (
+                $_POST['latitude']
+                ?? ''
+            )
+        );
+
+    $longitudeInput =
+        trim(
+            (string) (
+                $_POST['longitude']
+                ?? ''
+            )
+        );
+
+    $latitude = null;
+    $longitude = null;
+
+    if (
+        $latitudeInput !== '' ||
+        $longitudeInput !== ''
+    ) {
+
+        if (
+            $latitudeInput === '' ||
+            $longitudeInput === ''
+        ) {
+            $errorMessage =
+                'Both latitude and longitude are required for store location.';
+
+        } elseif (
+            !is_numeric($latitudeInput) ||
+            !is_numeric($longitudeInput)
+        ) {
+            $errorMessage =
+                'Invalid store location coordinates.';
+
+        } else {
+
+            $latitude =
+                (float) $latitudeInput;
+
+            $longitude =
+                (float) $longitudeInput;
+
+            if (
+                $latitude < -90 ||
+                $latitude > 90
+            ) {
+                $errorMessage =
+                    'Invalid latitude value.';
+
+            } elseif (
+                $longitude < -180 ||
+                $longitude > 180
+            ) {
+                $errorMessage =
+                    'Invalid longitude value.';
+            }
+        }
+    }
 
 
     /*
@@ -537,57 +478,29 @@ if (
     $deliveryMethod =
         trim(
             (string) (
-                $_POST[
-                    'delivery_method'
-                ]
+                $_POST['delivery_method']
                 ?? 'Both'
             )
         );
 
-
     $postageFee =
-        isset(
-            $_POST[
-                'postage_fee'
-            ]
-        )
-            ? (float)
-                $_POST[
-                    'postage_fee'
-                ]
+        isset($_POST['postage_fee'])
+            ? (float) $_POST['postage_fee']
             : 0.00;
 
-
     $allowVendorDelivery =
-        isset(
-            $_POST[
-                'allow_vendor_delivery'
-            ]
-        )
+        isset($_POST['allow_vendor_delivery'])
             ? 1
             : 0;
-
 
     $codEnabled =
-        isset(
-            $_POST[
-                'cod_enabled'
-            ]
-        )
+        isset($_POST['cod_enabled'])
             ? 1
             : 0;
 
-
     $vendorDeliveryFee =
-        isset(
-            $_POST[
-                'vendor_delivery_fee'
-            ]
-        )
-            ? (float)
-                $_POST[
-                    'vendor_delivery_fee'
-                ]
+        isset($_POST['vendor_delivery_fee'])
+            ? (float) $_POST['vendor_delivery_fee']
             : 0.00;
 
 
@@ -595,31 +508,19 @@ if (
     |--------------------------------------------------------------------------
     | COMMISSION
     |--------------------------------------------------------------------------
-    |
-    | Vendor chooses their own commission.
-    |
-    | Minimum: 5%
-    | Maximum: 100%
-    |--------------------------------------------------------------------------
     */
 
     $commissionInput =
         trim(
             (string) (
-                $_POST[
-                    'commission_rate'
-                ]
+                $_POST['commission_rate']
                 ?? ''
             )
         );
 
-
     $commissionRate =
-        is_numeric(
-            $commissionInput
-        )
-            ? (float)
-                $commissionInput
+        is_numeric($commissionInput)
+            ? (float) $commissionInput
             : 0.00;
 
 
@@ -635,32 +536,33 @@ if (
         'Both'
     ];
 
-
-    if ($businessName === '') {
-
+    if (
+        $errorMessage === '' &&
+        $businessName === ''
+    ) {
         $errorMessage =
             'Business name is required.';
 
-
-    } elseif ($category === '') {
-
+    } elseif (
+        $errorMessage === '' &&
+        $category === ''
+    ) {
         $errorMessage =
             'Business category is required.';
 
-
     } elseif (
+        $errorMessage === '' &&
         !in_array(
             $deliveryMethod,
             $allowedDeliveryMethods,
             true
         )
     ) {
-
         $errorMessage =
             'Invalid delivery method.';
 
-
     } elseif (
+        $errorMessage === '' &&
         in_array(
             $deliveryMethod,
             [
@@ -671,42 +573,44 @@ if (
         ) &&
         $businessAddress === ''
     ) {
-
         $errorMessage =
             'Business / pickup address is required when Pickup is enabled.';
 
-
-    } elseif ($postageFee < 0) {
-
+    } elseif (
+        $errorMessage === '' &&
+        $postageFee < 0
+    ) {
         $errorMessage =
             'Postage fee cannot be negative.';
 
-
-    } elseif ($vendorDeliveryFee < 0) {
-
+    } elseif (
+        $errorMessage === '' &&
+        $vendorDeliveryFee < 0
+    ) {
         $errorMessage =
             'Vendor delivery fee cannot be negative.';
 
-
     } elseif (
-        $commissionInput === '' ||
-        !is_numeric(
-            $commissionInput
+        $errorMessage === '' &&
+        (
+            $commissionInput === '' ||
+            !is_numeric($commissionInput)
         )
     ) {
-
         $errorMessage =
             'Please enter a valid commission rate.';
 
-
-    } elseif ($commissionRate < 5) {
-
+    } elseif (
+        $errorMessage === '' &&
+        $commissionRate < 5
+    ) {
         $errorMessage =
             'Commission rate must be at least 5%.';
 
-
-    } elseif ($commissionRate > 100) {
-
+    } elseif (
+        $errorMessage === '' &&
+        $commissionRate > 100
+    ) {
         $errorMessage =
             'Commission rate cannot exceed 100%.';
     }
@@ -718,23 +622,13 @@ if (
     |--------------------------------------------------------------------------
     */
 
-    if (
-        $deliveryMethod ===
-        'Pickup'
-    ) {
-
-        $postageFee =
-            0.00;
+    if ($deliveryMethod === 'Pickup') {
+        $postageFee = 0.00;
     }
 
-
     if (!$allowVendorDelivery) {
-
-        $vendorDeliveryFee =
-            0.00;
-
-        $codEnabled =
-            0;
+        $vendorDeliveryFee = 0.00;
+        $codEnabled = 0;
     }
 
 
@@ -753,6 +647,33 @@ if (
 
     /*
     |--------------------------------------------------------------------------
+    | NORMALIZE LOCATION
+    |--------------------------------------------------------------------------
+    */
+
+    if ($latitude !== null) {
+        $latitude =
+            number_format(
+                $latitude,
+                8,
+                '.',
+                ''
+            );
+    }
+
+    if ($longitude !== null) {
+        $longitude =
+            number_format(
+                $longitude,
+                8,
+                '.',
+                ''
+            );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
     | LOGO
     |--------------------------------------------------------------------------
     */
@@ -760,87 +681,49 @@ if (
     $newLogo =
         $currentBusinessLogo;
 
-
     if (
         $errorMessage === '' &&
-        isset(
-            $_FILES[
-                'business_logo'
-            ]
-        ) &&
-        isset(
-            $_FILES[
-                'business_logo'
-            ][
-                'error'
-            ]
-        ) &&
-        $_FILES[
-            'business_logo'
-        ][
-            'error'
-        ] !== UPLOAD_ERR_NO_FILE
+        isset($_FILES['business_logo']) &&
+        isset($_FILES['business_logo']['error']) &&
+        $_FILES['business_logo']['error']
+            !== UPLOAD_ERR_NO_FILE
     ) {
 
         if (
-            $_FILES[
-                'business_logo'
-            ][
-                'error'
-            ] !== UPLOAD_ERR_OK
+            $_FILES['business_logo']['error']
+            !== UPLOAD_ERR_OK
         ) {
-
             $errorMessage =
                 'Unable to upload business logo.';
-
 
         } else {
 
             $maxSize =
                 5 * 1024 * 1024;
 
-
             if (
-                (int)
-                $_FILES[
-                    'business_logo'
-                ][
-                    'size'
-                ] >
-                $maxSize
+                (int) $_FILES['business_logo']['size']
+                > $maxSize
             ) {
-
                 $errorMessage =
                     'Business logo must be 5MB or smaller.';
-
 
             } else {
 
                 $tmpFile =
-                    $_FILES[
-                        'business_logo'
-                    ][
-                        'tmp_name'
-                    ];
-
+                    $_FILES['business_logo']['tmp_name'];
 
                 $mimeType = '';
 
-
                 if (
-                    function_exists(
-                        'finfo_open'
-                    )
+                    function_exists('finfo_open')
                 ) {
-
                     $finfo =
                         finfo_open(
                             FILEINFO_MIME_TYPE
                         );
 
-
                     if ($finfo) {
-
                         $mimeType =
                             (string)
                             finfo_file(
@@ -848,13 +731,9 @@ if (
                                 $tmpFile
                             );
 
-
-                        finfo_close(
-                            $finfo
-                        );
+                        finfo_close($finfo);
                     }
                 }
-
 
                 if ($mimeType === '') {
 
@@ -863,39 +742,24 @@ if (
                             $tmpFile
                         );
 
-
                     $mimeType =
-                        $imageInfo[
-                            'mime'
-                        ]
+                        $imageInfo['mime']
                         ?? '';
                 }
 
-
                 $allowedImages = [
-
-                    'image/jpeg' =>
-                        'jpg',
-
-                    'image/png' =>
-                        'png',
-
-                    'image/webp' =>
-                        'webp'
+                    'image/jpeg' => 'jpg',
+                    'image/png'  => 'png',
+                    'image/webp' => 'webp'
                 ];
-
 
                 if (
                     !isset(
-                        $allowedImages[
-                            $mimeType
-                        ]
+                        $allowedImages[$mimeType]
                     )
                 ) {
-
                     $errorMessage =
                         'Logo must be JPG, PNG or WEBP.';
-
 
                 } else {
 
@@ -903,20 +767,17 @@ if (
                         __DIR__ .
                         '/../uploads/vendors/';
 
-
                     if (
                         !is_dir(
                             $uploadDirectory
                         )
                     ) {
-
                         @mkdir(
                             $uploadDirectory,
                             0775,
                             true
                         );
                     }
-
 
                     if (
                         !is_dir(
@@ -926,32 +787,24 @@ if (
                             $uploadDirectory
                         )
                     ) {
-
                         $errorMessage =
                             'Vendor logo folder is not writable.';
-
 
                     } else {
 
                         $extension =
-                            $allowedImages[
-                                $mimeType
-                            ];
-
+                            $allowedImages[$mimeType];
 
                         try {
-
                             $randomString =
                                 bin2hex(
                                     random_bytes(4)
                                 );
 
                         } catch (Throwable $e) {
-
                             $randomString =
                                 uniqid();
                         }
-
 
                         $fileName =
                             'vendor_' .
@@ -963,11 +816,9 @@ if (
                             '.' .
                             $extension;
 
-
                         $destination =
                             $uploadDirectory .
                             $fileName;
-
 
                         if (
                             !move_uploaded_file(
@@ -975,13 +826,10 @@ if (
                                 $destination
                             )
                         ) {
-
                             $errorMessage =
                                 'Failed to save business logo.';
 
-
                         } else {
-
                             $newLogo =
                                 $fileName;
                         }
@@ -1004,17 +852,19 @@ if (
 
             $db->beginTransaction();
 
-
             $updateStmt =
                 $db->prepare("
                     UPDATE vendors
 
                     SET
-
                         business_name = ?,
                         business_logo = ?,
                         business_description = ?,
                         business_address = ?,
+
+                        latitude = ?,
+                        longitude = ?,
+
                         category = ?,
                         delivery_method = ?,
                         postage_fee = ?,
@@ -1024,19 +874,15 @@ if (
                         commission_rate = ?
 
                     WHERE vendor_id = ?
-
                     AND user_id = ?
                 ");
-
 
             $updateStmt->execute([
 
                 $businessName,
 
                 $newLogo !== ''
-                    ? basename(
-                        $newLogo
-                    )
+                    ? basename($newLogo)
                     : null,
 
                 $businessDescription !== ''
@@ -1046,6 +892,10 @@ if (
                 $businessAddress !== ''
                     ? $businessAddress
                     : null,
+
+                $latitude,
+
+                $longitude,
 
                 $category,
 
@@ -1072,19 +922,10 @@ if (
                 $userId
             ]);
 
-
             $db->commit();
 
-
-            $_SESSION[
-                'store_profile_success'
-            ] =
-                'Store profile updated successfully. Commission rate is now ' .
-                storeProfileMoney(
-                    $commissionRate
-                ) .
-                '%.';
-
+            $_SESSION['store_profile_success'] =
+                'Store profile updated successfully.';
 
             header(
                 'Location: ' .
@@ -1092,19 +933,13 @@ if (
                 'seller/setup_profile.php'
             );
 
-
             exit;
-
 
         } catch (Throwable $exception) {
 
-            if (
-                $db->inTransaction()
-            ) {
-
+            if ($db->inTransaction()) {
                 $db->rollBack();
             }
-
 
             $errorMessage =
                 'Unable to update store profile. ' .
@@ -1122,22 +957,23 @@ if (
     $currentBusinessName =
         $businessName;
 
-
     $currentBusinessDescription =
         $businessDescription;
-
 
     $currentBusinessAddress =
         $businessAddress;
 
+    $currentLatitude =
+        $latitudeInput;
+
+    $currentLongitude =
+        $longitudeInput;
 
     $currentCategory =
         $category;
 
-
     $currentDeliveryMethod =
         $deliveryMethod;
-
 
     $currentPostageFee =
         max(
@@ -1145,14 +981,11 @@ if (
             $postageFee
         );
 
-
     $currentAllowVendorDelivery =
         $allowVendorDelivery;
 
-
     $currentCodEnabled =
         $codEnabled;
-
 
     $currentVendorDeliveryFee =
         max(
@@ -1160,24 +993,14 @@ if (
             $vendorDeliveryFee
         );
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | KEEP COMMISSION VALUE
-    |--------------------------------------------------------------------------
-    */
-
     if (
         is_numeric(
             $commissionInput
         )
     ) {
-
         $currentCommissionRate =
-            (float)
-            $commissionInput;
+            (float) $commissionInput;
     }
-
 
     $currentBusinessLogo =
         $newLogo;
@@ -1195,34 +1018,27 @@ $ownerName =
     ?? $currentUser['name']
     ?? 'Vendor';
 
-
 $ownerEmail =
     $vendor['email']
     ?? $currentUser['email']
     ?? '';
-
 
 $statusClass =
     storeProfileStatusClass(
         $currentApprovalStatus
     );
 
-
 $currentLogoUrl = '';
-
 
 if (
     trim(
-        (string)
-        $currentBusinessLogo
+        (string) $currentBusinessLogo
     ) !== ''
 ) {
-
     $logoFile =
         basename(
             $currentBusinessLogo
         );
-
 
     $currentLogoUrl =
         BASE_URL .
@@ -1235,6 +1051,17 @@ if (
 
 /*
 |--------------------------------------------------------------------------
+| LOCATION STATUS
+|--------------------------------------------------------------------------
+*/
+
+$hasStoreLocation =
+    $currentLatitude !== '' &&
+    $currentLongitude !== '';
+
+
+/*
+|--------------------------------------------------------------------------
 | USER INITIAL
 |--------------------------------------------------------------------------
 */
@@ -1242,14 +1069,8 @@ if (
 $userInitial =
     strtoupper(
         substr(
-            trim(
-                (string)
-                $ownerName
-            ) !== ''
-                ? trim(
-                    (string)
-                    $ownerName
-                )
+            trim((string) $ownerName) !== ''
+                ? trim((string) $ownerName)
                 : 'V',
             0,
             1
@@ -1262,7 +1083,6 @@ $pageTitle =
 
 ?>
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
@@ -1275,9 +1095,7 @@ $pageTitle =
 >
 
 <title>
-    <?= storeProfileEscape(
-        $pageTitle
-    ) ?>
+    <?= storeProfileEscape($pageTitle) ?>
 </title>
 
 
@@ -1328,30 +1146,18 @@ $pageTitle =
     box-sizing: border-box;
 }
 
-
 html,
 body {
-
     margin: 0;
-
     min-height: 100%;
-
     padding: 0;
 }
 
-
 body.seller-dashboard-page {
-
     overflow-x: hidden;
-
     color: #14213d;
-
     background: #f5f8fc;
-
-    font-family:
-        Inter,
-        Arial,
-        sans-serif;
+    font-family: Inter, Arial, sans-serif;
 }
 
 
@@ -1360,7 +1166,6 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-main {
-
     width:
         calc(
             100% -
@@ -1373,18 +1178,11 @@ body.seller-dashboard-page {
         var(--seller-sidebar);
 
     background:
-
         radial-gradient(
             circle at 96% 5%,
-            rgba(
-                37,
-                99,
-                235,
-                .08
-            ),
+            rgba(37, 99, 235, .08),
             transparent 22%
         ),
-
         #f5f8fc;
 }
 
@@ -1394,18 +1192,12 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-topbar {
-
     height: 72px;
-
-    padding:
-        0 32px;
+    padding: 0 32px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: space-between;
-
     gap: 20px;
 
     background:
@@ -1417,43 +1209,29 @@ body.seller-dashboard-page {
         );
 
     border-bottom:
-        1px solid
-        #e8edf5;
+        1px solid #e8edf5;
 }
 
-
 .seller-store-topbar-label {
-
     color: #8292ab;
-
     font-size: 11px;
-
     font-weight: 700;
 }
 
-
 .seller-store-topbar-user {
-
     display: flex;
-
     align-items: center;
-
     gap: 10px;
 }
 
-
 .seller-store-topbar-avatar {
-
     width: 39px;
-
     height: 39px;
 
     overflow: hidden;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     flex-shrink: 0;
@@ -1461,7 +1239,6 @@ body.seller-dashboard-page {
     color: #ffffff;
 
     background:
-
         linear-gradient(
             135deg,
             #2563eb,
@@ -1471,41 +1248,26 @@ body.seller-dashboard-page {
     border-radius: 50%;
 
     font-size: 12px;
-
     font-weight: 900;
 }
 
-
 .seller-store-topbar-avatar img {
-
     width: 100%;
-
     height: 100%;
-
     object-fit: cover;
 }
 
-
 .seller-store-topbar-user strong {
-
     display: block;
-
     color: #14213d;
-
     font-size: 11px;
-
     font-weight: 800;
 }
 
-
 .seller-store-topbar-user small {
-
     display: block;
-
     margin-top: 2px;
-
     color: #94a3b8;
-
     font-size: 8px;
 }
 
@@ -1515,17 +1277,10 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-content {
-
     width: 100%;
-
     max-width: 1450px;
-
-    margin:
-        0 auto;
-
-    padding:
-        29px 32px
-        65px;
+    margin: 0 auto;
+    padding: 29px 32px 65px;
 }
 
 
@@ -1534,39 +1289,27 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-heading {
-
     margin-bottom: 22px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: space-between;
-
     gap: 20px;
 }
 
-
 .seller-store-eyebrow {
-
     display: block;
-
     margin-bottom: 7px;
 
     color: #2563eb;
 
     font-size: 8px;
-
     font-weight: 900;
-
     letter-spacing: 1.4px;
-
     text-transform: uppercase;
 }
 
-
 .seller-store-heading h1 {
-
     margin: 0;
 
     color: #10213f;
@@ -1584,44 +1327,31 @@ body.seller-dashboard-page {
         );
 
     line-height: 1.15;
-
     letter-spacing: -1px;
 }
 
-
 .seller-store-heading p {
-
-    margin:
-        8px 0 0;
+    margin: 8px 0 0;
 
     color: #8492a8;
 
     font-size: 11px;
 }
 
-
 .seller-store-dashboard-link {
-
     min-height: 42px;
-
-    padding:
-        0 15px;
+    padding: 0 15px;
 
     display: inline-flex;
-
     align-items: center;
-
     justify-content: center;
-
     gap: 7px;
 
     color: #2c496d;
-
     background: #ffffff;
 
     border:
-        1px solid
-        #dfe7f2;
+        1px solid #dfe7f2;
 
     border-radius: 13px;
 
@@ -1635,7 +1365,6 @@ body.seller-dashboard-page {
         );
 
     font-size: 9px;
-
     font-weight: 800;
 
     text-decoration: none;
@@ -1647,29 +1376,22 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-hero {
-
     position: relative;
-
     overflow: hidden;
 
     min-height: 176px;
 
     margin-bottom: 22px;
-
     padding: 31px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: space-between;
-
     gap: 35px;
 
     color: #ffffff;
 
     background:
-
         linear-gradient(
             112deg,
             #103b82 0%,
@@ -1689,19 +1411,15 @@ body.seller-dashboard-page {
         );
 }
 
-
 .seller-store-hero::before {
-
     content: "";
 
     position: absolute;
 
     width: 250px;
-
     height: 250px;
 
     right: -70px;
-
     top: -140px;
 
     border-radius: 50%;
@@ -1715,19 +1433,15 @@ body.seller-dashboard-page {
         );
 }
 
-
 .seller-store-hero::after {
-
     content: "";
 
     position: absolute;
 
     width: 185px;
-
     height: 185px;
 
     right: 175px;
-
     bottom: -135px;
 
     border-radius: 50%;
@@ -1741,37 +1455,25 @@ body.seller-dashboard-page {
         );
 }
 
-
 .seller-store-hero-copy {
-
     position: relative;
-
     z-index: 2;
 }
 
-
 .seller-store-hero-label {
-
     display: block;
-
     margin-bottom: 9px;
 
     color: #b9d7ff;
 
     font-size: 8px;
-
     font-weight: 900;
-
     letter-spacing: 1.3px;
-
     text-transform: uppercase;
 }
 
-
 .seller-store-hero h2 {
-
-    margin:
-        0 0 9px;
+    margin: 0 0 9px;
 
     font-family:
         Poppins,
@@ -1788,11 +1490,8 @@ body.seller-dashboard-page {
     letter-spacing: -.7px;
 }
 
-
 .seller-store-hero p {
-
     max-width: 670px;
-
     margin: 0;
 
     color:
@@ -1804,30 +1503,21 @@ body.seller-dashboard-page {
         );
 
     font-size: 10px;
-
     line-height: 1.75;
 }
 
-
 .seller-store-hero-status {
-
     position: relative;
-
     z-index: 2;
 
     min-width: 140px;
-
     min-height: 50px;
 
-    padding:
-        0 17px;
+    padding: 0 17px;
 
     display: inline-flex;
-
     align-items: center;
-
     justify-content: center;
-
     gap: 8px;
 
     color: #ffffff;
@@ -1855,7 +1545,6 @@ body.seller-dashboard-page {
         blur(8px);
 
     font-size: 10px;
-
     font-weight: 850;
 }
 
@@ -1865,47 +1554,33 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-alert {
-
     margin-bottom: 18px;
-
-    padding:
-        14px 17px;
+    padding: 14px 17px;
 
     display: flex;
-
     align-items: center;
-
     gap: 9px;
 
     border-radius: 14px;
 
     font-size: 10px;
-
     font-weight: 750;
 }
 
-
 .seller-store-alert.success {
-
     color: #087443;
-
     background: #ecfdf3;
 
     border:
-        1px solid
-        #a7f3d0;
+        1px solid #a7f3d0;
 }
 
-
 .seller-store-alert.error {
-
     color: #b42318;
-
     background: #fff2f1;
 
     border:
-        1px solid
-        #fecaca;
+        1px solid #fecaca;
 }
 
 
@@ -1914,7 +1589,6 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-layout {
-
     display: grid;
 
     grid-template-columns:
@@ -1935,14 +1609,12 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-form-card {
-
     overflow: hidden;
 
     background: #ffffff;
 
     border:
-        1px solid
-        #e1e8f2;
+        1px solid #e1e8f2;
 
     border-radius: 22px;
 
@@ -1956,40 +1628,28 @@ body.seller-dashboard-page {
         );
 }
 
-
 .seller-store-form-header {
-
-    padding:
-        22px 24px;
+    padding: 22px 24px;
 
     display: flex;
-
     align-items: center;
-
     gap: 12px;
 
     border-bottom:
-        1px solid
-        #edf1f6;
+        1px solid #edf1f6;
 }
 
-
 .seller-store-form-icon {
-
     width: 46px;
-
     height: 46px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     color: #ffffff;
 
     background:
-
         linear-gradient(
             135deg,
             #2563eb,
@@ -2010,20 +1670,15 @@ body.seller-dashboard-page {
     font-size: 16px;
 }
 
-
 .seller-store-form-header h3 {
-
-    margin:
-        0 0 4px;
+    margin: 0 0 4px;
 
     color: #11213e;
 
     font-size: 16px;
 }
 
-
 .seller-store-form-header p {
-
     margin: 0;
 
     color: #8896aa;
@@ -2037,72 +1692,52 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .store-form-section {
-
     padding: 25px;
 
     border-bottom:
-        1px solid
-        #edf1f6;
+        1px solid #edf1f6;
 }
 
-
 .store-form-section:last-of-type {
-
     border-bottom: none;
 }
 
-
 .store-section-title {
-
     margin-bottom: 21px;
 
     display: flex;
-
     align-items: center;
-
     gap: 11px;
 }
 
-
 .store-section-title-icon {
-
     width: 39px;
-
     height: 39px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     color: #2563eb;
-
     background: #edf5ff;
 
     border:
-        1px solid
-        #dceaff;
+        1px solid #dceaff;
 
     border-radius: 11px;
 
     font-size: 14px;
 }
 
-
 .store-section-title h4 {
-
-    margin:
-        0 0 3px;
+    margin: 0 0 3px;
 
     color: #18365e;
 
     font-size: 14px;
 }
 
-
 .store-section-title p {
-
     margin: 0;
 
     color: #8c9aaf;
@@ -2116,7 +1751,6 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-field-grid {
-
     display: grid;
 
     grid-template-columns:
@@ -2131,85 +1765,60 @@ body.seller-dashboard-page {
     gap: 18px;
 }
 
-
 .seller-store-field.full {
-
-    grid-column:
-        1 / -1;
+    grid-column: 1 / -1;
 }
 
-
 .seller-store-field label {
-
     margin-bottom: 7px;
 
     display: flex;
-
     align-items: center;
-
     gap: 6px;
 
     color: #2d405e;
 
     font-size: 9px;
-
     font-weight: 800;
 }
 
-
 .seller-store-field label i {
-
     color: #2563eb;
 }
 
-
 .seller-store-required {
-
     color: #ef4444;
 }
-
 
 .seller-store-field input,
 .seller-store-field select,
 .seller-store-field textarea {
-
     width: 100%;
 
     outline: none;
 
     color: #1a3559;
-
     background: #fbfdff;
 
     border:
-        1px solid
-        #dce5f0;
+        1px solid #dce5f0;
 
     border-radius: 12px;
 
     font-family: inherit;
-
     font-size: 10px;
 
-    transition:
-        .18s ease;
+    transition: .18s ease;
 }
-
 
 .seller-store-field input,
 .seller-store-field select {
-
     height: 45px;
-
-    padding:
-        0 13px;
+    padding: 0 13px;
 }
 
-
 .seller-store-field textarea {
-
     min-height: 115px;
-
     padding: 13px;
 
     line-height: 1.65;
@@ -2217,13 +1826,10 @@ body.seller-dashboard-page {
     resize: vertical;
 }
 
-
 .seller-store-field input:focus,
 .seller-store-field select:focus,
 .seller-store-field textarea:focus {
-
     border-color: #4d8cf8;
-
     background: #ffffff;
 
     box-shadow:
@@ -2236,9 +1842,7 @@ body.seller-dashboard-page {
         );
 }
 
-
 .seller-store-field small {
-
     display: block;
 
     margin-top: 6px;
@@ -2246,7 +1850,6 @@ body.seller-dashboard-page {
     color: #95a2b5;
 
     font-size: 8px;
-
     line-height: 1.55;
 }
 
@@ -2256,12 +1859,210 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .store-file-input {
+    padding: 10px !important;
+    height: auto !important;
+}
 
-    padding:
-        10px !important;
 
-    height:
-        auto !important;
+/* =========================================================
+   STORE LOCATION
+========================================================= */
+
+.store-location-box {
+    padding: 20px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #f6faff,
+            #f9fbff
+        );
+
+    border:
+        1px solid #dce9fb;
+
+    border-radius: 16px;
+}
+
+.store-location-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    gap: 20px;
+}
+
+.store-location-copy {
+    flex: 1;
+}
+
+.store-location-copy strong {
+    display: block;
+
+    margin-bottom: 5px;
+
+    color: #173b69;
+
+    font-size: 11px;
+}
+
+.store-location-copy p {
+    margin: 0;
+
+    max-width: 560px;
+
+    color: #7f90a8;
+
+    font-size: 9px;
+    line-height: 1.65;
+}
+
+.store-location-button {
+    min-height: 42px;
+
+    padding: 0 16px;
+
+    flex-shrink: 0;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    color: #ffffff;
+
+    background:
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #4f46e5
+        );
+
+    border: none;
+    border-radius: 12px;
+
+    box-shadow:
+        0 8px 20px
+        rgba(
+            37,
+            99,
+            235,
+            .18
+        );
+
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 850;
+
+    cursor: pointer;
+}
+
+.store-location-button:disabled {
+    opacity: .65;
+    cursor: wait;
+}
+
+.store-location-status {
+    margin-top: 16px;
+
+    padding: 12px 14px;
+
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+
+    color: #536780;
+
+    background: #ffffff;
+
+    border:
+        1px solid #e0e8f3;
+
+    border-radius: 12px;
+
+    font-size: 9px;
+    line-height: 1.55;
+}
+
+.store-location-status.success {
+    color: #087443;
+    background: #ecfdf3;
+    border-color: #a7f3d0;
+}
+
+.store-location-status.error {
+    color: #b42318;
+    background: #fff2f1;
+    border-color: #fecaca;
+}
+
+.store-location-status.loading {
+    color: #1d4ed8;
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+
+.store-coordinate-grid {
+    margin-top: 16px;
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap: 12px;
+}
+
+.store-coordinate {
+    padding: 12px 14px;
+
+    background: #ffffff;
+
+    border:
+        1px solid #e1e8f2;
+
+    border-radius: 12px;
+}
+
+.store-coordinate span {
+    display: block;
+
+    margin-bottom: 5px;
+
+    color: #8b98aa;
+
+    font-size: 8px;
+    font-weight: 700;
+}
+
+.store-coordinate strong {
+    color: #18365e;
+
+    font-size: 10px;
+}
+
+.store-location-note {
+    margin-top: 13px;
+
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+
+    color: #71839b;
+
+    font-size: 8px;
+    line-height: 1.55;
+}
+
+.store-location-note i {
+    margin-top: 2px;
+    color: #2563eb;
 }
 
 
@@ -2270,17 +2071,13 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .store-money {
-
     position: relative;
 }
 
-
 .store-money span {
-
     position: absolute;
 
     left: 13px;
-
     top: 50%;
 
     z-index: 2;
@@ -2293,42 +2090,32 @@ body.seller-dashboard-page {
     color: #65768e;
 
     font-size: 9px;
-
     font-weight: 850;
 
     pointer-events: none;
 }
 
-
 .store-money input {
-
     padding-left: 43px;
 }
 
 
 /* =========================================================
-   PERCENT FIELD
+   PERCENT
 ========================================================= */
 
 .store-percent {
-
     position: relative;
 }
 
-
 .store-percent input {
-
-    padding-right:
-        42px;
+    padding-right: 42px;
 }
 
-
 .store-percent span {
-
     position: absolute;
 
     top: 50%;
-
     right: 14px;
 
     transform:
@@ -2339,7 +2126,6 @@ body.seller-dashboard-page {
     color: #2563eb;
 
     font-size: 10px;
-
     font-weight: 900;
 
     pointer-events: none;
@@ -2351,7 +2137,6 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .store-delivery-grid {
-
     display: grid;
 
     grid-template-columns:
@@ -2366,29 +2151,19 @@ body.seller-dashboard-page {
     gap: 11px;
 }
 
-
 .store-delivery-choice {
-
     position: relative;
-
     cursor: pointer;
 }
 
-
 .store-delivery-choice input {
-
     position: absolute;
-
     opacity: 0;
-
     pointer-events: none;
 }
 
-
 .store-delivery-card {
-
     min-height: 115px;
-
     height: 100%;
 
     padding: 16px;
@@ -2396,18 +2171,14 @@ body.seller-dashboard-page {
     background: #fbfdff;
 
     border:
-        1.5px solid
-        #dfe7f1;
+        1.5px solid #dfe7f1;
 
     border-radius: 15px;
 
-    transition:
-        .18s ease;
+    transition: .18s ease;
 }
 
-
 .store-delivery-card i {
-
     margin-bottom: 11px;
 
     display: block;
@@ -2417,9 +2188,7 @@ body.seller-dashboard-page {
     font-size: 18px;
 }
 
-
 .store-delivery-card strong {
-
     display: block;
 
     margin-bottom: 5px;
@@ -2429,23 +2198,17 @@ body.seller-dashboard-page {
     font-size: 10px;
 }
 
-
 .store-delivery-card small {
-
     color: #8998ad;
 
     font-size: 8px;
-
     line-height: 1.5;
 }
-
 
 .store-delivery-choice
 input:checked +
 .store-delivery-card {
-
     border-color: #3b82f6;
-
     background: #f0f6ff;
 
     box-shadow:
@@ -2464,7 +2227,6 @@ input:checked +
 ========================================================= */
 
 .store-conditional {
-
     margin-top: 16px;
 
     padding: 18px;
@@ -2472,8 +2234,7 @@ input:checked +
     background: #f8fbff;
 
     border:
-        1px solid
-        #e0e8f3;
+        1px solid #e0e8f3;
 
     border-radius: 14px;
 }
@@ -2484,13 +2245,10 @@ input:checked +
 ========================================================= */
 
 .store-toggle-row {
-
     padding: 16px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: space-between;
 
     gap: 20px;
@@ -2498,15 +2256,12 @@ input:checked +
     background: #fbfcfe;
 
     border:
-        1px solid
-        #e3e9f2;
+        1px solid #e3e9f2;
 
     border-radius: 14px;
 }
 
-
 .store-toggle-copy strong {
-
     display: block;
 
     margin-bottom: 4px;
@@ -2516,41 +2271,29 @@ input:checked +
     font-size: 10px;
 }
 
-
 .store-toggle-copy small {
-
     color: #8c9bae;
 
     font-size: 8px;
-
     line-height: 1.5;
 }
 
-
 .store-switch {
-
     position: relative;
 
     width: 46px;
-
     height: 25px;
 
     flex-shrink: 0;
 }
 
-
 .store-switch input {
-
     position: absolute;
-
     opacity: 0;
 }
 
-
 .store-switch-slider {
-
     position: absolute;
-
     inset: 0;
 
     cursor: pointer;
@@ -2562,19 +2305,15 @@ input:checked +
     transition: .2s;
 }
 
-
 .store-switch-slider::before {
-
     content: "";
 
     position: absolute;
 
     width: 19px;
-
     height: 19px;
 
     left: 3px;
-
     top: 3px;
 
     background: #ffffff;
@@ -2593,19 +2332,15 @@ input:checked +
     transition: .2s;
 }
 
-
 .store-switch
 input:checked +
 .store-switch-slider {
-
     background: #2563eb;
 }
-
 
 .store-switch
 input:checked +
 .store-switch-slider::before {
-
     transform:
         translateX(
             21px
@@ -2618,11 +2353,9 @@ input:checked +
 ========================================================= */
 
 .store-commission-box {
-
     padding: 18px;
 
     background:
-
         linear-gradient(
             135deg,
             #f3f8ff,
@@ -2630,24 +2363,18 @@ input:checked +
         );
 
     border:
-        1px solid
-        #d9e8fb;
+        1px solid #d9e8fb;
 
     border-radius: 14px;
 }
 
-
 .store-commission-notice {
-
     margin-top: 12px;
 
-    padding:
-        11px 13px;
+    padding: 11px 13px;
 
     display: flex;
-
     gap: 8px;
-
     align-items: flex-start;
 
     color: #315987;
@@ -2661,21 +2388,16 @@ input:checked +
         );
 
     border:
-        1px solid
-        #dae8fa;
+        1px solid #dae8fa;
 
     border-radius: 10px;
 
     font-size: 8px;
-
     line-height: 1.55;
 }
 
-
 .store-commission-notice i {
-
     margin-top: 2px;
-
     color: #2563eb;
 }
 
@@ -2685,41 +2407,30 @@ input:checked +
 ========================================================= */
 
 .seller-store-save-row {
-
-    padding:
-        21px 25px;
+    padding: 21px 25px;
 
     display: flex;
-
     justify-content: flex-end;
 
     background: #fafcff;
 
     border-top:
-        1px solid
-        #edf1f6;
+        1px solid #edf1f6;
 }
 
-
 .seller-store-save {
-
     min-height: 45px;
 
-    padding:
-        0 19px;
+    padding: 0 19px;
 
     display: inline-flex;
-
     align-items: center;
-
     justify-content: center;
-
     gap: 7px;
 
     color: #ffffff;
 
     background:
-
         linear-gradient(
             135deg,
             #2563eb,
@@ -2727,7 +2438,6 @@ input:checked +
         );
 
     border: none;
-
     border-radius: 12px;
 
     box-shadow:
@@ -2742,7 +2452,6 @@ input:checked +
     font-family: inherit;
 
     font-size: 9px;
-
     font-weight: 850;
 
     cursor: pointer;
@@ -2754,22 +2463,17 @@ input:checked +
 ========================================================= */
 
 .seller-store-side {
-
     display: grid;
-
     gap: 17px;
 }
 
-
 .seller-store-summary {
-
     padding: 22px;
 
     background: #ffffff;
 
     border:
-        1px solid
-        #e0e7f1;
+        1px solid #e0e7f1;
 
     border-radius: 21px;
 
@@ -2783,28 +2487,21 @@ input:checked +
         );
 }
 
-
 .seller-store-logo {
-
     width: 103px;
-
     height: 103px;
 
-    margin:
-        0 auto 15px;
+    margin: 0 auto 15px;
 
     overflow: hidden;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     color: #4169e1;
 
     background:
-
         linear-gradient(
             135deg,
             #eef4ff,
@@ -2812,29 +2509,21 @@ input:checked +
         );
 
     border:
-        1px solid
-        #e0e5ef;
+        1px solid #e0e5ef;
 
     border-radius: 22px;
 
     font-size: 34px;
 }
 
-
 .seller-store-logo img {
-
     width: 100%;
-
     height: 100%;
-
     object-fit: cover;
 }
 
-
 .seller-store-summary h3 {
-
-    margin:
-        0 0 4px;
+    margin: 0 0 4px;
 
     text-align: center;
 
@@ -2843,11 +2532,8 @@ input:checked +
     font-size: 17px;
 }
 
-
 .seller-store-category {
-
-    margin:
-        0 0 18px;
+    margin: 0 0 18px;
 
     text-align: center;
 
@@ -2856,80 +2542,55 @@ input:checked +
     font-size: 9px;
 }
 
-
 .seller-store-info-row {
-
-    padding:
-        11px 0;
+    padding: 11px 0;
 
     display: flex;
-
     align-items: center;
-
     justify-content: space-between;
 
     gap: 15px;
 
     border-top:
-        1px solid
-        #edf1f6;
+        1px solid #edf1f6;
 
     font-size: 9px;
 }
 
-
 .seller-store-info-row span {
-
     color: #7f8da3;
 }
 
-
 .seller-store-info-row strong {
-
     color: #213b62;
-
     text-align: right;
 }
 
-
 .seller-store-status {
-
-    padding:
-        5px 8px;
+    padding: 5px 8px;
 
     display: inline-flex;
-
     align-items: center;
 
     border-radius: 999px;
 
     font-size: 8px;
-
     font-weight: 850;
 }
 
-
 .seller-store-status.approved {
-
     color: #047857;
-
     background: #e9f9ef;
 }
 
-
 .seller-store-status.pending {
-
     color: #a15c00;
-
     background: #fff4d8;
 }
 
-
 .seller-store-status.rejected,
 .seller-store-status.suspended {
-
     color: #b42318;
-
     background: #ffefed;
 }
 
@@ -2939,13 +2600,11 @@ input:checked +
 ========================================================= */
 
 .seller-store-guide {
-
     padding: 21px;
 
     color: #ffffff;
 
     background:
-
         linear-gradient(
             135deg,
             #123b7a,
@@ -2964,19 +2623,14 @@ input:checked +
         );
 }
 
-
 .seller-store-guide-icon {
-
     width: 42px;
-
     height: 42px;
 
     margin-bottom: 13px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     background:
@@ -2992,18 +2646,12 @@ input:checked +
     font-size: 16px;
 }
 
-
 .seller-store-guide h3 {
-
-    margin:
-        0 0 7px;
-
+    margin: 0 0 7px;
     font-size: 13px;
 }
 
-
 .seller-store-guide p {
-
     margin: 0;
 
     color:
@@ -3015,7 +2663,6 @@ input:checked +
         );
 
     font-size: 9px;
-
     line-height: 1.7;
 }
 
@@ -3024,19 +2671,13 @@ input:checked +
    RESPONSIVE
 ========================================================= */
 
-@media (
-    max-width: 1100px
-) {
+@media (max-width: 1100px) {
 
     .seller-store-layout {
-
-        grid-template-columns:
-            1fr;
+        grid-template-columns: 1fr;
     }
 
-
     .seller-store-side {
-
         grid-template-columns:
             repeat(
                 2,
@@ -3049,26 +2690,18 @@ input:checked +
 }
 
 
-@media (
-    max-width: 850px
-) {
+@media (max-width: 850px) {
 
     .seller-store-main {
-
         width: 100%;
-
         margin-left: 0;
     }
 
-
     .seller-store-topbar {
-
         padding-left: 70px;
     }
 
-
     .seller-store-content {
-
         padding:
             24px
             20px
@@ -3077,82 +2710,66 @@ input:checked +
 }
 
 
-@media (
-    max-width: 650px
-) {
+@media (max-width: 650px) {
 
     .seller-store-topbar-user
     > div:last-child {
-
         display: none;
     }
 
-
     .seller-store-content {
-
         padding:
             20px
             14px
             45px;
     }
 
-
     .seller-store-heading {
-
         align-items: flex-start;
-
         flex-direction: column;
     }
 
-
     .seller-store-dashboard-link {
-
         width: 100%;
     }
 
-
     .seller-store-hero {
-
         min-height: auto;
 
         padding: 24px;
 
         align-items: flex-start;
-
         flex-direction: column;
     }
 
-
     .seller-store-hero-status {
-
         width: 100%;
     }
 
-
     .seller-store-field-grid,
     .store-delivery-grid,
-    .seller-store-side {
-
-        grid-template-columns:
-            1fr;
+    .seller-store-side,
+    .store-coordinate-grid {
+        grid-template-columns: 1fr;
     }
 
+    .store-location-top {
+        flex-direction: column;
+    }
+
+    .store-location-button {
+        width: 100%;
+    }
 
     .store-form-section {
-
         padding: 20px;
     }
 
-
     .seller-store-save-row {
-
-        padding:
-            18px 20px;
+        padding: 18px 20px;
     }
 
-
     .seller-store-save {
-
         width: 100%;
     }
 }
@@ -3187,24 +2804,18 @@ require_once __DIR__ .
 
     <header class="seller-store-topbar">
 
-
         <span class="seller-store-topbar-label">
-
             Seller Center
-
         </span>
 
 
         <div class="seller-store-topbar-user">
 
-
             <div class="seller-store-topbar-avatar">
-
 
                 <?php if (
                     $currentLogoUrl !== ''
                 ): ?>
-
 
                     <img
                         src="<?= storeProfileEscape(
@@ -3213,46 +2824,34 @@ require_once __DIR__ .
                         alt="Store"
                     >
 
-
                 <?php else: ?>
-
 
                     <?= storeProfileEscape(
                         $userInitial
                     ) ?>
 
-
                 <?php endif; ?>
-
 
             </div>
 
 
             <div>
 
-
                 <strong>
-
                     <?= storeProfileEscape(
                         $ownerName
                     ) ?>
-
                 </strong>
-
 
                 <small>
                     Vendor
                 </small>
 
-
             </div>
-
 
         </div>
 
-
     </header>
-
 
 
     <!-- =========================================================
@@ -3262,37 +2861,25 @@ require_once __DIR__ .
     <div class="seller-store-content">
 
 
-        <!-- =====================================================
-             HEADING
-        ====================================================== -->
+        <!-- HEADING -->
 
         <section class="seller-store-heading">
 
-
             <div>
 
-
                 <span class="seller-store-eyebrow">
-
                     STORE MANAGEMENT
-
                 </span>
 
-
                 <h1>
-
                     Store Profile
-
                 </h1>
 
-
                 <p>
-
                     Manage your public store information,
-                    delivery settings and commission rate.
-
+                    store location, delivery settings and
+                    commission rate.
                 </p>
-
 
             </div>
 
@@ -3303,51 +2890,33 @@ require_once __DIR__ .
                 ) ?>seller/dashboard.php"
                 class="seller-store-dashboard-link"
             >
-
                 <i class="fa-solid fa-arrow-left"></i>
-
                 Dashboard
-
             </a>
-
 
         </section>
 
 
-
-        <!-- =====================================================
-             HERO
-        ====================================================== -->
+        <!-- HERO -->
 
         <section class="seller-store-hero">
 
-
             <div class="seller-store-hero-copy">
 
-
                 <span class="seller-store-hero-label">
-
                     SELLER WORKSPACE
-
                 </span>
 
-
                 <h2>
-
                     Build a store customers trust.
-
                 </h2>
 
-
                 <p>
-
                     Keep your business details,
-                    pickup location, postage fee,
-                    vendor delivery settings and
-                    commission rate accurate.
-
+                    pickup location, store coordinates,
+                    postage fee, vendor delivery settings
+                    and commission rate accurate.
                 </p>
-
 
             </div>
 
@@ -3362,19 +2931,14 @@ require_once __DIR__ .
 
             </div>
 
-
         </section>
 
 
-
-        <!-- =====================================================
-             ALERT
-        ====================================================== -->
+        <!-- ALERT -->
 
         <?php if (
             $successMessage !== ''
         ): ?>
-
 
             <div class="
                 seller-store-alert
@@ -3384,15 +2948,12 @@ require_once __DIR__ .
                 <i class="fa-solid fa-circle-check"></i>
 
                 <span>
-
                     <?= storeProfileEscape(
                         $successMessage
                     ) ?>
-
                 </span>
 
             </div>
-
 
         <?php endif; ?>
 
@@ -3400,7 +2961,6 @@ require_once __DIR__ .
         <?php if (
             $errorMessage !== ''
         ): ?>
-
 
             <div class="
                 seller-store-alert
@@ -3410,18 +2970,14 @@ require_once __DIR__ .
                 <i class="fa-solid fa-circle-exclamation"></i>
 
                 <span>
-
                     <?= storeProfileEscape(
                         $errorMessage
                     ) ?>
-
                 </span>
 
             </div>
 
-
         <?php endif; ?>
-
 
 
         <!-- =====================================================
@@ -3444,34 +3000,24 @@ require_once __DIR__ .
 
                 <div class="seller-store-form-header">
 
-
                     <div class="seller-store-form-icon">
-
                         <i class="fa-solid fa-store"></i>
-
                     </div>
-
 
                     <div>
 
                         <h3>
-
                             Store Settings
-
                         </h3>
 
                         <p>
-
                             Update your business,
-                            delivery and commission settings.
-
+                            location and delivery information.
                         </p>
 
                     </div>
 
-
                 </div>
-
 
 
                 <!-- =============================================
@@ -3480,16 +3026,11 @@ require_once __DIR__ .
 
                 <section class="store-form-section">
 
-
                     <div class="store-section-title">
 
-
                         <div class="store-section-title-icon">
-
-                            <i class="fa-solid fa-building"></i>
-
+                            <i class="fa-solid fa-shop"></i>
                         </div>
-
 
                         <div>
 
@@ -3498,11 +3039,11 @@ require_once __DIR__ .
                             </h4>
 
                             <p>
-                                Public information shown to customers.
+                                Information displayed
+                                to your customers.
                             </p>
 
                         </div>
-
 
                     </div>
 
@@ -3511,7 +3052,6 @@ require_once __DIR__ .
 
 
                         <div class="seller-store-field">
-
 
                             <label for="business_name">
 
@@ -3525,29 +3065,25 @@ require_once __DIR__ .
 
                             </label>
 
-
                             <input
                                 type="text"
                                 id="business_name"
                                 name="business_name"
+                                maxlength="150"
                                 value="<?= storeProfileEscape(
                                     $currentBusinessName
                                 ) ?>"
-                                maxlength="150"
                                 required
                             >
-
 
                         </div>
 
 
-
                         <div class="seller-store-field">
-
 
                             <label for="category">
 
-                                <i class="fa-solid fa-tag"></i>
+                                <i class="fa-solid fa-layer-group"></i>
 
                                 Business Category
 
@@ -3557,29 +3093,25 @@ require_once __DIR__ .
 
                             </label>
 
-
                             <input
                                 type="text"
                                 id="category"
                                 name="category"
+                                maxlength="100"
                                 value="<?= storeProfileEscape(
                                     $currentCategory
                                 ) ?>"
-                                maxlength="100"
-                                placeholder="Example: Food & Beverage"
+                                placeholder="Example: Food, Beverage, Fashion"
                                 required
                             >
 
-
                         </div>
-
 
 
                         <div class="
                             seller-store-field
                             full
                         ">
-
 
                             <label for="business_description">
 
@@ -3589,26 +3121,21 @@ require_once __DIR__ .
 
                             </label>
 
-
                             <textarea
                                 id="business_description"
                                 name="business_description"
-                                maxlength="2000"
                                 placeholder="Tell customers about your store..."
                             ><?= storeProfileEscape(
                                 $currentBusinessDescription
                             ) ?></textarea>
 
-
                         </div>
-
 
 
                         <div class="
                             seller-store-field
                             full
                         ">
-
 
                             <label for="business_address">
 
@@ -3618,34 +3145,25 @@ require_once __DIR__ .
 
                             </label>
 
-
                             <textarea
                                 id="business_address"
                                 name="business_address"
-                                maxlength="1000"
-                                placeholder="Enter the complete store address..."
+                                placeholder="Enter your full business or pickup address..."
                             ><?= storeProfileEscape(
                                 $currentBusinessAddress
                             ) ?></textarea>
 
-
                             <small>
-
-                                Required when Pickup
-                                is available.
-
+                                Required when Pickup is enabled.
                             </small>
 
-
                         </div>
-
 
 
                         <div class="
                             seller-store-field
                             full
                         ">
-
 
                             <label for="business_logo">
 
@@ -3655,50 +3173,225 @@ require_once __DIR__ .
 
                             </label>
 
-
                             <input
                                 type="file"
                                 id="business_logo"
                                 name="business_logo"
-                                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                                 class="store-file-input"
+                                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                             >
 
-
                             <small>
-
                                 JPG, PNG or WEBP.
-                                Maximum file size 5MB.
-
+                                Maximum size 5MB.
                             </small>
-
 
                         </div>
 
 
                     </div>
 
-
                 </section>
 
 
-
                 <!-- =============================================
-                     DELIVERY SETTINGS
+                     STORE LOCATION - NEARBY STORES
                 ============================================== -->
 
                 <section class="store-form-section">
 
-
                     <div class="store-section-title">
 
-
                         <div class="store-section-title-icon">
+                            <i class="fa-solid fa-location-crosshairs"></i>
+                        </div>
 
-                            <i class="fa-solid fa-truck"></i>
+                        <div>
+
+                            <h4>
+                                Store Location
+                            </h4>
+
+                            <p>
+                                Used to show your store
+                                to nearby customers.
+                            </p>
 
                         </div>
 
+                    </div>
+
+
+                    <div class="store-location-box">
+
+
+                        <div class="store-location-top">
+
+                            <div class="store-location-copy">
+
+                                <strong>
+                                    Set Your Store Location
+                                </strong>
+
+                                <p>
+                                    Go to your physical store
+                                    location and press the button.
+                                    Your browser will request
+                                    permission to access your
+                                    current location.
+                                </p>
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                id="getStoreLocation"
+                                class="store-location-button"
+                            >
+
+                                <i class="fa-solid fa-location-crosshairs"></i>
+
+                                Use My Current Location
+
+                            </button>
+
+                        </div>
+
+
+                        <input
+                            type="hidden"
+                            id="latitude"
+                            name="latitude"
+                            value="<?= storeProfileEscape(
+                                $currentLatitude
+                            ) ?>"
+                        >
+
+                        <input
+                            type="hidden"
+                            id="longitude"
+                            name="longitude"
+                            value="<?= storeProfileEscape(
+                                $currentLongitude
+                            ) ?>"
+                        >
+
+
+                        <div
+                            id="locationStatus"
+                            class="
+                                store-location-status
+                                <?= $hasStoreLocation
+                                    ? 'success'
+                                    : '' ?>
+                            "
+                        >
+
+                            <i
+                                id="locationStatusIcon"
+                                class="<?= $hasStoreLocation
+                                    ? 'fa-solid fa-circle-check'
+                                    : 'fa-solid fa-circle-info' ?>"
+                            ></i>
+
+                            <span id="locationStatusText">
+
+                                <?php if (
+                                    $hasStoreLocation
+                                ): ?>
+
+                                    Store location is saved.
+                                    Press "Use My Current Location"
+                                    again if you want to update it.
+
+                                <?php else: ?>
+
+                                    Store location has not been set yet.
+
+                                <?php endif; ?>
+
+                            </span>
+
+                        </div>
+
+
+                        <div class="store-coordinate-grid">
+
+
+                            <div class="store-coordinate">
+
+                                <span>
+                                    LATITUDE
+                                </span>
+
+                                <strong id="latitudeDisplay">
+
+                                    <?= $currentLatitude !== ''
+                                        ? storeProfileEscape(
+                                            $currentLatitude
+                                        )
+                                        : 'Not set' ?>
+
+                                </strong>
+
+                            </div>
+
+
+                            <div class="store-coordinate">
+
+                                <span>
+                                    LONGITUDE
+                                </span>
+
+                                <strong id="longitudeDisplay">
+
+                                    <?= $currentLongitude !== ''
+                                        ? storeProfileEscape(
+                                            $currentLongitude
+                                        )
+                                        : 'Not set' ?>
+
+                                </strong>
+
+                            </div>
+
+
+                        </div>
+
+
+                        <div class="store-location-note">
+
+                            <i class="fa-solid fa-shield-halved"></i>
+
+                            <span>
+                                Location is only captured after
+                                you allow browser location access.
+                                The saved coordinates will be used
+                                by HochipoHub's Nearby Stores
+                                feature to calculate distance
+                                between customers and your store.
+                            </span>
+
+                        </div>
+
+
+                    </div>
+
+                </section>
+
+
+                <!-- =============================================
+                     DELIVERY
+                ============================================== -->
+
+                <section class="store-form-section">
+
+                    <div class="store-section-title">
+
+                        <div class="store-section-title-icon">
+                            <i class="fa-solid fa-truck"></i>
+                        </div>
 
                         <div>
 
@@ -3707,14 +3400,13 @@ require_once __DIR__ .
                             </h4>
 
                             <p>
-                                Choose how customers receive orders.
+                                Choose how customers
+                                receive their orders.
                             </p>
 
                         </div>
 
-
                     </div>
-
 
 
                     <div class="store-delivery-grid">
@@ -3722,19 +3414,16 @@ require_once __DIR__ .
 
                         <label class="store-delivery-choice">
 
-
                             <input
                                 type="radio"
                                 name="delivery_method"
                                 value="Pickup"
-                                <?= $currentDeliveryMethod ===
-                                    'Pickup'
-                                        ? 'checked'
-                                        : '' ?>
+                                <?= $currentDeliveryMethod === 'Pickup'
+                                    ? 'checked'
+                                    : '' ?>
                             >
 
-
-                            <div class="store-delivery-card">
+                            <span class="store-delivery-card">
 
                                 <i class="fa-solid fa-store"></i>
 
@@ -3743,34 +3432,27 @@ require_once __DIR__ .
                                 </strong>
 
                                 <small>
-
                                     Customers collect
                                     orders from your store.
-
                                 </small>
 
-                            </div>
-
+                            </span>
 
                         </label>
 
 
-
                         <label class="store-delivery-choice">
-
 
                             <input
                                 type="radio"
                                 name="delivery_method"
                                 value="Postage"
-                                <?= $currentDeliveryMethod ===
-                                    'Postage'
-                                        ? 'checked'
-                                        : '' ?>
+                                <?= $currentDeliveryMethod === 'Postage'
+                                    ? 'checked'
+                                    : '' ?>
                             >
 
-
-                            <div class="store-delivery-card">
+                            <span class="store-delivery-card">
 
                                 <i class="fa-solid fa-box"></i>
 
@@ -3779,34 +3461,27 @@ require_once __DIR__ .
                                 </strong>
 
                                 <small>
-
                                     Ship orders using
-                                    courier services.
-
+                                    a courier service.
                                 </small>
 
-                            </div>
-
+                            </span>
 
                         </label>
 
 
-
                         <label class="store-delivery-choice">
-
 
                             <input
                                 type="radio"
                                 name="delivery_method"
                                 value="Both"
-                                <?= $currentDeliveryMethod ===
-                                    'Both'
-                                        ? 'checked'
-                                        : '' ?>
+                                <?= $currentDeliveryMethod === 'Both'
+                                    ? 'checked'
+                                    : '' ?>
                             >
 
-
-                            <div class="store-delivery-card">
+                            <span class="store-delivery-card">
 
                                 <i class="fa-solid fa-arrows-left-right"></i>
 
@@ -3815,14 +3490,11 @@ require_once __DIR__ .
                                 </strong>
 
                                 <small>
-
-                                    Allow Pickup
-                                    and Postage.
-
+                                    Allow both pickup
+                                    and postage.
                                 </small>
 
-                            </div>
-
+                            </span>
 
                         </label>
 
@@ -3830,26 +3502,22 @@ require_once __DIR__ .
                     </div>
 
 
-
                     <!-- POSTAGE -->
 
                     <div
-                        class="store-conditional"
                         id="postageSettings"
+                        class="store-conditional"
                     >
-
 
                         <div class="seller-store-field">
 
-
                             <label for="postage_fee">
 
-                                <i class="fa-solid fa-money-bill"></i>
+                                <i class="fa-solid fa-box"></i>
 
                                 Postage Fee
 
                             </label>
-
 
                             <div class="store-money">
 
@@ -3872,12 +3540,9 @@ require_once __DIR__ .
 
                             </div>
 
-
                         </div>
 
-
                     </div>
-
 
 
                     <!-- VENDOR DELIVERY -->
@@ -3887,23 +3552,17 @@ require_once __DIR__ .
                         style="margin-top:16px;"
                     >
 
-
                         <div class="store-toggle-row">
-
 
                             <div class="store-toggle-copy">
 
                                 <strong>
-
                                     Enable Vendor Delivery
-
                                 </strong>
 
                                 <small>
-
                                     Deliver orders directly
                                     to your customers yourself.
-
                                 </small>
 
                             </div>
@@ -3925,9 +3584,7 @@ require_once __DIR__ .
 
                             </label>
 
-
                         </div>
-
 
 
                         <div
@@ -3935,12 +3592,10 @@ require_once __DIR__ .
                             style="margin-top:15px;"
                         >
 
-
                             <div class="seller-store-field-grid">
 
 
                                 <div class="seller-store-field">
-
 
                                     <label for="vendor_delivery_fee">
 
@@ -3949,7 +3604,6 @@ require_once __DIR__ .
                                         Vendor Delivery Fee
 
                                     </label>
-
 
                                     <div class="store-money">
 
@@ -3972,13 +3626,10 @@ require_once __DIR__ .
 
                                     </div>
 
-
                                 </div>
 
 
-
                                 <div class="seller-store-field">
-
 
                                     <label>
 
@@ -3991,7 +3642,6 @@ require_once __DIR__ .
 
                                     <div class="store-toggle-row">
 
-
                                         <div class="store-toggle-copy">
 
                                             <strong>
@@ -3999,10 +3649,8 @@ require_once __DIR__ .
                                             </strong>
 
                                             <small>
-
                                                 Customer can pay
                                                 cash during delivery.
-
                                             </small>
 
                                         </div>
@@ -4024,24 +3672,18 @@ require_once __DIR__ .
 
                                         </label>
 
-
                                     </div>
-
 
                                 </div>
 
 
                             </div>
 
-
                         </div>
-
 
                     </div>
 
-
                 </section>
-
 
 
                 <!-- =============================================
@@ -4050,44 +3692,31 @@ require_once __DIR__ .
 
                 <section class="store-form-section">
 
-
                     <div class="store-section-title">
 
-
                         <div class="store-section-title-icon">
-
                             <i class="fa-solid fa-percent"></i>
-
                         </div>
-
 
                         <div>
 
                             <h4>
-
                                 Commission Rate
-
                             </h4>
 
                             <p>
-
                                 Set your preferred
                                 commission percentage.
-
                             </p>
 
                         </div>
 
-
                     </div>
-
 
 
                     <div class="store-commission-box">
 
-
                         <div class="seller-store-field">
-
 
                             <label for="commission_rate">
 
@@ -4104,7 +3733,6 @@ require_once __DIR__ .
 
                             <div class="store-percent">
 
-
                                 <input
                                     type="number"
                                     id="commission_rate"
@@ -4120,27 +3748,21 @@ require_once __DIR__ .
                                     required
                                 >
 
-
                                 <span>
                                     %
                                 </span>
-
 
                             </div>
 
 
                             <small>
-
                                 Minimum commission rate
                                 is <strong>5%</strong>.
                                 You may choose any rate
                                 from 5% up to 100%.
-
                             </small>
 
-
                         </div>
-
 
 
                         <div class="store-commission-notice">
@@ -4148,23 +3770,18 @@ require_once __DIR__ .
                             <i class="fa-solid fa-circle-info"></i>
 
                             <div>
-
                                 You control your store's
                                 commission rate. HochipoHub
                                 requires a minimum rate of
                                 <strong>5%</strong>. A rate
                                 below 5% will not be saved.
-
                             </div>
 
                         </div>
 
-
                     </div>
 
-
                 </section>
-
 
 
                 <!-- =============================================
@@ -4172,7 +3789,6 @@ require_once __DIR__ .
                 ============================================== -->
 
                 <div class="seller-store-save-row">
-
 
                     <button
                         type="submit"
@@ -4185,12 +3801,10 @@ require_once __DIR__ .
 
                     </button>
 
-
                 </div>
 
 
             </form>
-
 
 
             <!-- =================================================
@@ -4204,14 +3818,11 @@ require_once __DIR__ .
 
                 <section class="seller-store-summary">
 
-
                     <div class="seller-store-logo">
-
 
                         <?php if (
                             $currentLogoUrl !== ''
                         ): ?>
-
 
                             <img
                                 src="<?= storeProfileEscape(
@@ -4222,15 +3833,11 @@ require_once __DIR__ .
                                 ) ?>"
                             >
 
-
                         <?php else: ?>
-
 
                             <i class="fa-solid fa-store"></i>
 
-
                         <?php endif; ?>
-
 
                     </div>
 
@@ -4257,7 +3864,6 @@ require_once __DIR__ .
                     </p>
 
 
-
                     <div class="seller-store-info-row">
 
                         <span>
@@ -4265,15 +3871,12 @@ require_once __DIR__ .
                         </span>
 
                         <strong>
-
                             <?= storeProfileEscape(
                                 $ownerName
                             ) ?>
-
                         </strong>
 
                     </div>
-
 
 
                     <div class="seller-store-info-row">
@@ -4293,7 +3896,6 @@ require_once __DIR__ .
                         </strong>
 
                     </div>
-
 
 
                     <div class="seller-store-info-row">
@@ -4324,6 +3926,22 @@ require_once __DIR__ .
                     </div>
 
 
+                    <div class="seller-store-info-row">
+
+                        <span>
+                            Store Location
+                        </span>
+
+                        <strong id="summaryLocation">
+
+                            <?= $hasStoreLocation
+                                ? 'Saved'
+                                : 'Not Set' ?>
+
+                        </strong>
+
+                    </div>
+
 
                     <div class="seller-store-info-row">
 
@@ -4332,15 +3950,12 @@ require_once __DIR__ .
                         </span>
 
                         <strong>
-
                             <?= storeProfileEscape(
                                 $currentDeliveryMethod
                             ) ?>
-
                         </strong>
 
                     </div>
-
 
 
                     <div class="seller-store-info-row">
@@ -4363,7 +3978,6 @@ require_once __DIR__ .
                     </div>
 
 
-
                     <div class="seller-store-info-row">
 
                         <span>
@@ -4381,7 +3995,6 @@ require_once __DIR__ .
                     </div>
 
 
-
                     <div class="seller-store-info-row">
 
                         <span>
@@ -4397,7 +4010,6 @@ require_once __DIR__ .
                         </strong>
 
                     </div>
-
 
 
                     <div class="seller-store-info-row">
@@ -4418,40 +4030,29 @@ require_once __DIR__ .
 
                     </div>
 
-
                 </section>
-
 
 
                 <!-- GUIDE -->
 
                 <section class="seller-store-guide">
 
-
                     <div class="seller-store-guide-icon">
-
                         <i class="fa-solid fa-lightbulb"></i>
-
                     </div>
 
-
                     <h3>
-
                         Store Profile Tips
-
                     </h3>
 
-
                     <p>
-
                         Keep your store information,
-                        pickup address and delivery fees
-                        accurate. You may also set your
-                        preferred commission rate, but
-                        HochipoHub requires at least 5%.
-
+                        pickup address and location accurate
+                        so customers can discover your store
+                        through Nearby Stores. You may also
+                        set your preferred commission rate,
+                        but HochipoHub requires at least 5%.
                     </p>
-
 
                 </section>
 
@@ -4472,13 +4073,20 @@ require_once __DIR__ .
 
 /*
 |--------------------------------------------------------------------------
-| DELIVERY UI
+| PAGE UI
 |--------------------------------------------------------------------------
 */
 
 document.addEventListener(
     'DOMContentLoaded',
     function () {
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ELEMENTS
+        |--------------------------------------------------------------------------
+        */
 
         const deliveryRadios =
             document.querySelectorAll(
@@ -4494,7 +4102,6 @@ document.addEventListener(
             document.getElementById(
                 'postage_fee'
             );
-
 
         const vendorDeliveryToggle =
             document.getElementById(
@@ -4516,10 +4123,61 @@ document.addEventListener(
                 'cod_enabled'
             );
 
-
         const commissionRate =
             document.getElementById(
                 'commission_rate'
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | LOCATION ELEMENTS
+        |--------------------------------------------------------------------------
+        */
+
+        const getStoreLocationButton =
+            document.getElementById(
+                'getStoreLocation'
+            );
+
+        const latitudeInput =
+            document.getElementById(
+                'latitude'
+            );
+
+        const longitudeInput =
+            document.getElementById(
+                'longitude'
+            );
+
+        const latitudeDisplay =
+            document.getElementById(
+                'latitudeDisplay'
+            );
+
+        const longitudeDisplay =
+            document.getElementById(
+                'longitudeDisplay'
+            );
+
+        const locationStatus =
+            document.getElementById(
+                'locationStatus'
+            );
+
+        const locationStatusIcon =
+            document.getElementById(
+                'locationStatusIcon'
+            );
+
+        const locationStatusText =
+            document.getElementById(
+                'locationStatusText'
+            );
+
+        const summaryLocation =
+            document.getElementById(
+                'summaryLocation'
             );
 
 
@@ -4536,29 +4194,23 @@ document.addEventListener(
                     'input[name="delivery_method"]:checked'
                 );
 
-
             const method =
                 selected
                     ? selected.value
                     : 'Both';
 
-
             const showPostage =
                 method === 'Postage' ||
                 method === 'Both';
 
-
             if (postageSettings) {
-
                 postageSettings.style.display =
                     showPostage
                         ? 'block'
                         : 'none';
             }
 
-
             if (postageFee) {
-
                 postageFee.disabled =
                     !showPostage;
             }
@@ -4572,6 +4224,7 @@ document.addEventListener(
                     'change',
                     updatePostageSettings
                 );
+
             }
         );
 
@@ -4588,7 +4241,6 @@ document.addEventListener(
                 vendorDeliveryToggle &&
                 vendorDeliveryToggle.checked;
 
-
             if (vendorDeliverySettings) {
 
                 vendorDeliverySettings.style.display =
@@ -4597,22 +4249,17 @@ document.addEventListener(
                         : 'none';
             }
 
-
             if (vendorDeliveryFee) {
-
                 vendorDeliveryFee.disabled =
                     !enabled;
             }
-
 
             if (codEnabled) {
 
                 codEnabled.disabled =
                     !enabled;
 
-
                 if (!enabled) {
-
                     codEnabled.checked =
                         false;
                 }
@@ -4646,7 +4293,6 @@ document.addEventListener(
                             commissionRate.value
                         );
 
-
                     if (
                         commissionRate.value !== '' &&
                         !Number.isNaN(value) &&
@@ -4679,6 +4325,230 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
+        | LOCATION STATUS HELPER
+        |--------------------------------------------------------------------------
+        */
+
+        function setLocationStatus(
+            type,
+            message,
+            iconClass
+        ) {
+
+            if (!locationStatus) {
+                return;
+            }
+
+            locationStatus.classList.remove(
+                'success',
+                'error',
+                'loading'
+            );
+
+            if (type) {
+                locationStatus.classList.add(
+                    type
+                );
+            }
+
+            if (locationStatusText) {
+                locationStatusText.textContent =
+                    message;
+            }
+
+            if (locationStatusIcon) {
+                locationStatusIcon.className =
+                    iconClass;
+            }
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | GET CURRENT STORE LOCATION
+        |--------------------------------------------------------------------------
+        */
+
+        if (getStoreLocationButton) {
+
+            getStoreLocationButton.addEventListener(
+                'click',
+                function () {
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CHECK GEOLOCATION SUPPORT
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (!navigator.geolocation) {
+
+                        setLocationStatus(
+                            'error',
+                            'Geolocation is not supported by this browser.',
+                            'fa-solid fa-circle-exclamation'
+                        );
+
+                        return;
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | LOADING
+                    |--------------------------------------------------------------------------
+                    */
+
+                    getStoreLocationButton.disabled =
+                        true;
+
+                    getStoreLocationButton.innerHTML =
+                        '<i class="fa-solid fa-spinner fa-spin"></i> Detecting Location...';
+
+
+                    setLocationStatus(
+                        'loading',
+                        'Detecting your current location. Please allow location access when your browser asks for permission.',
+                        'fa-solid fa-location-crosshairs'
+                    );
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | REQUEST LOCATION
+                    |--------------------------------------------------------------------------
+                    */
+
+                    navigator.geolocation.getCurrentPosition(
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | SUCCESS
+                        |--------------------------------------------------------------------------
+                        */
+
+                        function (position) {
+
+                            const latitude =
+                                Number(
+                                    position.coords.latitude
+                                ).toFixed(8);
+
+                            const longitude =
+                                Number(
+                                    position.coords.longitude
+                                ).toFixed(8);
+
+
+                            if (latitudeInput) {
+                                latitudeInput.value =
+                                    latitude;
+                            }
+
+                            if (longitudeInput) {
+                                longitudeInput.value =
+                                    longitude;
+                            }
+
+                            if (latitudeDisplay) {
+                                latitudeDisplay.textContent =
+                                    latitude;
+                            }
+
+                            if (longitudeDisplay) {
+                                longitudeDisplay.textContent =
+                                    longitude;
+                            }
+
+                            if (summaryLocation) {
+                                summaryLocation.textContent =
+                                    'Ready to Save';
+                            }
+
+
+                            setLocationStatus(
+                                'success',
+                                'Location detected successfully. Click "Save Store Profile" to save this location.',
+                                'fa-solid fa-circle-check'
+                            );
+
+
+                            getStoreLocationButton.disabled =
+                                false;
+
+                            getStoreLocationButton.innerHTML =
+                                '<i class="fa-solid fa-location-crosshairs"></i> Update Current Location';
+                        },
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | ERROR
+                        |--------------------------------------------------------------------------
+                        */
+
+                        function (error) {
+
+                            let message =
+                                'Unable to detect your location.';
+
+
+                            if (error.code === 1) {
+
+                                message =
+                                    'Location permission was denied. Please allow location access in your browser and try again.';
+
+                            } else if (
+                                error.code === 2
+                            ) {
+
+                                message =
+                                    'Your current location is unavailable. Please check your device location service and try again.';
+
+                            } else if (
+                                error.code === 3
+                            ) {
+
+                                message =
+                                    'Location request timed out. Please try again.';
+                            }
+
+
+                            setLocationStatus(
+                                'error',
+                                message,
+                                'fa-solid fa-circle-exclamation'
+                            );
+
+
+                            getStoreLocationButton.disabled =
+                                false;
+
+                            getStoreLocationButton.innerHTML =
+                                '<i class="fa-solid fa-location-crosshairs"></i> Use My Current Location';
+                        },
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | GEOLOCATION OPTIONS
+                        |--------------------------------------------------------------------------
+                        */
+
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 15000,
+                            maximumAge: 0
+                        }
+                    );
+                }
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
         | INITIAL
         |--------------------------------------------------------------------------
         */
@@ -4686,6 +4556,7 @@ document.addEventListener(
         updatePostageSettings();
 
         updateVendorDeliverySettings();
+
     }
 );
 
