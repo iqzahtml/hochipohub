@@ -3294,3 +3294,21 @@ document.addEventListener(
 );
 
 </script>
+
+
+<!-- =========================================================
+     AJAX PRODUCT SEARCH SCRIPT
+========================================================= -->
+<script
+    src="<?= navE(
+        navUrl('js/search.js')
+        . '?v='
+        . (
+            file_exists(dirname(__DIR__) . '/js/search.js')
+                ? filemtime(dirname(__DIR__) . '/js/search.js')
+                : time()
+        )
+    ) ?>"
+    defer
+></script>
+
