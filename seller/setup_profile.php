@@ -98,9 +98,8 @@ if (!$currentUser) {
 */
 
 if (
-    strtolower(
-        (string) $currentUser['role']
-    ) !== 'vendor'
+    strtolower((string) $currentUser['role'])
+    !== 'vendor'
 ) {
     header('Location: ' . BASE_URL . 'dashboard.php');
     exit;
@@ -114,6 +113,7 @@ if (
 */
 
 if (!function_exists('storeProfileEscape')) {
+
     function storeProfileEscape($value): string
     {
         return htmlspecialchars(
@@ -126,6 +126,7 @@ if (!function_exists('storeProfileEscape')) {
 
 
 if (!function_exists('storeProfileMoney')) {
+
     function storeProfileMoney($value): string
     {
         return number_format(
@@ -139,6 +140,7 @@ if (!function_exists('storeProfileMoney')) {
 
 
 if (!function_exists('storeProfileStatusClass')) {
+
     function storeProfileStatusClass($status): string
     {
         return strtolower(
@@ -166,10 +168,8 @@ $vendorStmt = $db->prepare("
         v.business_logo,
         v.business_description,
         v.business_address,
-
         v.latitude,
         v.longitude,
-
         v.category,
         v.delivery_method,
         v.postage_fee,
@@ -213,6 +213,7 @@ if (!$vendor) {
             ? trim((string) $currentUser['name'])
             : 'My Store';
 
+
     $createVendor = $db->prepare("
         INSERT INTO vendors
         (
@@ -240,14 +241,17 @@ if (!$vendor) {
         )
     ");
 
+
     $createVendor->execute([
         $userId,
         $defaultBusinessName
     ]);
 
+
     $vendorStmt->execute([$userId]);
 
-    $vendor = $vendorStmt->fetch(PDO::FETCH_ASSOC);
+    $vendor =
+        $vendorStmt->fetch(PDO::FETCH_ASSOC);
 }
 
 
@@ -257,32 +261,32 @@ if (!$vendor) {
 |--------------------------------------------------------------------------
 */
 
-$vendorId = (int) ($vendor['vendor_id'] ?? 0);
+$vendorId =
+    (int) ($vendor['vendor_id'] ?? 0);
+
 
 $currentBusinessName =
     (string) ($vendor['business_name'] ?? '');
 
+
 $currentBusinessLogo =
     (string) ($vendor['business_logo'] ?? '');
+
 
 $currentBusinessDescription =
     (string) ($vendor['business_description'] ?? '');
 
+
 $currentBusinessAddress =
     (string) ($vendor['business_address'] ?? '');
 
-
-/*
-|--------------------------------------------------------------------------
-| CURRENT LOCATION
-|--------------------------------------------------------------------------
-*/
 
 $currentLatitude =
     isset($vendor['latitude']) &&
     $vendor['latitude'] !== null
         ? (string) $vendor['latitude']
         : '';
+
 
 $currentLongitude =
     isset($vendor['longitude']) &&
@@ -294,20 +298,26 @@ $currentLongitude =
 $currentCategory =
     (string) ($vendor['category'] ?? '');
 
+
 $currentDeliveryMethod =
     (string) ($vendor['delivery_method'] ?? 'Both');
+
 
 $currentPostageFee =
     (float) ($vendor['postage_fee'] ?? 0);
 
+
 $currentAllowVendorDelivery =
     (int) ($vendor['allow_vendor_delivery'] ?? 0);
+
 
 $currentCodEnabled =
     (int) ($vendor['cod_enabled'] ?? 0);
 
+
 $currentVendorDeliveryFee =
     (float) ($vendor['vendor_delivery_fee'] ?? 0);
+
 
 $currentCommissionRate =
     (float) ($vendor['commission_rate'] ?? 5);
@@ -330,25 +340,20 @@ $currentApprovalStatus =
 
 /*
 |--------------------------------------------------------------------------
-| FLASH
+| FLASH MESSAGE
 |--------------------------------------------------------------------------
 */
 
 $successMessage = '';
 $errorMessage = '';
 
-if (
-    isset(
-        $_SESSION['store_profile_success']
-    )
-) {
-    $successMessage =
-        (string)
-        $_SESSION['store_profile_success'];
 
-    unset(
-        $_SESSION['store_profile_success']
-    );
+if (isset($_SESSION['store_profile_success'])) {
+
+    $successMessage =
+        (string) $_SESSION['store_profile_success'];
+
+    unset($_SESSION['store_profile_success']);
 }
 
 
@@ -359,6 +364,7 @@ if (
 */
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
 
     /*
     |--------------------------------------------------------------------------
@@ -374,6 +380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             )
         );
 
+
     $businessDescription =
         trim(
             (string) (
@@ -382,6 +389,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             )
         );
 
+
     $businessAddress =
         trim(
             (string) (
@@ -389,6 +397,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ?? ''
             )
         );
+
 
     $category =
         trim(
@@ -401,7 +410,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /*
     |--------------------------------------------------------------------------
-    | STORE LOCATION
+    | LOCATION
     |--------------------------------------------------------------------------
     */
 
@@ -413,6 +422,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             )
         );
 
+
     $longitudeInput =
         trim(
             (string) (
@@ -421,8 +431,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             )
         );
 
+
     $latitude = null;
     $longitude = null;
+
 
     if (
         $latitudeInput !== '' ||
@@ -433,6 +445,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $latitudeInput === '' ||
             $longitudeInput === ''
         ) {
+
             $errorMessage =
                 'Both latitude and longitude are required for store location.';
 
@@ -440,6 +453,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             !is_numeric($latitudeInput) ||
             !is_numeric($longitudeInput)
         ) {
+
             $errorMessage =
                 'Invalid store location coordinates.';
 
@@ -451,10 +465,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $longitude =
                 (float) $longitudeInput;
 
+
             if (
                 $latitude < -90 ||
                 $latitude > 90
             ) {
+
                 $errorMessage =
                     'Invalid latitude value.';
 
@@ -462,6 +478,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $longitude < -180 ||
                 $longitude > 180
             ) {
+
                 $errorMessage =
                     'Invalid longitude value.';
             }
@@ -483,20 +500,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             )
         );
 
+
     $postageFee =
         isset($_POST['postage_fee'])
             ? (float) $_POST['postage_fee']
             : 0.00;
+
 
     $allowVendorDelivery =
         isset($_POST['allow_vendor_delivery'])
             ? 1
             : 0;
 
+
     $codEnabled =
         isset($_POST['cod_enabled'])
             ? 1
             : 0;
+
 
     $vendorDeliveryFee =
         isset($_POST['vendor_delivery_fee'])
@@ -518,6 +539,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             )
         );
 
+
     $commissionRate =
         is_numeric($commissionInput)
             ? (float) $commissionInput
@@ -536,10 +558,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'Both'
     ];
 
+
     if (
         $errorMessage === '' &&
         $businessName === ''
     ) {
+
         $errorMessage =
             'Business name is required.';
 
@@ -547,6 +571,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errorMessage === '' &&
         $category === ''
     ) {
+
         $errorMessage =
             'Business category is required.';
 
@@ -558,6 +583,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             true
         )
     ) {
+
         $errorMessage =
             'Invalid delivery method.';
 
@@ -573,6 +599,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ) &&
         $businessAddress === ''
     ) {
+
         $errorMessage =
             'Business / pickup address is required when Pickup is enabled.';
 
@@ -580,6 +607,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errorMessage === '' &&
         $postageFee < 0
     ) {
+
         $errorMessage =
             'Postage fee cannot be negative.';
 
@@ -587,6 +615,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errorMessage === '' &&
         $vendorDeliveryFee < 0
     ) {
+
         $errorMessage =
             'Vendor delivery fee cannot be negative.';
 
@@ -597,6 +626,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             !is_numeric($commissionInput)
         )
     ) {
+
         $errorMessage =
             'Please enter a valid commission rate.';
 
@@ -604,6 +634,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errorMessage === '' &&
         $commissionRate < 5
     ) {
+
         $errorMessage =
             'Commission rate must be at least 5%.';
 
@@ -611,6 +642,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errorMessage === '' &&
         $commissionRate > 100
     ) {
+
         $errorMessage =
             'Commission rate cannot exceed 100%.';
     }
@@ -626,8 +658,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postageFee = 0.00;
     }
 
+
     if (!$allowVendorDelivery) {
+
         $vendorDeliveryFee = 0.00;
+
         $codEnabled = 0;
     }
 
@@ -652,6 +687,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     */
 
     if ($latitude !== null) {
+
         $latitude =
             number_format(
                 $latitude,
@@ -661,7 +697,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
     }
 
+
     if ($longitude !== null) {
+
         $longitude =
             number_format(
                 $longitude,
@@ -681,6 +719,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $newLogo =
         $currentBusinessLogo;
 
+
     if (
         $errorMessage === '' &&
         isset($_FILES['business_logo']) &&
@@ -693,6 +732,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_FILES['business_logo']['error']
             !== UPLOAD_ERR_OK
         ) {
+
             $errorMessage =
                 'Unable to upload business logo.';
 
@@ -701,10 +741,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $maxSize =
                 5 * 1024 * 1024;
 
+
             if (
                 (int) $_FILES['business_logo']['size']
                 > $maxSize
             ) {
+
                 $errorMessage =
                     'Business logo must be 5MB or smaller.';
 
@@ -713,17 +755,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $tmpFile =
                     $_FILES['business_logo']['tmp_name'];
 
+
                 $mimeType = '';
 
+
                 if (
-                    function_exists('finfo_open')
+                    function_exists(
+                        'finfo_open'
+                    )
                 ) {
+
                     $finfo =
                         finfo_open(
                             FILEINFO_MIME_TYPE
                         );
 
+
                     if ($finfo) {
+
                         $mimeType =
                             (string)
                             finfo_file(
@@ -731,9 +780,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $tmpFile
                             );
 
-                        finfo_close($finfo);
+
+                        finfo_close(
+                            $finfo
+                        );
                     }
                 }
+
 
                 if ($mimeType === '') {
 
@@ -742,22 +795,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $tmpFile
                         );
 
+
                     $mimeType =
                         $imageInfo['mime']
                         ?? '';
                 }
 
+
                 $allowedImages = [
-                    'image/jpeg' => 'jpg',
-                    'image/png'  => 'png',
-                    'image/webp' => 'webp'
+
+                    'image/jpeg' =>
+                        'jpg',
+
+                    'image/png' =>
+                        'png',
+
+                    'image/webp' =>
+                        'webp'
                 ];
+
 
                 if (
                     !isset(
-                        $allowedImages[$mimeType]
+                        $allowedImages[
+                            $mimeType
+                        ]
                     )
                 ) {
+
                     $errorMessage =
                         'Logo must be JPG, PNG or WEBP.';
 
@@ -767,17 +832,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         __DIR__ .
                         '/../uploads/vendors/';
 
+
                     if (
                         !is_dir(
                             $uploadDirectory
                         )
                     ) {
+
                         @mkdir(
                             $uploadDirectory,
                             0775,
                             true
                         );
                     }
+
 
                     if (
                         !is_dir(
@@ -787,24 +855,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $uploadDirectory
                         )
                     ) {
+
                         $errorMessage =
                             'Vendor logo folder is not writable.';
 
                     } else {
 
                         $extension =
-                            $allowedImages[$mimeType];
+                            $allowedImages[
+                                $mimeType
+                            ];
+
 
                         try {
+
                             $randomString =
                                 bin2hex(
                                     random_bytes(4)
                                 );
 
                         } catch (Throwable $e) {
+
                             $randomString =
                                 uniqid();
                         }
+
 
                         $fileName =
                             'vendor_' .
@@ -816,9 +891,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             '.' .
                             $extension;
 
+
                         $destination =
                             $uploadDirectory .
                             $fileName;
+
 
                         if (
                             !move_uploaded_file(
@@ -826,10 +903,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $destination
                             )
                         ) {
+
                             $errorMessage =
                                 'Failed to save business logo.';
 
                         } else {
+
                             $newLogo =
                                 $fileName;
                         }
@@ -852,6 +931,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $db->beginTransaction();
 
+
             $updateStmt =
                 $db->prepare("
                     UPDATE vendors
@@ -861,10 +941,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         business_logo = ?,
                         business_description = ?,
                         business_address = ?,
-
                         latitude = ?,
                         longitude = ?,
-
                         category = ?,
                         delivery_method = ?,
                         postage_fee = ?,
@@ -876,6 +954,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     WHERE vendor_id = ?
                     AND user_id = ?
                 ");
+
 
             $updateStmt->execute([
 
@@ -922,10 +1001,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $userId
             ]);
 
+
             $db->commit();
+
 
             $_SESSION['store_profile_success'] =
                 'Store profile updated successfully.';
+
 
             header(
                 'Location: ' .
@@ -941,6 +1023,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db->rollBack();
             }
 
+
             $errorMessage =
                 'Unable to update store profile. ' .
                 $exception->getMessage();
@@ -950,30 +1033,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /*
     |--------------------------------------------------------------------------
-    | KEEP FORM VALUES AFTER ERROR
+    | KEEP VALUES AFTER ERROR
     |--------------------------------------------------------------------------
     */
 
     $currentBusinessName =
         $businessName;
 
+
     $currentBusinessDescription =
         $businessDescription;
+
 
     $currentBusinessAddress =
         $businessAddress;
 
+
     $currentLatitude =
         $latitudeInput;
+
 
     $currentLongitude =
         $longitudeInput;
 
+
     $currentCategory =
         $category;
 
+
     $currentDeliveryMethod =
         $deliveryMethod;
+
 
     $currentPostageFee =
         max(
@@ -981,11 +1071,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $postageFee
         );
 
+
     $currentAllowVendorDelivery =
         $allowVendorDelivery;
 
+
     $currentCodEnabled =
         $codEnabled;
+
 
     $currentVendorDeliveryFee =
         max(
@@ -993,14 +1086,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $vendorDeliveryFee
         );
 
-    if (
-        is_numeric(
-            $commissionInput
-        )
-    ) {
+
+    if (is_numeric($commissionInput)) {
+
         $currentCommissionRate =
             (float) $commissionInput;
     }
+
 
     $currentBusinessLogo =
         $newLogo;
@@ -1018,27 +1110,33 @@ $ownerName =
     ?? $currentUser['name']
     ?? 'Vendor';
 
+
 $ownerEmail =
     $vendor['email']
     ?? $currentUser['email']
     ?? '';
+
 
 $statusClass =
     storeProfileStatusClass(
         $currentApprovalStatus
     );
 
+
 $currentLogoUrl = '';
+
 
 if (
     trim(
         (string) $currentBusinessLogo
     ) !== ''
 ) {
+
     $logoFile =
         basename(
             $currentBusinessLogo
         );
+
 
     $currentLogoUrl =
         BASE_URL .
@@ -1083,6 +1181,7 @@ $pageTitle =
 
 ?>
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
@@ -1166,16 +1265,9 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-main {
-    width:
-        calc(
-            100% -
-            var(--seller-sidebar)
-        );
-
+    width: calc(100% - var(--seller-sidebar));
     min-height: 100vh;
-
-    margin-left:
-        var(--seller-sidebar);
+    margin-left: var(--seller-sidebar);
 
     background:
         radial-gradient(
@@ -1200,13 +1292,7 @@ body.seller-dashboard-page {
     justify-content: space-between;
     gap: 20px;
 
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            .97
-        );
+    background: rgba(255, 255, 255, .97);
 
     border-bottom:
         1px solid #e8edf5;
@@ -1259,15 +1345,20 @@ body.seller-dashboard-page {
 
 .seller-store-topbar-user strong {
     display: block;
+
     color: #14213d;
+
     font-size: 11px;
     font-weight: 800;
 }
 
 .seller-store-topbar-user small {
     display: block;
+
     margin-top: 2px;
+
     color: #94a3b8;
+
     font-size: 8px;
 }
 
@@ -1279,8 +1370,13 @@ body.seller-dashboard-page {
 .seller-store-content {
     width: 100%;
     max-width: 1450px;
+
     margin: 0 auto;
-    padding: 29px 32px 65px;
+
+    padding:
+        29px
+        32px
+        65px;
 }
 
 
@@ -1299,6 +1395,7 @@ body.seller-dashboard-page {
 
 .seller-store-eyebrow {
     display: block;
+
     margin-bottom: 7px;
 
     color: #2563eb;
@@ -1306,6 +1403,7 @@ body.seller-dashboard-page {
     font-size: 8px;
     font-weight: 900;
     letter-spacing: 1.4px;
+
     text-transform: uppercase;
 }
 
@@ -1340,6 +1438,7 @@ body.seller-dashboard-page {
 
 .seller-store-dashboard-link {
     min-height: 42px;
+
     padding: 0 15px;
 
     display: inline-flex;
@@ -1377,16 +1476,19 @@ body.seller-dashboard-page {
 
 .seller-store-hero {
     position: relative;
+
     overflow: hidden;
 
     min-height: 176px;
 
     margin-bottom: 22px;
+
     padding: 31px;
 
     display: flex;
     align-items: center;
     justify-content: space-between;
+
     gap: 35px;
 
     color: #ffffff;
@@ -1462,6 +1564,7 @@ body.seller-dashboard-page {
 
 .seller-store-hero-label {
     display: block;
+
     margin-bottom: 9px;
 
     color: #b9d7ff;
@@ -1469,6 +1572,7 @@ body.seller-dashboard-page {
     font-size: 8px;
     font-weight: 900;
     letter-spacing: 1.3px;
+
     text-transform: uppercase;
 }
 
@@ -1492,6 +1596,7 @@ body.seller-dashboard-page {
 
 .seller-store-hero p {
     max-width: 670px;
+
     margin: 0;
 
     color:
@@ -1508,6 +1613,7 @@ body.seller-dashboard-page {
 
 .seller-store-hero-status {
     position: relative;
+
     z-index: 2;
 
     min-width: 140px;
@@ -1518,6 +1624,7 @@ body.seller-dashboard-page {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+
     gap: 8px;
 
     color: #ffffff;
@@ -1555,10 +1662,12 @@ body.seller-dashboard-page {
 
 .seller-store-alert {
     margin-bottom: 18px;
+
     padding: 14px 17px;
 
     display: flex;
     align-items: center;
+
     gap: 9px;
 
     border-radius: 14px;
@@ -1609,6 +1718,8 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .seller-store-form-card {
+    width: 100%;
+
     overflow: hidden;
 
     background: #ffffff;
@@ -1633,6 +1744,7 @@ body.seller-dashboard-page {
 
     display: flex;
     align-items: center;
+
     gap: 12px;
 
     border-bottom:
@@ -1692,6 +1804,8 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .store-form-section {
+    width: 100%;
+
     padding: 25px;
 
     border-bottom:
@@ -1707,6 +1821,7 @@ body.seller-dashboard-page {
 
     display: flex;
     align-items: center;
+
     gap: 11px;
 }
 
@@ -1717,6 +1832,8 @@ body.seller-dashboard-page {
     display: flex;
     align-items: center;
     justify-content: center;
+
+    flex-shrink: 0;
 
     color: #2563eb;
     background: #edf5ff;
@@ -1774,6 +1891,7 @@ body.seller-dashboard-page {
 
     display: flex;
     align-items: center;
+
     gap: 6px;
 
     color: #2d405e;
@@ -1814,11 +1932,13 @@ body.seller-dashboard-page {
 .seller-store-field input,
 .seller-store-field select {
     height: 45px;
+
     padding: 0 13px;
 }
 
 .seller-store-field textarea {
     min-height: 115px;
+
     padding: 13px;
 
     line-height: 1.65;
@@ -1830,6 +1950,7 @@ body.seller-dashboard-page {
 .seller-store-field select:focus,
 .seller-store-field textarea:focus {
     border-color: #4d8cf8;
+
     background: #ffffff;
 
     box-shadow:
@@ -1859,16 +1980,19 @@ body.seller-dashboard-page {
 ========================================================= */
 
 .store-file-input {
-    padding: 10px !important;
     height: auto !important;
+
+    padding: 10px !important;
 }
 
 
 /* =========================================================
-   STORE LOCATION
+   LOCATION
 ========================================================= */
 
 .store-location-box {
+    width: 100%;
+
     padding: 20px;
 
     background:
@@ -1893,6 +2017,7 @@ body.seller-dashboard-page {
 }
 
 .store-location-copy {
+    min-width: 0;
     flex: 1;
 }
 
@@ -1927,6 +2052,7 @@ body.seller-dashboard-page {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+
     gap: 8px;
 
     color: #ffffff;
@@ -1939,6 +2065,7 @@ body.seller-dashboard-page {
         );
 
     border: none;
+
     border-radius: 12px;
 
     box-shadow:
@@ -1951,6 +2078,7 @@ body.seller-dashboard-page {
         );
 
     font-family: inherit;
+
     font-size: 9px;
     font-weight: 850;
 
@@ -1963,16 +2091,18 @@ body.seller-dashboard-page {
 }
 
 .store-location-status {
+    width: 100%;
+
     margin-top: 16px;
 
     padding: 12px 14px;
 
     display: flex;
     align-items: flex-start;
+
     gap: 9px;
 
     color: #536780;
-
     background: #ffffff;
 
     border:
@@ -2003,6 +2133,8 @@ body.seller-dashboard-page {
 }
 
 .store-coordinate-grid {
+    width: 100%;
+
     margin-top: 16px;
 
     display: grid;
@@ -2020,6 +2152,8 @@ body.seller-dashboard-page {
 }
 
 .store-coordinate {
+    min-width: 0;
+
     padding: 12px 14px;
 
     background: #ffffff;
@@ -2042,6 +2176,10 @@ body.seller-dashboard-page {
 }
 
 .store-coordinate strong {
+    display: block;
+
+    overflow-wrap: anywhere;
+
     color: #18365e;
 
     font-size: 10px;
@@ -2052,6 +2190,7 @@ body.seller-dashboard-page {
 
     display: flex;
     align-items: flex-start;
+
     gap: 7px;
 
     color: #71839b;
@@ -2062,6 +2201,7 @@ body.seller-dashboard-page {
 
 .store-location-note i {
     margin-top: 2px;
+
     color: #2563eb;
 }
 
@@ -2133,10 +2273,12 @@ body.seller-dashboard-page {
 
 
 /* =========================================================
-   DELIVERY CARDS
+   DELIVERY CARDS - FIXED
 ========================================================= */
 
 .store-delivery-grid {
+    width: 100%;
+
     display: grid;
 
     grid-template-columns:
@@ -2148,25 +2290,58 @@ body.seller-dashboard-page {
             )
         );
 
-    gap: 11px;
+    align-items: stretch;
+
+    gap: 14px;
 }
+
 
 .store-delivery-choice {
     position: relative;
+
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+
+    margin: 0;
+
+    display: block;
+
     cursor: pointer;
 }
 
+
 .store-delivery-choice input {
     position: absolute;
+
+    width: 1px;
+    height: 1px;
+
+    margin: 0;
+    padding: 0;
+
     opacity: 0;
+
     pointer-events: none;
 }
 
+
 .store-delivery-card {
-    min-height: 115px;
+    width: 100%;
+    min-width: 0;
+    min-height: 128px;
     height: 100%;
 
-    padding: 16px;
+    margin: 0;
+
+    padding: 18px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+
+    color: #203c64;
 
     background: #fbfdff;
 
@@ -2175,40 +2350,87 @@ body.seller-dashboard-page {
 
     border-radius: 15px;
 
-    transition: .18s ease;
+    transition:
+        border-color .18s ease,
+        background .18s ease,
+        box-shadow .18s ease,
+        transform .18s ease;
 }
+
 
 .store-delivery-card i {
-    margin-bottom: 11px;
+    width: 34px;
+    height: 34px;
 
-    display: block;
+    margin: 0 0 12px;
 
-    color: #3b82f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-    font-size: 18px;
+    flex-shrink: 0;
+
+    color: #2563eb;
+
+    background: #edf5ff;
+
+    border-radius: 10px;
+
+    font-size: 15px;
 }
 
-.store-delivery-card strong {
-    display: block;
 
-    margin-bottom: 5px;
+.store-delivery-card strong {
+    width: 100%;
+
+    margin: 0 0 6px;
+
+    display: block;
 
     color: #203c64;
 
     font-size: 10px;
+    font-weight: 800;
+
+    line-height: 1.4;
 }
 
+
 .store-delivery-card small {
+    width: 100%;
+
+    margin: 0;
+
+    display: block;
+
     color: #8998ad;
 
     font-size: 8px;
-    line-height: 1.5;
+    font-weight: 500;
+
+    line-height: 1.55;
 }
 
-.store-delivery-choice
-input:checked +
+
+.store-delivery-choice:hover
 .store-delivery-card {
+    border-color: #9ec5ff;
+
+    transform:
+        translateY(
+            -1px
+        );
+}
+
+
+.store-delivery-choice
+input:checked
++
+.store-delivery-card {
+    color: #1d4ed8;
+
     border-color: #3b82f6;
+
     background: #f0f6ff;
 
     box-shadow:
@@ -2217,8 +2439,19 @@ input:checked +
             59,
             130,
             246,
-            .07
+            .08
         );
+}
+
+
+.store-delivery-choice
+input:checked
++
+.store-delivery-card
+i {
+    color: #ffffff;
+
+    background: #3b82f6;
 }
 
 
@@ -2227,6 +2460,8 @@ input:checked +
 ========================================================= */
 
 .store-conditional {
+    width: 100%;
+
     margin-top: 16px;
 
     padding: 18px;
@@ -2245,6 +2480,8 @@ input:checked +
 ========================================================= */
 
 .store-toggle-row {
+    width: 100%;
+
     padding: 16px;
 
     display: flex;
@@ -2259,6 +2496,10 @@ input:checked +
         1px solid #e3e9f2;
 
     border-radius: 14px;
+}
+
+.store-toggle-copy {
+    min-width: 0;
 }
 
 .store-toggle-copy strong {
@@ -2284,17 +2525,28 @@ input:checked +
     width: 46px;
     height: 25px;
 
+    margin: 0;
+
+    display: block;
+
     flex-shrink: 0;
 }
 
 .store-switch input {
     position: absolute;
+
+    width: 1px;
+    height: 1px;
+
     opacity: 0;
 }
 
 .store-switch-slider {
     position: absolute;
+
     inset: 0;
+
+    display: block;
 
     cursor: pointer;
 
@@ -2333,13 +2585,15 @@ input:checked +
 }
 
 .store-switch
-input:checked +
+input:checked
++
 .store-switch-slider {
     background: #2563eb;
 }
 
 .store-switch
-input:checked +
+input:checked
++
 .store-switch-slider::before {
     transform:
         translateX(
@@ -2353,6 +2607,8 @@ input:checked +
 ========================================================= */
 
 .store-commission-box {
+    width: 100%;
+
     padding: 18px;
 
     background:
@@ -2374,8 +2630,9 @@ input:checked +
     padding: 11px 13px;
 
     display: flex;
-    gap: 8px;
     align-items: flex-start;
+
+    gap: 8px;
 
     color: #315987;
 
@@ -2398,6 +2655,7 @@ input:checked +
 
 .store-commission-notice i {
     margin-top: 2px;
+
     color: #2563eb;
 }
 
@@ -2426,6 +2684,7 @@ input:checked +
     display: inline-flex;
     align-items: center;
     justify-content: center;
+
     gap: 7px;
 
     color: #ffffff;
@@ -2438,6 +2697,7 @@ input:checked +
         );
 
     border: none;
+
     border-radius: 12px;
 
     box-shadow:
@@ -2464,6 +2724,7 @@ input:checked +
 
 .seller-store-side {
     display: grid;
+
     gap: 17px;
 }
 
@@ -2519,6 +2780,7 @@ input:checked +
 .seller-store-logo img {
     width: 100%;
     height: 100%;
+
     object-fit: cover;
 }
 
@@ -2563,6 +2825,7 @@ input:checked +
 
 .seller-store-info-row strong {
     color: #213b62;
+
     text-align: right;
 }
 
@@ -2648,6 +2911,7 @@ input:checked +
 
 .seller-store-guide h3 {
     margin: 0 0 7px;
+
     font-size: 13px;
 }
 
@@ -2694,6 +2958,7 @@ input:checked +
 
     .seller-store-main {
         width: 100%;
+
         margin-left: 0;
     }
 
@@ -2726,6 +2991,7 @@ input:checked +
 
     .seller-store-heading {
         align-items: flex-start;
+
         flex-direction: column;
     }
 
@@ -2739,6 +3005,7 @@ input:checked +
         padding: 24px;
 
         align-items: flex-start;
+
         flex-direction: column;
     }
 
@@ -2798,1284 +3065,1294 @@ require_once __DIR__ .
 <main class="seller-store-main">
 
 
-    <!-- =========================================================
-         TOPBAR
-    ========================================================== -->
+<header class="seller-store-topbar">
 
-    <header class="seller-store-topbar">
-
-        <span class="seller-store-topbar-label">
-            Seller Center
-        </span>
+    <span class="seller-store-topbar-label">
+        Seller Center
+    </span>
 
 
-        <div class="seller-store-topbar-user">
+    <div class="seller-store-topbar-user">
 
-            <div class="seller-store-topbar-avatar">
+        <div class="seller-store-topbar-avatar">
 
-                <?php if (
-                    $currentLogoUrl !== ''
-                ): ?>
+            <?php if ($currentLogoUrl !== ''): ?>
 
-                    <img
-                        src="<?= storeProfileEscape(
-                            $currentLogoUrl
-                        ) ?>"
-                        alt="Store"
-                    >
+                <img
+                    src="<?= storeProfileEscape(
+                        $currentLogoUrl
+                    ) ?>"
+                    alt="Store"
+                >
 
-                <?php else: ?>
-
-                    <?= storeProfileEscape(
-                        $userInitial
-                    ) ?>
-
-                <?php endif; ?>
-
-            </div>
-
-
-            <div>
-
-                <strong>
-                    <?= storeProfileEscape(
-                        $ownerName
-                    ) ?>
-                </strong>
-
-                <small>
-                    Vendor
-                </small>
-
-            </div>
-
-        </div>
-
-    </header>
-
-
-    <!-- =========================================================
-         CONTENT
-    ========================================================== -->
-
-    <div class="seller-store-content">
-
-
-        <!-- HEADING -->
-
-        <section class="seller-store-heading">
-
-            <div>
-
-                <span class="seller-store-eyebrow">
-                    STORE MANAGEMENT
-                </span>
-
-                <h1>
-                    Store Profile
-                </h1>
-
-                <p>
-                    Manage your public store information,
-                    store location, delivery settings and
-                    commission rate.
-                </p>
-
-            </div>
-
-
-            <a
-                href="<?= storeProfileEscape(
-                    BASE_URL
-                ) ?>seller/dashboard.php"
-                class="seller-store-dashboard-link"
-            >
-                <i class="fa-solid fa-arrow-left"></i>
-                Dashboard
-            </a>
-
-        </section>
-
-
-        <!-- HERO -->
-
-        <section class="seller-store-hero">
-
-            <div class="seller-store-hero-copy">
-
-                <span class="seller-store-hero-label">
-                    SELLER WORKSPACE
-                </span>
-
-                <h2>
-                    Build a store customers trust.
-                </h2>
-
-                <p>
-                    Keep your business details,
-                    pickup location, store coordinates,
-                    postage fee, vendor delivery settings
-                    and commission rate accurate.
-                </p>
-
-            </div>
-
-
-            <div class="seller-store-hero-status">
-
-                <i class="fa-solid fa-circle-check"></i>
+            <?php else: ?>
 
                 <?= storeProfileEscape(
-                    $currentApprovalStatus
+                    $userInitial
                 ) ?>
 
-            </div>
-
-        </section>
-
-
-        <!-- ALERT -->
-
-        <?php if (
-            $successMessage !== ''
-        ): ?>
-
-            <div class="
-                seller-store-alert
-                success
-            ">
-
-                <i class="fa-solid fa-circle-check"></i>
-
-                <span>
-                    <?= storeProfileEscape(
-                        $successMessage
-                    ) ?>
-                </span>
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <?php if (
-            $errorMessage !== ''
-        ): ?>
-
-            <div class="
-                seller-store-alert
-                error
-            ">
-
-                <i class="fa-solid fa-circle-exclamation"></i>
-
-                <span>
-                    <?= storeProfileEscape(
-                        $errorMessage
-                    ) ?>
-                </span>
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <!-- =====================================================
-             LAYOUT
-        ====================================================== -->
-
-        <div class="seller-store-layout">
-
-
-            <!-- =================================================
-                 FORM
-            ================================================== -->
-
-            <form
-                method="POST"
-                enctype="multipart/form-data"
-                class="seller-store-form-card"
-            >
-
-
-                <div class="seller-store-form-header">
-
-                    <div class="seller-store-form-icon">
-                        <i class="fa-solid fa-store"></i>
-                    </div>
-
-                    <div>
-
-                        <h3>
-                            Store Settings
-                        </h3>
-
-                        <p>
-                            Update your business,
-                            location and delivery information.
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <!-- =============================================
-                     BUSINESS INFORMATION
-                ============================================== -->
-
-                <section class="store-form-section">
-
-                    <div class="store-section-title">
-
-                        <div class="store-section-title-icon">
-                            <i class="fa-solid fa-shop"></i>
-                        </div>
-
-                        <div>
-
-                            <h4>
-                                Business Information
-                            </h4>
-
-                            <p>
-                                Information displayed
-                                to your customers.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="seller-store-field-grid">
-
-
-                        <div class="seller-store-field">
-
-                            <label for="business_name">
-
-                                <i class="fa-solid fa-store"></i>
-
-                                Business Name
-
-                                <span class="seller-store-required">
-                                    *
-                                </span>
-
-                            </label>
-
-                            <input
-                                type="text"
-                                id="business_name"
-                                name="business_name"
-                                maxlength="150"
-                                value="<?= storeProfileEscape(
-                                    $currentBusinessName
-                                ) ?>"
-                                required
-                            >
-
-                        </div>
-
-
-                        <div class="seller-store-field">
-
-                            <label for="category">
-
-                                <i class="fa-solid fa-layer-group"></i>
-
-                                Business Category
-
-                                <span class="seller-store-required">
-                                    *
-                                </span>
-
-                            </label>
-
-                            <input
-                                type="text"
-                                id="category"
-                                name="category"
-                                maxlength="100"
-                                value="<?= storeProfileEscape(
-                                    $currentCategory
-                                ) ?>"
-                                placeholder="Example: Food, Beverage, Fashion"
-                                required
-                            >
-
-                        </div>
-
-
-                        <div class="
-                            seller-store-field
-                            full
-                        ">
-
-                            <label for="business_description">
-
-                                <i class="fa-solid fa-align-left"></i>
-
-                                Business Description
-
-                            </label>
-
-                            <textarea
-                                id="business_description"
-                                name="business_description"
-                                placeholder="Tell customers about your store..."
-                            ><?= storeProfileEscape(
-                                $currentBusinessDescription
-                            ) ?></textarea>
-
-                        </div>
-
-
-                        <div class="
-                            seller-store-field
-                            full
-                        ">
-
-                            <label for="business_address">
-
-                                <i class="fa-solid fa-location-dot"></i>
-
-                                Business / Pickup Address
-
-                            </label>
-
-                            <textarea
-                                id="business_address"
-                                name="business_address"
-                                placeholder="Enter your full business or pickup address..."
-                            ><?= storeProfileEscape(
-                                $currentBusinessAddress
-                            ) ?></textarea>
-
-                            <small>
-                                Required when Pickup is enabled.
-                            </small>
-
-                        </div>
-
-
-                        <div class="
-                            seller-store-field
-                            full
-                        ">
-
-                            <label for="business_logo">
-
-                                <i class="fa-solid fa-image"></i>
-
-                                Business Logo
-
-                            </label>
-
-                            <input
-                                type="file"
-                                id="business_logo"
-                                name="business_logo"
-                                class="store-file-input"
-                                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                            >
-
-                            <small>
-                                JPG, PNG or WEBP.
-                                Maximum size 5MB.
-                            </small>
-
-                        </div>
-
-
-                    </div>
-
-                </section>
-
-
-                <!-- =============================================
-                     STORE LOCATION - NEARBY STORES
-                ============================================== -->
-
-                <section class="store-form-section">
-
-                    <div class="store-section-title">
-
-                        <div class="store-section-title-icon">
-                            <i class="fa-solid fa-location-crosshairs"></i>
-                        </div>
-
-                        <div>
-
-                            <h4>
-                                Store Location
-                            </h4>
-
-                            <p>
-                                Used to show your store
-                                to nearby customers.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="store-location-box">
-
-
-                        <div class="store-location-top">
-
-                            <div class="store-location-copy">
-
-                                <strong>
-                                    Set Your Store Location
-                                </strong>
-
-                                <p>
-                                    Go to your physical store
-                                    location and press the button.
-                                    Your browser will request
-                                    permission to access your
-                                    current location.
-                                </p>
-
-                            </div>
-
-
-                            <button
-                                type="button"
-                                id="getStoreLocation"
-                                class="store-location-button"
-                            >
-
-                                <i class="fa-solid fa-location-crosshairs"></i>
-
-                                Use My Current Location
-
-                            </button>
-
-                        </div>
-
-
-                        <input
-                            type="hidden"
-                            id="latitude"
-                            name="latitude"
-                            value="<?= storeProfileEscape(
-                                $currentLatitude
-                            ) ?>"
-                        >
-
-                        <input
-                            type="hidden"
-                            id="longitude"
-                            name="longitude"
-                            value="<?= storeProfileEscape(
-                                $currentLongitude
-                            ) ?>"
-                        >
-
-
-                        <div
-                            id="locationStatus"
-                            class="
-                                store-location-status
-                                <?= $hasStoreLocation
-                                    ? 'success'
-                                    : '' ?>
-                            "
-                        >
-
-                            <i
-                                id="locationStatusIcon"
-                                class="<?= $hasStoreLocation
-                                    ? 'fa-solid fa-circle-check'
-                                    : 'fa-solid fa-circle-info' ?>"
-                            ></i>
-
-                            <span id="locationStatusText">
-
-                                <?php if (
-                                    $hasStoreLocation
-                                ): ?>
-
-                                    Store location is saved.
-                                    Press "Use My Current Location"
-                                    again if you want to update it.
-
-                                <?php else: ?>
-
-                                    Store location has not been set yet.
-
-                                <?php endif; ?>
-
-                            </span>
-
-                        </div>
-
-
-                        <div class="store-coordinate-grid">
-
-
-                            <div class="store-coordinate">
-
-                                <span>
-                                    LATITUDE
-                                </span>
-
-                                <strong id="latitudeDisplay">
-
-                                    <?= $currentLatitude !== ''
-                                        ? storeProfileEscape(
-                                            $currentLatitude
-                                        )
-                                        : 'Not set' ?>
-
-                                </strong>
-
-                            </div>
-
-
-                            <div class="store-coordinate">
-
-                                <span>
-                                    LONGITUDE
-                                </span>
-
-                                <strong id="longitudeDisplay">
-
-                                    <?= $currentLongitude !== ''
-                                        ? storeProfileEscape(
-                                            $currentLongitude
-                                        )
-                                        : 'Not set' ?>
-
-                                </strong>
-
-                            </div>
-
-
-                        </div>
-
-
-                        <div class="store-location-note">
-
-                            <i class="fa-solid fa-shield-halved"></i>
-
-                            <span>
-                                Location is only captured after
-                                you allow browser location access.
-                                The saved coordinates will be used
-                                by HochipoHub's Nearby Stores
-                                feature to calculate distance
-                                between customers and your store.
-                            </span>
-
-                        </div>
-
-
-                    </div>
-
-                </section>
-
-
-                <!-- =============================================
-                     DELIVERY
-                ============================================== -->
-
-                <section class="store-form-section">
-
-                    <div class="store-section-title">
-
-                        <div class="store-section-title-icon">
-                            <i class="fa-solid fa-truck"></i>
-                        </div>
-
-                        <div>
-
-                            <h4>
-                                Delivery Settings
-                            </h4>
-
-                            <p>
-                                Choose how customers
-                                receive their orders.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="store-delivery-grid">
-
-
-                        <label class="store-delivery-choice">
-
-                            <input
-                                type="radio"
-                                name="delivery_method"
-                                value="Pickup"
-                                <?= $currentDeliveryMethod === 'Pickup'
-                                    ? 'checked'
-                                    : '' ?>
-                            >
-
-                            <span class="store-delivery-card">
-
-                                <i class="fa-solid fa-store"></i>
-
-                                <strong>
-                                    Pickup
-                                </strong>
-
-                                <small>
-                                    Customers collect
-                                    orders from your store.
-                                </small>
-
-                            </span>
-
-                        </label>
-
-
-                        <label class="store-delivery-choice">
-
-                            <input
-                                type="radio"
-                                name="delivery_method"
-                                value="Postage"
-                                <?= $currentDeliveryMethod === 'Postage'
-                                    ? 'checked'
-                                    : '' ?>
-                            >
-
-                            <span class="store-delivery-card">
-
-                                <i class="fa-solid fa-box"></i>
-
-                                <strong>
-                                    Postage
-                                </strong>
-
-                                <small>
-                                    Ship orders using
-                                    a courier service.
-                                </small>
-
-                            </span>
-
-                        </label>
-
-
-                        <label class="store-delivery-choice">
-
-                            <input
-                                type="radio"
-                                name="delivery_method"
-                                value="Both"
-                                <?= $currentDeliveryMethod === 'Both'
-                                    ? 'checked'
-                                    : '' ?>
-                            >
-
-                            <span class="store-delivery-card">
-
-                                <i class="fa-solid fa-arrows-left-right"></i>
-
-                                <strong>
-                                    Both
-                                </strong>
-
-                                <small>
-                                    Allow both pickup
-                                    and postage.
-                                </small>
-
-                            </span>
-
-                        </label>
-
-
-                    </div>
-
-
-                    <!-- POSTAGE -->
-
-                    <div
-                        id="postageSettings"
-                        class="store-conditional"
-                    >
-
-                        <div class="seller-store-field">
-
-                            <label for="postage_fee">
-
-                                <i class="fa-solid fa-box"></i>
-
-                                Postage Fee
-
-                            </label>
-
-                            <div class="store-money">
-
-                                <span>
-                                    RM
-                                </span>
-
-                                <input
-                                    type="number"
-                                    id="postage_fee"
-                                    name="postage_fee"
-                                    min="0"
-                                    step="0.01"
-                                    value="<?= storeProfileEscape(
-                                        storeProfileMoney(
-                                            $currentPostageFee
-                                        )
-                                    ) ?>"
-                                >
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- VENDOR DELIVERY -->
-
-                    <div
-                        class="store-conditional"
-                        style="margin-top:16px;"
-                    >
-
-                        <div class="store-toggle-row">
-
-                            <div class="store-toggle-copy">
-
-                                <strong>
-                                    Enable Vendor Delivery
-                                </strong>
-
-                                <small>
-                                    Deliver orders directly
-                                    to your customers yourself.
-                                </small>
-
-                            </div>
-
-
-                            <label class="store-switch">
-
-                                <input
-                                    type="checkbox"
-                                    id="allow_vendor_delivery"
-                                    name="allow_vendor_delivery"
-                                    value="1"
-                                    <?= $currentAllowVendorDelivery
-                                        ? 'checked'
-                                        : '' ?>
-                                >
-
-                                <span class="store-switch-slider"></span>
-
-                            </label>
-
-                        </div>
-
-
-                        <div
-                            id="vendorDeliverySettings"
-                            style="margin-top:15px;"
-                        >
-
-                            <div class="seller-store-field-grid">
-
-
-                                <div class="seller-store-field">
-
-                                    <label for="vendor_delivery_fee">
-
-                                        <i class="fa-solid fa-motorcycle"></i>
-
-                                        Vendor Delivery Fee
-
-                                    </label>
-
-                                    <div class="store-money">
-
-                                        <span>
-                                            RM
-                                        </span>
-
-                                        <input
-                                            type="number"
-                                            id="vendor_delivery_fee"
-                                            name="vendor_delivery_fee"
-                                            min="0"
-                                            step="0.01"
-                                            value="<?= storeProfileEscape(
-                                                storeProfileMoney(
-                                                    $currentVendorDeliveryFee
-                                                )
-                                            ) ?>"
-                                        >
-
-                                    </div>
-
-                                </div>
-
-
-                                <div class="seller-store-field">
-
-                                    <label>
-
-                                        <i class="fa-solid fa-money-bill-wave"></i>
-
-                                        Cash on Delivery
-
-                                    </label>
-
-
-                                    <div class="store-toggle-row">
-
-                                        <div class="store-toggle-copy">
-
-                                            <strong>
-                                                Allow COD
-                                            </strong>
-
-                                            <small>
-                                                Customer can pay
-                                                cash during delivery.
-                                            </small>
-
-                                        </div>
-
-
-                                        <label class="store-switch">
-
-                                            <input
-                                                type="checkbox"
-                                                id="cod_enabled"
-                                                name="cod_enabled"
-                                                value="1"
-                                                <?= $currentCodEnabled
-                                                    ? 'checked'
-                                                    : '' ?>
-                                            >
-
-                                            <span class="store-switch-slider"></span>
-
-                                        </label>
-
-                                    </div>
-
-                                </div>
-
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </section>
-
-
-                <!-- =============================================
-                     COMMISSION
-                ============================================== -->
-
-                <section class="store-form-section">
-
-                    <div class="store-section-title">
-
-                        <div class="store-section-title-icon">
-                            <i class="fa-solid fa-percent"></i>
-                        </div>
-
-                        <div>
-
-                            <h4>
-                                Commission Rate
-                            </h4>
-
-                            <p>
-                                Set your preferred
-                                commission percentage.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="store-commission-box">
-
-                        <div class="seller-store-field">
-
-                            <label for="commission_rate">
-
-                                <i class="fa-solid fa-percent"></i>
-
-                                Store Commission Rate
-
-                                <span class="seller-store-required">
-                                    *
-                                </span>
-
-                            </label>
-
-
-                            <div class="store-percent">
-
-                                <input
-                                    type="number"
-                                    id="commission_rate"
-                                    name="commission_rate"
-                                    min="5"
-                                    max="100"
-                                    step="0.01"
-                                    value="<?= storeProfileEscape(
-                                        storeProfileMoney(
-                                            $currentCommissionRate
-                                        )
-                                    ) ?>"
-                                    required
-                                >
-
-                                <span>
-                                    %
-                                </span>
-
-                            </div>
-
-
-                            <small>
-                                Minimum commission rate
-                                is <strong>5%</strong>.
-                                You may choose any rate
-                                from 5% up to 100%.
-                            </small>
-
-                        </div>
-
-
-                        <div class="store-commission-notice">
-
-                            <i class="fa-solid fa-circle-info"></i>
-
-                            <div>
-                                You control your store's
-                                commission rate. HochipoHub
-                                requires a minimum rate of
-                                <strong>5%</strong>. A rate
-                                below 5% will not be saved.
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </section>
-
-
-                <!-- =============================================
-                     SAVE
-                ============================================== -->
-
-                <div class="seller-store-save-row">
-
-                    <button
-                        type="submit"
-                        class="seller-store-save"
-                    >
-
-                        <i class="fa-solid fa-floppy-disk"></i>
-
-                        Save Store Profile
-
-                    </button>
-
-                </div>
-
-
-            </form>
-
-
-            <!-- =================================================
-                 RIGHT SIDE
-            ================================================== -->
-
-            <aside class="seller-store-side">
-
-
-                <!-- STORE SUMMARY -->
-
-                <section class="seller-store-summary">
-
-                    <div class="seller-store-logo">
-
-                        <?php if (
-                            $currentLogoUrl !== ''
-                        ): ?>
-
-                            <img
-                                src="<?= storeProfileEscape(
-                                    $currentLogoUrl
-                                ) ?>"
-                                alt="<?= storeProfileEscape(
-                                    $currentBusinessName
-                                ) ?>"
-                            >
-
-                        <?php else: ?>
-
-                            <i class="fa-solid fa-store"></i>
-
-                        <?php endif; ?>
-
-                    </div>
-
-
-                    <h3>
-
-                        <?= storeProfileEscape(
-                            $currentBusinessName !== ''
-                                ? $currentBusinessName
-                                : 'My Store'
-                        ) ?>
-
-                    </h3>
-
-
-                    <p class="seller-store-category">
-
-                        <?= storeProfileEscape(
-                            $currentCategory !== ''
-                                ? $currentCategory
-                                : 'Store category'
-                        ) ?>
-
-                    </p>
-
-
-                    <div class="seller-store-info-row">
-
-                        <span>
-                            Owner
-                        </span>
-
-                        <strong>
-                            <?= storeProfileEscape(
-                                $ownerName
-                            ) ?>
-                        </strong>
-
-                    </div>
-
-
-                    <div class="seller-store-info-row">
-
-                        <span>
-                            Email
-                        </span>
-
-                        <strong>
-
-                            <?= storeProfileEscape(
-                                $ownerEmail !== ''
-                                    ? $ownerEmail
-                                    : '-'
-                            ) ?>
-
-                        </strong>
-
-                    </div>
-
-
-                    <div class="seller-store-info-row">
-
-                        <span>
-                            Status
-                        </span>
-
-                        <strong>
-
-                            <span
-                                class="
-                                    seller-store-status
-                                    <?= storeProfileEscape(
-                                        $statusClass
-                                    ) ?>
-                                "
-                            >
-
-                                <?= storeProfileEscape(
-                                    $currentApprovalStatus
-                                ) ?>
-
-                            </span>
-
-                        </strong>
-
-                    </div>
-
-
-                    <div class="seller-store-info-row">
-
-                        <span>
-                            Store Location
-                        </span>
-
-                        <strong id="summaryLocation">
-
-                            <?= $hasStoreLocation
-                                ? 'Saved'
-                                : 'Not Set' ?>
-
-                        </strong>
-
-                    </div>
-
-
-                    <div class="seller-store-info-row">
-
-                        <span>
-                            Delivery
-                        </span>
-
-                        <strong>
-                            <?= storeProfileEscape(
-                                $currentDeliveryMethod
-                            ) ?>
-                        </strong>
-
-                    </div>
-
-
-                    <div class="seller-store-info-row">
-
-                        <span>
-                            Postage
-                        </span>
-
-                        <strong>
-
-                            RM
-                            <?= storeProfileEscape(
-                                storeProfileMoney(
-                                    $currentPostageFee
-                                )
-                            ) ?>
-
-                        </strong>
-
-                    </div>
-
-
-                    <div class="seller-store-info-row">
-
-                        <span>
-                            Vendor Delivery
-                        </span>
-
-                        <strong>
-
-                            <?= $currentAllowVendorDelivery
-                                ? 'Enabled'
-                                : 'Disabled' ?>
-
-                        </strong>
-
-                    </div>
-
-
-                    <div class="seller-store-info-row">
-
-                        <span>
-                            COD
-                        </span>
-
-                        <strong>
-
-                            <?= $currentCodEnabled
-                                ? 'Enabled'
-                                : 'Disabled' ?>
-
-                        </strong>
-
-                    </div>
-
-
-                    <div class="seller-store-info-row">
-
-                        <span>
-                            Commission
-                        </span>
-
-                        <strong>
-
-                            <?= storeProfileEscape(
-                                storeProfileMoney(
-                                    $currentCommissionRate
-                                )
-                            ) ?>%
-
-                        </strong>
-
-                    </div>
-
-                </section>
-
-
-                <!-- GUIDE -->
-
-                <section class="seller-store-guide">
-
-                    <div class="seller-store-guide-icon">
-                        <i class="fa-solid fa-lightbulb"></i>
-                    </div>
-
-                    <h3>
-                        Store Profile Tips
-                    </h3>
-
-                    <p>
-                        Keep your store information,
-                        pickup address and location accurate
-                        so customers can discover your store
-                        through Nearby Stores. You may also
-                        set your preferred commission rate,
-                        but HochipoHub requires at least 5%.
-                    </p>
-
-                </section>
-
-
-            </aside>
-
+            <?php endif; ?>
 
         </div>
+
+
+        <div>
+
+            <strong>
+                <?= storeProfileEscape(
+                    $ownerName
+                ) ?>
+            </strong>
+
+            <small>
+                Vendor
+            </small>
+
+        </div>
+
+    </div>
+
+</header>
+
+
+<div class="seller-store-content">
+
+
+<section class="seller-store-heading">
+
+    <div>
+
+        <span class="seller-store-eyebrow">
+            STORE MANAGEMENT
+        </span>
+
+        <h1>
+            Store Profile
+        </h1>
+
+        <p>
+            Manage your public store information,
+            store location, delivery settings and
+            commission rate.
+        </p>
+
+    </div>
+
+
+    <a
+        href="<?= storeProfileEscape(
+            BASE_URL
+        ) ?>seller/dashboard.php"
+        class="seller-store-dashboard-link"
+    >
+
+        <i class="fa-solid fa-arrow-left"></i>
+
+        Dashboard
+
+    </a>
+
+</section>
+
+
+<section class="seller-store-hero">
+
+    <div class="seller-store-hero-copy">
+
+        <span class="seller-store-hero-label">
+            SELLER WORKSPACE
+        </span>
+
+        <h2>
+            Build a store customers trust.
+        </h2>
+
+        <p>
+            Keep your business details,
+            pickup location, store coordinates,
+            postage fee, vendor delivery settings
+            and commission rate accurate.
+        </p>
+
+    </div>
+
+
+    <div class="seller-store-hero-status">
+
+        <i class="fa-solid fa-circle-check"></i>
+
+        <?= storeProfileEscape(
+            $currentApprovalStatus
+        ) ?>
+
+    </div>
+
+</section>
+
+
+<?php if ($successMessage !== ''): ?>
+
+<div class="
+    seller-store-alert
+    success
+">
+
+    <i class="fa-solid fa-circle-check"></i>
+
+    <span>
+        <?= storeProfileEscape(
+            $successMessage
+        ) ?>
+    </span>
+
+</div>
+
+<?php endif; ?>
+
+
+<?php if ($errorMessage !== ''): ?>
+
+<div class="
+    seller-store-alert
+    error
+">
+
+    <i class="fa-solid fa-circle-exclamation"></i>
+
+    <span>
+        <?= storeProfileEscape(
+            $errorMessage
+        ) ?>
+    </span>
+
+</div>
+
+<?php endif; ?>
+
+
+<div class="seller-store-layout">
+
+
+<form
+    method="POST"
+    enctype="multipart/form-data"
+    class="seller-store-form-card"
+>
+
+
+<div class="seller-store-form-header">
+
+    <div class="seller-store-form-icon">
+
+        <i class="fa-solid fa-store"></i>
+
+    </div>
+
+
+    <div>
+
+        <h3>
+            Store Settings
+        </h3>
+
+        <p>
+            Update your business,
+            location and delivery information.
+        </p>
+
+    </div>
+
+</div>
+
+
+<!-- =========================================================
+     BUSINESS INFORMATION
+========================================================== -->
+
+<section class="store-form-section">
+
+
+<div class="store-section-title">
+
+    <div class="store-section-title-icon">
+
+        <i class="fa-solid fa-shop"></i>
+
+    </div>
+
+
+    <div>
+
+        <h4>
+            Business Information
+        </h4>
+
+        <p>
+            Information displayed
+            to your customers.
+        </p>
+
+    </div>
+
+</div>
+
+
+<div class="seller-store-field-grid">
+
+
+<div class="seller-store-field">
+
+    <label for="business_name">
+
+        <i class="fa-solid fa-store"></i>
+
+        Business Name
+
+        <span class="seller-store-required">
+            *
+        </span>
+
+    </label>
+
+
+    <input
+        type="text"
+        id="business_name"
+        name="business_name"
+        maxlength="150"
+        value="<?= storeProfileEscape(
+            $currentBusinessName
+        ) ?>"
+        required
+    >
+
+</div>
+
+
+<div class="seller-store-field">
+
+    <label for="category">
+
+        <i class="fa-solid fa-layer-group"></i>
+
+        Business Category
+
+        <span class="seller-store-required">
+            *
+        </span>
+
+    </label>
+
+
+    <input
+        type="text"
+        id="category"
+        name="category"
+        maxlength="100"
+        value="<?= storeProfileEscape(
+            $currentCategory
+        ) ?>"
+        placeholder="Example: Food, Beverage, Fashion"
+        required
+    >
+
+</div>
+
+
+<div class="
+    seller-store-field
+    full
+">
+
+    <label for="business_description">
+
+        <i class="fa-solid fa-align-left"></i>
+
+        Business Description
+
+    </label>
+
+
+    <textarea
+        id="business_description"
+        name="business_description"
+        placeholder="Tell customers about your store..."
+    ><?= storeProfileEscape(
+        $currentBusinessDescription
+    ) ?></textarea>
+
+</div>
+
+
+<div class="
+    seller-store-field
+    full
+">
+
+    <label for="business_address">
+
+        <i class="fa-solid fa-location-dot"></i>
+
+        Business / Pickup Address
+
+    </label>
+
+
+    <textarea
+        id="business_address"
+        name="business_address"
+        placeholder="Enter your full business or pickup address..."
+    ><?= storeProfileEscape(
+        $currentBusinessAddress
+    ) ?></textarea>
+
+
+    <small>
+        Required when Pickup is enabled.
+    </small>
+
+</div>
+
+
+<div class="
+    seller-store-field
+    full
+">
+
+    <label for="business_logo">
+
+        <i class="fa-solid fa-image"></i>
+
+        Business Logo
+
+    </label>
+
+
+    <input
+        type="file"
+        id="business_logo"
+        name="business_logo"
+        class="store-file-input"
+        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+    >
+
+
+    <small>
+        JPG, PNG or WEBP.
+        Maximum size 5MB.
+    </small>
+
+</div>
+
+
+</div>
+
+</section>
+
+
+<!-- =========================================================
+     STORE LOCATION
+========================================================== -->
+
+<section class="store-form-section">
+
+
+<div class="store-section-title">
+
+    <div class="store-section-title-icon">
+
+        <i class="fa-solid fa-location-crosshairs"></i>
+
+    </div>
+
+
+    <div>
+
+        <h4>
+            Store Location
+        </h4>
+
+        <p>
+            Used to show your store
+            to nearby customers.
+        </p>
+
+    </div>
+
+</div>
+
+
+<div class="store-location-box">
+
+
+<div class="store-location-top">
+
+
+<div class="store-location-copy">
+
+    <strong>
+        Set Your Store Location
+    </strong>
+
+    <p>
+        Go to your physical store location
+        and press the button. Your browser
+        will request permission to access
+        your current location.
+    </p>
+
+</div>
+
+
+<button
+    type="button"
+    id="getStoreLocation"
+    class="store-location-button"
+>
+
+    <i class="fa-solid fa-location-crosshairs"></i>
+
+    Use My Current Location
+
+</button>
+
+
+</div>
+
+
+<input
+    type="hidden"
+    id="latitude"
+    name="latitude"
+    value="<?= storeProfileEscape(
+        $currentLatitude
+    ) ?>"
+>
+
+
+<input
+    type="hidden"
+    id="longitude"
+    name="longitude"
+    value="<?= storeProfileEscape(
+        $currentLongitude
+    ) ?>"
+>
+
+
+<div
+    id="locationStatus"
+    class="
+        store-location-status
+        <?= $hasStoreLocation
+            ? 'success'
+            : '' ?>
+    "
+>
+
+    <i
+        id="locationStatusIcon"
+        class="<?= $hasStoreLocation
+            ? 'fa-solid fa-circle-check'
+            : 'fa-solid fa-circle-info' ?>"
+    ></i>
+
+
+    <span id="locationStatusText">
+
+        <?php if ($hasStoreLocation): ?>
+
+            Store location is saved.
+            Press "Use My Current Location"
+            again if you want to update it.
+
+        <?php else: ?>
+
+            Store location has not been set yet.
+
+        <?php endif; ?>
+
+    </span>
+
+</div>
+
+
+<div class="store-coordinate-grid">
+
+
+<div class="store-coordinate">
+
+    <span>
+        LATITUDE
+    </span>
+
+    <strong id="latitudeDisplay">
+
+        <?= $currentLatitude !== ''
+            ? storeProfileEscape(
+                $currentLatitude
+            )
+            : 'Not set' ?>
+
+    </strong>
+
+</div>
+
+
+<div class="store-coordinate">
+
+    <span>
+        LONGITUDE
+    </span>
+
+    <strong id="longitudeDisplay">
+
+        <?= $currentLongitude !== ''
+            ? storeProfileEscape(
+                $currentLongitude
+            )
+            : 'Not set' ?>
+
+    </strong>
+
+</div>
+
+
+</div>
+
+
+<div class="store-location-note">
+
+    <i class="fa-solid fa-shield-halved"></i>
+
+    <span>
+        Location is only captured after
+        you allow browser location access.
+        The saved coordinates will be used
+        by HochipoHub's Nearby Stores feature
+        to calculate distance between customers
+        and your store.
+    </span>
+
+</div>
+
+
+</div>
+
+</section>
+
+
+<!-- =========================================================
+     DELIVERY SETTINGS
+========================================================== -->
+
+<section class="store-form-section">
+
+
+<div class="store-section-title">
+
+    <div class="store-section-title-icon">
+
+        <i class="fa-solid fa-truck"></i>
+
+    </div>
+
+
+    <div>
+
+        <h4>
+            Delivery Settings
+        </h4>
+
+        <p>
+            Choose how customers
+            receive their orders.
+        </p>
+
+    </div>
+
+</div>
+
+
+<div class="store-delivery-grid">
+
+
+<label class="store-delivery-choice">
+
+    <input
+        type="radio"
+        name="delivery_method"
+        value="Pickup"
+        <?= $currentDeliveryMethod === 'Pickup'
+            ? 'checked'
+            : '' ?>
+    >
+
+
+    <span class="store-delivery-card">
+
+        <i class="fa-solid fa-store"></i>
+
+        <strong>
+            Pickup
+        </strong>
+
+        <small>
+            Customers collect orders
+            from your store.
+        </small>
+
+    </span>
+
+</label>
+
+
+<label class="store-delivery-choice">
+
+    <input
+        type="radio"
+        name="delivery_method"
+        value="Postage"
+        <?= $currentDeliveryMethod === 'Postage'
+            ? 'checked'
+            : '' ?>
+    >
+
+
+    <span class="store-delivery-card">
+
+        <i class="fa-solid fa-box"></i>
+
+        <strong>
+            Postage
+        </strong>
+
+        <small>
+            Ship orders using
+            a courier service.
+        </small>
+
+    </span>
+
+</label>
+
+
+<label class="store-delivery-choice">
+
+    <input
+        type="radio"
+        name="delivery_method"
+        value="Both"
+        <?= $currentDeliveryMethod === 'Both'
+            ? 'checked'
+            : '' ?>
+    >
+
+
+    <span class="store-delivery-card">
+
+        <i class="fa-solid fa-arrows-left-right"></i>
+
+        <strong>
+            Both
+        </strong>
+
+        <small>
+            Allow both pickup
+            and postage.
+        </small>
+
+    </span>
+
+</label>
+
+
+</div>
+
+
+<div
+    id="postageSettings"
+    class="store-conditional"
+>
+
+
+<div class="seller-store-field">
+
+    <label for="postage_fee">
+
+        <i class="fa-solid fa-box"></i>
+
+        Postage Fee
+
+    </label>
+
+
+    <div class="store-money">
+
+        <span>
+            RM
+        </span>
+
+        <input
+            type="number"
+            id="postage_fee"
+            name="postage_fee"
+            min="0"
+            step="0.01"
+            value="<?= storeProfileEscape(
+                storeProfileMoney(
+                    $currentPostageFee
+                )
+            ) ?>"
+        >
+
+    </div>
+
+</div>
+
+
+</div>
+
+
+<div
+    class="store-conditional"
+    style="margin-top:16px;"
+>
+
+
+<div class="store-toggle-row">
+
+
+<div class="store-toggle-copy">
+
+    <strong>
+        Enable Vendor Delivery
+    </strong>
+
+    <small>
+        Deliver orders directly
+        to your customers yourself.
+    </small>
+
+</div>
+
+
+<label class="store-switch">
+
+    <input
+        type="checkbox"
+        id="allow_vendor_delivery"
+        name="allow_vendor_delivery"
+        value="1"
+        <?= $currentAllowVendorDelivery
+            ? 'checked'
+            : '' ?>
+    >
+
+    <span class="store-switch-slider"></span>
+
+</label>
+
+
+</div>
+
+
+<div
+    id="vendorDeliverySettings"
+    style="margin-top:15px;"
+>
+
+
+<div class="seller-store-field-grid">
+
+
+<div class="seller-store-field">
+
+    <label for="vendor_delivery_fee">
+
+        <i class="fa-solid fa-motorcycle"></i>
+
+        Vendor Delivery Fee
+
+    </label>
+
+
+    <div class="store-money">
+
+        <span>
+            RM
+        </span>
+
+        <input
+            type="number"
+            id="vendor_delivery_fee"
+            name="vendor_delivery_fee"
+            min="0"
+            step="0.01"
+            value="<?= storeProfileEscape(
+                storeProfileMoney(
+                    $currentVendorDeliveryFee
+                )
+            ) ?>"
+        >
+
+    </div>
+
+</div>
+
+
+<div class="seller-store-field">
+
+    <label>
+
+        <i class="fa-solid fa-money-bill-wave"></i>
+
+        Cash on Delivery
+
+    </label>
+
+
+    <div class="store-toggle-row">
+
+
+    <div class="store-toggle-copy">
+
+        <strong>
+            Allow COD
+        </strong>
+
+        <small>
+            Customer can pay
+            cash during delivery.
+        </small>
+
+    </div>
+
+
+    <label class="store-switch">
+
+        <input
+            type="checkbox"
+            id="cod_enabled"
+            name="cod_enabled"
+            value="1"
+            <?= $currentCodEnabled
+                ? 'checked'
+                : '' ?>
+        >
+
+        <span class="store-switch-slider"></span>
+
+    </label>
 
 
     </div>
 
+</div>
+
+
+</div>
+
+</div>
+
+
+</div>
+
+</section>
+
+
+<!-- =========================================================
+     COMMISSION
+========================================================== -->
+
+<section class="store-form-section">
+
+
+<div class="store-section-title">
+
+    <div class="store-section-title-icon">
+
+        <i class="fa-solid fa-percent"></i>
+
+    </div>
+
+
+    <div>
+
+        <h4>
+            Commission Rate
+        </h4>
+
+        <p>
+            Set your preferred
+            commission percentage.
+        </p>
+
+    </div>
+
+</div>
+
+
+<div class="store-commission-box">
+
+
+<div class="seller-store-field">
+
+    <label for="commission_rate">
+
+        <i class="fa-solid fa-percent"></i>
+
+        Store Commission Rate
+
+        <span class="seller-store-required">
+            *
+        </span>
+
+    </label>
+
+
+    <div class="store-percent">
+
+        <input
+            type="number"
+            id="commission_rate"
+            name="commission_rate"
+            min="5"
+            max="100"
+            step="0.01"
+            value="<?= storeProfileEscape(
+                storeProfileMoney(
+                    $currentCommissionRate
+                )
+            ) ?>"
+            required
+        >
+
+        <span>
+            %
+        </span>
+
+    </div>
+
+
+    <small>
+        Minimum commission rate
+        is <strong>5%</strong>.
+        You may choose any rate
+        from 5% up to 100%.
+    </small>
+
+</div>
+
+
+<div class="store-commission-notice">
+
+    <i class="fa-solid fa-circle-info"></i>
+
+    <div>
+        You control your store's
+        commission rate. HochipoHub
+        requires a minimum rate of
+        <strong>5%</strong>. A rate
+        below 5% will not be saved.
+    </div>
+
+</div>
+
+
+</div>
+
+</section>
+
+
+<!-- =========================================================
+     SAVE
+========================================================== -->
+
+<div class="seller-store-save-row">
+
+<button
+    type="submit"
+    class="seller-store-save"
+>
+
+    <i class="fa-solid fa-floppy-disk"></i>
+
+    Save Store Profile
+
+</button>
+
+</div>
+
+
+</form>
+
+
+<!-- =========================================================
+     RIGHT SIDE
+========================================================== -->
+
+<aside class="seller-store-side">
+
+
+<section class="seller-store-summary">
+
+
+<div class="seller-store-logo">
+
+<?php if ($currentLogoUrl !== ''): ?>
+
+    <img
+        src="<?= storeProfileEscape(
+            $currentLogoUrl
+        ) ?>"
+        alt="<?= storeProfileEscape(
+            $currentBusinessName
+        ) ?>"
+    >
+
+<?php else: ?>
+
+    <i class="fa-solid fa-store"></i>
+
+<?php endif; ?>
+
+</div>
+
+
+<h3>
+
+<?= storeProfileEscape(
+    $currentBusinessName !== ''
+        ? $currentBusinessName
+        : 'My Store'
+) ?>
+
+</h3>
+
+
+<p class="seller-store-category">
+
+<?= storeProfileEscape(
+    $currentCategory !== ''
+        ? $currentCategory
+        : 'Store category'
+) ?>
+
+</p>
+
+
+<div class="seller-store-info-row">
+
+    <span>
+        Owner
+    </span>
+
+    <strong>
+        <?= storeProfileEscape(
+            $ownerName
+        ) ?>
+    </strong>
+
+</div>
+
+
+<div class="seller-store-info-row">
+
+    <span>
+        Email
+    </span>
+
+    <strong>
+
+        <?= storeProfileEscape(
+            $ownerEmail !== ''
+                ? $ownerEmail
+                : '-'
+        ) ?>
+
+    </strong>
+
+</div>
+
+
+<div class="seller-store-info-row">
+
+    <span>
+        Status
+    </span>
+
+    <strong>
+
+        <span
+            class="
+                seller-store-status
+                <?= storeProfileEscape(
+                    $statusClass
+                ) ?>
+            "
+        >
+
+            <?= storeProfileEscape(
+                $currentApprovalStatus
+            ) ?>
+
+        </span>
+
+    </strong>
+
+</div>
+
+
+<div class="seller-store-info-row">
+
+    <span>
+        Store Location
+    </span>
+
+    <strong id="summaryLocation">
+
+        <?= $hasStoreLocation
+            ? 'Saved'
+            : 'Not Set' ?>
+
+    </strong>
+
+</div>
+
+
+<div class="seller-store-info-row">
+
+    <span>
+        Delivery
+    </span>
+
+    <strong>
+
+        <?= storeProfileEscape(
+            $currentDeliveryMethod
+        ) ?>
+
+    </strong>
+
+</div>
+
+
+<div class="seller-store-info-row">
+
+    <span>
+        Postage
+    </span>
+
+    <strong>
+
+        RM
+        <?= storeProfileEscape(
+            storeProfileMoney(
+                $currentPostageFee
+            )
+        ) ?>
+
+    </strong>
+
+</div>
+
+
+<div class="seller-store-info-row">
+
+    <span>
+        Vendor Delivery
+    </span>
+
+    <strong>
+
+        <?= $currentAllowVendorDelivery
+            ? 'Enabled'
+            : 'Disabled' ?>
+
+    </strong>
+
+</div>
+
+
+<div class="seller-store-info-row">
+
+    <span>
+        COD
+    </span>
+
+    <strong>
+
+        <?= $currentCodEnabled
+            ? 'Enabled'
+            : 'Disabled' ?>
+
+    </strong>
+
+</div>
+
+
+<div class="seller-store-info-row">
+
+    <span>
+        Commission
+    </span>
+
+    <strong>
+
+        <?= storeProfileEscape(
+            storeProfileMoney(
+                $currentCommissionRate
+            )
+        ) ?>%
+
+    </strong>
+
+</div>
+
+
+</section>
+
+
+<section class="seller-store-guide">
+
+
+<div class="seller-store-guide-icon">
+
+    <i class="fa-solid fa-lightbulb"></i>
+
+</div>
+
+
+<h3>
+    Store Profile Tips
+</h3>
+
+
+<p>
+    Keep your store information,
+    pickup address and location accurate
+    so customers can discover your store
+    through Nearby Stores. You may also
+    set your preferred commission rate,
+    but HochipoHub requires at least 5%.
+</p>
+
+
+</section>
+
+
+</aside>
+
+
+</div>
+
+</div>
 
 </main>
 
 
 <script>
-
-/*
-|--------------------------------------------------------------------------
-| PAGE UI
-|--------------------------------------------------------------------------
-*/
 
 document.addEventListener(
     'DOMContentLoaded',
@@ -4084,7 +4361,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | ELEMENTS
+        | DELIVERY ELEMENTS
         |--------------------------------------------------------------------------
         */
 
@@ -4093,35 +4370,42 @@ document.addEventListener(
                 'input[name="delivery_method"]'
             );
 
+
         const postageSettings =
             document.getElementById(
                 'postageSettings'
             );
+
 
         const postageFee =
             document.getElementById(
                 'postage_fee'
             );
 
+
         const vendorDeliveryToggle =
             document.getElementById(
                 'allow_vendor_delivery'
             );
+
 
         const vendorDeliverySettings =
             document.getElementById(
                 'vendorDeliverySettings'
             );
 
+
         const vendorDeliveryFee =
             document.getElementById(
                 'vendor_delivery_fee'
             );
 
+
         const codEnabled =
             document.getElementById(
                 'cod_enabled'
             );
+
 
         const commissionRate =
             document.getElementById(
@@ -4140,40 +4424,48 @@ document.addEventListener(
                 'getStoreLocation'
             );
 
+
         const latitudeInput =
             document.getElementById(
                 'latitude'
             );
+
 
         const longitudeInput =
             document.getElementById(
                 'longitude'
             );
 
+
         const latitudeDisplay =
             document.getElementById(
                 'latitudeDisplay'
             );
+
 
         const longitudeDisplay =
             document.getElementById(
                 'longitudeDisplay'
             );
 
+
         const locationStatus =
             document.getElementById(
                 'locationStatus'
             );
+
 
         const locationStatusIcon =
             document.getElementById(
                 'locationStatusIcon'
             );
 
+
         const locationStatusText =
             document.getElementById(
                 'locationStatusText'
             );
+
 
         const summaryLocation =
             document.getElementById(
@@ -4194,23 +4486,29 @@ document.addEventListener(
                     'input[name="delivery_method"]:checked'
                 );
 
+
             const method =
                 selected
                     ? selected.value
                     : 'Both';
 
+
             const showPostage =
                 method === 'Postage' ||
                 method === 'Both';
 
+
             if (postageSettings) {
+
                 postageSettings.style.display =
                     showPostage
                         ? 'block'
                         : 'none';
             }
 
+
             if (postageFee) {
+
                 postageFee.disabled =
                     !showPostage;
             }
@@ -4224,7 +4522,6 @@ document.addEventListener(
                     'change',
                     updatePostageSettings
                 );
-
             }
         );
 
@@ -4241,6 +4538,7 @@ document.addEventListener(
                 vendorDeliveryToggle &&
                 vendorDeliveryToggle.checked;
 
+
             if (vendorDeliverySettings) {
 
                 vendorDeliverySettings.style.display =
@@ -4249,17 +4547,22 @@ document.addEventListener(
                         : 'none';
             }
 
+
             if (vendorDeliveryFee) {
+
                 vendorDeliveryFee.disabled =
                     !enabled;
             }
+
 
             if (codEnabled) {
 
                 codEnabled.disabled =
                     !enabled;
 
+
                 if (!enabled) {
+
                     codEnabled.checked =
                         false;
                 }
@@ -4278,7 +4581,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | COMMISSION CLIENT VALIDATION
+        | COMMISSION
         |--------------------------------------------------------------------------
         */
 
@@ -4292,6 +4595,7 @@ document.addEventListener(
                         parseFloat(
                             commissionRate.value
                         );
+
 
                     if (
                         commissionRate.value !== '' &&
@@ -4325,7 +4629,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | LOCATION STATUS HELPER
+        | LOCATION STATUS
         |--------------------------------------------------------------------------
         */
 
@@ -4339,24 +4643,31 @@ document.addEventListener(
                 return;
             }
 
+
             locationStatus.classList.remove(
                 'success',
                 'error',
                 'loading'
             );
 
+
             if (type) {
+
                 locationStatus.classList.add(
                     type
                 );
             }
 
+
             if (locationStatusText) {
+
                 locationStatusText.textContent =
                     message;
             }
 
+
             if (locationStatusIcon) {
+
                 locationStatusIcon.className =
                     iconClass;
             }
@@ -4365,7 +4676,7 @@ document.addEventListener(
 
         /*
         |--------------------------------------------------------------------------
-        | GET CURRENT STORE LOCATION
+        | GEOLOCATION
         |--------------------------------------------------------------------------
         */
 
@@ -4375,12 +4686,6 @@ document.addEventListener(
                 'click',
                 function () {
 
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | CHECK GEOLOCATION SUPPORT
-                    |--------------------------------------------------------------------------
-                    */
 
                     if (!navigator.geolocation) {
 
@@ -4394,14 +4699,9 @@ document.addEventListener(
                     }
 
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | LOADING
-                    |--------------------------------------------------------------------------
-                    */
-
                     getStoreLocationButton.disabled =
                         true;
+
 
                     getStoreLocationButton.innerHTML =
                         '<i class="fa-solid fa-spinner fa-spin"></i> Detecting Location...';
@@ -4414,19 +4714,7 @@ document.addEventListener(
                     );
 
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | REQUEST LOCATION
-                    |--------------------------------------------------------------------------
-                    */
-
                     navigator.geolocation.getCurrentPosition(
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | SUCCESS
-                        |--------------------------------------------------------------------------
-                        */
 
                         function (position) {
 
@@ -4435,6 +4723,7 @@ document.addEventListener(
                                     position.coords.latitude
                                 ).toFixed(8);
 
+
                             const longitude =
                                 Number(
                                     position.coords.longitude
@@ -4442,26 +4731,35 @@ document.addEventListener(
 
 
                             if (latitudeInput) {
+
                                 latitudeInput.value =
                                     latitude;
                             }
 
+
                             if (longitudeInput) {
+
                                 longitudeInput.value =
                                     longitude;
                             }
 
+
                             if (latitudeDisplay) {
+
                                 latitudeDisplay.textContent =
                                     latitude;
                             }
 
+
                             if (longitudeDisplay) {
+
                                 longitudeDisplay.textContent =
                                     longitude;
                             }
 
+
                             if (summaryLocation) {
+
                                 summaryLocation.textContent =
                                     'Ready to Save';
                             }
@@ -4477,16 +4775,11 @@ document.addEventListener(
                             getStoreLocationButton.disabled =
                                 false;
 
+
                             getStoreLocationButton.innerHTML =
                                 '<i class="fa-solid fa-location-crosshairs"></i> Update Current Location';
                         },
 
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | ERROR
-                        |--------------------------------------------------------------------------
-                        */
 
                         function (error) {
 
@@ -4525,16 +4818,11 @@ document.addEventListener(
                             getStoreLocationButton.disabled =
                                 false;
 
+
                             getStoreLocationButton.innerHTML =
                                 '<i class="fa-solid fa-location-crosshairs"></i> Use My Current Location';
                         },
 
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | GEOLOCATION OPTIONS
-                        |--------------------------------------------------------------------------
-                        */
 
                         {
                             enableHighAccuracy: true,
