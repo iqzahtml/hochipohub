@@ -3399,6 +3399,304 @@ function escapeCatalogHtml(
 </script>
 
 
+
+
+<style>
+.hh-catalog-results-wrap { position: relative; min-height: 120px; }
+.hh-catalog-results-wrap.is-loading { opacity: .55; pointer-events: none; }
+.hh-catalog-results-wrap.is-loading::after {
+    content: "Loading products...";
+    position: absolute; inset: 12px 12px auto 12px; z-index: 20;
+    padding: 12px 16px; text-align: center; color: #1e56a8;
+    background: rgba(255,255,255,.96); border: 1px solid #dbe7f7;
+    border-radius: 12px; box-shadow: 0 10px 25px rgba(30,86,168,.10);
+    font-size: 10px; font-weight: 900;
+}
+</style>
+
+<script>
+/* ===============================================================
+   CATALOG LIVE AJAX FILTERING
+================================================================ */
+document.addEventListener('DOMContentLoaded', function () {
+    const endpoint = <?= json_encode(BASE_URL . 'ajax/load_products.php', JSON_UNESCAPED_SLASHES) ?>;
+    const baseUrl = <?= json_encode(BASE_URL, JSON_UNESCAPED_SLASHES) ?>;
+    const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES) ?>;
+    const userId = <?= (int) $userId ?>;
+    const isCustomer = <?= $isCustomerLoggedIn ? 'true' : 'false' ?>;
+
+    const searchForm = document.querySelector('.hh-catalog-search');
+    const searchInput = searchForm ? searchForm.querySelector('input[name="search"]') : null;
+    const filterCards = document.querySelectorAll('.hh-filter-card');
+    const categoryCard = filterCards[0] || null;
+    const vendorCard = filterCards[1] || null;
+    const sortForm = document.querySelector('.hh-catalog-sort');
+    const sortSelect = sortForm ? sortForm.querySelector('select[name="sort"]') : null;
+    const toolbarTitle = document.querySelector('.hh-catalog-toolbar h2');
+    const toolbarCount = document.querySelector('.hh-catalog-toolbar p');
+    const productStat = document.querySelector('.hh-catalog-stat strong');
+
+    let resultNode = document.querySelector('.hh-catalog-grid, .hh-catalog-empty');
+    if (!resultNode) return;
+
+    const resultsWrap = document.createElement('div');
+    resultsWrap.className = 'hh-catalog-results-wrap';
+    resultNode.parentNode.insertBefore(resultsWrap, resultNode);
+    resultsWrap.appendChild(resultNode);
+
+    const params = new URLSearchParams(window.location.search);
+    const state = {
+        keyword: params.get('search') || '',
+        categoryId: parseInt(params.get('category') || '0', 10) || 0,
+        vendorId: parseInt(params.get('vendor') || '0', 10) || 0,
+        sort: params.get('sort') || 'latest'
+    };
+
+    let debounceTimer = null;
+    let controller = null;
+
+    function esc(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function selectedName(card, paramName, value) {
+        if (!value || !card) return '';
+        const links = card.querySelectorAll('.hh-filter-list a');
+        for (const link of links) {
+            try {
+                const u = new URL(link.href, window.location.href);
+                if ((parseInt(u.searchParams.get(paramName) || '0', 10) || 0) === value) {
+                    return link.textContent.replace(/\s+/g, ' ').trim();
+                }
+            } catch (_) {}
+        }
+        return '';
+    }
+
+    function updateToolbar(total) {
+        const categoryName = selectedName(categoryCard, 'category', state.categoryId);
+        const vendorName = selectedName(vendorCard, 'vendor', state.vendorId);
+        if (toolbarTitle) {
+            toolbarTitle.textContent = categoryName || vendorName || (state.keyword ? 'Search Results' : 'All Products');
+        }
+        if (toolbarCount) toolbarCount.textContent = total + ' product' + (total === 1 ? '' : 's') + ' found';
+        if (productStat) productStat.textContent = total;
+    }
+
+    function updateActiveFilters() {
+        if (categoryCard) {
+            categoryCard.querySelectorAll('.hh-filter-list a').forEach(function (link) {
+                const u = new URL(link.href, window.location.href);
+                const value = parseInt(u.searchParams.get('category') || '0', 10) || 0;
+                link.classList.toggle('active', value === state.categoryId);
+            });
+        }
+        if (vendorCard) {
+            vendorCard.querySelectorAll('.hh-filter-list a').forEach(function (link) {
+                const u = new URL(link.href, window.location.href);
+                const value = parseInt(u.searchParams.get('vendor') || '0', 10) || 0;
+                link.classList.toggle('active', value === state.vendorId);
+            });
+        }
+    }
+
+    function updateUrl() {
+        const url = new URL(window.location.href);
+        const setOrDelete = (key, value, emptyValue = 0) => {
+            if (value === '' || value === emptyValue || value === 'latest') url.searchParams.delete(key);
+            else url.searchParams.set(key, value);
+        };
+        setOrDelete('search', state.keyword, '');
+        setOrDelete('category', state.categoryId, 0);
+        setOrDelete('vendor', state.vendorId, 0);
+        setOrDelete('sort', state.sort, 'latest');
+        window.history.replaceState({}, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : ''));
+    }
+
+    function productCard(product) {
+        const id = parseInt(product.product_id, 10) || 0;
+        const url = product.product_url || (baseUrl + 'product_details.php?id=' + encodeURIComponent(id));
+        const image = String(product.image_url || '').trim();
+        const description = String(product.description || '').trim() || 'Discover this product from HochipoHub.';
+        let action = '';
+        let wishlist = '';
+
+        if (isCustomer) {
+            wishlist = `<button type="button" class="hh-wishlist-button js-catalog-dynamic-wishlist" data-product-id="${id}" data-csrf="${esc(csrfToken)}" title="Add to wishlist"><i class="bi bi-heart-fill"></i></button>`;
+            action = `<button type="button" class="hh-add-cart js-catalog-dynamic-cart" data-product-id="${id}" data-csrf="${esc(csrfToken)}"><i class="bi bi-cart-plus"></i> Add</button>`;
+        } else if (userId <= 0) {
+            action = `<a href="${esc(baseUrl + 'index.php?login=1')}" class="hh-add-cart">Login</a>`;
+        } else {
+            action = `<button type="button" class="hh-add-cart" disabled>Customer Only</button>`;
+        }
+
+        const imageHtml = image
+            ? `<img src="${esc(image)}" alt="${esc(product.product_name)}" loading="lazy">`
+            : `<i class="bi bi-image" style="font-size:35px;color:#2563eb;"></i>`;
+
+        return `
+            <article class="hh-product-card">
+                <div class="hh-product-image">
+                    <a href="${esc(url)}">${imageHtml}</a>
+                    <span class="hh-product-category">${esc(product.category_name)}</span>
+                    <span class="hh-product-stock">${parseInt(product.stock_quantity, 10) || 0} in stock</span>
+                    ${wishlist}
+                </div>
+                <div class="hh-product-body">
+                    <div class="hh-product-vendor"><i class="bi bi-shop"></i> ${esc(product.business_name)}</div>
+                    <h3><a href="${esc(url)}">${esc(product.product_name)}</a></h3>
+                    <p class="hh-product-description">${esc(description)}</p>
+                    <div class="hh-product-footer">
+                        <div class="hh-product-price"><small>PRICE</small><strong>RM ${esc(product.formatted_price)}</strong></div>
+                        ${action}
+                    </div>
+                </div>
+            </article>`;
+    }
+
+    function render(products) {
+        if (!Array.isArray(products) || products.length === 0) {
+            resultsWrap.innerHTML = `<div class="hh-catalog-empty"><i class="bi bi-search"></i><h2>No products found</h2><p>Try another search, category or seller.</p></div>`;
+            return;
+        }
+        resultsWrap.innerHTML = `<div class="hh-catalog-grid">${products.map(productCard).join('')}</div>`;
+    }
+
+    async function loadProducts() {
+        if (controller) controller.abort();
+        controller = new AbortController();
+        resultsWrap.classList.add('is-loading');
+
+        const query = new URLSearchParams();
+        if (state.keyword) query.set('keyword', state.keyword);
+        if (state.categoryId > 0) query.set('category_id', state.categoryId);
+        if (state.vendorId > 0) query.set('vendor_id', state.vendorId);
+        query.set('sort', state.sort);
+        query.set('limit', '100');
+        query.set('offset', '0');
+
+        try {
+            const response = await fetch(endpoint + '?' + query.toString(), {
+                method: 'GET',
+                headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                cache: 'no-store',
+                credentials: 'same-origin',
+                signal: controller.signal
+            });
+            const text = await response.text();
+            let data;
+            try { data = JSON.parse(text); }
+            catch (_) { console.error('Invalid catalog AJAX response:', text); throw new Error('Server did not return valid JSON.'); }
+            if (!response.ok || data.success !== true) throw new Error(data.message || 'Unable to load products.');
+            render(data.products || []);
+            updateToolbar(parseInt(data.total, 10) || 0);
+            updateActiveFilters();
+            updateUrl();
+        } catch (error) {
+            if (error.name === 'AbortError') return;
+            console.error('Catalog AJAX error:', error);
+            showToast('error', 'Catalog error', error.message || 'Unable to load products.');
+        } finally {
+            resultsWrap.classList.remove('is-loading');
+        }
+    }
+
+    if (searchForm && searchInput) {
+        searchForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            state.keyword = searchInput.value.trim();
+            loadProducts();
+        });
+        searchInput.addEventListener('input', function () {
+            state.keyword = searchInput.value.trim();
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(loadProducts, 350);
+        });
+    }
+
+    if (categoryCard) {
+        categoryCard.addEventListener('click', function (event) {
+            const link = event.target.closest('.hh-filter-list a');
+            if (!link) return;
+            event.preventDefault();
+            const u = new URL(link.href, window.location.href);
+            state.categoryId = parseInt(u.searchParams.get('category') || '0', 10) || 0;
+            loadProducts();
+        });
+    }
+
+    if (vendorCard) {
+        vendorCard.addEventListener('click', function (event) {
+            const link = event.target.closest('.hh-filter-list a');
+            if (!link) return;
+            event.preventDefault();
+            const u = new URL(link.href, window.location.href);
+            state.vendorId = parseInt(u.searchParams.get('vendor') || '0', 10) || 0;
+            loadProducts();
+        });
+    }
+
+    if (sortForm && sortSelect) {
+        sortSelect.removeAttribute('onchange');
+        sortForm.addEventListener('submit', function (event) { event.preventDefault(); loadProducts(); });
+        sortSelect.addEventListener('change', function () {
+            state.sort = sortSelect.value || 'latest';
+            loadProducts();
+        });
+    }
+
+    resultsWrap.addEventListener('click', async function (event) {
+        const cartButton = event.target.closest('.js-catalog-dynamic-cart');
+        const wishlistButton = event.target.closest('.js-catalog-dynamic-wishlist');
+
+        if (cartButton) {
+            const original = cartButton.innerHTML;
+            cartButton.disabled = true;
+            cartButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Adding...';
+            try {
+                const fd = new FormData();
+                fd.append('product_id', cartButton.dataset.productId || '');
+                fd.append('quantity', '1');
+                fd.append('csrf_token', cartButton.dataset.csrf || '');
+                const response = await fetch(<?= json_encode(BASE_URL . 'ajax/add_cart.php', JSON_UNESCAPED_SLASHES) ?>, {method:'POST', body:fd, credentials:'same-origin'});
+                const data = await response.json();
+                if (!response.ok || data.success !== true) throw new Error(data.message || 'Unable to add product to cart.');
+                cartButton.classList.add('added');
+                cartButton.innerHTML = '<i class="bi bi-check-lg"></i> Added';
+                showToast('success', 'Added to cart', data.message || 'Product added successfully.');
+                if (data.cart_count !== undefined) updateSidebarBadge('cart.php', data.cart_count);
+                setTimeout(function(){ cartButton.classList.remove('added'); cartButton.innerHTML = original; cartButton.disabled = false; }, 1800);
+            } catch (error) {
+                cartButton.disabled = false; cartButton.innerHTML = original;
+                showToast('error', 'Unable to add product', error.message || 'Please try again.');
+            }
+        }
+
+        if (wishlistButton) {
+            wishlistButton.disabled = true;
+            try {
+                const fd = new FormData();
+                fd.append('product_id', wishlistButton.dataset.productId || '');
+                fd.append('csrf_token', wishlistButton.dataset.csrf || '');
+                const response = await fetch(<?= json_encode(BASE_URL . 'ajax/add_wishlist.php', JSON_UNESCAPED_SLASHES) ?>, {method:'POST', body:fd, credentials:'same-origin'});
+                const data = await response.json();
+                if (!response.ok || data.success !== true) throw new Error(data.message || 'Unable to add product to wishlist.');
+                wishlistButton.classList.add('saved');
+                showToast(data.already_exists ? 'info' : 'success', data.already_exists ? 'Already saved' : 'Added to wishlist', data.message || 'Product saved successfully.');
+                if (data.wishlist_count !== undefined) updateSidebarBadge('wishlist.php', data.wishlist_count);
+            } catch (error) {
+                showToast('error', 'Wishlist error', error.message || 'Please try again.');
+            } finally {
+                wishlistButton.disabled = false;
+            }
+        }
+    });
+});
+</script>
+
 <?php
 
 require_once __DIR__ .
