@@ -231,6 +231,7 @@ $registerModalClass =
                         name="email"
                         placeholder="you@example.com"
                         autocomplete="email"
+                        maxlength="150"
                         value="<?= htmlspecialchars(
                             $registerOld['email'] ?? '',
                             ENT_QUOTES,
@@ -252,8 +253,10 @@ $registerModalClass =
                         type="tel"
                         id="registerPhone"
                         name="phone"
-                        placeholder="01X-XXXXXXX"
+                        placeholder="e.g. 012-3456789"
                         autocomplete="tel"
+                        inputmode="tel"
+                        maxlength="12"
                         value="<?= htmlspecialchars(
                             $registerOld['phone'] ?? '',
                             ENT_QUOTES,
@@ -261,6 +264,10 @@ $registerModalClass =
                         ) ?>"
                         required
                     >
+
+                    <small class="form-hint">
+                        Malaysian mobile number, e.g. 012-3456789
+                    </small>
 
                 </div>
 
@@ -697,6 +704,7 @@ $registerModalClass =
                     'false'
                 );
 
+
                 if (registerModal) {
 
                     registerModal.classList.add('active');
@@ -706,7 +714,9 @@ $registerModalClass =
                         'aria-hidden',
                         'false'
                     );
+
                 }
+
 
                 document.body.classList.add(
                     'terms-open'
@@ -739,6 +749,7 @@ $registerModalClass =
                     scrollTop + clientHeight >=
                     scrollHeight - 10;
 
+
                 if (reachedBottom) {
 
                     termsHaveBeenRead = true;
@@ -765,6 +776,7 @@ $registerModalClass =
                 event.preventDefault();
                 event.stopPropagation();
 
+
                 if (!termsHaveBeenRead) {
 
                     alert(
@@ -774,6 +786,7 @@ $registerModalClass =
                     return;
                 }
 
+
                 if (termsCheckbox) {
 
                     termsCheckbox.disabled = false;
@@ -781,6 +794,7 @@ $registerModalClass =
                     termsCheckbox.checked = true;
 
                 }
+
 
                 termsModal.classList.remove('show');
 
@@ -814,9 +828,11 @@ $registerModalClass =
             const button =
                 document.getElementById(buttonId);
 
+
             if (!input || !button) {
                 return;
             }
+
 
             button.addEventListener(
                 'click',
@@ -825,11 +841,22 @@ $registerModalClass =
                     event.preventDefault();
                     event.stopPropagation();
 
+
                     if (input.type === 'password') {
 
                         input.type = 'text';
 
                         button.innerHTML = '🙈';
+
+                        button.setAttribute(
+                            'aria-label',
+                            'Hide password'
+                        );
+
+                        button.setAttribute(
+                            'title',
+                            'Hide password'
+                        );
 
                     } else {
 
@@ -837,10 +864,21 @@ $registerModalClass =
 
                         button.innerHTML = '👁';
 
+                        button.setAttribute(
+                            'aria-label',
+                            'Show password'
+                        );
+
+                        button.setAttribute(
+                            'title',
+                            'Show password'
+                        );
+
                     }
 
                 }
             );
+
         }
 
 
@@ -848,6 +886,7 @@ $registerModalClass =
             'registerPassword',
             'registerPasswordToggle'
         );
+
 
         setupPasswordToggle(
             'registerConfirmPassword',
