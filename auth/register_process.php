@@ -15,6 +15,7 @@
 | - Duplicate email
 | - Duplicate phone number
 | - Malaysian phone validation
+| - Secure register password validation
 | - Registration validation
 |--------------------------------------------------------------------------
 */
@@ -66,14 +67,6 @@ $name = trim(
 |--------------------------------------------------------------------------
 | NORMALIZE EMAIL
 |--------------------------------------------------------------------------
-|
-| Email is converted to lowercase so:
-|
-| USER@GMAIL.COM
-| user@gmail.com
-|
-| are treated as the same email address.
-|--------------------------------------------------------------------------
 */
 
 $email = strtolower(
@@ -118,7 +111,7 @@ $terms =
 | 012 3456789
 | 0123456789
 |
-| will all become:
+| All become:
 |
 | 0123456789
 |
@@ -137,8 +130,7 @@ $cleanPhone = preg_replace(
 | OLD FORM DATA
 |--------------------------------------------------------------------------
 |
-| Keep the entered information if registration fails.
-| Password is intentionally NOT stored in the session.
+| Password is intentionally NOT stored in session.
 |--------------------------------------------------------------------------
 */
 
@@ -236,17 +228,12 @@ if ($cleanPhone === '') {
 | MALAYSIAN MOBILE PHONE VALIDATION
 |--------------------------------------------------------------------------
 |
-| Accepted examples:
+| Accepted:
 |
 | 0123456789
 | 012-3456789
 | 01112345678
 | 011-12345678
-|
-| After cleaning:
-|
-| Must start with 01
-| Total length must be 10 or 11 digits.
 |
 |--------------------------------------------------------------------------
 */
@@ -292,22 +279,73 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| PASSWORD VALIDATION
+| PASSWORD REQUIRED
+|--------------------------------------------------------------------------
+*/
+
+if ($password === '') {
+
+    registerError(
+        'Password is required.'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PASSWORD MINIMUM LENGTH
 |--------------------------------------------------------------------------
 |
-| Problem 6 will handle the special-character requirement.
-| For now, keep the current minimum length requirement.
+| REGISTER ONLY:
+| Minimum 8 characters.
 |--------------------------------------------------------------------------
 */
 
 if (
-    strlen(
-        $password
-    ) < 6
+    strlen($password) < 8
 ) {
 
     registerError(
-        'Password must contain at least 6 characters.'
+        'Password must contain at least 8 characters.'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PASSWORD SPECIAL CHARACTER
+|--------------------------------------------------------------------------
+|
+| REGISTER ONLY:
+|
+| Password must contain at least one character that is NOT:
+| A-Z
+| a-z
+| 0-9
+|
+| Examples:
+| @
+| #
+| $
+| %
+| !
+| &
+| *
+| _
+| -
+|
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !preg_match(
+        '/[^A-Za-z0-9]/',
+        $password
+    )
+) {
+
+    registerError(
+        'Password must contain at least 1 special character.'
     );
 }
 
@@ -376,7 +414,7 @@ try {
     | CHECK DUPLICATE EMAIL
     |--------------------------------------------------------------------------
     |
-    | One email address can only be used for one account.
+    | One email address = one account.
     |--------------------------------------------------------------------------
     */
 
@@ -400,7 +438,11 @@ try {
     ]);
 
 
-    if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+    if (
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        )
+    ) {
 
         registerError(
             'This email is already registered. Please use another email.'
@@ -413,9 +455,7 @@ try {
     | CHECK DUPLICATE PHONE NUMBER
     |--------------------------------------------------------------------------
     |
-    | One phone number can only be used for one account.
-    |
-    | New registrations are stored without spaces or dashes.
+    | One phone number = one account.
     |--------------------------------------------------------------------------
     */
 
@@ -439,7 +479,11 @@ try {
     ]);
 
 
-    if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+    if (
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        )
+    ) {
 
         registerError(
             'This phone number is already registered. Please use another phone number.'
@@ -483,7 +527,7 @@ try {
     |--------------------------------------------------------------------------
     |
     | Customer = active
-    | Vendor   = pending until admin approves application
+    | Vendor   = pending until admin approval
     |
     |--------------------------------------------------------------------------
     */
