@@ -1068,9 +1068,6 @@ COLLATE=utf8mb4_unicode_ci;
 -- Password is stored as PHP password_hash(), NOT plain text.
 -- ============================================================
 
-<<<<<<< HEAD
-SET FOREIGN_KEY_CHECKS = 1;hhochipohubochipohub
-=======
 INSERT INTO `users`
 (
     `name`,
@@ -1105,7 +1102,6 @@ VALUES
     NOW(),
     NOW()
 );
->>>>>>> b18fad65e5132498271b8ead394f187953c9eb77
 
 
 -- ============================================================
