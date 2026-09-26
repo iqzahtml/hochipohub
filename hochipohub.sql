@@ -825,7 +825,7 @@ COLLATE=utf8mb4_unicode_ci;
 -- RESTORE FOREIGN KEY CHECK
 -- ============================================================
 
-SET FOREIGN_KEY_CHECKS = 1;hochipohub
+SET FOREIGN_KEY_CHECKS = 1;hhochipohubochipohub
 
 
 -- ============================================================
