@@ -451,23 +451,7 @@ define(
 );
 
 
-/*
-|--------------------------------------------------------------------------
-| SMTP APP PASSWORD
-|--------------------------------------------------------------------------
-|
-| PASTE THE 16-CHARACTER GOOGLE APP PASSWORD BELOW.
-|
-| Example only:
-| abcd efgh ijkl mnop
-|
-| Write it WITHOUT spaces:
-| abcdefghijklmnop
-|
-| DO NOT put "HochipoHub SMTP" here.
-|
-|--------------------------------------------------------------------------
-*/
+
 
 define(
     'SMTP_PASSWORD',
