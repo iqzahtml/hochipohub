@@ -1,64 +1,126 @@
-\<?php
+<?php
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| HOCHIPOHUB - VENDOR SIDEBAR
 
-\|--------------------------------------------------------------------------
 
-\| File:
+/*
 
-\| includes/vendor_sidebar.php
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| HOCHIPOHUB - VENDOR SIDEBAR
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| File:
+
+
+
+\\| includes/vendor_sidebar.php
+
+
 
 |
 
-\| Shared seller sidebar for:
 
-\| - seller/dashboard.php
 
-\| - seller/products.php
-
-\| - seller/add_product.php
-
-\| - seller/orders.php
-
-\| - seller/sales.php
-
-\| - seller/messages.php
-
-\| - seller/setup_profile.php
-
-\| - inventory.php
-
-\| - commission.php
-
-\|--------------------------------------------------------------------------
-
-\*/
+\\| Shared seller sidebar for:
 
 
 
+\\| - seller/dashboard.php
 
 
-/\*
 
-\|--------------------------------------------------------------------------
+\\| - seller/products.php
 
-\| SESSION
 
-\|--------------------------------------------------------------------------
 
-\*/
+\\| - seller/add_product.php
+
+
+
+\\| - seller/orders.php
+
+
+
+\\| - seller/sales.php
+
+
+
+\\| - seller/messages.php
+
+
+
+\\| - seller/setup_profile.php
+
+
+
+\\| - inventory.php
+
+
+
+\\| - commission.php
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| SESSION
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
 if (session_status() === PHP_SESSION_NONE) {
 
-    session_start();
+
+
+    session_start();
+
+
 
 }
 
@@ -66,45 +128,93 @@ if (session_status() === PHP_SESSION_NONE) {
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| BASE URL
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| BASE URL
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
 $vendorSidebarBaseUrl =
 
-    defined('BASE_URL')
 
-        ? rtrim(
 
-            BASE_URL,
-
-            '/'
-
-        ) . '/'
-
-        : '/hochipohub/';
+    defined('BASE_URL')
 
 
 
+        ? rtrim(
 
 
-/\*
 
-\|--------------------------------------------------------------------------
+            BASE_URL,
 
-\| ESCAPE
 
-\|--------------------------------------------------------------------------
 
-\*/
+            '/'
+
+
+
+        ) . '/'
+
+
+
+        : '/hochipohub/';
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| ESCAPE
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -112,21 +222,41 @@ if (!function_exists('vendorSidebarEscape')) {
 
 
 
-    function vendorSidebarEscape($value): string
 
-    {
 
-        return htmlspecialchars(
 
-            (string) $value,
 
-            ENT_QUOTES,
+    function vendorSidebarEscape($value): string
 
-            'UTF-8'
 
-        );
 
-    }
+    {
+
+
+
+        return htmlspecialchars(
+
+
+
+            (string) $value,
+
+
+
+            ENT_QUOTES,
+
+
+
+            'UTF-8'
+
+
+
+        );
+
+
+
+    }
+
+
 
 }
 
@@ -134,31 +264,67 @@ if (!function_exists('vendorSidebarEscape')) {
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| CURRENT SCRIPT
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| CURRENT SCRIPT
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
 $currentScript =
 
-    str_replace(
 
-        '\\\\',
 
-        '/',
+    str_replace(
 
-        $\_SERVER['PHP_SELF']
 
-        ?? ''
 
-    );
+        '\\',
+
+
+
+        '/',
+
+
+
+        $_SERVER['PHP_SELF']
+
+
+
+        ?? ''
+
+
+
+    );
+
+
+
+
+
+
 
 
 
@@ -166,11 +332,23 @@ $currentScript =
 
 $currentPage =
 
-    basename(
 
-        $currentScript
 
-    );
+    basename(
+
+
+
+        $currentScript
+
+
+
+    );
+
+
+
+
+
+
 
 
 
@@ -178,27 +356,53 @@ $currentPage =
 
 $isSellerDirectory =
 
-    strpos(
 
-        $currentScript,
 
-        '/seller/'
-
-    ) !== false;
+    strpos(
 
 
 
+        $currentScript,
 
 
-/\*
 
-\|--------------------------------------------------------------------------
+        '/seller/'
 
-\| ACTIVE HELPERS
 
-\|--------------------------------------------------------------------------
 
-\*/
+    ) !== false;
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| ACTIVE HELPERS
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -206,51 +410,105 @@ if (!function_exists('vendorSidebarActive')) {
 
 
 
-    function vendorSidebarActive(
-
-        $pages
-
-    ): string {
 
 
 
-        global $currentPage;
+
+    function vendorSidebarActive(
 
 
 
-        if (!is_array($pages)) {
+        $pages
 
 
 
-            $pages = [
-
-                $pages
-
-            ];
-
-        }
+    ): string {
 
 
 
 
 
-        return in_array(
 
-            $currentPage,
 
-            $pages,
+        global $currentPage;
 
-            true
 
-        )
 
-            ? 'active'
 
-            : '';
 
-    }
+
+
+        if (!is_array($pages)) {
+
+
+
+
+
+
+
+            $pages = [
+
+
+
+                $pages
+
+
+
+            ];
+
+
+
+        }
+
+
+
+
+
+
+
+
+
+
+
+        return in_array(
+
+
+
+            $currentPage,
+
+
+
+            $pages,
+
+
+
+            true
+
+
+
+        )
+
+
+
+            ? 'active'
+
+
+
+            : '';
+
+
+
+    }
+
+
 
 }
+
+
+
+
+
+
 
 
 
@@ -260,29 +518,57 @@ if (!function_exists('vendorSidebarDashboardActive')) {
 
 
 
-    function vendorSidebarDashboardActive(): string
-
-    {
-
-        global $currentPage;
-
-        global $isSellerDirectory;
 
 
 
-        return (
 
-            $currentPage === 'dashboard.php' &&
+    function vendorSidebarDashboardActive(): string
 
-            $isSellerDirectory
 
-        )
 
-            ? 'active'
+    {
 
-            : '';
 
-    }
+
+        global $currentPage;
+
+
+
+        global $isSellerDirectory;
+
+
+
+
+
+
+
+        return (
+
+
+
+            $currentPage === 'dashboard.php' &&
+
+
+
+            $isSellerDirectory
+
+
+
+        )
+
+
+
+            ? 'active'
+
+
+
+            : '';
+
+
+
+    }
+
+
 
 }
 
@@ -290,23 +576,49 @@ if (!function_exists('vendorSidebarDashboardActive')) {
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| DATABASE
 
-\|--------------------------------------------------------------------------
+
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| DATABASE
+
+
+
+\\|--------------------------------------------------------------------------
+
+
 
 |
 
-\| Sidebar boleh load sendiri vendor information jika page
 
-\| tak provide $vendor.
 
-\|--------------------------------------------------------------------------
+\\| Sidebar boleh load sendiri vendor information jika page
 
-\*/
+
+
+\\| tak provide $vendor.
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -316,23 +628,49 @@ $sidebarDb = null;
 
 
 
+
+
+
+
+
+
 try {
 
 
 
-    if (
-
-        function_exists('getDB')
-
-    ) {
 
 
 
-        $sidebarDb =
 
-            getDB();
+    if (
 
-    }
+
+
+        function_exists('getDB')
+
+
+
+    ) {
+
+
+
+
+
+
+
+        $sidebarDb =
+
+
+
+            getDB();
+
+
+
+    }
+
+
+
+
 
 
 
@@ -340,7 +678,13 @@ try {
 
 
 
-    $sidebarDb = null;
+
+
+
+
+    $sidebarDb = null;
+
+
 
 }
 
@@ -348,147 +692,295 @@ try {
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| USER ID
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| USER ID
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
 $sidebarUserId =
 
-    (int) (
 
-        $\_SESSION['user_id']
 
-        ?? 0
-
-    );
+    (int) (
 
 
 
+        $_SESSION['user_id']
 
 
-/\*
 
-\|--------------------------------------------------------------------------
+        ?? 0
 
-\| LOAD VENDOR IF PAGE DOES NOT HAVE IT
 
-\|--------------------------------------------------------------------------
 
-\*/
+    );
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| LOAD VENDOR IF PAGE DOES NOT HAVE IT
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
 if (
 
-    (
 
-        !isset($vendor) ||
 
-        !is_array($vendor) ||
+    (
 
-        empty($vendor)
 
-    ) &&
 
-    $sidebarUserId > 0 &&
+        !isset($vendor) ||
 
-    $sidebarDb instanceof PDO
+
+
+        !is_array($vendor) ||
+
+
+
+        empty($vendor)
+
+
+
+    ) &&
+
+
+
+    $sidebarUserId > 0 &&
+
+
+
+    $sidebarDb instanceof PDO
+
+
 
 ) {
 
 
 
-    try {
 
 
 
-        $sidebarVendorStmt =
 
-            $sidebarDb->prepare("
-
-                SELECT
-
-                    v.\*,
-
-                    u.name,
-
-                    u.email,
-
-                    u.phone
-
-
-
-                FROM vendors v
-
-
-
-                INNER JOIN users u
-
-                    ON v.user_id = u.user_id
-
-
-
-                WHERE v.user_id = ?
-
-
-
-                LIMIT 1
-
-            ");
+    try {
 
 
 
 
 
-        $sidebarVendorStmt->execute([
 
-            $sidebarUserId
 
-        ]);
+        $sidebarVendorStmt =
 
 
 
-
-
-        $sidebarLoadedVendor =
-
-            $sidebarVendorStmt->fetch(
-
-                PDO::FETCH_ASSOC
-
-            );
+            $sidebarDb->prepare("
 
 
 
-
-
-        if ($sidebarLoadedVendor) {
-
-
-
-            $vendor =
-
-                $sidebarLoadedVendor;
-
-        }
+                SELECT
 
 
 
-    } catch (Throwable $e) {
+                    v.*,
 
 
 
-        // Sidebar still works using session fallback.
+                    u.name,
 
-    }
+
+
+                    u.email,
+
+
+
+                    u.phone
+
+
+
+
+
+
+
+                FROM vendors v
+
+
+
+
+
+
+
+                INNER JOIN users u
+
+
+
+                    ON v.user_id = u.user_id
+
+
+
+
+
+
+
+                WHERE v.user_id = ?
+
+
+
+
+
+
+
+                LIMIT 1
+
+
+
+            ");
+
+
+
+
+
+
+
+
+
+
+
+        $sidebarVendorStmt->execute([
+
+
+
+            $sidebarUserId
+
+
+
+        ]);
+
+
+
+
+
+
+
+
+
+
+
+        $sidebarLoadedVendor =
+
+
+
+            $sidebarVendorStmt->fetch(
+
+
+
+                PDO::FETCH_ASSOC
+
+
+
+            );
+
+
+
+
+
+
+
+
+
+
+
+        if ($sidebarLoadedVendor) {
+
+
+
+
+
+
+
+            $vendor =
+
+
+
+                $sidebarLoadedVendor;
+
+
+
+        }
+
+
+
+
+
+
+
+    } catch (Throwable $e) {
+
+
+
+
+
+
+
+        // Sidebar still works using session fallback.
+
+
+
+    }
+
+
 
 }
 
@@ -496,25 +988,55 @@ if (
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| VENDOR INFORMATION
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| VENDOR INFORMATION
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
 $sidebarBusinessName =
 
-    $vendor['business_name']
 
-    ?? $\_SESSION['business_name']
 
-    ?? 'My Store';
+    $vendor['business_name']
+
+
+
+    ?? $_SESSION['business_name']
+
+
+
+    ?? 'My Store';
+
+
+
+
+
+
 
 
 
@@ -522,13 +1044,27 @@ $sidebarBusinessName =
 
 $sidebarVendorName =
 
-    $vendor['name']
 
-    ?? $\_SESSION['name']
 
-    ?? $\_SESSION['user_name']
+    $vendor['name']
 
-    ?? 'Vendor';
+
+
+    ?? $_SESSION['name']
+
+
+
+    ?? $_SESSION['user_name']
+
+
+
+    ?? 'Vendor';
+
+
+
+
+
+
 
 
 
@@ -536,11 +1072,23 @@ $sidebarVendorName =
 
 $sidebarStatus =
 
-    $vendor['approval_status']
 
-    ?? $\_SESSION['vendor_approval_status']
 
-    ?? 'Pending';
+    $vendor['approval_status']
+
+
+
+    ?? $_SESSION['vendor_approval_status']
+
+
+
+    ?? 'Pending';
+
+
+
+
+
+
 
 
 
@@ -548,29 +1096,57 @@ $sidebarStatus =
 
 $sidebarVendorId =
 
-    (int) (
 
-        $vendor['vendor_id']
 
-        ?? $\_SESSION['vendor_id']
-
-        ?? 0
-
-    );
+    (int) (
 
 
 
+        $vendor['vendor_id']
 
 
-/\*
 
-\|--------------------------------------------------------------------------
+        ?? $_SESSION['vendor_id']
 
-\| BUSINESS LOGO
 
-\|--------------------------------------------------------------------------
 
-\*/
+        ?? 0
+
+
+
+    );
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| BUSINESS LOGO
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -580,41 +1156,83 @@ $sidebarLogo = '';
 
 
 
+
+
+
+
+
+
 if (
 
-    isset(
 
-        $vendor['business_logo']
 
-    ) &&
+    isset(
 
-    trim(
 
-        (string)
 
-        $vendor['business_logo']
+        $vendor['business_logo']
 
-    ) !== ''
+
+
+    ) &&
+
+
+
+    trim(
+
+
+
+        (string)
+
+
+
+        $vendor['business_logo']
+
+
+
+    ) !== ''
+
+
 
 ) {
 
 
 
-    $sidebarLogo =
 
-        $vendorSidebarBaseUrl .
 
-        'uploads/vendors/' .
 
-        rawurlencode(
 
-            basename(
+    $sidebarLogo =
 
-                $vendor['business_logo']
 
-            )
 
-        );
+        $vendorSidebarBaseUrl .
+
+
+
+        'uploads/vendors/' .
+
+
+
+        rawurlencode(
+
+
+
+            basename(
+
+
+
+                $vendor['business_logo']
+
+
+
+            )
+
+
+
+        );
+
+
 
 }
 
@@ -622,15 +1240,33 @@ if (
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| PENDING ORDERS NOTIFICATION
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| PENDING ORDERS NOTIFICATION
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -640,69 +1276,139 @@ $sidebarPendingOrders = 0;
 
 
 
+
+
+
+
+
+
 if (
 
-    $sidebarVendorId > 0 &&
 
-    $sidebarDb instanceof PDO
+
+    $sidebarVendorId > 0 &&
+
+
+
+    $sidebarDb instanceof PDO
+
+
 
 ) {
 
 
 
-    try {
 
 
 
-        $sidebarOrderStmt =
 
-            $sidebarDb->prepare("
-
-                SELECT
-
-                    COUNT(\*)
-
-
-
-                FROM vendor_orders
-
-
-
-                WHERE vendor_id = ?
-
-                  AND vendor_status = 'Pending'
-
-            ");
+    try {
 
 
 
 
 
-        $sidebarOrderStmt->execute([
 
-            $sidebarVendorId
 
-        ]);
+        $sidebarOrderStmt =
 
 
 
-
-
-        $sidebarPendingOrders =
-
-            (int)
-
-            $sidebarOrderStmt->fetchColumn();
+            $sidebarDb->prepare("
 
 
 
-    } catch (Throwable $e) {
+                SELECT
 
 
 
-        $sidebarPendingOrders = 0;
+                    COUNT(*)
 
-    }
+
+
+
+
+
+
+                FROM vendor_orders
+
+
+
+
+
+
+
+                WHERE vendor_id = ?
+
+
+
+                  AND vendor_status = 'Pending'
+
+
+
+            ");
+
+
+
+
+
+
+
+
+
+
+
+        $sidebarOrderStmt->execute([
+
+
+
+            $sidebarVendorId
+
+
+
+        ]);
+
+
+
+
+
+
+
+
+
+
+
+        $sidebarPendingOrders =
+
+
+
+            (int)
+
+
+
+            $sidebarOrderStmt->fetchColumn();
+
+
+
+
+
+
+
+    } catch (Throwable $e) {
+
+
+
+
+
+
+
+        $sidebarPendingOrders = 0;
+
+
+
+    }
+
+
 
 }
 
@@ -710,23 +1416,51 @@ if (
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| URLS
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| URLS
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
 $sidebarDashboardUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'seller/dashboard.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'seller/dashboard.php';
+
+
+
+
+
+
 
 
 
@@ -734,9 +1468,19 @@ $sidebarDashboardUrl =
 
 $sidebarProductsUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'seller/products.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'seller/products.php';
+
+
+
+
+
+
 
 
 
@@ -744,9 +1488,19 @@ $sidebarProductsUrl =
 
 $sidebarAddProductUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'seller/add_product.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'seller/add_product.php';
+
+
+
+
+
+
 
 
 
@@ -754,9 +1508,19 @@ $sidebarAddProductUrl =
 
 $sidebarOrdersUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'seller/orders.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'seller/orders.php';
+
+
+
+
+
+
 
 
 
@@ -764,9 +1528,19 @@ $sidebarOrdersUrl =
 
 $sidebarPendingOrdersUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'seller/orders.php?status=Pending';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'seller/orders.php?status=Pending';
+
+
+
+
+
+
 
 
 
@@ -774,9 +1548,19 @@ $sidebarPendingOrdersUrl =
 
 $sidebarSalesUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'seller/sales.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'seller/sales.php';
+
+
+
+
+
+
 
 
 
@@ -784,9 +1568,19 @@ $sidebarSalesUrl =
 
 $sidebarMessagesUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'seller/messages.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'seller/messages.php';
+
+
+
+
+
+
 
 
 
@@ -794,17 +1588,35 @@ $sidebarMessagesUrl =
 
 $sidebarInventoryUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'inventory.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'inventory.php';
+
+
+
+
+
+
 
 
 
 
 
 $sidebarCommissionUrl =
+
     $vendorSidebarBaseUrl .
+
     'seller/commission.php';
+
+
+
+
+
+
 
 
 
@@ -812,9 +1624,19 @@ $sidebarCommissionUrl =
 
 $sidebarStoreProfileUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'seller/setup_profile.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'seller/setup_profile.php';
+
+
+
+
+
+
 
 
 
@@ -822,9 +1644,19 @@ $sidebarStoreProfileUrl =
 
 $sidebarCatalogUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'catalog.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'catalog.php';
+
+
+
+
+
+
 
 
 
@@ -832,9 +1664,19 @@ $sidebarCatalogUrl =
 
 $sidebarHomeUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'index.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'index.php';
+
+
+
+
+
+
 
 
 
@@ -842,9 +1684,19 @@ $sidebarHomeUrl =
 
 $sidebarProfileUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'profile.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'profile.php';
+
+
+
+
+
+
 
 
 
@@ -852,9 +1704,17 @@ $sidebarProfileUrl =
 
 $sidebarLogoutUrl =
 
-    $vendorSidebarBaseUrl .
 
-    'auth/logout.php';
+
+    $vendorSidebarBaseUrl .
+
+
+
+    'auth/logout.php';
+
+
+
+
 
 
 
@@ -864,23 +1724,49 @@ $sidebarLogoutUrl =
 
 
 
-\<style>
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| SIDEBAR SAFETY FIX
 
-\|--------------------------------------------------------------------------
+<style>
 
-\| Prevent seller page content from sitting above sidebar links.
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| SIDEBAR SAFETY FIX
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| Prevent seller page content from sitting above sidebar links.
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -888,45 +1774,89 @@ $sidebarLogoutUrl =
 
 
 
-    position:
-
-        fixed !important;
 
 
 
-    top:
 
-        0 !important;
-
-
-
-    left:
-
-        0 !important;
+    position:
 
 
 
-    bottom:
-
-        0 !important;
+        fixed !important;
 
 
 
-    z-index:
-
-        10000 !important;
 
 
 
-    pointer-events:
 
-        auto !important;
-
+    top:
 
 
-    isolation:
 
-        isolate;
+        0 !important;
+
+
+
+
+
+
+
+    left:
+
+
+
+        0 !important;
+
+
+
+
+
+
+
+    bottom:
+
+
+
+        0 !important;
+
+
+
+
+
+
+
+    z-index:
+
+
+
+        10000 !important;
+
+
+
+
+
+
+
+    pointer-events:
+
+
+
+        auto !important;
+
+
+
+
+
+
+
+    isolation:
+
+
+
+        isolate;
+
+
 
 }
 
@@ -934,15 +1864,33 @@ $sidebarLogoutUrl =
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| LINKS
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| LINKS
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -950,23 +1898,49 @@ $sidebarLogoutUrl =
 
 
 
-    position:
-
-        relative;
 
 
 
-    z-index:
 
-        2;
-
+    position:
 
 
-    pointer-events:
 
-        auto !important;
+        relative;
+
+
+
+
+
+
+
+    z-index:
+
+
+
+        2;
+
+
+
+
+
+
+
+    pointer-events:
+
+
+
+        auto !important;
+
+
 
 }
+
+
+
+
+
+
 
 
 
@@ -976,39 +1950,77 @@ $sidebarLogoutUrl =
 
 
 
-    position:
-
-        relative !important;
 
 
 
-    z-index:
 
-        3 !important;
-
-
-
-    width:
-
-        100%;
+    position:
 
 
 
-    pointer-events:
-
-        auto !important;
+        relative !important;
 
 
 
-    cursor:
-
-        pointer !important;
 
 
 
-    overflow:
 
-        hidden;
+    z-index:
+
+
+
+        3 !important;
+
+
+
+
+
+
+
+    width:
+
+
+
+        100%;
+
+
+
+
+
+
+
+    pointer-events:
+
+
+
+        auto !important;
+
+
+
+
+
+
+
+    cursor:
+
+
+
+        pointer !important;
+
+
+
+
+
+
+
+    overflow:
+
+
+
+        hidden;
+
+
 
 }
 
@@ -1016,25 +2028,51 @@ $sidebarLogoutUrl =
 
 
 
-.vendor-sidebar-link > \* {
 
 
 
-    position:
-
-        relative;
 
 
 
-    z-index:
-
-        1;
+.vendor-sidebar-link > * {
 
 
 
-    pointer-events:
 
-        none;
+
+
+
+    position:
+
+
+
+        relative;
+
+
+
+
+
+
+
+    z-index:
+
+
+
+        1;
+
+
+
+
+
+
+
+    pointer-events:
+
+
+
+        none;
+
+
 
 }
 
@@ -1042,15 +2080,33 @@ $sidebarLogoutUrl =
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| ORDER NOTIFICATION BADGE
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| ORDER NOTIFICATION BADGE
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -1058,123 +2114,245 @@ $sidebarLogoutUrl =
 
 
 
-    min-width:
 
-        20px;
 
 
 
-    height:
+    min-width:
 
-        20px;
 
 
+        20px;
 
-    padding:
 
-        0 6px;
 
 
 
-    margin-left:
 
-        auto;
 
+    height:
 
 
-    display:
 
-        inline-flex;
+        20px;
 
 
 
-    align-items:
 
-        center;
 
 
 
-    justify-content:
+    padding:
 
-        center;
 
 
+        0 6px;
 
-    color:
 
-        #ffffff;
 
 
 
-    background:
 
-        #ef4444;
 
+    margin-left:
 
 
-    border:
 
-        2px solid
+        auto;
 
-        rgba(
 
-            255,
 
-            255,
 
-            255,
 
-            .15
 
-        );
 
+    display:
 
 
-    border-radius:
 
-        999px;
+        inline-flex;
 
 
 
-    box-shadow:
 
-        0 5px 12px
 
-        rgba(
 
-            239,
 
-            68,
+    align-items:
 
-            68,
 
-            .25
 
-        );
+        center;
 
 
 
-    font-size:
 
-        9px;
 
 
 
-    font-weight:
+    justify-content:
 
-        900;
 
 
+        center;
 
-    line-height:
 
-        1;
 
 
 
-    pointer-events:
 
-        none;
+
+    color:
+
+
+
+        #ffffff;
+
+
+
+
+
+
+
+    background:
+
+
+
+        #ef4444;
+
+
+
+
+
+
+
+    border:
+
+
+
+        2px solid
+
+
+
+        rgba(
+
+
+
+            255,
+
+
+
+            255,
+
+
+
+            255,
+
+
+
+            .15
+
+
+
+        );
+
+
+
+
+
+
+
+    border-radius:
+
+
+
+        999px;
+
+
+
+
+
+
+
+    box-shadow:
+
+
+
+        0 5px 12px
+
+
+
+        rgba(
+
+
+
+            239,
+
+
+
+            68,
+
+
+
+            68,
+
+
+
+            .25
+
+
+
+        );
+
+
+
+
+
+
+
+    font-size:
+
+
+
+        9px;
+
+
+
+
+
+
+
+    font-weight:
+
+
+
+        900;
+
+
+
+
+
+
+
+    line-height:
+
+
+
+        1;
+
+
+
+
+
+
+
+    pointer-events:
+
+
+
+        none;
+
+
 
 }
 
@@ -1182,15 +2360,33 @@ $sidebarLogoutUrl =
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| ACTIVE LINK SAFETY
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| ACTIVE LINK SAFETY
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -1198,9 +2394,17 @@ $sidebarLogoutUrl =
 
 
 
-    z-index:
 
-        4 !important;
+
+
+
+    z-index:
+
+
+
+        4 !important;
+
+
 
 }
 
@@ -1208,15 +2412,33 @@ $sidebarLogoutUrl =
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| FOOTER
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| FOOTER
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -1224,23 +2446,49 @@ $sidebarLogoutUrl =
 
 
 
-    position:
-
-        relative;
 
 
 
-    z-index:
 
-        3;
-
+    position:
 
 
-    pointer-events:
 
-        auto;
+        relative;
+
+
+
+
+
+
+
+    z-index:
+
+
+
+        3;
+
+
+
+
+
+
+
+    pointer-events:
+
+
+
+        auto;
+
+
 
 }
+
+
+
+
+
+
 
 
 
@@ -1250,21 +2498,41 @@ $sidebarLogoutUrl =
 
 
 
-    position:
-
-        relative;
 
 
 
-    z-index:
 
-        4;
-
+    position:
 
 
-    pointer-events:
 
-        auto !important;
+        relative;
+
+
+
+
+
+
+
+    z-index:
+
+
+
+        4;
+
+
+
+
+
+
+
+    pointer-events:
+
+
+
+        auto !important;
+
+
 
 }
 
@@ -1272,13 +2540,27 @@ $sidebarLogoutUrl =
 
 
 
-.vendor-footer-link > \* {
 
 
 
-    pointer-events:
 
-        none;
+
+
+.vendor-footer-link > * {
+
+
+
+
+
+
+
+    pointer-events:
+
+
+
+        none;
+
+
 
 }
 
@@ -1286,15 +2568,33 @@ $sidebarLogoutUrl =
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| MOBILE BUTTON
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| MOBILE BUTTON
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -1302,15 +2602,29 @@ $sidebarLogoutUrl =
 
 
 
-    position:
-
-        fixed;
 
 
 
-    z-index:
 
-        10020;
+    position:
+
+
+
+        fixed;
+
+
+
+
+
+
+
+    z-index:
+
+
+
+        10020;
+
+
 
 }
 
@@ -1318,15 +2632,33 @@ $sidebarLogoutUrl =
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| OVERLAY
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| OVERLAY
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
@@ -1334,27 +2666,53 @@ $sidebarLogoutUrl =
 
 
 
-    position:
-
-        fixed;
 
 
 
-    inset:
 
-        0;
-
-
-
-    z-index:
-
-        9990;
+    position:
 
 
 
-    pointer-events:
+        fixed;
 
-        none;
+
+
+
+
+
+
+    inset:
+
+
+
+        0;
+
+
+
+
+
+
+
+    z-index:
+
+
+
+        9990;
+
+
+
+
+
+
+
+    pointer-events:
+
+
+
+        none;
+
+
 
 }
 
@@ -1362,55 +2720,111 @@ $sidebarLogoutUrl =
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| DESKTOP
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| DESKTOP
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
 @media (
 
-    min-width: 769px
+
+
+    min-width: 769px
+
+
 
 ) {
 
 
 
-    .vendor-sidebar-overlay {
 
 
 
-        display:
 
-            none !important;
-
-
-
-        pointer-events:
-
-            none !important;
-
-    }
+    .vendor-sidebar-overlay {
 
 
 
 
 
-    .seller-mobile-menu {
+
+
+        display:
 
 
 
-        display:
+            none !important;
 
-            none !important;
 
-    }
+
+
+
+
+
+        pointer-events:
+
+
+
+            none !important;
+
+
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+    .seller-mobile-menu {
+
+
+
+
+
+
+
+        display:
+
+
+
+            none !important;
+
+
+
+    }
+
+
 
 }
 
@@ -1418,41 +2832,85 @@ $sidebarLogoutUrl =
 
 
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| MOBILE
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| MOBILE
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
 @media (
 
-    max-width: 768px
+
+
+    max-width: 768px
+
+
 
 ) {
 
 
 
-    .vendor-sidebar-overlay.show {
 
 
 
-        display:
 
-            block;
-
+    .vendor-sidebar-overlay.show {
 
 
-        pointer-events:
 
-            auto;
 
-    }
+
+
+
+        display:
+
+
+
+            block;
+
+
+
+
+
+
+
+        pointer-events:
+
+
+
+            auto;
+
+
+
+    }
+
+
+
+
 
 
 
@@ -1460,1826 +2918,3652 @@ $sidebarLogoutUrl =
 
 
 
-\</style>
 
 
 
 
+</style>
 
-\<!-- ===============================================================
 
-     VENDOR SIDEBAR
 
-\================================================================ -->
 
 
 
-\<aside
 
-    class="vendor-sidebar"
 
-    id="vendorSidebar"
 
-\>
 
 
+<!-- ===============================================================
 
 
 
-    \<!-- ===========================================================
+     VENDOR SIDEBAR
 
-         BRAND
 
-    ============================================================ -->
 
+\\================================================================ -->
 
 
-    \<div class="vendor-sidebar-brand">
 
 
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarDashboardUrl
+<aside
 
-            ) ?>"
 
-            class="vendor-brand"
 
-        >
+    class="vendor-sidebar"
 
 
 
-            \<div class="vendor-brand-logo">
+    id="vendorSidebar"
 
 
 
-                \<i class="fa-solid fa-store">\</i>
+\\>
 
 
 
-            \</div>
 
 
 
 
 
-            \<div class="vendor-brand-copy">
 
 
 
-                \<strong>
+    <!-- ===========================================================
 
 
 
-                    HOCHIPO\<span>HUB\</span>
+         BRAND
 
 
 
-                \</strong>
+    ============================================================ -->
 
 
 
 
 
-                \<small>
 
 
+    <div class="vendor-sidebar-brand">
 
-                    VENDOR PANEL
 
 
 
-                \</small>
 
 
 
-            \</div>
+        <a
 
 
 
-        \</a>
+            href="<?= vendorSidebarEscape(
 
 
 
+                $sidebarDashboardUrl
 
 
-        \<button
 
-            type="button"
+            ) ?>"
 
-            class="vendor-sidebar-close"
 
-            id="vendorSidebarClose"
 
-            aria-label="Close sidebar"
+            class="vendor-brand"
 
-        >
 
 
+        >
 
-            \<i class="fa-solid fa-xmark">\</i>
 
 
 
-        \</button>
 
 
 
-    \</div>
+            <div class="vendor-brand-logo">
 
 
 
 
 
-    \<!-- ===========================================================
 
-         PROFILE
 
-    ============================================================ -->
+                <i class="fa-solid fa-store"></i>
 
 
 
-    \<div class="vendor-sidebar-profile">
 
 
 
 
+            </div>
 
-        \<div class="vendor-sidebar-avatar">
 
 
 
-            \<?php if (
 
-                $sidebarLogo !== ''
 
-            ): ?>
 
 
 
-                \<img
 
-                    src="\<?= vendorSidebarEscape(
 
-                        $sidebarLogo
+            <div class="vendor-brand-copy">
 
-                    ) ?>"
 
-                    alt="\<?= vendorSidebarEscape(
 
-                        $sidebarBusinessName
 
-                    ) ?>"
 
-                    onerror="
 
-                        this.style.display='none';
 
-                        this.nextElementSibling.style.display='flex';
+                <strong>
 
-                    "
 
-                >
 
 
 
 
 
-                \<div
+                    HOCHIPO<span>HUB</span>
 
-                    class="vendor-avatar-fallback"
 
-                    style="display:none;"
 
-                >
 
 
 
-                    \<i class="fa-solid fa-store">\</i>
 
+                </strong>
 
 
-                \</div>
 
 
 
-            \<?php else: ?>
 
 
 
-                \<div class="vendor-avatar-fallback">
 
 
 
-                    \<i class="fa-solid fa-store">\</i>
+                <small>
 
 
 
-                \</div>
 
 
 
-            \<?php endif; ?>
 
+                    VENDOR PANEL
 
 
-        \</div>
 
 
 
 
 
-        \<div class="vendor-sidebar-profile-copy">
+                </small>
 
 
 
-            \<strong>
 
 
 
-                \<?= vendorSidebarEscape(
 
-                    $sidebarBusinessName
+            </div>
 
-                ) ?>
 
 
 
-            \</strong>
 
 
 
+        </a>
 
 
-            \<span>
 
 
 
-                \<?= vendorSidebarEscape(
 
-                    $sidebarVendorName
 
-                ) ?>
 
 
 
-            \</span>
 
+        <button
 
 
 
+            type="button"
 
-            \<small
 
-                class="
 
-                    vendor-account-status
+            class="vendor-sidebar-close"
 
-                    \<?= vendorSidebarEscape(
 
-                        strtolower(
 
-                            trim(
+            id="vendorSidebarClose"
 
-                                (string)
 
-                                $sidebarStatus
 
-                            )
+            aria-label="Close sidebar"
 
-                        )
 
-                    ) ?>
 
-                "
+        >
 
-            >
 
 
 
-                \<?= vendorSidebarEscape(
 
-                    $sidebarStatus
 
-                ) ?>
 
+            <i class="fa-solid fa-xmark"></i>
 
 
-            \</small>
 
 
 
-        \</div>
 
 
+        </button>
 
-    \</div>
 
 
 
 
 
-    \<!-- ===========================================================
 
-         NAVIGATION
+    </div>
 
-    ============================================================ -->
 
 
 
-    \<nav class="vendor-sidebar-nav">
 
 
 
 
 
-        \<!-- MAIN MENU -->
 
 
+    <!-- ===========================================================
 
-        \<div class="vendor-sidebar-label">
 
 
+         PROFILE
 
-            MAIN MENU
 
 
+    ============================================================ -->
 
-        \</div>
 
 
 
 
 
-        \<!-- =======================================================
 
-             DASHBOARD
+    <div class="vendor-sidebar-profile">
 
-        ======================================================== -->
 
 
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarDashboardUrl
 
-            ) ?>"
 
-            class="
 
-                vendor-sidebar-link
 
-                \<?= vendorSidebarDashboardActive() ?>
 
-            "
+        <div class="vendor-sidebar-avatar">
 
-        >
 
 
 
-            \<span class="vendor-link-icon">
 
 
 
-                \<i class="fa-solid fa-table-columns">\</i>
+            <?php if (
 
 
 
-            \</span>
+                $sidebarLogo !== ''
 
 
 
+            ): ?>
 
 
-            \<span class="vendor-link-text">
 
 
 
-                Dashboard
 
 
+                <img
 
-            \</span>
 
 
+                    src="<?= vendorSidebarEscape(
 
-        \</a>
 
 
+                        $sidebarLogo
 
 
 
-        \<!-- =======================================================
+                    ) ?>"
 
-             MY PRODUCTS
 
-        ======================================================== -->
 
+                    alt="<?= vendorSidebarEscape(
 
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
+                        $sidebarBusinessName
 
-                $sidebarProductsUrl
 
-            ) ?>"
 
-            class="
+                    ) ?>"
 
-                vendor-sidebar-link
 
-                \<?= vendorSidebarActive([
 
-                    'products.php',
+                    onerror="
 
-                    'edit_product.php'
 
-                ]) ?>
 
-            "
+                        this.style.display='none';
 
-        >
 
 
+                        this.nextElementSibling.style.display='flex';
 
-            \<span class="vendor-link-icon">
 
 
+                    "
 
-                \<i class="fa-solid fa-cube">\</i>
 
 
+                >
 
-            \</span>
 
 
 
 
 
-            \<span class="vendor-link-text">
 
 
 
-                My Products
 
 
+                <div
 
-            \</span>
 
 
+                    class="vendor-avatar-fallback"
 
-        \</a>
 
 
+                    style="display:none;"
 
 
 
-        \<!-- =======================================================
+                >
 
-             ADD PRODUCT
 
-        ======================================================== -->
 
 
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarAddProductUrl
+                    <i class="fa-solid fa-store"></i>
 
-            ) ?>"
 
-            class="
 
-                vendor-sidebar-link
 
-                \<?= vendorSidebarActive(
 
-                    'add_product.php'
 
-                ) ?>
 
-            "
+                </div>
 
-        >
 
 
 
-            \<span class="vendor-link-icon">
 
 
 
-                \<i class="fa-solid fa-circle-plus">\</i>
+            <?php else: ?>
 
 
 
-            \</span>
 
 
 
 
+                <div class="vendor-avatar-fallback">
 
-            \<span class="vendor-link-text">
 
 
 
-                Add Product
 
 
 
-            \</span>
+                    <i class="fa-solid fa-store"></i>
 
 
 
-        \</a>
 
 
 
 
+                </div>
 
-        \<!-- =======================================================
 
-             ORDERS
 
-        ======================================================== -->
 
 
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
+            <?php endif; ?>
 
-                $sidebarOrdersUrl
 
-            ) ?>"
 
-            class="
 
-                vendor-sidebar-link
 
-                \<?= vendorSidebarActive(
 
-                    'orders.php'
 
-                ) ?>
+        </div>
 
-            "
 
-        >
 
 
 
-            \<span class="vendor-link-icon">
 
 
 
-                \<i class="fa-solid fa-bag-shopping">\</i>
 
 
 
-            \</span>
+        <div class="vendor-sidebar-profile-copy">
 
 
 
 
 
-            \<span class="vendor-link-text">
 
 
+            <strong>
 
-                Orders
 
 
 
-            \</span>
 
 
 
+                <?= vendorSidebarEscape(
 
 
-            \<?php if (
 
-                $sidebarPendingOrders > 0
+                    $sidebarBusinessName
 
-            ): ?>
 
 
+                ) ?>
 
-                \<span
 
-                    class="vendor-order-notification"
 
-                    title="\<?= vendorSidebarEscape(
 
-                        $sidebarPendingOrders .
 
-                        ' pending order(s)'
 
-                    ) ?>"
 
-                >
+            </strong>
 
 
 
-                    \<?= $sidebarPendingOrders > 99
 
-                        ? '99+'
 
-                        : (int)
 
-                            $sidebarPendingOrders ?>
 
 
 
-                \</span>
 
 
+            <span>
 
-            \<?php endif; ?>
 
 
 
-        \</a>
 
 
 
+                <?= vendorSidebarEscape(
 
 
-        \<!-- =======================================================
 
-             SALES
+                    $sidebarVendorName
 
-        ======================================================== -->
 
 
+                ) ?>
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarSalesUrl
 
-            ) ?>"
 
-            class="
 
-                vendor-sidebar-link
 
-                \<?= vendorSidebarActive(
+            </span>
 
-                    'sales.php'
 
-                ) ?>
 
-            "
 
-        >
 
 
 
-            \<span class="vendor-link-icon">
 
 
 
-                \<i class="fa-solid fa-chart-column">\</i>
 
+            <small
 
 
-            \</span>
 
+                class="
 
 
 
+                    vendor-account-status
 
-            \<span class="vendor-link-text">
 
 
+                    <?= vendorSidebarEscape(
 
-                Sales
 
 
+                        strtolower(
 
-            \</span>
 
 
+                            trim(
 
-        \</a>
 
 
+                                (string)
 
 
 
-        \<!-- =======================================================
+                                $sidebarStatus
 
-             MESSAGES
 
-        ======================================================== -->
 
+                            )
 
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
+                        )
 
-                $sidebarMessagesUrl
 
-            ) ?>"
 
-            class="
+                    ) ?>
 
-                vendor-sidebar-link
 
-                \<?= vendorSidebarActive(
 
-                    'messages.php'
+                "
 
-                ) ?>
 
-            "
 
-        >
+            >
 
 
 
-            \<span class="vendor-link-icon">
 
 
 
-                \<i class="fa-solid fa-message">\</i>
 
+                <?= vendorSidebarEscape(
 
 
-            \</span>
 
+                    $sidebarStatus
 
 
 
+                ) ?>
 
-            \<span class="vendor-link-text">
 
 
 
-                Messages
 
 
 
-            \</span>
+            </small>
 
 
 
-        \</a>
 
 
 
 
+        </div>
 
-        \<!-- =======================================================
 
-             MANAGEMENT
 
-        ======================================================== -->
 
 
 
-        \<div
 
-            class="
+    </div>
 
-                vendor-sidebar-label
 
-                vendor-label-space
 
-            "
 
-        >
 
 
 
-            MANAGEMENT
 
 
 
-        \</div>
 
+    <!-- ===========================================================
 
 
 
+         NAVIGATION
 
-        \<!-- =======================================================
 
-             INVENTORY
 
-        ======================================================== -->
+    ============================================================ -->
 
 
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarInventoryUrl
 
-            ) ?>"
 
-            class="
+    <nav class="vendor-sidebar-nav">
 
-                vendor-sidebar-link
 
-                \<?= vendorSidebarActive(
 
-                    'inventory.php'
 
-                ) ?>
 
-            "
 
-        >
 
 
 
-            \<span class="vendor-link-icon">
 
 
+        <!-- MAIN MENU -->
 
-                \<i class="fa-solid fa-warehouse">\</i>
 
 
 
-            \</span>
 
 
 
+        <div class="vendor-sidebar-label">
 
 
-            \<span class="vendor-link-text">
 
 
 
-                Inventory
 
 
+            MAIN MENU
 
-            \</span>
 
 
 
-        \</a>
 
 
 
+        </div>
 
 
-        \<!-- =======================================================
 
-             COMMISSION
 
-        ======================================================== -->
 
 
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarCommissionUrl
 
-            ) ?>"
 
-            class="
+        <!-- =======================================================
 
-                vendor-sidebar-link
 
-                \<?= vendorSidebarActive(
 
-                    'commission.php'
+             DASHBOARD
 
-                ) ?>
 
-            "
 
-        >
+        ======================================================== -->
 
 
 
-            \<span class="vendor-link-icon">
 
 
 
-                \<i class="fa-solid fa-circle-dollar-to-slot">\</i>
 
+        <a
 
 
-            \</span>
 
+            href="<?= vendorSidebarEscape(
 
 
 
+                $sidebarDashboardUrl
 
-            \<span class="vendor-link-text">
 
 
+            ) ?>"
 
-                Commission
 
 
+            class="
 
-            \</span>
 
 
+                vendor-sidebar-link
 
-        \</a>
 
 
+                <?= vendorSidebarDashboardActive() ?>
 
 
 
-        \<!-- =======================================================
+            "
 
-             STORE PROFILE
 
-        ======================================================== -->
 
+        >
 
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarStoreProfileUrl
 
-            ) ?>"
 
-            class="
 
-                vendor-sidebar-link
+            <span class="vendor-link-icon">
 
-                \<?= vendorSidebarActive(
 
-                    'setup_profile.php'
 
-                ) ?>
 
-            "
 
-        >
 
 
+                <i class="fa-solid fa-table-columns"></i>
 
-            \<span class="vendor-link-icon">
 
 
 
-                \<i class="fa-solid fa-store">\</i>
 
 
 
-            \</span>
+            </span>
 
 
 
 
 
-            \<span class="vendor-link-text">
 
 
 
-                Store Profile
 
 
 
-            \</span>
+            <span class="vendor-link-text">
 
 
 
-        \</a>
 
 
 
 
+                Dashboard
 
-        \<!-- =======================================================
 
-             DIVIDER
 
-        ======================================================== -->
 
 
 
-        \<div class="vendor-sidebar-divider">\</div>
 
+            </span>
 
 
 
 
-        \<!-- =======================================================
 
-             VIEW MARKETPLACE
 
-        ======================================================== -->
 
+        </a>
 
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarCatalogUrl
 
-            ) ?>"
 
-            class="vendor-sidebar-link"
 
-        >
 
 
 
-            \<span class="vendor-link-icon">
 
+        <!-- =======================================================
 
 
-                \<i class="fa-solid fa-cart-shopping">\</i>
 
+             MY PRODUCTS
 
 
-            \</span>
 
+        ======================================================== -->
 
 
 
 
-            \<span class="vendor-link-text">
 
 
 
-                View Marketplace
+        <a
 
 
 
-            \</span>
+            href="<?= vendorSidebarEscape(
 
 
 
-        \</a>
+                $sidebarProductsUrl
 
 
 
+            ) ?>"
 
 
-        \<!-- =======================================================
 
-             HOME
+            class="
 
-        ======================================================== -->
 
 
+                vendor-sidebar-link
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarHomeUrl
+                <?= vendorSidebarActive([
 
-            ) ?>"
 
-            class="vendor-sidebar-link"
 
-        >
+                    'products.php',
 
 
 
-            \<span class="vendor-link-icon">
+                    'edit_product.php'
 
 
 
-                \<i class="fa-solid fa-house">\</i>
+                ]) ?>
 
 
 
-            \</span>
+            "
 
 
 
+        >
 
 
-            \<span class="vendor-link-text">
 
 
 
-                Home
 
 
+            <span class="vendor-link-icon">
 
-            \</span>
 
 
 
-        \</a>
 
 
 
-    \</nav>
+                <i class="fa-solid fa-cube"></i>
 
 
 
 
 
-    \<!-- ===========================================================
 
-         SIDEBAR FOOTER
 
-    ============================================================ -->
+            </span>
 
 
 
-    \<div class="vendor-sidebar-footer">
 
 
 
 
 
-        \<!-- PROFILE -->
 
 
 
-        \<a
+            <span class="vendor-link-text">
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarProfileUrl
 
-            ) ?>"
 
-            class="vendor-footer-link"
 
-        >
 
 
+                My Products
 
-            \<span>
 
 
 
-                \<i class="fa-solid fa-user">\</i>
 
 
 
-            \</span>
+            </span>
 
 
 
 
 
-            \<span>
 
 
+        </a>
 
-                My Profile
 
 
 
-            \</span>
 
 
 
-        \</a>
 
 
 
 
+        <!-- =======================================================
 
-        \<!-- LOGOUT -->
 
 
+             ADD PRODUCT
 
-        \<a
 
-            href="\<?= vendorSidebarEscape(
 
-                $sidebarLogoutUrl
+        ======================================================== -->
 
-            ) ?>"
 
-            class="
 
-                vendor-footer-link
 
-                logout
 
-            "
 
-        >
 
+        <a
 
 
-            \<span>
 
+            href="<?= vendorSidebarEscape(
 
 
-                \<i class="fa-solid fa-right-from-bracket">\</i>
 
+                $sidebarAddProductUrl
 
 
-            \</span>
 
+            ) ?>"
 
 
 
+            class="
 
-            \<span>
 
 
+                vendor-sidebar-link
 
-                Logout
 
 
+                <?= vendorSidebarActive(
 
-            \</span>
 
 
+                    'add_product.php'
 
-        \</a>
 
 
+                ) ?>
 
-    \</div>
 
 
+            "
 
-\</aside>
 
 
+        >
 
 
 
-\<!-- ===============================================================
 
-     MOBILE OPEN BUTTON
 
-\================================================================ -->
 
 
+            <span class="vendor-link-icon">
 
-\<button
 
-    type="button"
 
-    class="seller-mobile-menu"
 
-    data-vendor-sidebar-toggle
 
-    aria-label="Open seller navigation"
 
-\>
 
+                <i class="fa-solid fa-circle-plus"></i>
 
 
-    \<i class="fa-solid fa-bars">\</i>
 
 
 
-\</button>
 
 
+            </span>
 
 
 
-\<!-- ===============================================================
 
-     MOBILE OVERLAY
 
-\================================================================ -->
 
 
 
-\<div
 
-    class="vendor-sidebar-overlay"
 
-    id="vendorSidebarOverlay"
 
-\>\</div>
+            <span class="vendor-link-text">
 
 
 
 
 
-\<script>
 
 
+                Add Product
 
-/\*
 
-\|--------------------------------------------------------------------------
 
-\| HOCHIPOHUB - VENDOR SIDEBAR
 
-\|--------------------------------------------------------------------------
 
-\*/
+
+
+            </span>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- =======================================================
+
+
+
+             ORDERS
+
+
+
+        ======================================================== -->
+
+
+
+
+
+
+
+        <a
+
+
+
+            href="<?= vendorSidebarEscape(
+
+
+
+                $sidebarOrdersUrl
+
+
+
+            ) ?>"
+
+
+
+            class="
+
+
+
+                vendor-sidebar-link
+
+
+
+                <?= vendorSidebarActive(
+
+
+
+                    'orders.php'
+
+
+
+                ) ?>
+
+
+
+            "
+
+
+
+        >
+
+
+
+
+
+
+
+            <span class="vendor-link-icon">
+
+
+
+
+
+
+
+                <i class="fa-solid fa-bag-shopping"></i>
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <span class="vendor-link-text">
+
+
+
+
+
+
+
+                Orders
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <?php if (
+
+
+
+                $sidebarPendingOrders > 0
+
+
+
+            ): ?>
+
+
+
+
+
+
+
+                <span
+
+
+
+                    class="vendor-order-notification"
+
+
+
+                    title="<?= vendorSidebarEscape(
+
+
+
+                        $sidebarPendingOrders .
+
+
+
+                        ' pending order(s)'
+
+
+
+                    ) ?>"
+
+
+
+                >
+
+
+
+
+
+
+
+                    <?= $sidebarPendingOrders > 99
+
+
+
+                        ? '99+'
+
+
+
+                        : (int)
+
+
+
+                            $sidebarPendingOrders ?>
+
+
+
+
+
+
+
+                </span>
+
+
+
+
+
+
+
+            <?php endif; ?>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- =======================================================
+
+
+
+             SALES
+
+
+
+        ======================================================== -->
+
+
+
+
+
+
+
+        <a
+
+
+
+            href="<?= vendorSidebarEscape(
+
+
+
+                $sidebarSalesUrl
+
+
+
+            ) ?>"
+
+
+
+            class="
+
+
+
+                vendor-sidebar-link
+
+
+
+                <?= vendorSidebarActive(
+
+
+
+                    'sales.php'
+
+
+
+                ) ?>
+
+
+
+            "
+
+
+
+        >
+
+
+
+
+
+
+
+            <span class="vendor-link-icon">
+
+
+
+
+
+
+
+                <i class="fa-solid fa-chart-column"></i>
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <span class="vendor-link-text">
+
+
+
+
+
+
+
+                Sales
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- =======================================================
+
+
+
+             MESSAGES
+
+
+
+        ======================================================== -->
+
+
+
+
+
+
+
+        <a
+
+
+
+            href="<?= vendorSidebarEscape(
+
+
+
+                $sidebarMessagesUrl
+
+
+
+            ) ?>"
+
+
+
+            class="
+
+
+
+                vendor-sidebar-link
+
+
+
+                <?= vendorSidebarActive(
+
+
+
+                    'messages.php'
+
+
+
+                ) ?>
+
+
+
+            "
+
+
+
+        >
+
+
+
+
+
+
+
+            <span class="vendor-link-icon">
+
+
+
+
+
+
+
+                <i class="fa-solid fa-message"></i>
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <span class="vendor-link-text">
+
+
+
+
+
+
+
+                Messages
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- =======================================================
+
+
+
+             MANAGEMENT
+
+
+
+        ======================================================== -->
+
+
+
+
+
+
+
+        <div
+
+
+
+            class="
+
+
+
+                vendor-sidebar-label
+
+
+
+                vendor-label-space
+
+
+
+            "
+
+
+
+        >
+
+
+
+
+
+
+
+            MANAGEMENT
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- =======================================================
+
+
+
+             INVENTORY
+
+
+
+        ======================================================== -->
+
+
+
+
+
+
+
+        <a
+
+
+
+            href="<?= vendorSidebarEscape(
+
+
+
+                $sidebarInventoryUrl
+
+
+
+            ) ?>"
+
+
+
+            class="
+
+
+
+                vendor-sidebar-link
+
+
+
+                <?= vendorSidebarActive(
+
+
+
+                    'inventory.php'
+
+
+
+                ) ?>
+
+
+
+            "
+
+
+
+        >
+
+
+
+
+
+
+
+            <span class="vendor-link-icon">
+
+
+
+
+
+
+
+                <i class="fa-solid fa-warehouse"></i>
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <span class="vendor-link-text">
+
+
+
+
+
+
+
+                Inventory
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- =======================================================
+
+
+
+             COMMISSION
+
+
+
+        ======================================================== -->
+
+
+
+
+
+
+
+        <a
+
+
+
+            href="<?= vendorSidebarEscape(
+
+
+
+                $sidebarCommissionUrl
+
+
+
+            ) ?>"
+
+
+
+            class="
+
+
+
+                vendor-sidebar-link
+
+
+
+                <?= vendorSidebarActive(
+
+
+
+                    'commission.php'
+
+
+
+                ) ?>
+
+
+
+            "
+
+
+
+        >
+
+
+
+
+
+
+
+            <span class="vendor-link-icon">
+
+
+
+
+
+
+
+                <i class="fa-solid fa-circle-dollar-to-slot"></i>
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <span class="vendor-link-text">
+
+
+
+
+
+
+
+                Commission
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- =======================================================
+
+
+
+             STORE PROFILE
+
+
+
+        ======================================================== -->
+
+
+
+
+
+
+
+        <a
+
+
+
+            href="<?= vendorSidebarEscape(
+
+
+
+                $sidebarStoreProfileUrl
+
+
+
+            ) ?>"
+
+
+
+            class="
+
+
+
+                vendor-sidebar-link
+
+
+
+                <?= vendorSidebarActive(
+
+
+
+                    'setup_profile.php'
+
+
+
+                ) ?>
+
+
+
+            "
+
+
+
+        >
+
+
+
+
+
+
+
+            <span class="vendor-link-icon">
+
+
+
+
+
+
+
+                <i class="fa-solid fa-store"></i>
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <span class="vendor-link-text">
+
+
+
+
+
+
+
+                Store Profile
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- =======================================================
+
+
+
+             DIVIDER
+
+
+
+        ======================================================== -->
+
+
+
+
+
+
+
+        <div class="vendor-sidebar-divider"></div>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- =======================================================
+
+
+
+             VIEW MARKETPLACE
+
+
+
+        ======================================================== -->
+
+
+
+
+
+
+
+        <a
+
+
+
+            href="<?= vendorSidebarEscape(
+
+
+
+                $sidebarCatalogUrl
+
+
+
+            ) ?>"
+
+
+
+            class="vendor-sidebar-link"
+
+
+
+        >
+
+
+
+
+
+
+
+            <span class="vendor-link-icon">
+
+
+
+
+
+
+
+                <i class="fa-solid fa-cart-shopping"></i>
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <span class="vendor-link-text">
+
+
+
+
+
+
+
+                View Marketplace
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- =======================================================
+
+
+
+             HOME
+
+
+
+        ======================================================== -->
+
+
+
+
+
+
+
+        <a
+
+
+
+            href="<?= vendorSidebarEscape(
+
+
+
+                $sidebarHomeUrl
+
+
+
+            ) ?>"
+
+
+
+            class="vendor-sidebar-link"
+
+
+
+        >
+
+
+
+
+
+
+
+            <span class="vendor-link-icon">
+
+
+
+
+
+
+
+                <i class="fa-solid fa-house"></i>
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <span class="vendor-link-text">
+
+
+
+
+
+
+
+                Home
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+    </nav>
+
+
+
+
+
+
+
+
+
+
+
+    <!-- ===========================================================
+
+
+
+         SIDEBAR FOOTER
+
+
+
+    ============================================================ -->
+
+
+
+
+
+
+
+    <div class="vendor-sidebar-footer">
+
+
+
+
+
+
+
+
+
+
+
+        <!-- PROFILE -->
+
+
+
+
+
+
+
+        <a
+
+
+
+            href="<?= vendorSidebarEscape(
+
+
+
+                $sidebarProfileUrl
+
+
+
+            ) ?>"
+
+
+
+            class="vendor-footer-link"
+
+
+
+        >
+
+
+
+
+
+
+
+            <span>
+
+
+
+
+
+
+
+                <i class="fa-solid fa-user"></i>
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <span>
+
+
+
+
+
+
+
+                My Profile
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+
+
+
+
+        <!-- LOGOUT -->
+
+
+
+
+
+
+
+        <a
+
+
+
+            href="<?= vendorSidebarEscape(
+
+
+
+                $sidebarLogoutUrl
+
+
+
+            ) ?>"
+
+
+
+            class="
+
+
+
+                vendor-footer-link
+
+
+
+                logout
+
+
+
+            "
+
+
+
+        >
+
+
+
+
+
+
+
+            <span>
+
+
+
+
+
+
+
+                <i class="fa-solid fa-right-from-bracket"></i>
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+
+
+
+
+            <span>
+
+
+
+
+
+
+
+                Logout
+
+
+
+
+
+
+
+            </span>
+
+
+
+
+
+
+
+        </a>
+
+
+
+
+
+
+
+    </div>
+
+
+
+
+
+
+
+</aside>
+
+
+
+
+
+
+
+
+
+
+
+<!-- ===============================================================
+
+
+
+     MOBILE OPEN BUTTON
+
+
+
+\\================================================================ -->
+
+
+
+
+
+
+
+<button
+
+
+
+    type="button"
+
+
+
+    class="seller-mobile-menu"
+
+
+
+    data-vendor-sidebar-toggle
+
+
+
+    aria-label="Open seller navigation"
+
+
+
+\\>
+
+
+
+
+
+
+
+    <i class="fa-solid fa-bars"></i>
+
+
+
+
+
+
+
+</button>
+
+
+
+
+
+
+
+
+
+
+
+<!-- ===============================================================
+
+
+
+     MOBILE OVERLAY
+
+
+
+\\================================================================ -->
+
+
+
+
+
+
+
+<div
+
+
+
+    class="vendor-sidebar-overlay"
+
+
+
+    id="vendorSidebarOverlay"
+
+
+
+\\></div>
+
+
+
+
+
+
+
+
+
+
+
+<script>
+
+
+
+
+
+
+
+/*
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+\\| HOCHIPOHUB - VENDOR SIDEBAR
+
+
+
+\\|--------------------------------------------------------------------------
+
+
+
+*/
+
+
+
+
 
 
 
 document.addEventListener(
 
-    'DOMContentLoaded',
 
-    function () {
 
+    'DOMContentLoaded',
 
 
 
+    function () {
 
-        /\*
 
-        |--------------------------------------------------------------------------
 
-        | ELEMENTS
 
-        |--------------------------------------------------------------------------
 
-        \*/
 
 
 
-        const sidebar =
 
-            document.getElementById(
 
-                'vendorSidebar'
 
-            );
+        /*
 
 
 
+        |--------------------------------------------------------------------------
 
 
-        const overlay =
 
-            document.getElementById(
+        | ELEMENTS
 
-                'vendorSidebarOverlay'
 
-            );
 
+        |--------------------------------------------------------------------------
 
 
 
+        */
 
-        const closeButton =
 
-            document.getElementById(
 
-                'vendorSidebarClose'
 
-            );
 
 
 
+        const sidebar =
 
 
-        const toggleButtons =
 
-            document.querySelectorAll(
+            document.getElementById(
 
-                '[data-vendor-sidebar-toggle]'
 
-            );
 
+                'vendorSidebar'
 
 
 
+            );
 
-        /\*
 
-        |--------------------------------------------------------------------------
 
-        | OPEN
 
-        |--------------------------------------------------------------------------
 
-        \*/
 
 
 
-        function openVendorSidebar() {
 
 
 
-            if (sidebar) {
+        const overlay =
 
 
 
-                sidebar.classList.add(
+            document.getElementById(
 
-                    'open'
 
-                );
 
-            }
+                'vendorSidebarOverlay'
 
 
 
+            );
 
 
-            if (overlay) {
 
 
 
-                overlay.classList.add(
 
-                    'show'
 
-                );
 
-            }
 
 
 
+        const closeButton =
 
 
-            document.body.classList.add(
 
-                'vendor-sidebar-open'
+            document.getElementById(
 
-            );
 
-        }
 
+                'vendorSidebarClose'
 
 
 
+            );
 
-        /\*
 
-        |--------------------------------------------------------------------------
 
-        | CLOSE
 
-        |--------------------------------------------------------------------------
 
-        \*/
 
 
 
-        function closeVendorSidebar() {
 
 
 
-            if (sidebar) {
+        const toggleButtons =
 
 
 
-                sidebar.classList.remove(
+            document.querySelectorAll(
 
-                    'open'
 
-                );
 
-            }
+                '[data-vendor-sidebar-toggle]'
 
 
 
+            );
 
 
-            if (overlay) {
 
 
 
-                overlay.classList.remove(
 
-                    'show'
 
-                );
 
-            }
 
 
 
+        /*
 
 
-            document.body.classList.remove(
 
-                'vendor-sidebar-open'
+        |--------------------------------------------------------------------------
 
-            );
 
-        }
 
+        | OPEN
 
 
 
+        |--------------------------------------------------------------------------
 
-        /\*
 
-        |--------------------------------------------------------------------------
 
-        | TOGGLE
+        */
 
-        |--------------------------------------------------------------------------
 
-        \*/
 
 
 
-        toggleButtons.forEach(
 
-            function (button) {
 
+        function openVendorSidebar() {
 
 
-                button.addEventListener(
 
-                    'click',
 
-                    function (event) {
 
 
 
-                        event.preventDefault();
+            if (sidebar) {
 
 
 
-                        event.stopPropagation();
 
 
 
 
+                sidebar.classList.add(
 
-                        if (
 
-                            sidebar &&
 
-                            sidebar.classList.contains(
+                    'open'
 
-                                'open'
 
-                            )
 
-                        ) {
+                );
 
 
 
-                            closeVendorSidebar();
+            }
 
 
 
-                        } else {
 
 
 
-                            openVendorSidebar();
 
-                        }
 
-                    }
 
-                );
 
-            }
 
-        );
+            if (overlay) {
 
 
 
 
 
-        /\*
 
-        |--------------------------------------------------------------------------
 
-        | CLOSE BUTTON
+                overlay.classList.add(
 
-        |--------------------------------------------------------------------------
 
-        \*/
 
+                    'show'
 
 
-        if (closeButton) {
 
+                );
 
 
-            closeButton.addEventListener(
 
-                'click',
+            }
 
-                function (event) {
 
 
 
-                    event.preventDefault();
 
 
 
-                    event.stopPropagation();
 
 
 
-                    closeVendorSidebar();
 
-                }
+            document.body.classList.add(
 
-            );
 
-        }
 
+                'vendor-sidebar-open'
 
 
 
+            );
 
-        /\*
 
-        |--------------------------------------------------------------------------
 
-        | OVERLAY
+        }
 
-        |--------------------------------------------------------------------------
 
-        \*/
 
 
 
-        if (overlay) {
 
 
 
-            overlay.addEventListener(
 
-                'click',
 
-                function (event) {
 
+        /*
 
 
-                    event.preventDefault();
 
+        |--------------------------------------------------------------------------
 
 
-                    closeVendorSidebar();
 
-                }
+        | CLOSE
 
-            );
 
-        }
 
+        |--------------------------------------------------------------------------
 
 
 
+        */
 
-        /\*
 
-        |--------------------------------------------------------------------------
 
-        | ESC
 
-        |--------------------------------------------------------------------------
 
-        \*/
 
 
+        function closeVendorSidebar() {
 
-        document.addEventListener(
 
-            'keydown',
 
-            function (event) {
 
 
 
-                if (
 
-                    event.key ===
+            if (sidebar) {
 
-                    'Escape'
 
-                ) {
 
 
 
-                    closeVendorSidebar();
 
-                }
 
-            }
+                sidebar.classList.remove(
 
-        );
 
 
+                    'open'
 
 
 
-        /\*
+                );
 
-        |--------------------------------------------------------------------------
 
-        | MOBILE LINK
 
-        |--------------------------------------------------------------------------
+            }
 
-        \*/
 
 
 
-        document
 
-            .querySelectorAll(
 
-                '.vendor-sidebar-link, .vendor-footer-link'
 
-            )
 
-            .forEach(
 
-                function (link) {
 
 
+            if (overlay) {
 
-                    link.addEventListener(
 
-                        'click',
 
-                        function () {
 
 
 
-                            if (
 
-                                window\.innerWidth <=
+                overlay.classList.remove(
 
-                                768
 
-                            ) {
 
+                    'show'
 
 
-                                closeVendorSidebar();
 
-                            }
+                );
 
-                        }
 
-                    );
 
-                }
+            }
 
-            );
 
 
 
 
 
-        /\*
 
-        |--------------------------------------------------------------------------
 
-        | DESKTOP RESIZE
 
-        |--------------------------------------------------------------------------
 
-        \*/
 
+            document.body.classList.remove(
 
 
-        window\.addEventListener(
 
-            'resize',
+                'vendor-sidebar-open'
 
-            function () {
 
 
+            );
 
-                if (
 
-                    window\.innerWidth >
 
-                    768
+        }
 
-                ) {
 
 
 
-                    closeVendorSidebar();
 
-                }
 
-            }
 
-        );
 
 
 
-    }
+
+        /*
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        | TOGGLE
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        */
+
+
+
+
+
+
+
+        toggleButtons.forEach(
+
+
+
+            function (button) {
+
+
+
+
+
+
+
+                button.addEventListener(
+
+
+
+                    'click',
+
+
+
+                    function (event) {
+
+
+
+
+
+
+
+                        event.preventDefault();
+
+
+
+
+
+
+
+                        event.stopPropagation();
+
+
+
+
+
+
+
+
+
+
+
+                        if (
+
+
+
+                            sidebar &&
+
+
+
+                            sidebar.classList.contains(
+
+
+
+                                'open'
+
+
+
+                            )
+
+
+
+                        ) {
+
+
+
+
+
+
+
+                            closeVendorSidebar();
+
+
+
+
+
+
+
+                        } else {
+
+
+
+
+
+
+
+                            openVendorSidebar();
+
+
+
+                        }
+
+
+
+                    }
+
+
+
+                );
+
+
+
+            }
+
+
+
+        );
+
+
+
+
+
+
+
+
+
+
+
+        /*
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        | CLOSE BUTTON
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        */
+
+
+
+
+
+
+
+        if (closeButton) {
+
+
+
+
+
+
+
+            closeButton.addEventListener(
+
+
+
+                'click',
+
+
+
+                function (event) {
+
+
+
+
+
+
+
+                    event.preventDefault();
+
+
+
+
+
+
+
+                    event.stopPropagation();
+
+
+
+
+
+
+
+                    closeVendorSidebar();
+
+
+
+                }
+
+
+
+            );
+
+
+
+        }
+
+
+
+
+
+
+
+
+
+
+
+        /*
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        | OVERLAY
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        */
+
+
+
+
+
+
+
+        if (overlay) {
+
+
+
+
+
+
+
+            overlay.addEventListener(
+
+
+
+                'click',
+
+
+
+                function (event) {
+
+
+
+
+
+
+
+                    event.preventDefault();
+
+
+
+
+
+
+
+                    closeVendorSidebar();
+
+
+
+                }
+
+
+
+            );
+
+
+
+        }
+
+
+
+
+
+
+
+
+
+
+
+        /*
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        | ESC
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        */
+
+
+
+
+
+
+
+        document.addEventListener(
+
+
+
+            'keydown',
+
+
+
+            function (event) {
+
+
+
+
+
+
+
+                if (
+
+
+
+                    event.key ===
+
+
+
+                    'Escape'
+
+
+
+                ) {
+
+
+
+
+
+
+
+                    closeVendorSidebar();
+
+
+
+                }
+
+
+
+            }
+
+
+
+        );
+
+
+
+
+
+
+
+
+
+
+
+        /*
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        | MOBILE LINK
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        */
+
+
+
+
+
+
+
+        document
+
+
+
+            .querySelectorAll(
+
+
+
+                '.vendor-sidebar-link, .vendor-footer-link'
+
+
+
+            )
+
+
+
+            .forEach(
+
+
+
+                function (link) {
+
+
+
+
+
+
+
+                    link.addEventListener(
+
+
+
+                        'click',
+
+
+
+                        function () {
+
+
+
+
+
+
+
+                            if (
+
+
+
+                                window\\.innerWidth <=
+
+
+
+                                768
+
+
+
+                            ) {
+
+
+
+
+
+
+
+                                closeVendorSidebar();
+
+
+
+                            }
+
+
+
+                        }
+
+
+
+                    );
+
+
+
+                }
+
+
+
+            );
+
+
+
+
+
+
+
+
+
+
+
+        /*
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        | DESKTOP RESIZE
+
+
+
+        |--------------------------------------------------------------------------
+
+
+
+        */
+
+
+
+
+
+
+
+        window\\.addEventListener(
+
+
+
+            'resize',
+
+
+
+            function () {
+
+
+
+
+
+
+
+                if (
+
+
+
+                    window\\.innerWidth >
+
+
+
+                    768
+
+
+
+                ) {
+
+
+
+
+
+
+
+                    closeVendorSidebar();
+
+
+
+                }
+
+
+
+            }
+
+
+
+        );
+
+
+
+
+
+
+
+    }
+
+
 
 );
 
 
 
-\</script>
+
+
+
+
+</script>
