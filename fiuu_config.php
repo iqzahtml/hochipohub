@@ -32,11 +32,20 @@ define(
     'hochipohub'
 );
 
+
+/*
+|--------------------------------------------------------------------------
+| FIUU KEYS
+|--------------------------------------------------------------------------
+| Replace these with the CURRENT keys from your FIUU Merchant Portal.
+| Do not share these keys publicly.
+|--------------------------------------------------------------------------
+*/
+
 define(
     'FIUU_VERIFY_KEY',
     'c991b4dd2497ba85c06c181f16b9110e'
 );
-
 
 define(
     'FIUU_SECRET_KEY',
@@ -49,14 +58,15 @@ define(
 | HOCHIPOHUB PUBLIC PAYMENT BASE URL
 |--------------------------------------------------------------------------
 |
-| IMPORTANT:
-| Do NOT use localhost here.
+| ngrok already points directly to the HOCHIPOHUB project root.
 |
-| Current ngrok public URL:
+| Therefore:
+|
+| CORRECT:
 | https://zippy-shifty-treat.ngrok-free.dev
 |
-| HochipoHub project:
-| /hochipohub
+| WRONG:
+| https://zippy-shifty-treat.ngrok-free.dev/hochipohub
 |
 | Do NOT put "/" at the end.
 |--------------------------------------------------------------------------
@@ -64,7 +74,7 @@ define(
 
 define(
     'HOCHIPOHUB_PAYMENT_BASE_URL',
-    'https://zippy-shifty-treat.ngrok-free.dev/hochipohub'
+    'https://zippy-shifty-treat.ngrok-free.dev'
 );
 
 
@@ -86,7 +96,7 @@ define(
 | RETURN URL
 |--------------------------------------------------------------------------
 |
-| Customer browser will return here after Fiuu payment.
+| Customer browser returns here after FIUU payment.
 |--------------------------------------------------------------------------
 */
 
@@ -102,12 +112,9 @@ define(
 | CALLBACK URL
 |--------------------------------------------------------------------------
 |
-| Fiuu server sends the actual payment confirmation here.
+| FIUU server sends payment confirmation here.
 |
-| This MUST be publicly accessible.
-|
-| Current callback:
-| https://zippy-shifty-treat.ngrok-free.dev/hochipohub/fiuu_callback.php
+| This endpoint must be publicly accessible.
 |--------------------------------------------------------------------------
 */
 
@@ -123,7 +130,7 @@ define(
 | CANCEL URL
 |--------------------------------------------------------------------------
 |
-| Customer is returned here when payment is cancelled.
+| Customer returns here when payment is cancelled.
 |--------------------------------------------------------------------------
 */
 
