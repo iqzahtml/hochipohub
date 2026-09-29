@@ -23,32 +23,58 @@ require_once __DIR__ . '/../includes/session.php';
 require_once __DIR__ . '/../includes/functions.php';
 
 
+/*
+|--------------------------------------------------------------------------
+| SESSION
+|--------------------------------------------------------------------------
+*/
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 
-requireLogin();
+/*
+|--------------------------------------------------------------------------
+| LOGIN CHECK
+|--------------------------------------------------------------------------
+*/
 
-
-$db = getDB();
-
-
-if (!($db instanceof PDO)) {
-    die('Database connection is not available.');
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../index.php');
+    exit;
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| CURRENT USER
+| VENDOR ROLE CHECK
 |--------------------------------------------------------------------------
 */
 
-$userId = (int) (
-    $_SESSION['user_id']
-    ?? 0
-);
+if (
+    !isset($_SESSION['role']) ||
+    strtolower((string) $_SESSION['role']) !== 'vendor'
+) {
+    header('Location: ../dashboard.php');
+    exit;
+}
+
+
+$userId = (int) $_SESSION['user_id'];
+
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE
+|--------------------------------------------------------------------------
+*/
+
+$db = getDB();
+
+if (!($db instanceof PDO)) {
+    die('Database connection is not available.');
+}
 
 
 /*
@@ -132,91 +158,6 @@ if (!function_exists('commissionStatusClass')) {
                 return 'default';
         }
     }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| GET USER
-|--------------------------------------------------------------------------
-*/
-
-try {
-
-    $stmt = $db->prepare("
-        SELECT
-            user_id,
-            name,
-            email,
-            phone,
-            role,
-            status
-
-        FROM users
-
-        WHERE user_id = ?
-
-        LIMIT 1
-    ");
-
-
-    $stmt->execute([
-        $userId
-    ]);
-
-
-    $user = $stmt->fetch(
-        PDO::FETCH_ASSOC
-    );
-
-} catch (Throwable $e) {
-
-    $user = false;
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| USER NOT FOUND
-|--------------------------------------------------------------------------
-*/
-
-if (!$user) {
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'index.php'
-    );
-
-    exit;
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| VENDOR ONLY
-|--------------------------------------------------------------------------
-*/
-
-if (
-    strtolower(
-        trim(
-            (string) (
-                $user['role']
-                ?? ''
-            )
-        )
-    ) !== 'vendor'
-) {
-
-    header(
-        'Location: ' .
-        BASE_URL .
-        'dashboard.php'
-    );
-
-    exit;
 }
 
 
