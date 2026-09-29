@@ -1,6 +1,15 @@
 <?php
-require_once '../database/db.php';
-require_once '../includes/session.php';
+
+/*
+|--------------------------------------------------------------------------
+| HOCHIPOHUB - DELETE PRODUCT
+|--------------------------------------------------------------------------
+| File: seller/delete_product.php
+|--------------------------------------------------------------------------
+*/
+
+require_once __DIR__ . '/../database/db.php';
+require_once __DIR__ . '/../includes/session.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -8,11 +17,24 @@ if (session_status() === PHP_SESSION_NONE) {
 
 /*
 |--------------------------------------------------------------------------
+| DATABASE
+|--------------------------------------------------------------------------
+*/
+
+$db = getDB();
+
+if (!($db instanceof PDO)) {
+    die('Database connection is not available.');
+}
+
+/*
+|--------------------------------------------------------------------------
 | CHECK LOGIN
 |--------------------------------------------------------------------------
 */
+
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ../index.php");
+    header('Location: ../index.php');
     exit;
 }
 
@@ -21,75 +43,113 @@ if (!isset($_SESSION['user_id'])) {
 | CHECK VENDOR ROLE
 |--------------------------------------------------------------------------
 */
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'vendor') {
-    header("Location: ../dashboard.php");
+
+$role = strtolower(
+    trim(
+        (string) (
+            $_SESSION['role']
+            ?? $_SESSION['user_role']
+            ?? ''
+        )
+    )
+);
+
+if ($role !== 'vendor') {
+    header('Location: ../dashboard.php');
     exit;
 }
 
-$user_id = (int) $_SESSION['user_id'];
+$userId = (int) $_SESSION['user_id'];
 
 /*
 |--------------------------------------------------------------------------
 | GET VENDOR ID
 |--------------------------------------------------------------------------
 */
-$stmt = $conn->prepare("
-    SELECT vendor_id
-    FROM vendors
-    WHERE user_id = ?
-    LIMIT 1
-");
 
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
+try {
 
-$result = $stmt->get_result();
-$vendor = $result->fetch_assoc();
+    $stmt = $db->prepare("
+        SELECT vendor_id
+        FROM vendors
+        WHERE user_id = ?
+        LIMIT 1
+    ");
 
-$stmt->close();
+    $stmt->execute([
+        $userId
+    ]);
 
-if (!$vendor) {
-    header("Location: dashboard.php?error=vendor_not_found");
+    $vendor = $stmt->fetch(PDO::FETCH_ASSOC);
+
+} catch (Throwable $e) {
+
+    header('Location: dashboard.php?error=vendor_not_found');
     exit;
 }
 
-$vendor_id = (int) $vendor['vendor_id'];
+if (!$vendor) {
+    header('Location: dashboard.php?error=vendor_not_found');
+    exit;
+}
+
+$vendorId = (int) $vendor['vendor_id'];
 
 /*
 |--------------------------------------------------------------------------
 | GET PRODUCT ID
 |--------------------------------------------------------------------------
 */
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    header("Location: products.php?error=invalid_product");
+
+if (
+    !isset($_GET['id']) ||
+    !is_numeric($_GET['id'])
+) {
+    header('Location: products.php?error=invalid_product');
     exit;
 }
 
-$product_id = (int) $_GET['id'];
+$productId = (int) $_GET['id'];
+
+if ($productId <= 0) {
+    header('Location: products.php?error=invalid_product');
+    exit;
+}
 
 /*
 |--------------------------------------------------------------------------
 | VERIFY PRODUCT BELONGS TO THIS VENDOR
 |--------------------------------------------------------------------------
 */
-$stmt = $conn->prepare("
-    SELECT product_id, product_name, image
-    FROM products
-    WHERE product_id = ?
-    AND vendor_id = ?
-    LIMIT 1
-");
 
-$stmt->bind_param("ii", $product_id, $vendor_id);
-$stmt->execute();
+try {
 
-$result = $stmt->get_result();
-$product = $result->fetch_assoc();
+    $stmt = $db->prepare("
+        SELECT
+            product_id,
+            product_name,
+            image
+        FROM products
+        WHERE product_id = ?
+        AND vendor_id = ?
+        LIMIT 1
+    ");
 
-$stmt->close();
+    $stmt->execute([
+        $productId,
+        $vendorId
+    ]);
+
+    $product = $stmt->fetch(PDO::FETCH_ASSOC);
+
+} catch (Throwable $e) {
+
+    header('Location: products.php?error=product_not_found');
+    exit;
+}
 
 if (!$product) {
-    header("Location: products.php?error=product_not_found");
+    header('Location: products.php?error=product_not_found');
     exit;
 }
 
@@ -98,187 +158,223 @@ if (!$product) {
 | CHECK WHETHER PRODUCT HAS ORDER HISTORY
 |--------------------------------------------------------------------------
 |
-| Product yang pernah digunakan dalam order_details jangan terus delete
-| sebab ia akan menyebabkan historical order data hilang / FK conflict.
+| Product yang pernah digunakan dalam order_details tidak akan
+| dipadam kerana order history perlu dikekalkan.
 |
-| Jadi kita tukar status kepada Hidden jika sudah pernah dipesan.
+| Product tersebut akan ditukar kepada Hidden.
+|
 |--------------------------------------------------------------------------
 */
-$stmt = $conn->prepare("
-    SELECT COUNT(*) AS total
-    FROM order_details
-    WHERE product_id = ?
-");
 
-$stmt->bind_param("i", $product_id);
-$stmt->execute();
+try {
 
-$result = $stmt->get_result();
-$order_data = $result->fetch_assoc();
+    $stmt = $db->prepare("
+        SELECT COUNT(*)
+        FROM order_details
+        WHERE product_id = ?
+    ");
 
-$stmt->close();
+    $stmt->execute([
+        $productId
+    ]);
 
-$has_orders = ((int) $order_data['total'] > 0);
+    $hasOrders = ((int) $stmt->fetchColumn() > 0);
+
+} catch (Throwable $e) {
+
+    header('Location: products.php?error=delete_failed');
+    exit;
+}
 
 /*
 |--------------------------------------------------------------------------
-| DELETE / HIDE PRODUCT
+| PRODUCT HAS ORDER HISTORY
 |--------------------------------------------------------------------------
 */
-if ($has_orders) {
 
-    /*
-    |--------------------------------------------------------------------------
-    | PRODUCT PERNAH ADA DALAM ORDER
-    |--------------------------------------------------------------------------
-    | Jangan delete.
-    | Tukar kepada Hidden.
-    |--------------------------------------------------------------------------
-    */
-    $stmt = $conn->prepare("
-        UPDATE products
-        SET status = 'Hidden'
-        WHERE product_id = ?
-        AND vendor_id = ?
-    ");
-
-    $stmt->bind_param("ii", $product_id, $vendor_id);
-
-    if ($stmt->execute()) {
-        $stmt->close();
-
-        header("Location: products.php?success=product_hidden");
-        exit;
-    }
-
-    $stmt->close();
-
-    header("Location: products.php?error=update_failed");
-    exit;
-
-} else {
-
-    /*
-    |--------------------------------------------------------------------------
-    | PRODUCT BELUM PERNAH DIBELI
-    |--------------------------------------------------------------------------
-    | Safe untuk delete.
-    |--------------------------------------------------------------------------
-    */
-    $conn->begin_transaction();
+if ($hasOrders) {
 
     try {
 
-        /*
-        |--------------------------------------------------------------------------
-        | DELETE INVENTORY
-        |--------------------------------------------------------------------------
-        */
-        $stmt = $conn->prepare("
-            DELETE FROM inventory
-            WHERE product_id = ?
-        ");
-
-        $stmt->bind_param("i", $product_id);
-        $stmt->execute();
-        $stmt->close();
-
-        /*
-        |--------------------------------------------------------------------------
-        | DELETE CART
-        |--------------------------------------------------------------------------
-        */
-        $stmt = $conn->prepare("
-            DELETE FROM cart
-            WHERE product_id = ?
-        ");
-
-        $stmt->bind_param("i", $product_id);
-        $stmt->execute();
-        $stmt->close();
-
-        /*
-        |--------------------------------------------------------------------------
-        | DELETE WISHLIST
-        |--------------------------------------------------------------------------
-        */
-        $stmt = $conn->prepare("
-            DELETE FROM wishlist
-            WHERE product_id = ?
-        ");
-
-        $stmt->bind_param("i", $product_id);
-        $stmt->execute();
-        $stmt->close();
-
-        /*
-        |--------------------------------------------------------------------------
-        | DELETE REVIEWS
-        |--------------------------------------------------------------------------
-        */
-        $stmt = $conn->prepare("
-            DELETE FROM reviews
-            WHERE product_id = ?
-        ");
-
-        $stmt->bind_param("i", $product_id);
-        $stmt->execute();
-        $stmt->close();
-
-        /*
-        |--------------------------------------------------------------------------
-        | DELETE PRODUCT
-        |--------------------------------------------------------------------------
-        */
-        $stmt = $conn->prepare("
-            DELETE FROM products
+        $stmt = $db->prepare("
+            UPDATE products
+            SET status = 'Hidden'
             WHERE product_id = ?
             AND vendor_id = ?
         ");
 
-        $stmt->bind_param("ii", $product_id, $vendor_id);
+        $stmt->execute([
+            $productId,
+            $vendorId
+        ]);
 
-        if (!$stmt->execute()) {
-            throw new Exception("Failed to delete product.");
-        }
-
-        $stmt->close();
-
-        /*
-        |--------------------------------------------------------------------------
-        | COMMIT
-        |--------------------------------------------------------------------------
-        */
-        $conn->commit();
-
-        /*
-        |--------------------------------------------------------------------------
-        | DELETE PRODUCT IMAGE
-        |--------------------------------------------------------------------------
-        */
-        if (!empty($product['image'])) {
-
-            $image_path = '../uploads/products/' . $product['image'];
-
-            if (file_exists($image_path) && is_file($image_path)) {
-                unlink($image_path);
-            }
-        }
-
-        header("Location: products.php?success=product_deleted");
+        header('Location: products.php?success=product_hidden');
         exit;
 
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
 
-        /*
-        |--------------------------------------------------------------------------
-        | ROLLBACK
-        |--------------------------------------------------------------------------
-        */
-        $conn->rollback();
-
-        header("Location: products.php?error=delete_failed");
+        header('Location: products.php?error=update_failed');
         exit;
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| PRODUCT HAS NO ORDER HISTORY
+|--------------------------------------------------------------------------
+|
+| Product selamat untuk dipadam.
+|
+|--------------------------------------------------------------------------
+*/
+
+try {
+
+    $db->beginTransaction();
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE INVENTORY
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $db->prepare("
+        DELETE FROM inventory
+        WHERE product_id = ?
+    ");
+
+    $stmt->execute([
+        $productId
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE CART
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $db->prepare("
+        DELETE FROM cart
+        WHERE product_id = ?
+    ");
+
+    $stmt->execute([
+        $productId
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE WISHLIST
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $db->prepare("
+        DELETE FROM wishlist
+        WHERE product_id = ?
+    ");
+
+    $stmt->execute([
+        $productId
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE REVIEWS
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $db->prepare("
+        DELETE FROM reviews
+        WHERE product_id = ?
+    ");
+
+    $stmt->execute([
+        $productId
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE PRODUCT
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $db->prepare("
+        DELETE FROM products
+        WHERE product_id = ?
+        AND vendor_id = ?
+    ");
+
+    $stmt->execute([
+        $productId,
+        $vendorId
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | MAKE SURE PRODUCT WAS DELETED
+    |--------------------------------------------------------------------------
+    */
+
+    if ($stmt->rowCount() < 1) {
+        throw new RuntimeException(
+            'Product could not be deleted.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | COMMIT
+    |--------------------------------------------------------------------------
+    */
+
+    $db->commit();
+
+} catch (Throwable $e) {
+
+    if ($db->inTransaction()) {
+        $db->rollBack();
+    }
+
+    header('Location: products.php?error=delete_failed');
+    exit;
+}
+
+/*
+|--------------------------------------------------------------------------
+| DELETE PRODUCT IMAGE
+|--------------------------------------------------------------------------
+|
+| Delete image only AFTER database transaction is successful.
+|
+|--------------------------------------------------------------------------
+*/
+
+if (!empty($product['image'])) {
+
+    $imageName = basename(
+        (string) $product['image']
+    );
+
+    $imagePath =
+        __DIR__
+        . '/../uploads/products/'
+        . $imageName;
+
+    if (
+        is_file($imagePath) &&
+        file_exists($imagePath)
+    ) {
+
+        @unlink($imagePath);
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| SUCCESS
+|--------------------------------------------------------------------------
+*/
+
+header('Location: products.php?success=product_deleted');
+exit;
 ?>
