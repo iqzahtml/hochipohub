@@ -44,21 +44,21 @@ if (!function_exists('e')) {
 
 
 
-    function e($value)
+    function e($value)
 
-    {
+    {
 
-        return htmlspecialchars(
+        return htmlspecialchars(
 
-            (string) $value,
+            (string) $value,
 
-            ENT_QUOTES,
+            ENT_QUOTES,
 
-            'UTF-8'
+            'UTF-8'
 
-        );
+        );
 
-    }
+    }
 
 }
 
@@ -82,21 +82,21 @@ if (!function_exists('redirect')) {
 
 
 
-    function redirect($url)
+    function redirect($url)
 
-    {
+    {
 
-        header(
+        header(
 
-            'Location: ' . $url
+            'Location: ' . $url
 
-        );
+        );
 
 
 
-        exit;
+        exit;
 
-    }
+    }
 
 }
 
@@ -120,13 +120,13 @@ if (!function_exists('getCurrentUserId')) {
 
 
 
-    function getCurrentUserId()
+    function getCurrentUserId()
 
-    {
+    {
 
-        return $_SESSION['user_id'] ?? null;
+        return $_SESSION['user_id'] ?? null;
 
-    }
+    }
 
 }
 
@@ -138,13 +138,13 @@ if (!function_exists('getCurrentUserRole')) {
 
 
 
-    function getCurrentUserRole()
+    function getCurrentUserRole()
 
-    {
+    {
 
-        return $_SESSION['role'] ?? '';
+        return $_SESSION['role'] ?? '';
 
-    }
+    }
 
 }
 
@@ -168,71 +168,71 @@ if (!function_exists('getUserById')) {
 
 
 
-    function getUserById(
+    function getUserById(
 
-        PDO $db,
+        PDO $db,
 
-        $userId
+        $userId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT
-
-                user_id,
-
-                name,
-
-                email,
-
-                phone,
-
-                profile_image,
-
-                role,
-
-                status,
-
-                mfa_enabled,
-
-                created_at,
-
-                updated_at
+    ) {
 
 
 
-            FROM users
+        $stmt = $db->prepare("
+
+            SELECT
+
+                user_id,
+
+                name,
+
+                email,
+
+                phone,
+
+                profile_image,
+
+                role,
+
+                status,
+
+                mfa_enabled,
+
+                created_at,
+
+                updated_at
 
 
 
-            WHERE user_id = ?
+            FROM users
 
 
 
-            LIMIT 1
-
-        ");
+            WHERE user_id = ?
 
 
 
-        $stmt->execute([
+            LIMIT 1
 
-            (int) $userId
-
-        ]);
+        ");
 
 
 
-        return $stmt->fetch(
+        $stmt->execute([
 
-            PDO::FETCH_ASSOC
+            (int) $userId
 
-        ) ?: null;
+        ]);
 
-    }
+
+
+        return $stmt->fetch(
+
+            PDO::FETCH_ASSOC
+
+        ) ?: null;
+
+    }
 
 }
 
@@ -256,33 +256,33 @@ if (!function_exists('getUserNameFromDB')) {
 
 
 
-    function getUserNameFromDB(
+    function getUserNameFromDB(
 
-        PDO $db,
+        PDO $db,
 
-        $userId
+        $userId
 
-    ) {
-
-
-
-        $user =
-
-            getUserById(
-
-                $db,
-
-                $userId
-
-            );
+    ) {
 
 
 
-        return $user['name']
+        $user =
 
-            ?? 'User';
+            getUserById(
 
-    }
+                $db,
+
+                $userId
+
+            );
+
+
+
+        return $user['name']
+
+            ?? 'User';
+
+    }
 
 }
 
@@ -306,73 +306,73 @@ if (!function_exists('getVendorByUserId')) {
 
 
 
-    function getVendorByUserId(
+    function getVendorByUserId(
 
-        PDO $db,
+        PDO $db,
 
-        $userId
+        $userId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT
-
-                vendor_id,
-
-                user_id,
-
-                business_name,
-
-                business_logo,
-
-                business_description,
-
-                business_address,
-
-                category,
-
-                delivery_method,
-
-                approval_status,
-
-                created_at,
-
-                updated_at
+    ) {
 
 
 
-            FROM vendors
+        $stmt = $db->prepare("
+
+            SELECT
+
+                vendor_id,
+
+                user_id,
+
+                business_name,
+
+                business_logo,
+
+                business_description,
+
+                business_address,
+
+                category,
+
+                delivery_method,
+
+                approval_status,
+
+                created_at,
+
+                updated_at
 
 
 
-            WHERE user_id = ?
+            FROM vendors
 
 
 
-            LIMIT 1
-
-        ");
+            WHERE user_id = ?
 
 
 
-        $stmt->execute([
+            LIMIT 1
 
-            (int) $userId
-
-        ]);
+        ");
 
 
 
-        return $stmt->fetch(
+        $stmt->execute([
 
-            PDO::FETCH_ASSOC
+            (int) $userId
 
-        ) ?: null;
+        ]);
 
-    }
+
+
+        return $stmt->fetch(
+
+            PDO::FETCH_ASSOC
+
+        ) ?: null;
+
+    }
 
 }
 
@@ -396,69 +396,69 @@ if (!function_exists('getVendorById')) {
 
 
 
-    function getVendorById(
+    function getVendorById(
 
-        PDO $db,
+        PDO $db,
 
-        $vendorId
+        $vendorId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT
-
-                v.*,
+    ) {
 
 
 
-                u.name,
+        $stmt = $db->prepare("
 
-                u.email,
+            SELECT
 
-                u.phone,
-
-                u.status AS user_status
+                v.*,
 
 
 
-            FROM vendors v
+                u.name,
+
+                u.email,
+
+                u.phone,
+
+                u.status AS user_status
 
 
 
-            INNER JOIN users u
-
-                ON v.user_id = u.user_id
+            FROM vendors v
 
 
 
-            WHERE v.vendor_id = ?
+            INNER JOIN users u
+
+                ON v.user_id = u.user_id
 
 
 
-            LIMIT 1
-
-        ");
+            WHERE v.vendor_id = ?
 
 
 
-        $stmt->execute([
+            LIMIT 1
 
-            (int) $vendorId
-
-        ]);
+        ");
 
 
 
-        return $stmt->fetch(
+        $stmt->execute([
 
-            PDO::FETCH_ASSOC
+            (int) $vendorId
 
-        ) ?: null;
+        ]);
 
-    }
+
+
+        return $stmt->fetch(
+
+            PDO::FETCH_ASSOC
+
+        ) ?: null;
+
+    }
 
 }
 
@@ -482,77 +482,77 @@ if (!function_exists('getProductById')) {
 
 
 
-    function getProductById(
+    function getProductById(
 
-        PDO $db,
+        PDO $db,
 
-        $productId
+        $productId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT
+    ) {
 
 
 
-                p.*,
+        $stmt = $db->prepare("
+
+            SELECT
 
 
 
-                v.business_name,
-
-                v.business_logo,
+                p.*,
 
 
 
-                c.category_name
+                v.business_name,
+
+                v.business_logo,
 
 
 
-            FROM products p
+                c.category_name
 
 
 
-            INNER JOIN vendors v
-
-                ON p.vendor_id = v.vendor_id
+            FROM products p
 
 
 
-            INNER JOIN categories c
+            INNER JOIN vendors v
 
-                ON p.category_id = c.category_id
-
-
-
-            WHERE p.product_id = ?
+                ON p.vendor_id = v.vendor_id
 
 
 
-            LIMIT 1
+            INNER JOIN categories c
 
-        ");
-
-
-
-        $stmt->execute([
-
-            (int) $productId
-
-        ]);
+                ON p.category_id = c.category_id
 
 
 
-        return $stmt->fetch(
+            WHERE p.product_id = ?
 
-            PDO::FETCH_ASSOC
 
-        ) ?: null;
 
-    }
+            LIMIT 1
+
+        ");
+
+
+
+        $stmt->execute([
+
+            (int) $productId
+
+        ]);
+
+
+
+        return $stmt->fetch(
+
+            PDO::FETCH_ASSOC
+
+        ) ?: null;
+
+    }
 
 }
 
@@ -576,21 +576,21 @@ if (!function_exists('formatPrice')) {
 
 
 
-    function formatPrice($price)
+    function formatPrice($price)
 
-    {
+    {
 
-        return 'RM ' .
+        return 'RM ' .
 
-            number_format(
+            number_format(
 
-                (float) $price,
+                (float) $price,
 
-                2
+                2
 
-            );
+            );
 
-    }
+    }
 
 }
 
@@ -614,29 +614,29 @@ if (!function_exists('getProductImage')) {
 
 
 
-    function getProductImage($image)
+    function getProductImage($image)
 
-    {
+    {
 
-        if (empty($image)) {
-
-
-
-            return BASE_URL .
-
-                'image/logo.jpg';
-
-        }
+        if (empty($image)) {
 
 
 
-        return BASE_URL .
+            return BASE_URL .
 
-            'uploads/products/' .
+                'image/logo.jpg';
 
-            basename($image);
+        }
 
-    }
+
+
+        return BASE_URL .
+
+            'uploads/products/' .
+
+            basename($image);
+
+    }
 
 }
 
@@ -660,29 +660,29 @@ if (!function_exists('getVendorImage')) {
 
 
 
-    function getVendorImage($image)
+    function getVendorImage($image)
 
-    {
+    {
 
-        if (empty($image)) {
-
-
-
-            return BASE_URL .
-
-                'image/logo.jpg';
-
-        }
+        if (empty($image)) {
 
 
 
-        return BASE_URL .
+            return BASE_URL .
 
-            'uploads/vendors/' .
+                'image/logo.jpg';
 
-            basename($image);
+        }
 
-    }
+
+
+        return BASE_URL .
+
+            'uploads/vendors/' .
+
+            basename($image);
+
+    }
 
 }
 
@@ -706,39 +706,39 @@ if (!function_exists('getStockStatus')) {
 
 
 
-    function getStockStatus($quantity)
+    function getStockStatus($quantity)
 
-    {
+    {
 
-        $quantity =
+        $quantity =
 
-            (int) $quantity;
-
-
-
-        if ($quantity <= 0) {
+            (int) $quantity;
 
 
 
-            return 'Out of Stock';
-
-        }
+        if ($quantity <= 0) {
 
 
 
-        if ($quantity <= 5) {
+            return 'Out of Stock';
+
+        }
 
 
 
-            return 'Low Stock';
-
-        }
+        if ($quantity <= 5) {
 
 
 
-        return 'In Stock';
+            return 'Low Stock';
 
-    }
+        }
+
+
+
+        return 'In Stock';
+
+    }
 
 }
 
@@ -762,77 +762,77 @@ if (!function_exists('updateProductStatus')) {
 
 
 
-    function updateProductStatus(
+    function updateProductStatus(
 
-        PDO $db,
+        PDO $db,
 
-        $productId
+        $productId
 
-    ) {
-
-
-
-        $product =
-
-            getProductById(
-
-                $db,
-
-                $productId
-
-            );
+    ) {
 
 
 
-        if (!$product) {
+        $product =
 
-            return false;
+            getProductById(
 
-        }
+                $db,
 
+                $productId
 
-
-        $quantity =
-
-            (int) $product['stock_quantity'];
+            );
 
 
 
-        $status =
+        if (!$product) {
 
-            $quantity <= 0
+            return false;
 
-                ? 'Out of Stock'
-
-                : 'Available';
+        }
 
 
 
-        $stmt = $db->prepare("
+        $quantity =
 
-            UPDATE products
-
-
-
-            SET status = ?
+            (int) $product['stock_quantity'];
 
 
 
-            WHERE product_id = ?
+        $status =
 
-        ");
+            $quantity <= 0
+
+                ? 'Out of Stock'
+
+                : 'Available';
 
 
 
-        return $stmt->execute([
+        $stmt = $db->prepare("
 
-            $status,
+            UPDATE products
 
-            (int) $productId
 
-        ]);
 
-    }
+            SET status = ?
+
+
+
+            WHERE product_id = ?
+
+        ");
+
+
+
+        return $stmt->execute([
+
+            $status,
+
+            (int) $productId
+
+        ]);
+
+    }
 
 }
 
@@ -856,65 +856,65 @@ if (!function_exists('getCartCount')) {
 
 
 
-    function getCartCount(
+    function getCartCount(
 
-        PDO $db,
+        PDO $db,
 
-        $userId
+        $userId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT
-
-                COALESCE(
-
-                    SUM(quantity),
-
-                    0
-
-                ) AS total
+    ) {
 
 
 
-            FROM cart
+        $stmt = $db->prepare("
+
+            SELECT
+
+                COALESCE(
+
+                    SUM(quantity),
+
+                    0
+
+                ) AS total
 
 
 
-            WHERE customer_id = ?
-
-        ");
+            FROM cart
 
 
 
-        $stmt->execute([
+            WHERE customer_id = ?
 
-            (int) $userId
-
-        ]);
+        ");
 
 
 
-        $row =
+        $stmt->execute([
 
-            $stmt->fetch(
+            (int) $userId
 
-                PDO::FETCH_ASSOC
-
-            );
+        ]);
 
 
 
-        return (int) (
+        $row =
 
-            $row['total'] ?? 0
+            $stmt->fetch(
 
-        );
+                PDO::FETCH_ASSOC
 
-    }
+            );
+
+
+
+        return (int) (
+
+            $row['total'] ?? 0
+
+        );
+
+    }
 
 }
 
@@ -938,59 +938,59 @@ if (!function_exists('getWishlistCount')) {
 
 
 
-    function getWishlistCount(
+    function getWishlistCount(
 
-        PDO $db,
+        PDO $db,
 
-        $userId
+        $userId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT
-
-                COUNT(*) AS total
+    ) {
 
 
 
-            FROM wishlist
+        $stmt = $db->prepare("
+
+            SELECT
+
+                COUNT(*) AS total
 
 
 
-            WHERE user_id = ?
-
-        ");
+            FROM wishlist
 
 
 
-        $stmt->execute([
+            WHERE user_id = ?
 
-            (int) $userId
-
-        ]);
+        ");
 
 
 
-        $row =
+        $stmt->execute([
 
-            $stmt->fetch(
+            (int) $userId
 
-                PDO::FETCH_ASSOC
-
-            );
+        ]);
 
 
 
-        return (int) (
+        $row =
 
-            $row['total'] ?? 0
+            $stmt->fetch(
 
-        );
+                PDO::FETCH_ASSOC
 
-    }
+            );
+
+
+
+        return (int) (
+
+            $row['total'] ?? 0
+
+        );
+
+    }
 
 }
 
@@ -1014,55 +1014,55 @@ if (!function_exists('isInWishlist')) {
 
 
 
-    function isInWishlist(
+    function isInWishlist(
 
-        PDO $db,
+        PDO $db,
 
-        $userId,
+        $userId,
 
-        $productId
+        $productId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT wishlist_id
+    ) {
 
 
 
-            FROM wishlist
+        $stmt = $db->prepare("
+
+            SELECT wishlist_id
 
 
 
-            WHERE user_id = ?
-
-            AND product_id = ?
+            FROM wishlist
 
 
 
-            LIMIT 1
+            WHERE user_id = ?
 
-        ");
-
-
-
-        $stmt->execute([
-
-            (int) $userId,
-
-            (int) $productId
-
-        ]);
+            AND product_id = ?
 
 
 
-        return (bool)
+            LIMIT 1
 
-            $stmt->fetchColumn();
+        ");
 
-    }
+
+
+        $stmt->execute([
+
+            (int) $userId,
+
+            (int) $productId
+
+        ]);
+
+
+
+        return (bool)
+
+            $stmt->fetchColumn();
+
+    }
 
 }
 
@@ -1086,55 +1086,55 @@ if (!function_exists('isInCart')) {
 
 
 
-    function isInCart(
+    function isInCart(
 
-        PDO $db,
+        PDO $db,
 
-        $userId,
+        $userId,
 
-        $productId
+        $productId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT cart_id
+    ) {
 
 
 
-            FROM cart
+        $stmt = $db->prepare("
+
+            SELECT cart_id
 
 
 
-            WHERE customer_id = ?
-
-            AND product_id = ?
+            FROM cart
 
 
 
-            LIMIT 1
+            WHERE customer_id = ?
 
-        ");
-
-
-
-        $stmt->execute([
-
-            (int) $userId,
-
-            (int) $productId
-
-        ]);
+            AND product_id = ?
 
 
 
-        return (bool)
+            LIMIT 1
 
-            $stmt->fetchColumn();
+        ");
 
-    }
+
+
+        $stmt->execute([
+
+            (int) $userId,
+
+            (int) $productId
+
+        ]);
+
+
+
+        return (bool)
+
+            $stmt->fetchColumn();
+
+    }
 
 }
 
@@ -1158,69 +1158,69 @@ if (!function_exists('getOrderById')) {
 
 
 
-    function getOrderById(
+    function getOrderById(
 
-        PDO $db,
+        PDO $db,
 
-        $orderId
+        $orderId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT
+    ) {
 
 
 
-                o.*,
+        $stmt = $db->prepare("
+
+            SELECT
 
 
 
-                u.name AS customer_name,
-
-                u.email AS customer_email,
-
-                u.phone AS customer_phone
+                o.*,
 
 
 
-            FROM orders o
+                u.name AS customer_name,
+
+                u.email AS customer_email,
+
+                u.phone AS customer_phone
 
 
 
-            INNER JOIN users u
-
-                ON o.customer_id = u.user_id
+            FROM orders o
 
 
 
-            WHERE o.order_id = ?
+            INNER JOIN users u
+
+                ON o.customer_id = u.user_id
 
 
 
-            LIMIT 1
-
-        ");
+            WHERE o.order_id = ?
 
 
 
-        $stmt->execute([
+            LIMIT 1
 
-            (int) $orderId
-
-        ]);
+        ");
 
 
 
-        return $stmt->fetch(
+        $stmt->execute([
 
-            PDO::FETCH_ASSOC
+            (int) $orderId
 
-        ) ?: null;
+        ]);
 
-    }
+
+
+        return $stmt->fetch(
+
+            PDO::FETCH_ASSOC
+
+        ) ?: null;
+
+    }
 
 }
 
@@ -1244,81 +1244,81 @@ if (!function_exists('getOrderDetails')) {
 
 
 
-    function getOrderDetails(
+    function getOrderDetails(
 
-        PDO $db,
+        PDO $db,
 
-        $orderId
+        $orderId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT
+    ) {
 
 
 
-                od.*,
+        $stmt = $db->prepare("
+
+            SELECT
 
 
 
-                p.product_name,
-
-                p.image,
-
-                p.vendor_id,
+                od.*,
 
 
 
-                v.business_name
+                p.product_name,
+
+                p.image,
+
+                p.vendor_id,
 
 
 
-            FROM order_details od
+                v.business_name
 
 
 
-            INNER JOIN products p
-
-                ON od.product_id = p.product_id
+            FROM order_details od
 
 
 
-            INNER JOIN vendors v
+            INNER JOIN products p
 
-                ON p.vendor_id = v.vendor_id
-
-
-
-            WHERE od.order_id = ?
+                ON od.product_id = p.product_id
 
 
 
-            ORDER BY
+            INNER JOIN vendors v
 
-                od.order_detail_id ASC
-
-        ");
+                ON p.vendor_id = v.vendor_id
 
 
 
-        $stmt->execute([
-
-            (int) $orderId
-
-        ]);
+            WHERE od.order_id = ?
 
 
 
-        return $stmt->fetchAll(
+            ORDER BY
 
-            PDO::FETCH_ASSOC
+                od.order_detail_id ASC
 
-        );
+        ");
 
-    }
+
+
+        $stmt->execute([
+
+            (int) $orderId
+
+        ]);
+
+
+
+        return $stmt->fetchAll(
+
+            PDO::FETCH_ASSOC
+
+        );
+
+    }
 
 }
 
@@ -1342,81 +1342,81 @@ if (!function_exists('getVendorOrders')) {
 
 
 
-    function getVendorOrders(
+    function getVendorOrders(
 
-        PDO $db,
+        PDO $db,
 
-        $vendorId
+        $vendorId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT
+    ) {
 
 
 
-                vo.*,
+        $stmt = $db->prepare("
+
+            SELECT
 
 
 
-                o.customer_id,
-
-                o.order_date,
-
-                o.order_status,
+                vo.*,
 
 
 
-                u.name AS customer_name
+                o.customer_id,
+
+                o.order_date,
+
+                o.order_status,
 
 
 
-            FROM vendor_orders vo
+                u.name AS customer_name
 
 
 
-            INNER JOIN orders o
-
-                ON vo.order_id = o.order_id
+            FROM vendor_orders vo
 
 
 
-            INNER JOIN users u
+            INNER JOIN orders o
 
-                ON o.customer_id = u.user_id
-
-
-
-            WHERE vo.vendor_id = ?
+                ON vo.order_id = o.order_id
 
 
 
-            ORDER BY
+            INNER JOIN users u
 
-                vo.created_at DESC
-
-        ");
+                ON o.customer_id = u.user_id
 
 
 
-        $stmt->execute([
-
-            (int) $vendorId
-
-        ]);
+            WHERE vo.vendor_id = ?
 
 
 
-        return $stmt->fetchAll(
+            ORDER BY
 
-            PDO::FETCH_ASSOC
+                vo.created_at DESC
 
-        );
+        ");
 
-    }
+
+
+        $stmt->execute([
+
+            (int) $vendorId
+
+        ]);
+
+
+
+        return $stmt->fetchAll(
+
+            PDO::FETCH_ASSOC
+
+        );
+
+    }
 
 }
 
@@ -1440,55 +1440,55 @@ if (!function_exists('getPaymentByOrder')) {
 
 
 
-    function getPaymentByOrder(
+    function getPaymentByOrder(
 
-        PDO $db,
+        PDO $db,
 
-        $orderId
+        $orderId
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            SELECT *
+    ) {
 
 
 
-            FROM payments
+        $stmt = $db->prepare("
+
+            SELECT *
 
 
 
-            WHERE order_id = ?
+            FROM payments
 
 
 
-            ORDER BY payment_id DESC
+            WHERE order_id = ?
 
 
 
-            LIMIT 1
-
-        ");
+            ORDER BY payment_id DESC
 
 
 
-        $stmt->execute([
+            LIMIT 1
 
-            (int) $orderId
-
-        ]);
+        ");
 
 
 
-        return $stmt->fetch(
+        $stmt->execute([
 
-            PDO::FETCH_ASSOC
+            (int) $orderId
 
-        ) ?: null;
+        ]);
 
-    }
+
+
+        return $stmt->fetch(
+
+            PDO::FETCH_ASSOC
+
+        ) ?: null;
+
+    }
 
 }
 
@@ -1512,91 +1512,91 @@ if (!function_exists('statusClass')) {
 
 
 
-    function statusClass($status)
+    function statusClass($status)
 
-    {
+    {
 
-        $status =
+        $status =
 
-            strtolower(
+            strtolower(
 
-                trim(
+                trim(
 
-                    (string) $status
+                    (string) $status
 
-                )
+                )
 
-            );
-
-
-
-        return match ($status) {
+            );
 
 
 
-            'active',
-
-            'approved',
-
-            'available',
-
-            'paid',
-
-            'completed',
-
-            'visible',
-
-            'ready',
-
-            'shipped',
-
-            'in stock'
-
-                => 'success',
+        return match ($status) {
 
 
 
-            'pending',
+            'active',
 
-            'processing',
+            'approved',
 
-            'low stock'
+            'available',
 
-                => 'warning',
+            'paid',
 
+            'completed',
 
+            'visible',
 
-            'rejected',
+            'ready',
 
-            'cancelled',
+            'shipped',
 
-            'failed',
+            'in stock'
 
-            'hidden',
-
-            'inactive',
-
-            'suspended',
-
-            'out of stock'
-
-                => 'danger',
+                => 'success',
 
 
 
-            'refunded'
+            'pending',
 
-                => 'info',
+            'processing',
+
+            'low stock'
+
+                => 'warning',
 
 
 
-            default
+            'rejected',
 
-                => 'default'
+            'cancelled',
 
-        };
+            'failed',
 
-    }
+            'hidden',
+
+            'inactive',
+
+            'suspended',
+
+            'out of stock'
+
+                => 'danger',
+
+
+
+            'refunded'
+
+                => 'info',
+
+
+
+            default
+
+                => 'default'
+
+        };
+
+    }
 
 }
 
@@ -1620,25 +1620,25 @@ if (!function_exists('calculateCommission')) {
 
 
 
-    function calculateCommission(
+    function calculateCommission(
 
-        $subtotal,
+        $subtotal,
 
-        $rate
+        $rate
 
-    ) {
+    ) {
 
 
 
-        return (
+        return (
 
-            (float) $subtotal *
+            (float) $subtotal *
 
-            ((float) $rate / 100)
+            ((float) $rate / 100)
 
-        );
+        );
 
-    }
+    }
 
 }
 
@@ -1662,63 +1662,63 @@ if (!function_exists('addAdminLog')) {
 
 
 
-    function addAdminLog(
+    function addAdminLog(
 
-        PDO $db,
+        PDO $db,
 
-        $adminId,
+        $adminId,
 
-        $action,
+        $action,
 
-        $targetType = null,
+        $targetType = null,
 
-        $targetId = null
+        $targetId = null
 
-    ) {
-
-
-
-        $stmt = $db->prepare("
-
-            INSERT INTO admin_logs
-
-            (
-
-                admin_id,
-
-                action,
-
-                target_type,
-
-                target_id
-
-            )
+    ) {
 
 
 
-            VALUES (?, ?, ?, ?)
+        $stmt = $db->prepare("
 
-        ");
+            INSERT INTO admin_logs
+
+            (
+
+                admin_id,
+
+                action,
+
+                target_type,
+
+                target_id
+
+            )
 
 
 
-        return $stmt->execute([
+            VALUES (?, ?, ?, ?)
 
-            (int) $adminId,
+        ");
 
-            $action,
 
-            $targetType,
 
-            $targetId !== null
+        return $stmt->execute([
 
-                ? (int) $targetId
+            (int) $adminId,
 
-                : null
+            $action,
 
-        ]);
+            $targetType,
 
-    }
+            $targetId !== null
+
+                ? (int) $targetId
+
+                : null
+
+        ]);
+
+    }
 
 }
 
@@ -1742,23 +1742,23 @@ if (!function_exists('post')) {
 
 
 
-    function post(
+    function post(
 
-        $key,
+        $key,
 
-        $default = ''
+        $default = ''
 
-    ) {
+    ) {
 
 
 
-        return isset($_POST[$key])
+        return isset($_POST[$key])
 
-            ? trim($_POST[$key])
+            ? trim($_POST[$key])
 
-            : $default;
+            : $default;
 
-    }
+    }
 
 }
 
@@ -1782,23 +1782,23 @@ if (!function_exists('get')) {
 
 
 
-    function get(
+    function get(
 
-        $key,
+        $key,
 
-        $default = ''
+        $default = ''
 
-    ) {
+    ) {
 
 
 
-        return isset($_GET[$key])
+        return isset($_GET[$key])
 
-            ? trim($_GET[$key])
+            ? trim($_GET[$key])
 
-            : $default;
+            : $default;
 
-    }
+    }
 
 }
 
@@ -1822,19 +1822,19 @@ if (!function_exists('isValidEmail')) {
 
 
 
-    function isValidEmail($email)
+    function isValidEmail($email)
 
-    {
+    {
 
-        return filter_var(
+        return filter_var(
 
-            $email,
+            $email,
 
-            FILTER_VALIDATE_EMAIL
+            FILTER_VALIDATE_EMAIL
 
-        ) !== false;
+        ) !== false;
 
-    }
+    }
 
 }
 
@@ -1858,57 +1858,57 @@ if (!function_exists('generateCode')) {
 
 
 
-    function generateCode(
+    function generateCode(
 
-        $length = 6
+        $length = 6
 
-    ) {
-
-
-
-        $characters =
-
-            '0123456789';
+    ) {
 
 
 
-        $code = '';
+        $characters =
+
+            '0123456789';
 
 
 
-        for (
-
-            $i = 0;
-
-            $i < $length;
-
-            $i++
-
-        ) {
+        $code = '';
 
 
 
-            $code .=
+        for (
 
-                $characters[
+            $i = 0;
 
-                    random_int(
+            $i < $length;
 
-                        0,
+            $i++
 
-                        strlen($characters) - 1
-
-                    )
-
-                ];
-
-        }
+        ) {
 
 
 
-        return $code;
+            $code .=
 
-    }
+                $characters[
+
+                    random_int(
+
+                        0,
+
+                        strlen($characters) - 1
+
+                    )
+
+                ];
+
+        }
+
+
+
+        return $code;
+
+    }
 
 }
 
@@ -1932,49 +1932,49 @@ if (!function_exists('getPaginationOffset')) {
 
 
 
-    function getPaginationOffset(
+    function getPaginationOffset(
 
-        $page,
+        $page,
 
-        $perPage
+        $perPage
 
-    ) {
-
-
-
-        $page =
-
-            max(
-
-                1,
-
-                (int) $page
-
-            );
+    ) {
 
 
 
-        $perPage =
+        $page =
 
-            max(
+            max(
 
-                1,
+                1,
 
-                (int) $perPage
+                (int) $page
 
-            );
+            );
 
 
 
-        return (
+        $perPage =
 
-            ($page - 1) *
+            max(
 
-            $perPage
+                1,
 
-        );
+                (int) $perPage
 
-    }
+            );
+
+
+
+        return (
+
+            ($page - 1) *
+
+            $perPage
+
+        );
+
+    }
 
 }
 
@@ -1998,37 +1998,37 @@ if (!function_exists('getTotalPages')) {
 
 
 
-    function getTotalPages(
+    function getTotalPages(
 
-        $totalRows,
+        $totalRows,
 
-        $perPage
+        $perPage
 
-    ) {
-
-
-
-        if ($perPage <= 0) {
-
-            return 1;
-
-        }
+    ) {
 
 
 
-        return max(
+        if ($perPage <= 0) {
 
-            1,
+            return 1;
 
-            (int) ceil(
+        }
 
-                $totalRows / $perPage
 
-            )
 
-        );
+        return max(
 
-    }
+            1,
+
+            (int) ceil(
+
+                $totalRows / $perPage
+
+            )
+
+        );
+
+    }
 
 }
 
@@ -2039,44 +2039,23 @@ if (!function_exists('getTotalPages')) {
 */
 
 if (!function_exists('generateCsrfToken')) {
-
     function generateCsrfToken(): string
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        if (
-            empty($_SESSION['csrf_token']) ||
-            !is_string($_SESSION['csrf_token'])
-        ) {
+        if (session_status() === PHP_SESSION_NONE) { session_start(); }
+        if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         }
-
         return $_SESSION['csrf_token'];
     }
 }
 
 if (!function_exists('validateCsrfToken')) {
-
     function validateCsrfToken($token): bool
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        if (
-            empty($_SESSION['csrf_token']) ||
-            !is_string($_SESSION['csrf_token']) ||
-            !is_string($token) ||
-            $token === ''
-        ) {
+        if (session_status() === PHP_SESSION_NONE) { session_start(); }
+        if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token']) || !is_string($token) || $token === '') {
             return false;
         }
-
-        return hash_equals(
-            $_SESSION['csrf_token'],
-            $token
-        );
+        return hash_equals($_SESSION['csrf_token'], $token);
     }
 }
